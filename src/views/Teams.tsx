@@ -1,17 +1,18 @@
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
-import { useData } from "../lib/data";
+import { api, useData } from "../lib/data";
 import { activeRoster, REGIONS, regionClass, teamOvr, teamTrend, useLabel } from "../lib/cards";
-import { strings, useT } from "../lib/i18n";
+import { strings, useLocale, useT } from "../lib/i18n";
 import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
-import type { Team } from "../lib/types";
+import type { EdlTeamSeries, Team } from "../lib/types";
 import { TrendBadge } from "../components/TrendBadge";
 import { Card } from "../components/Card";
 
 import { Icon } from "../components/Icon";
-import { easeOut, pageTitle, pill } from "../lib/ui";
+import { easeOut, pageTitle, pill, slugName } from "../lib/ui";
+import { EdlLogo } from "../components/EdlLogo";
 
 const S = strings({
   pt: {
@@ -19,18 +20,21 @@ const S = strings({
     desc: "OVR decrescente", asc: "OVR crescente", collapseAll: "Recolher todos", showAll: "Exibir todos",
     medium: "Cartas médias", large: "Cartas grandes", all: (n: number) => `Todas (${n})`, noTeams: "Nenhum time nesta região",
     count: (n: number) => `${n} ${n === 1 ? "jogador" : "jogadores"} no elenco oficial`, emptyRoster: "Nenhum jogador cadastrado neste elenco ainda.",
+    seriesTitle: "Séries no EDL", seriesHint: "Últimas séries do time no edl.gg", win: "Vitória", loss: "Derrota", vs: "contra", gameWon: "jogo ganho", gameLost: "jogo perdido",
   },
   en: {
     title: "Rosters & cards", hint: "Click a team to open its roster and a card to see its details",
     desc: "OVR descending", asc: "OVR ascending", collapseAll: "Collapse all", showAll: "Show all",
     medium: "Medium cards", large: "Large cards", all: (n: number) => `All (${n})`, noTeams: "No teams in this region",
     count: (n: number) => `${n} ${n === 1 ? "player" : "players"} on the official roster`, emptyRoster: "No players registered on this roster yet.",
+    seriesTitle: "Series on EDL", seriesHint: "Latest series for this team on edl.gg", win: "Win", loss: "Loss", vs: "against", gameWon: "game won", gameLost: "game lost",
   },
   es: {
     title: "Rosters y cartas", hint: "Haz clic en un equipo para abrir su roster y en una carta para ver los detalles",
     desc: "OVR descendente", asc: "OVR ascendente", collapseAll: "Contraer todos", showAll: "Mostrar todos",
     medium: "Cartas medianas", large: "Cartas grandes", all: (n: number) => `Todas (${n})`, noTeams: "Ningún equipo en esta región",
     count: (n: number) => `${n} ${n === 1 ? "jugador" : "jugadores"} en el roster oficial`, emptyRoster: "Aún no hay jugadores registrados en este roster.",
+    seriesTitle: "Series en EDL", seriesHint: "Últimas series del equipo en edl.gg", win: "Victoria", loss: "Derrota", vs: "contra", gameWon: "juego ganado", gameLost: "juego perdido",
   },
 });
 
@@ -130,6 +134,7 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
                       </motion.div>
                     ))}
                   </div>
+                  {team.edlSlug && <TeamSeries teamId={team.id} />}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -147,5 +152,49 @@ function TeamHeader({ team, open, onClick, children }: { team: Team; open: boole
       <TeamLogo3D team={team} className="size-[60px]" radius={14} tilt={{ rotateX, rotateY }} />
       {children}
     </motion.button>
+  );
+}
+
+const LAST_SERIES = 6;
+
+// Últimas séries do time no EDL; sem série (ou sem resposta) a seção some.
+function TeamSeries({ teamId }: { teamId: string }) {
+  const t = useT(S);
+  const locale = useLocale();
+  const [list, setList] = useState<EdlTeamSeries[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api.teamSeries(teamId).then((r) => alive && setList(r)).catch(() => alive && setList([]));
+    return () => { alive = false; };
+  }, [teamId]);
+  const recent = [...list].sort((a, b) => (b.startTime ?? 0) - (a.startTime ?? 0)).slice(0, LAST_SERIES);
+  if (!recent.length) return null;
+
+  return (
+    <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} aria-labelledby={`series-${teamId}`} className="mt-6 border-t border-zinc-200/15 pt-5">
+      <h3 id={`series-${teamId}`} className="font-display text-sm font-extrabold tracking-[0.14em] text-dl-text uppercase">{t.seriesTitle}</h3>
+      <p className="mt-0.5 text-xs text-zinc-400">{t.seriesHint}</p>
+      <ul className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2 lg:grid-cols-2">
+        {recent.map((s) => (
+          <li key={`${s.event}/${s.series}`} className="flex items-center gap-3 rounded-xl border border-zinc-200/10 bg-black/25 p-2.5 sm:p-3">
+            <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-extrabold ${s.won ? "bg-emerald-400/15 text-emerald-300" : "bg-red-400/15 text-red-300"}`}>
+              <span aria-hidden="true">{s.won ? "V" : "D"}</span>
+              <span className="sr-only">{s.won ? t.win : t.loss}</span>
+            </span>
+            <EdlLogo url={s.opponent.logoUrl} tag={s.opponent.tag} name={s.opponent.name} className="size-9" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-zinc-100"><span className="sr-only">{t.vs} </span>{s.opponent.name}{s.opponent.tag && <span className="font-normal text-zinc-400"> ({s.opponent.tag})</span>}</p>
+              <p className="truncate text-xs text-zinc-400">{slugName(s.event)}{s.startTime && ` · ${new Date(s.startTime * 1000).toLocaleDateString(locale, { day: "numeric", month: "short" }).replace(".", "")}`}</p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className={`font-display text-lg/none font-extrabold tabular-nums ${s.won ? "text-emerald-300" : "text-red-300"}`}>{s.score[0]}–{s.score[1]}</p>
+              <p className="mt-1 flex justify-end gap-0.5" aria-hidden="true">
+                {[...s.games].sort((a, b) => a.game - b.game).map((g) => <span key={g.matchId} title={g.won ? t.gameWon : t.gameLost} className={`h-1 w-3 rounded-full ${g.won ? "bg-emerald-400" : "bg-red-400/80"}`} />)}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </motion.section>
   );
 }

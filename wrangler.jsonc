@@ -23,7 +23,7 @@
     }
   ],
   "triggers": {
-    "crons": ["0 */6 * * *"]
+    "crons": ["0 */6 * * *", "*/10 6-8 * * *"]
   },
   "vars": {
     "DEADLOCK_API_BASE": "https://api.deadlock-api.com",

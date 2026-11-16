@@ -1,13 +1,16 @@
 import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, useData } from "../lib/data";
-import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, getPlayerHistory, getPlayerOvr } from "../lib/cards";
+import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, getPlayerHistory, getPlayerOvr, isMainCard } from "../lib/cards";
 import { FRAME_PRESETS, getCardTier, type Tier } from "../lib/rarity";
-import type { BgSettings, Player, Stats, Team, TierBand } from "../lib/types";
+import type { BackfillCandidate, BackfillResult, BgSettings, EdlImportResult, EdlMatch, EdlTeam, MatchLookup, MatchLookupPlayer, Player, Stats, SyncStatus, Team, TierBand } from "../lib/types";
 import { Card } from "../components/Card";
 import { TeamLogo } from "../components/TeamLogo";
 import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
+import { AUTOFOCUS, StepModal } from "../components/StepModal";
+import { EdlImportModal, EdlTeamBlock } from "../components/EdlTeam";
+import { danger, ghost, input, plural, primary, slugName } from "../lib/ui";
 
 const SECTIONS = [
   { id: "card", label: "Carta" },
@@ -15,14 +18,10 @@ const SECTIONS = [
   { id: "heroes", label: "Heróis" },
   { id: "look", label: "Aparência" },
   { id: "codes", label: "Códigos" },
+  { id: "sync", label: "Sync" },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
 
-const input = "w-full rounded-xl bg-zinc-950/80 border border-zinc-200/20 focus:border-zinc-200/70 px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none";
-const btn = "px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
-const primary = `${btn} bg-zinc-100 hover:bg-white text-zinc-950`;
-const ghost = `${btn} border border-zinc-200/20 text-zinc-300 hover:text-white bg-zinc-900/60`;
-const danger = `${btn} bg-red-600/90 hover:bg-red-500 text-white`;
 const today = () => new Date().toISOString().slice(0, 10);
 const newId = (p: string) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -104,6 +103,7 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
           {section === "heroes" && <HeroesForm />}
           {section === "look" && <LookForm />}
           {section === "codes" && <CodesForm />}
+          {section === "sync" && <SyncForm />}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -140,7 +140,7 @@ function PlayerForm({ editId, onEditId }: { editId: string | null; onEditId: (id
 
   const save = () => {
     const id = d.id || newId("p");
-    const body = { ...preview, id, name: d.name.trim() || "NOVO JOGADOR", footer: d.footer?.trim().slice(0, 30), specialText: d.special ? d.specialText?.trim().slice(0, 400) : undefined, frame: d.special ? frame : undefined };
+    const body = { ...preview, id, name: d.name.trim() || "NOVO JOGADOR", footer: d.footer?.trim().slice(0, 30), specialText: d.special ? d.specialText?.trim().slice(0, 400) : undefined, frame: d.special ? frame : undefined, ...(isMainCard(d) && { accountId: d.accountId ?? null }) };
     run(async () => { await api.save("players", id, body); onEditId(id); }, `Carta de "${body.name}" salva!`);
   };
   const remove = () => {
@@ -238,6 +238,8 @@ function PlayerForm({ editId, onEditId }: { editId: string | null; onEditId: (id
           )}
         </div>
 
+        <LinkProfile d={d} saved={existing?.accountId} onAccount={(accountId) => set({ accountId })} />
+
         <div className="space-y-3 rounded-2xl border border-amber-200/15 p-4">
           <label className="flex items-center gap-2 text-sm font-bold text-amber-200">
             <input type="checkbox" checked={!!d.special} onChange={(e) => set({ special: e.target.checked || undefined })} className="accent-amber-300" />
@@ -282,6 +284,401 @@ function PlayerForm({ editId, onEditId }: { editId: string | null; onEditId: (id
   );
 }
 
+// ID de partida: aceita o número puro ou um link que o contenha.
+const parseMatchId = (s: string) => Number(s.match(/\d{5,}/)?.[0]) || null;
+
+const shortDate = (unix: number) => new Date(unix * 1000).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "");
+
+// Partidas do EDL agrupadas por série; clicar num jogo entrega o ID da partida.
+function EdlPicker({ current, onPick }: { current: number | null; onPick: (matchId: number) => void }) {
+  const [list, setList] = useState<EdlMatch[] | null>(null);
+  const [state, setState] = useState<{ busy: "" | "load" | "refresh"; msg: string; ok: boolean }>({ busy: "load", msg: "", ok: true });
+  const [text, setText] = useState("");
+  const [event, setEvent] = useState("");
+
+  const load = async (msg?: string) => {
+    try {
+      const l = await api.edlMatches();
+      setList(l);
+      setState({ busy: "", msg: msg ?? "", ok: true });
+    } catch (e) {
+      setState({ busy: "", msg: `Erro: ${(e as Error).message}`, ok: false });
+    }
+  };
+  useEffect(() => { load(); }, []);
+
+  const refresh = async () => {
+    setState({ busy: "refresh", msg: "", ok: true });
+    try {
+      const { total } = await api.edlRefresh();
+      await load(`${total} partidas no EDL`);
+    } catch (e) {
+      setState({ busy: "", msg: `Erro: ${(e as Error).message}`, ok: false });
+    }
+  };
+
+  const events = [...new Set((list ?? []).map((m) => m.event))];
+  const q = text.trim().toLowerCase();
+  const series = new Map<string, EdlMatch[]>();
+  for (const m of list ?? []) {
+    if (event && m.event !== event) continue;
+    if (q && !`${m.teams ?? ""} ${slugName(m.event)}`.toLowerCase().includes(q)) continue;
+    series.set(`${m.event}/${m.series}`, [...(series.get(`${m.event}/${m.series}`) ?? []), m]);
+  }
+  const busy = state.busy !== "";
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <input {...AUTOFOCUS} type="search" className={`${input} min-w-48 flex-[2_1_12rem]`} aria-label="Buscar por time ou evento" placeholder="Buscar time ou evento" value={text} onChange={(e) => setText(e.target.value)} />
+        <select className={`${input} flex-[1_1_10rem]`} aria-label="Filtrar por evento" value={event} onChange={(e) => setEvent(e.target.value)}>
+          <option value="">Todos os eventos</option>
+          {events.map((ev) => <option key={ev} value={ev}>{slugName(ev)}</option>)}
+        </select>
+        <button type="button" className={`${ghost} min-h-11`} disabled={busy} onClick={refresh}>{state.busy === "refresh" ? "Atualizando…" : "Atualizar do EDL"}</button>
+      </div>
+
+      <p role="status" aria-live="polite" className={`text-xs ${state.busy ? "text-zinc-400" : state.ok ? "text-emerald-300" : "text-red-300"} ${state.busy || state.msg ? "" : "sr-only"}`}>
+        {state.busy === "load" ? "Carregando partidas…" : state.busy === "refresh" ? "Buscando no EDL, pode levar uns 15 segundos…" : state.msg}
+      </p>
+
+      <div className="space-y-2">
+        {list && !series.size && (
+          <p className="rounded-xl border border-dashed border-zinc-200/15 p-4 text-sm text-zinc-400">
+            {list.length ? "Nenhuma partida com esse filtro." : "Nenhuma partida carregada. Clique em Atualizar do EDL para buscar."}
+          </p>
+        )}
+        {[...series.values()].map((games) => {
+          const first = games[0];
+          const phase = slugName(first.series.replace(`-${first.event}`, ""));
+          const title = first.teams ?? phase;
+          return (
+            <section key={`${first.event}/${first.series}`} aria-label={title} className="rounded-xl border border-zinc-200/10 bg-zinc-900/40 p-3">
+              <h4 className="font-bold text-zinc-100">{title}</h4>
+              <p className="text-xs text-zinc-400">{slugName(first.event)}{first.teams && ` · ${phase}`}</p>
+              <ul className="mt-2 flex flex-wrap gap-1.5">
+                {[...games].sort((a, b) => (a.game ?? 0) - (b.game ?? 0)).map((m) => (
+                  <li key={m.matchId}>
+                    <button type="button" aria-pressed={m.matchId === current} onClick={() => onPick(m.matchId)} title={`ID ${m.matchId}`}
+                      className={`flex min-h-11 min-w-20 cursor-pointer flex-col items-center justify-center rounded-lg border px-3 text-sm font-semibold text-zinc-100 transition-colors hover:border-zinc-200/60 hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 ${m.matchId === current ? "border-white bg-zinc-800" : "border-zinc-200/15 bg-zinc-950/60"}`}>
+                      <span>{m.game ? `Jogo ${m.game}` : m.matchId}</span>
+                      {m.startTime && <span className="text-[11px] font-normal text-zinc-400 tabular-nums">{shortDate(m.startTime)}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PlayerLinkModal({ initial, current, onLink, onClose }: { initial: { matchId: number | null; lookup: MatchLookup | null }; current?: number; onLink: (pl: MatchLookupPlayer) => void; onClose: () => void }) {
+  const { heroById } = useData();
+  const [step, setStep] = useState(initial.lookup ? 1 : 0);
+  const [matchId, setMatchId] = useState(initial.matchId);
+  const [lookup, setLookup] = useState(initial.lookup);
+  const [picked, setPicked] = useState<MatchLookupPlayer | null>(initial.lookup?.players.find((p) => p.accountId === current) ?? null);
+  const [state, setState] = useState({ busy: false, msg: "" });
+
+  const advance = async () => {
+    if (step === 0) {
+      if (!matchId) return;
+      if (lookup?.matchId !== matchId) {
+        setState({ busy: true, msg: "" });
+        try {
+          const l = await api.matchLookup(matchId);
+          setLookup(l);
+          setPicked(l.players.find((p) => p.accountId === current) ?? null);
+        } catch (e) {
+          return setState({ busy: false, msg: `Erro: ${(e as Error).message}` });
+        }
+        setState({ busy: false, msg: "" });
+      }
+      return setStep(1);
+    }
+    if (step === 1) return picked && setStep(2);
+    if (picked) onLink(picked);
+  };
+  const hero = picked ? heroById(picked.heroId) : null;
+  const info = state.busy ? "Buscando a partida…" : state.msg ? <span className="text-red-300">{state.msg}</span>
+    : step === 0 ? (matchId ? `Partida ${matchId} escolhida.` : "Escolha um jogo.")
+    : step === 1 ? (picked ? `${picked.name ?? `ID ${picked.accountId}`} escolhido.` : "Clique no jogador que é ele.")
+    : "Só vale na carta depois de Salvar carta.";
+
+  return (
+    <StepModal title="Vincular perfil" steps={["Partida", "Jogador", "Confirmar"]} step={step} onStep={(i) => { if (i < step) { setState({ busy: false, msg: "" }); setStep(i); } }} onClose={onClose} info={info}
+      next={{ label: step === 2 ? "Vincular perfil" : "Avançar", onClick: advance, disabled: state.busy || (step === 0 && !matchId) || (step > 0 && !picked) }}>
+      {step === 0 && <EdlPicker current={matchId} onPick={(id) => { setMatchId(id); setState({ busy: false, msg: "" }); }} />}
+
+      {step === 1 && lookup && (
+        <>
+          <p className="text-sm text-zinc-400">Partida {lookup.matchId} · {Math.round(lookup.durationS / 60)} min. Clique em quem é o jogador desta carta.</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            {[0, 1].map((team) => (
+              <section key={team} aria-label={`Time ${team}`} className="space-y-1.5">
+                <h3 className="flex min-h-6 items-center justify-between text-[11px] font-bold tracking-[0.18em] text-zinc-300 uppercase">
+                  <span>Time {team}</span>
+                  {lookup.winningTeam === team && <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-amber-200">Vencedor</span>}
+                </h3>
+                <ul className="space-y-1.5">
+                  {lookup.players.filter((pl) => pl.team === team).map((pl) => {
+                    const h = heroById(pl.heroId);
+                    const on = pl.accountId === picked?.accountId;
+                    return (
+                      <li key={pl.accountId}>
+                        <button type="button" aria-pressed={on} onClick={() => setPicked(pl)} title={`ID ${pl.accountId}`}
+                          className={`flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-xl border bg-zinc-950/60 p-1.5 pr-3 text-left transition-colors hover:border-zinc-200/60 hover:bg-zinc-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 ${on ? "border-dl-text bg-zinc-900" : "border-zinc-200/10"}`}>
+                          {pl.avatar ? <img src={pl.avatar} alt="" loading="lazy" className="size-8 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="size-8 shrink-0 rounded-full bg-zinc-800" />}
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-100">{pl.name ?? `ID ${pl.accountId}`}</span>
+                          {h?.icon ? <img src={h.icon} alt={h.name} title={h.name} loading="lazy" className="size-8 shrink-0 rounded-lg object-cover" /> : <span className="shrink-0 text-xs text-zinc-500">{h?.name ?? `#${pl.heroId}`}</span>}
+                          <span className="w-16 shrink-0 text-right text-xs font-bold text-zinc-300 tabular-nums">{pl.kills}/{pl.deaths}/{pl.assists}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </>
+      )}
+
+      {step === 2 && picked && (
+        <>
+          <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-emerald-300/20 bg-emerald-300/5 p-4">
+            {picked.avatar ? <img src={picked.avatar} alt="" className="size-16 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="flex size-16 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xl text-zinc-400">?</span>}
+            <div className="min-w-40 flex-1">
+              <p className="truncate text-xl font-extrabold text-zinc-100">{picked.name ?? `ID ${picked.accountId}`}</p>
+              <p className="text-sm text-zinc-400 tabular-nums">ID {picked.accountId}</p>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-xl bg-zinc-950/60 p-2 pr-3">
+              {hero?.icon ? <img src={hero.icon} alt="" className="size-10 rounded-lg object-cover" /> : null}
+              <div className="text-sm">
+                <p className="font-semibold text-zinc-100">{hero?.name ?? `Herói #${picked.heroId}`}</p>
+                <p className="text-xs text-zinc-400 tabular-nums">{picked.kills}/{picked.deaths}/{picked.assists} na partida {lookup?.matchId}</p>
+              </div>
+            </div>
+          </div>
+          <p className="rounded-xl border border-amber-200/20 bg-amber-200/5 p-3 text-sm text-amber-100">
+            Vincular só marca este perfil no editor da carta. Depois, clique em <strong>Salvar carta</strong> para gravar.
+          </p>
+        </>
+      )}
+    </StepModal>
+  );
+}
+
+function BackfillModal({ player, accountId, nick, onClose }: { player: string; accountId: number; nick: string; onClose: () => void }) {
+  const { teams, reload } = useData();
+  const [list, setList] = useState<BackfillCandidate[] | null>(null);
+  const [err, setErr] = useState("");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [step, setStep] = useState(0);
+  const [applying, setApplying] = useState(false);
+  const [result, setResult] = useState<BackfillResult | null>(null);
+
+  const load = () => {
+    setErr("");
+    setList(null);
+    api.backfillCandidates(player).then(setList).catch((e: Error) => setErr(e.message));
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const blocked = (c: BackfillCandidate) => c.accountId !== undefined;
+  const free = (list ?? []).filter((c) => !blocked(c));
+  const chosen = free.filter((c) => picked.has(c.playerId));
+  const allOn = free.length > 0 && chosen.length === free.length;
+  const teamOf = (id: string) => teams.find((t) => t.id === id);
+  const nameOf = (id: string) => list?.find((c) => c.playerId === id)?.name ?? id;
+
+  const apply = async () => {
+    setApplying(true);
+    setErr("");
+    try {
+      const r = await api.backfillApply(player, chosen.map((c) => c.playerId));
+      await reload();
+      setResult(r);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const info = result ? "Concluído." : applying ? "Aplicando…" : !list ? (err ? "" : "Procurando cartas…") : plural(chosen.length, "carta marcada", "cartas marcadas");
+  const next = result ? { label: "Fechar", onClick: onClose }
+    : step === 0 ? { label: "Avançar", onClick: () => setStep(1), disabled: chosen.length === 0 }
+    : { label: applying ? "Aplicando…" : "Aplicar perfil", onClick: apply, disabled: applying || chosen.length === 0 };
+
+  return (
+    <StepModal title="Aplicar nas outras versões" steps={["Cartas encontradas", "Confirmar"]} step={result ? 1 : step} onStep={(i) => !result && !applying && i < step && setStep(i)} onClose={onClose} info={info} next={next} hideBack={!!result}>
+      {!list && !err && <p role="status" className="rounded-xl border border-zinc-200/10 bg-zinc-950/40 p-5 text-sm text-zinc-300">Procurando outras versões e cartas com o mesmo nome…</p>}
+      {err && !result && (
+        <div role="alert" className="space-y-3 rounded-xl border border-red-300/20 bg-red-400/5 p-4">
+          <p className="text-sm text-red-200">Erro: {err}</p>
+          {!list && <button type="button" className={`${ghost} min-h-11`} onClick={load}>Tentar de novo</button>}
+        </div>
+      )}
+
+      {list && !result && step === 0 && (
+        <>
+          <p className="text-sm text-zinc-400">Variações são cartas separadas e não herdam o perfil. Marque as que são do mesmo jogador; nada vem marcado.</p>
+          {list.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-zinc-200/15 p-4 text-sm text-zinc-400">Nenhuma outra carta com este nome ou ligada a esta como variação. Se a versão antiga tem outro nome, edite a carta e vincule o perfil nela.</p>
+          ) : (
+            <>
+              {free.length > 1 && <button type="button" className={`${ghost} min-h-11`} onClick={() => setPicked(allOn ? new Set() : new Set(free.map((c) => c.playerId)))}>{allOn ? "Desmarcar todas" : "Marcar todas"}</button>}
+              <ul className="space-y-2">
+                {list.map((c) => {
+                  const t = teamOf(c.teamId);
+                  const off = blocked(c);
+                  const body = (
+                    <>
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-bold text-zinc-100">{c.name}</span>
+                        {c.inactive && <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-[11px] font-bold text-amber-200">versão guardada</span>}
+                        <span className="text-xs text-zinc-500">{c.by === "variant" ? "variação desta carta" : "mesmo nome"}</span>
+                      </span>
+                      {t && <span className="mt-1 flex items-center gap-2 text-xs text-zinc-300"><span className="team-logo-frame size-6"><TeamLogo team={t} /></span>{t.name} ({t.tag})</span>}
+                      {off && <span className="mt-1 block text-xs text-amber-200/90">{c.accountId === accountId ? "Já tem este perfil." : `Vinculada a outro perfil: ID ${c.accountId}. Não dá para sobrescrever.`}</span>}
+                    </>
+                  );
+                  return (
+                    <li key={c.playerId}>
+                      {off ? (
+                        <div className="flex items-start gap-3 rounded-xl border border-zinc-200/10 bg-zinc-950/30 p-3 opacity-80"><span aria-hidden="true" className="mt-2 ml-1.5 size-2 shrink-0 rounded-full bg-zinc-600" /><span className="min-w-0 flex-1">{body}</span></div>
+                      ) : (
+                        <label className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-100 ${picked.has(c.playerId) ? "border-dl-text/60 bg-zinc-900" : "border-zinc-200/10 bg-zinc-950/50 hover:border-zinc-200/30"}`}>
+                          <input type="checkbox" checked={picked.has(c.playerId)} onChange={(e) => setPicked((s) => { const n = new Set(s); if (e.target.checked) n.add(c.playerId); else n.delete(c.playerId); return n; })} className="mt-0.5 size-5 shrink-0 cursor-pointer accent-dl-text" />
+                          <span className="min-w-0 flex-1">{body}</span>
+                        </label>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </>
+      )}
+
+      {list && !result && step === 1 && (
+        <>
+          <p className="text-base text-zinc-200">Aplicar o perfil <strong className="text-dl-text">{nick}</strong> <span className="text-zinc-400 tabular-nums">(ID {accountId})</span> em {plural(chosen.length, "carta", "cartas")}:</p>
+          <ul className="list-inside list-disc space-y-1 rounded-xl border border-zinc-200/10 bg-zinc-950/40 p-4 text-sm text-zinc-200">
+            {chosen.map((c) => <li key={c.playerId}>{c.name}{c.inactive && <span className="text-zinc-400"> (versão guardada)</span>}{teamOf(c.teamId) && <span className="text-zinc-400"> · {teamOf(c.teamId)!.tag}</span>}</li>)}
+          </ul>
+          <p className="rounded-xl border border-amber-200/20 bg-amber-200/5 p-3 text-sm text-amber-100">Grava direto nessas cartas, sem passar por Salvar carta.</p>
+        </>
+      )}
+
+      {result && (
+        <>
+          <div className="rounded-xl border border-emerald-300/20 bg-emerald-300/5 p-4 text-sm text-emerald-100">
+            <p className="font-bold">{plural(result.updated.length, "carta atualizada", "cartas atualizadas")}</p>
+            {result.updated.length > 0 && <p className="mt-1 text-emerald-100/90">{result.updated.map(nameOf).join(", ")}</p>}
+          </div>
+          {result.skipped.length > 0 && (
+            <div role="alert" className="rounded-xl border border-amber-200/20 bg-amber-200/5 p-4 text-sm text-amber-100">
+              <p className="font-bold">{plural(result.skipped.length, "carta pulada", "cartas puladas")}</p>
+              <ul className="mt-1.5 space-y-0.5">{result.skipped.map((s) => <li key={s.item}><strong>{nameOf(s.item)}</strong>: {s.reason}</li>)}</ul>
+            </div>
+          )}
+        </>
+      )}
+    </StepModal>
+  );
+}
+
+function LinkProfile({ d, saved, onAccount }: { d: Player; saved?: number; onAccount: (id: number | undefined) => void }) {
+  const [query, setQuery] = useState("");
+  const [modal, setModal] = useState<{ matchId: number | null; lookup: MatchLookup | null } | null>(null);
+  const [backfill, setBackfill] = useState(false);
+  const [picked, setPicked] = useState<MatchLookupPlayer | null>(null);
+  const [state, setState] = useState<{ busy: "" | "lookup" | "sync"; msg: string; ok: boolean }>({ busy: "", msg: "", ok: true });
+  const matchId = parseMatchId(query);
+  const linked = picked && picked.accountId === d.accountId ? picked : null;
+
+  if (!isMainCard(d)) {
+    return (
+      <div className="rounded-2xl border border-zinc-200/10 p-4">
+        <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Vincular perfil</span>
+        <p className="mt-1.5 text-sm text-zinc-400">Herda o perfil da carta base.</p>
+      </div>
+    );
+  }
+
+  // Busca direta por ID: a partida já abre na etapa do jogador.
+  const search = async () => {
+    if (!matchId) return setState({ busy: "", msg: "Informe o ID da partida (ou cole o link).", ok: false });
+    setState({ busy: "lookup", msg: "", ok: true });
+    try {
+      const lookup = await api.matchLookup(matchId);
+      setState({ busy: "", msg: "", ok: true });
+      setModal({ matchId, lookup });
+    } catch (e) {
+      setState({ busy: "", msg: `Erro: ${(e as Error).message}`, ok: false });
+    }
+  };
+  const unlink = () => { setPicked(null); onAccount(undefined); setState({ busy: "", msg: "", ok: true }); };
+  const sync = async () => {
+    setState({ busy: "sync", msg: "", ok: true });
+    try {
+      const { added } = await api.syncMatches(d.id);
+      setState({ busy: "", msg: added ? `${added} partida${added > 1 ? "s" : ""} nova${added > 1 ? "s" : ""}.` : "Nenhuma partida nova.", ok: true });
+    } catch (e) {
+      setState({ busy: "", msg: `Erro: ${(e as Error).message}`, ok: false });
+    }
+  };
+
+  const searching = state.busy === "lookup";
+  return (
+    <div className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
+      <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Vincular perfil</span>
+
+      {d.accountId !== undefined && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-300/20 bg-emerald-300/5 p-3">
+          {linked?.avatar ? <img src={linked.avatar} alt="" className="size-10 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-zinc-400">?</span>}
+          <div className="min-w-40 flex-1">
+            <p className="truncate font-bold text-zinc-100">{linked?.name ?? "Perfil vinculado"}</p>
+            <p className="text-xs text-zinc-400 tabular-nums">ID {d.accountId}{d.accountId !== saved && " · salve a carta para confirmar"}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={ghost} onClick={() => setModal({ matchId: null, lookup: null })}>Trocar</button>
+            <button type="button" className={ghost} onClick={unlink}>Desvincular</button>
+            {d.id && d.accountId === saved && <button type="button" className={ghost} aria-haspopup="dialog" onClick={() => setBackfill(true)}>Aplicar nas outras versões</button>}
+            <button type="button" className={ghost} disabled={state.busy === "sync" || !d.id || d.accountId !== saved} onClick={sync} title={d.id && d.accountId === saved ? undefined : "Salve a carta com este perfil antes de sincronizar"}>
+              {state.busy === "sync" ? "Sincronizando…" : "Sincronizar partidas"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-48 flex-1">
+          <Field label="ID da partida">
+            <input id="match-id" className={input} inputMode="numeric" value={query} placeholder="Ex.: 12345678 ou link da partida" onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), search())} />
+          </Field>
+        </div>
+        <button type="button" id="edl-toggle" className={`${ghost} min-h-11`} aria-haspopup="dialog" onClick={() => setModal({ matchId, lookup: null })}>Escolher do EDL</button>
+        <button type="button" className={`${primary} min-h-11`} disabled={searching || !query.trim()} onClick={search}>{searching ? "Buscando…" : "Buscar"}</button>
+      </div>
+      <p className="text-xs text-zinc-500">Cole o ID de uma partida do jogador ou escolha uma do EDL, depois marque quem é ele entre os 12 participantes.</p>
+
+      <p role="status" aria-live="polite" className={`text-sm ${state.msg ? (state.ok ? "text-emerald-300" : "text-red-300") : "sr-only"}`}>{state.msg}</p>
+
+      {backfill && d.accountId !== undefined && <BackfillModal player={d.id} accountId={d.accountId} nick={linked?.name ?? `ID ${d.accountId}`} onClose={() => setBackfill(false)} />}
+      {modal && (
+        <PlayerLinkModal initial={modal} current={d.accountId} onClose={() => setModal(null)}
+          onLink={(pl) => { setPicked(pl); onAccount(pl.accountId); setModal(null); }} />
+      )}
+    </div>
+  );
+}
+
 function TierPulse({ tier, children }: { tier: Tier; children: ReactNode }) {
   const [scope, animate] = useAnimate<HTMLDivElement>();
   const id = `${tier.key}:${tier.frame ?? ""}`;
@@ -309,14 +706,46 @@ function TeamsForm() {
   const save = () => {
     if (!d || !d.name.trim() || !d.tag.trim()) return;
     const id = d.id || newId("t");
-    run(async () => { await api.save("teams", id, { ...d, id, name: d.name.trim(), tag: d.tag.trim().toUpperCase().slice(0, 6) }); setD(null); }, `Time "${d.name}" salvo!`);
+    const t = { ...d, id, name: d.name.trim(), tag: d.tag.trim().toUpperCase().slice(0, 6) };
+    const pull = !d.id && !!d.edlSlug;
+    // edlSlug null desliga; ausente manteria o vínculo antigo.
+    run(async () => {
+      await api.save("teams", id, { ...t, edlSlug: d.edlSlug ?? null });
+      // Time novo ligado ao EDL abre a importação já com o time criado; os demais seguem abertos para editar.
+      setD(d.id || pull ? t : null);
+      if (pull) setImporting(t);
+    }, `Time "${t.name}" salvo!`);
   };
+  const [importing, setImporting] = useState<Team | null>(null);
+  // Anti-duplicação: o servidor recusa slug repetido (409); nome/tag iguais só pedem confirmação.
+  const [okKey, setOkKey] = useState("");
+  const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+  const dups = !d ? [] : teams.filter((t) => t.id !== d.id).flatMap((t) => {
+    const slug = !!d.edlSlug && t.edlSlug === d.edlSlug;
+    const why = [slug && "já está ligado a este time do EDL", !!squash(d.name) && squash(t.name) === squash(d.name) && "mesmo nome", !!squash(d.tag) && squash(t.tag) === squash(d.tag) && "mesma tag"].filter(Boolean);
+    return why.length ? [{ t, slug, why: why.join(" · ") }] : [];
+  });
+  const dupKey = dups.map((x) => x.t.id).join();
+  const blocked = dups.some((x) => x.slug);
+  const needsOk = !blocked && dups.length > 0 && okKey !== dupKey;
+  // Depois de importar, o formulário aberto recebe os campos aplicados sem perder o resto da edição.
+  const [applied, setApplied] = useState<EdlImportResult["applied"]["fields"]>([]);
+  const imported = (r: EdlImportResult) => setApplied(r.applied.fields);
+  useEffect(() => {
+    if (!applied.length) return;
+    const fresh = teams.find((t) => t.id === d?.id);
+    if (fresh) setD((t) => t && { ...t, ...Object.fromEntries(applied.map((f) => (f === "logo" ? ["logo", fresh.logo] : [f, fresh[f]]))) });
+    setApplied([]);
+  }, [applied, teams]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Time novo: escolher no EDL preenche nome, tag e região (a logo vem na importação, que grava no R2).
+  const onSlug = (edlSlug?: string, t?: EdlTeam) => set({ edlSlug, ...(t && !d?.id && { name: t.name.slice(0, 40), tag: (t.tag ?? d?.tag ?? "").slice(0, 6), region: t.region && REGIONS.includes(t.region) ? t.region : d?.region }) });
+  const edlBlock = d && <EdlTeamBlock team={d} savedSlug={teams.find((t) => t.id === d.id)?.edlSlug} onSlug={onSlug} onImported={imported} />;
   const remove = (t: Team) => {
     run(() => api.remove("teams", t.id), "Time excluído.");
   };
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
       <div className="noir-glass space-y-2 rounded-3xl p-5">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Times ({teams.length})</h2>
@@ -324,7 +753,7 @@ function TeamsForm() {
         </div>
         {teams.map((t) => (
           <motion.div layout key={t.id} className="flex items-center gap-3 rounded-xl border border-zinc-200/10 bg-zinc-950/50 p-2.5">
-            <div className="size-10 shrink-0"><TeamLogo team={t} /></div>
+            <div className="team-logo-frame size-10"><TeamLogo team={t} /></div>
             <div className="min-w-0 flex-1">
               <p className="truncate font-bold text-zinc-100">{t.name} <span className="text-zinc-400">({t.tag})</span></p>
               <p className="text-xs text-zinc-400">{t.region} · {players.filter((p) => p.teamId === t.id).length} cartas</p>
@@ -339,6 +768,7 @@ function TeamsForm() {
         {d && (
           <motion.div key={d.id || "new"} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="noir-glass space-y-4 rounded-3xl p-5">
             <h3 className="text-lg font-black tracking-[0.12em] text-white uppercase">{d.id ? `Editar ${d.name}` : "Novo time"}</h3>
+            {!d.id && edlBlock}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Nome"><input className={input} value={d.name} maxLength={40} onChange={(e) => set({ name: e.target.value })} /></Field>
               <Field label="Tag"><input className={input} value={d.tag} maxLength={6} onChange={(e) => set({ tag: e.target.value })} /></Field>
@@ -348,20 +778,44 @@ function TeamsForm() {
                 </select>
               </Field>
               <div className="flex items-end gap-3">
-                {d.logo && <div className="size-12"><TeamLogo team={d} /></div>}
+                {d.logo && <div className="team-logo-frame size-12"><TeamLogo team={d} /></div>}
                 <ImagePick folder="teams" label="Logo" onUrl={(logo) => set({ logo })} />
                 {d.logo && <button type="button" className={ghost} onClick={() => set({ logo: undefined })}>Remover</button>}
               </div>
             </div>
+            {d.id && edlBlock}
             <BgFields bg={d.bg} onChange={(bg) => set({ bg })} folder="teams" title="Fundo do time" />
+            <AnimatePresence initial={false}>
+              {dups.length > 0 && (
+                <motion.div key={dupKey} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} role="alert" className="space-y-3 rounded-2xl border border-amber-200/25 bg-amber-200/5 p-4">
+                  <p className="text-sm font-bold text-amber-100">{blocked ? "Este time do EDL já está cadastrado." : "Já existe um time parecido."}</p>
+                  <ul className="space-y-2">
+                    {dups.map(({ t, why }) => (
+                      <li key={t.id} className="flex flex-wrap items-center gap-3">
+                        <div className="team-logo-frame size-10"><TeamLogo team={t} /></div>
+                        <p className="min-w-40 flex-1 text-sm text-amber-100/90"><strong className="text-zinc-100">{t.name}</strong> ({t.tag}): {why}.</p>
+                        <button type="button" className={`${ghost} min-h-11`} onClick={() => setD(structuredClone(t))}>Editar {t.name}</button>
+                      </li>
+                    ))}
+                  </ul>
+                  {blocked ? <p className="text-xs text-amber-100/80">Salvar está desabilitado: edite o time existente em vez de criar outro.</p> : (
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-zinc-100 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-100">
+                      <input type="checkbox" className="size-5 shrink-0 cursor-pointer accent-dl-text" checked={okKey === dupKey} onChange={(e) => setOkKey(e.target.checked ? dupKey : "")} />
+                      {d.id ? "Salvar mesmo assim" : "Criar mesmo assim"}
+                    </label>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" className={primary} disabled={busy || !d.name.trim() || !d.tag.trim()} onClick={save}>{busy ? "Salvando…" : "Salvar time"}</button>
+              <button type="button" className={primary} disabled={busy || !d.name.trim() || !d.tag.trim() || blocked || needsOk} onClick={save}>{busy ? "Salvando…" : "Salvar time"}</button>
               <button type="button" className={ghost} onClick={() => setD(null)}>Cancelar</button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
       <div className="lg:col-span-2"><Toast msg={msg} /></div>
+      {importing && <EdlImportModal team={importing} onClose={() => setImporting(null)} onApplied={imported} />}
     </div>
   );
 }
@@ -453,7 +907,7 @@ function LookForm() {
   const setTier = (i: number, patch: Partial<TierBand>) => setTiers((t) => t.map((x, j) => (j === i ? { ...x, ...patch } : x)));
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
       <div className="noir-glass space-y-5 rounded-3xl p-5">
         <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Fundo e capa</h2>
         <BgFields bg={bg} onChange={setBg} folder="bg" title="Fundo do site" />
@@ -632,6 +1086,119 @@ function CodesForm() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// Entre lotes seguidos: a rota de metadata em lote da deadlock-api aceita 30 req/min por IP, então no máximo ~24 por minuto.
+const RUN_GAP_MS = 2500;
+const STUCK_RUNS = 3;
+const ROUTE_NAMES: Record<string, string> = {
+  "/v1/matches/metadata": "metadata de partidas (deadlock-api)",
+  "edl.gg": "edl.gg",
+};
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const fmtTime = (ts: number) => new Date(ts * 1000).toLocaleTimeString("pt-BR", { timeStyle: "short" });
+
+function SyncForm() {
+  const [status, setStatus] = useState<SyncStatus | null>(null);
+  const [state, setState] = useState<{ busy: "" | "load" | "one" | "all"; msg: string; ok: boolean }>({ busy: "load", msg: "", ok: true });
+  const [progress, setProgress] = useState<{ run: number; total: number } | null>(null);
+  const stop = useRef(false);
+
+  useEffect(() => {
+    api.syncStatus().then((s) => { setStatus(s); setState({ busy: "", msg: "", ok: true }); }).catch((e: Error) => setState({ busy: "", msg: `Erro: ${e.message}`, ok: false }));
+    return () => { stop.current = true; };
+  }, []);
+
+  const left = (s: SyncStatus) => s.staleAccounts + s.pendingEdlMatches;
+  const summary = (s: SyncStatus) => `${plural(s.staleAccounts, "conta atrasada", "contas atrasadas")} e ${plural(s.pendingEdlMatches, "partida do EDL pendente", "partidas do EDL pendentes")}`;
+  const pausedText = (s: SyncStatus) => s.paused.map((p) => `${ROUTE_NAMES[p.route] ?? p.route} até ${fmtTime(p.until)}`).join("; ");
+
+  const one = async () => {
+    stop.current = false;
+    setState({ busy: "one", msg: "", ok: true });
+    try {
+      const { status: s, done } = await api.syncRun();
+      setStatus(s);
+      setState({ busy: "", msg: s.paused.length ? `Rota em pausa: ${pausedText(s)}` : done ? "Tudo em dia" : `Lote concluído: ${summary(s)}`, ok: !s.paused.length });
+    } catch (e) {
+      setState({ busy: "", msg: `Erro: ${(e as Error).message}`, ok: false });
+    }
+  };
+
+  // Cada chamada é uma execução separada do Worker (limite de subrequests por execução); para sozinho se uma rota entrar em pausa ou nada mais andar.
+  const all = async () => {
+    stop.current = false;
+    const total = status ? left(status) : 0;
+    let same = 0, prev = "";
+    for (let run = 1; ; run++) {
+      setState({ busy: "all", msg: `Rodando o lote ${run}…`, ok: true });
+      setProgress({ run, total });
+      try {
+        const { status: s, done } = await api.syncRun();
+        setStatus(s);
+        const sig = `${s.staleAccounts}/${s.pendingEdlMatches}/${s.scannedEvents}`;
+        same = sig === prev ? same + 1 : 0;
+        prev = sig;
+        const end = done ? "Tudo em dia" : s.paused.length ? `Parou: rota em pausa, ${pausedText(s)}` : stop.current ? `Parado: ${summary(s)}` : same >= STUCK_RUNS ? `Parou sem progresso: ${summary(s)}` : "";
+        if (end) return setState({ busy: "", msg: end, ok: done || stop.current });
+      } catch (e) {
+        return setState({ busy: "", msg: `Erro no lote ${run}: ${(e as Error).message}`, ok: false });
+      }
+      await wait(RUN_GAP_MS);
+      if (stop.current) return setState({ busy: "", msg: "Parado", ok: true });
+    }
+  };
+
+  const busy = state.busy !== "";
+  const pct = progress && status && progress.total ? Math.min(100, Math.round(((progress.total - left(status)) / progress.total) * 100)) : 0;
+  const stat = (label: string, value: string) => (
+    <div className="rounded-2xl border border-zinc-200/10 bg-zinc-900/60 px-4 py-3">
+      <dt className="text-[11px] font-bold tracking-wider text-zinc-400 uppercase">{label}</dt>
+      <dd className="mt-1 text-base font-extrabold text-zinc-100 sm:text-lg">{value}</dd>
+    </div>
+  );
+
+  return (
+    <div className="noir-glass space-y-6 rounded-3xl p-5 sm:p-7">
+      <div>
+        <h2 className="text-lg font-extrabold tracking-[0.12em] text-zinc-100 uppercase">Sincronização</h2>
+        <p className="mt-1 text-xs text-zinc-400">Roda sozinho toda madrugada (3h–6h de Brasília), em lotes pequenos para respeitar os limites da deadlock-api e do edl.gg. Use os botões para adiantar.</p>
+      </div>
+
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stat("Última execução", status ? (status.lastRunAt ? fmtTs(status.lastRunAt) : "nunca") : "…")}
+        {stat("Contas atrasadas", status ? `${status.staleAccounts} de ${status.accounts}` : "…")}
+        {stat("Partidas do EDL pendentes", status ? String(status.pendingEdlMatches) : "…")}
+        {stat("Eventos do EDL varridos", status ? String(status.scannedEvents) : "…")}
+      </dl>
+
+      {status && status.paused.length > 0 && (
+        <p className="rounded-2xl border border-amber-300/30 bg-amber-950/30 px-4 py-3 text-xs text-amber-200">
+          Rota em pausa por limite de requisições: {pausedText(status)}. Os próximos lotes pulam essa rota até lá.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className={`${ghost} min-h-11`} disabled={busy || !status} onClick={one}>{state.busy === "one" ? "Rodando…" : "Rodar um lote"}</button>
+        {state.busy === "all"
+          ? <button type="button" className={`${danger} min-h-11`} onClick={() => { stop.current = true; setState((s) => ({ ...s, msg: "Parando depois do lote atual…" })); }}>Parar</button>
+          : <button type="button" className={`${primary} min-h-11`} disabled={busy || !status} onClick={all}>Atualizar tudo</button>}
+      </div>
+
+      {state.busy === "all" && progress && (
+        <div className="space-y-1.5">
+          <div role="progressbar" aria-label="Progresso da atualização" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className="h-2 overflow-hidden rounded-full bg-zinc-800">
+            <motion.div className="h-full rounded-full bg-zinc-100" initial={false} animate={{ width: `${pct}%` }} transition={{ duration: 0.25 }} />
+          </div>
+          <p className="text-xs text-zinc-400">Lote {progress.run}{status ? ` · ${summary(status)}` : ""}</p>
+        </div>
+      )}
+
+      <p role="status" aria-live="polite" className={`text-sm ${state.busy ? "text-zinc-400" : state.ok ? "text-emerald-300" : "text-red-300"} ${state.msg || state.busy ? "" : "sr-only"}`}>
+        {state.busy === "load" ? "Carregando…" : state.msg}
+      </p>
     </div>
   );
 }
