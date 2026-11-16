@@ -1,13 +1,13 @@
 // Regras e configuração do Cardslock Game: catálogo de habilidades e locais, carta padrão de cada jogador
 // e validação da configuração que o admin salva no editor. Sem dependências do front: o worker importa este arquivo.
 
-export const LOC_TYPES = ["none", "enter", "costLow", "costHigh", "slots", "endturn", "midboss", "urn", "loot", "zipline", "shrine", "patron", "ritual", "chaos"] as const;
+export const LOC_TYPES = ["none", "enter", "costLow", "costHigh", "slots", "endturn", "midboss", "urn", "loot", "zipline", "shrine", "patron", "ritual", "chaos", "shop"] as const;
 export type LocType = (typeof LOC_TYPES)[number];
 
 /** Campos que cada efeito de local usa: v = valor, n = número (custo, turno, espaços…). */
 export const LOC_FIELDS: Record<LocType, ("v" | "n")[]> = {
   none: [], enter: ["v"], costLow: ["v", "n"], costHigh: ["v", "n"], slots: ["n"], endturn: ["v"], midboss: ["v", "n"],
-  urn: ["v"], loot: ["v"], zipline: [], shrine: [], patron: [], ritual: [], chaos: ["n"],
+  urn: ["v"], loot: ["v"], zipline: [], shrine: [], patron: [], ritual: [], chaos: ["n"], shop: ["v"],
 };
 export const LOC_N_RANGE: Partial<Record<LocType, [number, number]>> = { slots: [1, 4], costLow: [0, 6], costHigh: [0, 6], midboss: [1, 6], chaos: [1, 15] };
 export const LOC_V_RANGE: [number, number] = [-10, 10];
@@ -28,6 +28,7 @@ export const DEFAULT_LOCS: GameLoc[] = [
   { id: "l10", name: "Maelstrom", type: "chaos", v: 0, n: 8 },
   { id: "l11", name: "Estação de Metrô", type: "slots", v: 0, n: 3 },
   { id: "l12", name: "Loja de Curiosidades", type: "enter", v: 1, n: 1 },
+  { id: "l13", name: "Loja Secreta", type: "shop", v: 1, n: 1 },
 ].map((l) => ({ ...l, type: l.type as LocType, desc: "" }));
 
 /** Momento da habilidade: r = ao revelar, c = contínuo, f = fim do turno, x = especial, - = nenhum. */
@@ -61,7 +62,59 @@ export const ability = (k: AbilityKey): AbilityDef => ABILITIES[k];
 export const ROLE_ABILITY: Record<string, AbilityKey> = { Carry: "self", OffCarry: "hit", Frontline: "aura", Suporte: "team", Flex: "draw" };
 
 export type CardOverride = { ab?: AbilityKey; cost?: number; power?: number; v?: number; desc?: string };
-export type GameConfig = { locs: GameLoc[]; cards: Record<string, CardOverride> };
+export type ItemOverride = { off?: boolean; v?: number };
+export type GameConfig = { locs: GameLoc[]; cards: Record<string, CardOverride>; items: Record<string, ItemOverride> };
+
+/* ---------- itens da loja ---------- */
+
+/** Turno em que cada lado escolhe 1 de 3 itens, e turno em que os itens são revelados e pagos. */
+export const ITEM_OFFER_TURN = 5;
+export const ITEM_REVEAL_TURN = 6;
+export const ITEM_TIERS = [1, 2, 3, 4] as const;
+export type ItemTier = (typeof ITEM_TIERS)[number];
+export type ItemSlot = "weapon" | "vitality" | "spirit";
+/** Custo em almas no turno da revelação: tier 1..4 = 1..4 almas (800/1600/3200/6400 no jogo). */
+export const itemCost = (tier: ItemTier) => tier;
+type ItemDef = { tier: ItemTier; slot: ItemSlot; v: number; usesV: boolean };
+const I = (tier: ItemTier, slot: ItemSlot, v: number, usesV = true): ItemDef => ({ tier, slot, v, usesV });
+
+/** Chave = nome do item no Deadlock (inglês, igual à API), com o tier real do jogo. 2 de cada categoria por tier. */
+export const ITEMS = {
+  "High-Velocity Rounds": I(1, "weapon", 3), "Close Quarters": I(1, "weapon", 3),
+  "Extra Health": I(1, "vitality", 1), "Healing Rite": I(1, "vitality", 2),
+  "Extra Spirit": I(1, "spirit", 1), "Golden Goose Egg": I(1, "spirit", 1),
+  "Swift Striker": I(2, "weapon", 3), "Long Range": I(2, "weapon", 9),
+  "Battle Vest": I(2, "vitality", 4), "Healing Booster": I(2, "vitality", 3),
+  "Arcane Surge": I(2, "spirit", 8), "Slowing Hex": I(2, "spirit", 7),
+  "Toxic Bullets": I(3, "weapon", 2), "Sharpshooter": I(3, "weapon", 10),
+  "Metal Skin": I(3, "vitality", 3), "Rescue Beam": I(3, "vitality", 7),
+  "Surge of Power": I(3, "spirit", 5), "Superior Cooldown": I(3, "spirit", 2),
+  "Glass Cannon": I(4, "weapon", 10), "Ricochet": I(4, "weapon", 7),
+  "Colossus": I(4, "vitality", 10), "Unstoppable": I(4, "vitality", 4),
+  "Echo Shard": I(4, "spirit", 6), "Refresher": I(4, "spirit", 3),
+} satisfies Record<string, ItemDef>;
+export type ItemKey = keyof typeof ITEMS;
+export const ITEM_KEYS = Object.keys(ITEMS) as ItemKey[];
+export const isItem = (k: unknown): k is ItemKey => typeof k === "string" && Object.hasOwn(ITEMS, k);
+export const ITEM_V_RANGE: [number, number] = [0, 10];
+
+/** Item como fica na partida: ligado/desligado e valor, com os ajustes do admin. */
+export function itemStats(k: ItemKey, items: GameConfig["items"]): { on: boolean; v: number } {
+  const o = items[k] ?? {};
+  return { on: !o.off, v: o.v ?? ITEMS[k].v };
+}
+
+/** Ícone de cada item, vindo da API do Deadlock (só os da loja, tier 1 a 4). */
+export type ItemIcon = { name: string; tier: number; slot: string; image: string };
+export function trimItemIcons(raw: unknown): ItemIcon[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((x: Record<string, unknown>) => {
+    const tier = Number(x?.item_tier);
+    const image = (x?.shop_image_webp ?? x?.image_webp) as unknown;
+    if (x?.type !== "upgrade" || !x.shopable || !(tier >= 1 && tier <= 4) || typeof x.name !== "string" || typeof image !== "string") return [];
+    return [{ name: x.name, tier, slot: String(x.item_slot_type ?? ""), image }];
+  });
+}
 
 export const COST_RANGE: [number, number] = [0, 6];
 export const POWER_RANGE: [number, number] = [0, 30];
@@ -130,24 +183,41 @@ export function sanitizeOverride(raw: unknown): CardOverride {
   return r;
 }
 
+const isRecord = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
+
+/** Ajustes dos itens: só chaves conhecidas; itens desconhecidos são ignorados. */
+function sanitizeItems(raw: unknown): GameConfig["items"] {
+  if (!isRecord(raw)) return {};
+  return Object.fromEntries(Object.entries(raw).flatMap(([k, o]) => {
+    if (!isItem(k) || !isRecord(o)) return [];
+    const r: ItemOverride = {};
+    if (o.off === true) r.off = true;
+    if (o.v !== undefined) r.v = clampInt(o.v, ITEM_V_RANGE, ITEMS[k].v);
+    return Object.keys(r).length ? [[k, r]] : [];
+  }));
+}
+
 /** Valida a configuração salva pelo admin. Devolve null se o formato estiver errado. */
 export function sanitizeGameConfig(raw: unknown): GameConfig | null {
-  if (!raw || typeof raw !== "object") return null;
-  const g = raw as Record<string, unknown>;
+  if (!isRecord(raw)) return null;
+  const g = raw;
   if (!Array.isArray(g.locs) || g.locs.length < MIN_LOCS || g.locs.length > MAX_LOCS) return null;
   const cards = g.cards === undefined ? {} : g.cards;
-  if (!cards || typeof cards !== "object" || Array.isArray(cards)) return null;
-  const entries = Object.entries(cards as Record<string, unknown>);
+  if (!isRecord(cards)) return null;
+  if (g.items !== undefined && !isRecord(g.items)) return null;
+  const entries = Object.entries(cards);
   if (entries.length > MAX_CARDS || entries.some(([id]) => !ID_RE.test(id))) return null;
   return {
     locs: g.locs.map(sanitizeLoc),
     cards: Object.fromEntries(entries.map(([id, o]) => [id, sanitizeOverride(o)] as const).filter(([, o]) => Object.keys(o).length)),
+    items: sanitizeItems(g.items),
   };
 }
 
 /** Configuração em uso: a salva, ou os locais padrão. */
 export function gameConfig(saved: unknown): GameConfig {
-  const g = (saved && typeof saved === "object" ? saved : {}) as Partial<GameConfig>;
+  const g = (isRecord(saved) ? saved : {}) as Partial<GameConfig>;
   const locs = Array.isArray(g.locs) && g.locs.length >= MIN_LOCS ? g.locs.map(sanitizeLoc) : DEFAULT_LOCS.map((l) => ({ ...l }));
-  return { locs, cards: sanitizeGameConfig({ locs, cards: g.cards ?? {} })?.cards ?? {} };
+  const clean = sanitizeGameConfig({ locs, cards: isRecord(g.cards) ? g.cards : {}, items: isRecord(g.items) ? g.items : {} });
+  return { locs, cards: clean?.cards ?? {}, items: clean?.items ?? {} };
 }

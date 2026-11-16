@@ -1,6 +1,6 @@
 // Textos do Cardslock Game em pt/en/es: habilidades, efeitos de local, mensagens do log e da tela.
 import { strings } from "../i18n";
-import type { AbilityKey, AbilityKind, LocType } from "./config";
+import type { AbilityKey, AbilityKind, ItemKey, ItemSlot, LocType } from "./config";
 import type { LogEntry, LogKey, Token } from "./engine";
 
 type V = (v: number) => string;
@@ -12,6 +12,13 @@ export type GameText = {
   kinds: Record<AbilityKind, string>;
   locs: Record<LocType, LocText>;
   tokens: Record<Token, string>;
+  /** Efeito de cada item (o nome fica em inglês, como no jogo e na API). */
+  items: Record<ItemKey, V>;
+  slots: Record<ItemSlot, string>;
+  shop: {
+    title: string; hint: string; tier: (t: number) => string; price: (n: number) => string; fitCards: (n: number) => string; fitLoc: (l: string) => string;
+    pick: string; picked: string; mine: string; ai: string; hidden: string; pickFirst: string; paid: (n: number) => string; label: (name: string, tier: number) => string;
+  };
   log: Record<LogKey, Log>;
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
@@ -100,8 +107,45 @@ export const GAME_TEXT = strings<GameText>({
       patron: { label: "Desempate", text: () => "Se os locais empatarem, quem vencer aqui vence a partida." },
       ritual: { label: "Revelar em dobro", text: () => "Efeitos “Ao revelar” de cartas aqui acontecem duas vezes." },
       chaos: { label: "Poder aleatório", text: (o) => `Cartas reveladas aqui recebem um poder aleatório de 1 a ${o.n}.` },
+      shop: { label: "Loja (preço do item)", text: (o) => `Quem vencer aqui no fim do turno 5 paga ${Math.abs(o.v)} ${pl(Math.abs(o.v), "alma", "almas")} a ${o.v >= 0 ? "menos" : "mais"} pelo item.` },
     },
     tokens: { pigeon: "Pombo", ghoul: "Carniçal", turret: "Torreta", rat: "Rato" },
+    items: {
+      "High-Velocity Rounds": (v) => `Seus Carry e OffCarry em jogo ganham +${v}.`,
+      "Close Quarters": (v) => `Suas cartas em locais onde o inimigo tem pelo menos tantas cartas quanto você ganham +${v}.`,
+      "Extra Health": (v) => `Todas as suas cartas em jogo ganham +${v}.`,
+      "Healing Rite": (v) => `Suas cartas queimando, envenenadas, atordoadas ou enfraquecidas ficam limpas e ganham +${v}; sua carta mais fraca também ganha +${v}.`,
+      "Extra Spirit": (v) => `Suas cartas em jogo com habilidade de herói ganham +${v}.`,
+      "Golden Goose Egg": (v) => `Você ganha +${v} ${pl(v, "alma", "almas")} neste turno (+2 se estiver vencendo um local de almas extras).`,
+      "Swift Striker": (v) => `Suas cartas de custo 3 ou menos têm +${v}.`,
+      "Long Range": (v) => `Suas cartas em locais onde você está perdendo ganham +${v}.`,
+      "Battle Vest": (v) => `Seus Frontline em jogo ganham +${v + 2}; suas outras cartas ganham +2.`,
+      "Healing Booster": (v) => `Todas as suas cartas em jogo ganham +2; as de apoio (Ivy, Kelvin, Nurse Harrow, Paige, Viscous, Fortalecer aliados, Aura nos aliados) ganham +${v} a mais.`,
+      "Arcane Surge": (v) => `Sua carta mais forte com “Ao revelar” ganha +${v} e ativa o “Ao revelar” de novo (duas vezes em local de Revelar em dobro).`,
+      "Slowing Hex": (v) => `A carta inimiga mais forte perde ${v} e perde a habilidade.`,
+      "Toxic Bullets": (v) => `Todas as inimigas em jogo queimam −${v} no fim de cada turno; em locais com Carry ou OffCarry seu, −${v + 3}.`,
+      "Sharpshooter": (v) => `Sua carta mais forte ganha +${v}; suas outras cartas em jogo ganham +2.`,
+      "Metal Skin": (v) => `Suas cartas ganham +${v} e ficam imunes a efeitos inimigos até o fim da partida, inclusive as que você revelar depois.`,
+      "Rescue Beam": (v) => `Sua carta mais fraca ganha +${v} e vai para um local onde você está perdendo.`,
+      "Surge of Power": (v) => `Suas cartas em jogo com “Ao revelar” ganham +${v}.`,
+      "Superior Cooldown": (v) => `Os efeitos “Fim do turno” das suas cartas acontecem duas vezes, e suas cartas ganham +${v} no fim de cada turno.`,
+      "Glass Cannon": (v) => `Seus Carry e OffCarry ganham +${v}; suas outras cartas em jogo ganham +2.`,
+      "Ricochet": (v) => `Em cada local, a carta inimiga mais forte perde ${v}.`,
+      "Colossus": (v) => `Suas cartas no local onde você tem mais cartas ganham +${v} (Frontline ganham o dobro).`,
+      "Unstoppable": (v) => `Suas cartas se livram de correntes, anulação e atordoamento, e ganham +${v}.`,
+      "Echo Shard": (v) => `Sua carta mais forte e mais duas cartas suas aleatórias ganham +${v}.`,
+      "Refresher": (v) => `Todas as suas cartas em jogo ativam de novo o “Ao revelar” e ganham +${v}.`,
+    },
+    slots: { weapon: "Arma", vitality: "Vitalidade", spirit: "Espírito" },
+    shop: {
+      title: "Loja: escolha 1 item",
+      hint: "O item fica escondido e é revelado no início do turno 6, quando você paga o custo em almas. A IA também escolhe um, com os mesmos tiers.",
+      tier: (t) => `Tier ${t}`, price: (n) => `Custa ${n} ${pl(n, "alma", "almas")} no turno 6`,
+      fitCards: (n) => `Combina com ${n} ${pl(n, "carta sua", "cartas suas")}`, fitLoc: (l) => `Sinergia: ${l}`,
+      pick: "Escolher", picked: "Escolhido", mine: "Seu item", ai: "Item da IA", hidden: "Escondido até o turno 6",
+      pickFirst: "Escolha um item na loja para fechar o turno.", paid: (n) => `pagou ${n} ${pl(n, "alma", "almas")}`,
+      label: (name, tier) => `${name}, tier ${tier}`,
+    },
     log: {
       riposte: (e, n) => `${n(e.c)} aparou o golpe de ${n(e.t)}!`,
       victor: (e, n) => `${n(e.c)} se reanimou com um choque!`,
@@ -151,6 +195,8 @@ export const GAME_TEXT = strings<GameText>({
       boss: (e) => `${e.side === "p" ? "Você pegou" : "A IA pegou"} o Rejuvenescedor!`,
       zipline: (e, n) => `${n(e.c)} desceu pela tirolesa até ${e.loc}.`,
       hotelBack: (e, n) => `${n(e.c)} voltou do hotel.`,
+      item: (e) => `${e.side === "p" ? "Você revelou" : "A IA revelou"} ${e.item}.`,
+      shop: (e) => `${e.side === "p" ? "Você ganhou" : "A IA ganhou"} desconto de ${e.v} na loja.`,
     },
     ui: {
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
@@ -238,8 +284,45 @@ export const GAME_TEXT = strings<GameText>({
       patron: { label: "Tiebreaker", text: () => "If locations are tied, whoever wins here wins the match." },
       ritual: { label: "Double reveal", text: () => "“On reveal” effects of cards here happen twice." },
       chaos: { label: "Random power", text: (o) => `Cards revealed here get a random power from 1 to ${o.n}.` },
+      shop: { label: "Shop (item price)", text: (o) => `Whoever is winning here at the end of turn 5 pays ${Math.abs(o.v)} ${pl(Math.abs(o.v), "soul", "souls")} ${o.v >= 0 ? "less" : "more"} for their item.` },
     },
     tokens: { pigeon: "Pigeon", ghoul: "Ghoul", turret: "Turret", rat: "Rat" },
+    items: {
+      "High-Velocity Rounds": (v) => `Your Carry and OffCarry cards in play gain +${v}.`,
+      "Close Quarters": (v) => `Your cards at locations where the opponent has at least as many cards as you gain +${v}.`,
+      "Extra Health": (v) => `All your cards in play gain +${v}.`,
+      "Healing Rite": (v) => `Your burning, poisoned, stunned or weakened cards are cleansed and gain +${v}; your weakest card also gains +${v}.`,
+      "Extra Spirit": (v) => `Your cards in play with a hero ability gain +${v}.`,
+      "Golden Goose Egg": (v) => `You get +${v} ${pl(v, "soul", "souls")} this turn (+2 if you're winning an extra-souls location).`,
+      "Swift Striker": (v) => `Your cards costing 3 or less have +${v}.`,
+      "Long Range": (v) => `Your cards at locations where you're losing gain +${v}.`,
+      "Battle Vest": (v) => `Your Frontline cards in play gain +${v + 2}; your other cards gain +2.`,
+      "Healing Booster": (v) => `All your cards in play gain +2; support cards (Ivy, Kelvin, Nurse Harrow, Paige, Viscous, Boost allies, Ally aura) gain +${v} more.`,
+      "Arcane Surge": (v) => `Your strongest card with “On reveal” gains +${v} and triggers its “On reveal” again (twice at a Double reveal location).`,
+      "Slowing Hex": (v) => `The strongest enemy card loses ${v} and loses its ability.`,
+      "Toxic Bullets": (v) => `All enemy cards in play burn −${v} at the end of each turn; −${v + 3} at locations with your Carry or OffCarry.`,
+      "Sharpshooter": (v) => `Your strongest card gains +${v}; your other cards in play gain +2.`,
+      "Metal Skin": (v) => `Your cards gain +${v} and become immune to enemy effects until the end of the match, including cards you reveal later.`,
+      "Rescue Beam": (v) => `Your weakest card gains +${v} and moves to a location where you're losing.`,
+      "Surge of Power": (v) => `Your cards in play with “On reveal” gain +${v}.`,
+      "Superior Cooldown": (v) => `“End of turn” effects of your cards happen twice, and your cards gain +${v} at the end of each turn.`,
+      "Glass Cannon": (v) => `Your Carry and OffCarry cards gain +${v}; your other cards in play gain +2.`,
+      "Ricochet": (v) => `At each location, the strongest enemy card loses ${v}.`,
+      "Colossus": (v) => `Your cards at the location where you have the most cards gain +${v} (Frontline gain double).`,
+      "Unstoppable": (v) => `Your cards break free of chains, silence and stun, and gain +${v}.`,
+      "Echo Shard": (v) => `Your strongest card and two other random cards of yours gain +${v}.`,
+      "Refresher": (v) => `All your cards in play trigger their “On reveal” again and gain +${v}.`,
+    },
+    slots: { weapon: "Weapon", vitality: "Vitality", spirit: "Spirit" },
+    shop: {
+      title: "Shop: pick 1 item",
+      hint: "Your item stays hidden and is revealed at the start of turn 6, when you pay its cost in souls. The AI picks one too, from the same tiers.",
+      tier: (t) => `Tier ${t}`, price: (n) => `Costs ${n} ${pl(n, "soul", "souls")} on turn 6`,
+      fitCards: (n) => `Fits ${n} of your ${pl(n, "card", "cards")}`, fitLoc: (l) => `Synergy: ${l}`,
+      pick: "Pick", picked: "Picked", mine: "Your item", ai: "AI item", hidden: "Hidden until turn 6",
+      pickFirst: "Pick an item in the shop to end the turn.", paid: (n) => `paid ${n} ${pl(n, "soul", "souls")}`,
+      label: (name, tier) => `${name}, tier ${tier}`,
+    },
     log: {
       riposte: (e, n) => `${n(e.c)} parried ${n(e.t)}'s attack!`,
       victor: (e, n) => `${n(e.c)} came back with a shock!`,
@@ -289,6 +372,8 @@ export const GAME_TEXT = strings<GameText>({
       boss: (e) => `${e.side === "p" ? "You got" : "The AI got"} the Rejuvenator!`,
       zipline: (e, n) => `${n(e.c)} rode the zipline to ${e.loc}.`,
       hotelBack: (e, n) => `${n(e.c)} came back from the hotel.`,
+      item: (e) => `${e.side === "p" ? "You revealed" : "The AI revealed"} ${e.item}.`,
+      shop: (e) => `${e.side === "p" ? "You got" : "The AI got"} a ${e.v}-soul shop discount.`,
     },
     ui: {
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
@@ -376,8 +461,45 @@ export const GAME_TEXT = strings<GameText>({
       patron: { label: "Desempate", text: () => "Si los lugares empatan, quien gane aquí gana la partida." },
       ritual: { label: "Revelar doble", text: () => "Los efectos «Al revelar» de las cartas aquí ocurren dos veces." },
       chaos: { label: "Poder aleatorio", text: (o) => `Las cartas reveladas aquí reciben un poder aleatorio de 1 a ${o.n}.` },
+      shop: { label: "Tienda (precio del objeto)", text: (o) => `Quien gane aquí al final del turno 5 paga ${Math.abs(o.v)} ${pl(Math.abs(o.v), "alma", "almas")} ${o.v >= 0 ? "menos" : "más"} por su objeto.` },
     },
     tokens: { pigeon: "Paloma", ghoul: "Necrófago", turret: "Torreta", rat: "Rata" },
+    items: {
+      "High-Velocity Rounds": (v) => `Tus Carry y OffCarry en juego ganan +${v}.`,
+      "Close Quarters": (v) => `Tus cartas en lugares donde el rival tiene al menos tantas cartas como tú ganan +${v}.`,
+      "Extra Health": (v) => `Todas tus cartas en juego ganan +${v}.`,
+      "Healing Rite": (v) => `Tus cartas ardiendo, envenenadas, aturdidas o debilitadas quedan limpias y ganan +${v}; tu carta más débil también gana +${v}.`,
+      "Extra Spirit": (v) => `Tus cartas en juego con habilidad de héroe ganan +${v}.`,
+      "Golden Goose Egg": (v) => `Ganas +${v} ${pl(v, "alma", "almas")} este turno (+2 si vas ganando un lugar de almas extra).`,
+      "Swift Striker": (v) => `Tus cartas de coste 3 o menos tienen +${v}.`,
+      "Long Range": (v) => `Tus cartas en lugares donde vas perdiendo ganan +${v}.`,
+      "Battle Vest": (v) => `Tus Frontline en juego ganan +${v + 2}; tus otras cartas ganan +2.`,
+      "Healing Booster": (v) => `Todas tus cartas en juego ganan +2; las de apoyo (Ivy, Kelvin, Nurse Harrow, Paige, Viscous, Reforzar aliados, Aura aliada) ganan +${v} más.`,
+      "Arcane Surge": (v) => `Tu carta más fuerte con «Al revelar» gana +${v} y activa su «Al revelar» de nuevo (dos veces en un lugar de Revelar doble).`,
+      "Slowing Hex": (v) => `La carta enemiga más fuerte pierde ${v} y pierde su habilidad.`,
+      "Toxic Bullets": (v) => `Todas las enemigas en juego arden −${v} al final de cada turno; −${v + 3} en lugares con tu Carry u OffCarry.`,
+      "Sharpshooter": (v) => `Tu carta más fuerte gana +${v}; tus otras cartas en juego ganan +2.`,
+      "Metal Skin": (v) => `Tus cartas ganan +${v} y quedan inmunes a efectos enemigos hasta el final de la partida, incluso las que reveles después.`,
+      "Rescue Beam": (v) => `Tu carta más débil gana +${v} y va a un lugar donde vas perdiendo.`,
+      "Surge of Power": (v) => `Tus cartas en juego con «Al revelar» ganan +${v}.`,
+      "Superior Cooldown": (v) => `Los efectos «Fin del turno» de tus cartas ocurren dos veces, y tus cartas ganan +${v} al final de cada turno.`,
+      "Glass Cannon": (v) => `Tus Carry y OffCarry ganan +${v}; tus otras cartas en juego ganan +2.`,
+      "Ricochet": (v) => `En cada lugar, la carta enemiga más fuerte pierde ${v}.`,
+      "Colossus": (v) => `Tus cartas en el lugar donde tienes más cartas ganan +${v} (las Frontline ganan el doble).`,
+      "Unstoppable": (v) => `Tus cartas se libran de cadenas, anulación y aturdimiento, y ganan +${v}.`,
+      "Echo Shard": (v) => `Tu carta más fuerte y otras dos cartas tuyas al azar ganan +${v}.`,
+      "Refresher": (v) => `Todas tus cartas en juego activan de nuevo su «Al revelar» y ganan +${v}.`,
+    },
+    slots: { weapon: "Arma", vitality: "Vitalidad", spirit: "Espíritu" },
+    shop: {
+      title: "Tienda: elige 1 objeto",
+      hint: "El objeto queda oculto y se revela al inicio del turno 6, cuando pagas su coste en almas. La IA también elige uno, con los mismos tiers.",
+      tier: (t) => `Tier ${t}`, price: (n) => `Cuesta ${n} ${pl(n, "alma", "almas")} en el turno 6`,
+      fitCards: (n) => `Combina con ${n} ${pl(n, "carta tuya", "cartas tuyas")}`, fitLoc: (l) => `Sinergia: ${l}`,
+      pick: "Elegir", picked: "Elegido", mine: "Tu objeto", ai: "Objeto de la IA", hidden: "Oculto hasta el turno 6",
+      pickFirst: "Elige un objeto en la tienda para terminar el turno.", paid: (n) => `pagó ${n} ${pl(n, "alma", "almas")}`,
+      label: (name, tier) => `${name}, tier ${tier}`,
+    },
     log: {
       riposte: (e, n) => `¡${n(e.c)} desvió el golpe de ${n(e.t)}!`,
       victor: (e, n) => `¡${n(e.c)} revivió con una descarga!`,
@@ -427,6 +549,8 @@ export const GAME_TEXT = strings<GameText>({
       boss: (e) => `¡${e.side === "p" ? "Conseguiste" : "La IA consiguió"} el Rejuvenecedor!`,
       zipline: (e, n) => `${n(e.c)} bajó por la tirolina hasta ${e.loc}.`,
       hotelBack: (e, n) => `${n(e.c)} volvió del hotel.`,
+      item: (e) => `${e.side === "p" ? "Revelaste" : "La IA reveló"} ${e.item}.`,
+      shop: (e) => `${e.side === "p" ? "Ganaste" : "La IA ganó"} un descuento de ${e.v} en la tienda.`,
     },
     ui: {
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",

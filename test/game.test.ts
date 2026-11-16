@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LOCS, cardStats, defaultCard, gameConfig, sanitizeGameConfig, type PoolCard } from "../src/lib/game/config";
+import {
+  DEFAULT_LOCS, ITEMS, ITEM_KEYS, cardStats, defaultCard, gameConfig, sanitizeGameConfig, trimItemIcons,
+  type GameConfig, type GameLoc, type ItemKey, type PoolCard,
+} from "../src/lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
 
@@ -119,6 +122,117 @@ describe("partida", () => {
         expect(l.s[s].length).toBeLessThanOrEqual(m.cap(l));
         for (const c of l.s[s]) expect(m.pow(c, l)).toBeGreaterThanOrEqual(0);
       }
+    }
+  });
+});
+
+/* ---------- itens da loja ---------- */
+
+const plainLocs: GameLoc[] = [0, 1, 2].map((i) => ({ id: `n${i}`, name: `Local ${i}`, type: "none", v: 0, n: 1, desc: "" }));
+const only = (keep: ItemKey[]): GameConfig["items"] => Object.fromEntries(ITEM_KEYS.filter((k) => !keep.includes(k)).map((k) => [k, { off: true }]));
+const cfgWith = (keep: ItemKey[], locs = plainLocs): GameConfig => ({ locs, cards: {}, items: only(keep) });
+function playUntil(m: Match, turn: number) {
+  while (m.t < turn && !m.result) m.runEndTurn();
+}
+
+describe("itens: configuração", () => {
+  it("guarda só itens conhecidos, liga/desliga e valor limitado", () => {
+    const g = sanitizeGameConfig({ locs: DEFAULT_LOCS, items: { "Sharpshooter": { v: 99, off: true }, "Hack": { off: true }, "Ricochet": { off: "sim" } } })!;
+    expect(g.items).toEqual({ "Sharpshooter": { v: 10, off: true } });
+    expect(sanitizeGameConfig({ locs: DEFAULT_LOCS, items: [] })).toBeNull();
+  });
+
+  it("tem 6 itens por tier, 2 de cada categoria", () => {
+    for (const tier of [1, 2, 3, 4]) {
+      const ks = ITEM_KEYS.filter((k) => ITEMS[k].tier === tier);
+      expect(ks).toHaveLength(6);
+      for (const slot of ["weapon", "vitality", "spirit"]) expect(ks.filter((k) => ITEMS[k].slot === slot)).toHaveLength(2);
+    }
+  });
+
+  it("ícones: só itens da loja de tier 1 a 4", () => {
+    const raw = [
+      { type: "upgrade", shopable: true, item_tier: 2, name: "Long Range", item_slot_type: "weapon", shop_image_webp: "a.webp" },
+      { type: "upgrade", shopable: true, item_tier: 5, name: "Shrink Ray", item_slot_type: "spirit", shop_image_webp: "b.webp" },
+      { type: "upgrade", shopable: false, item_tier: 1, name: "Escondido", image_webp: "c.webp" },
+      { type: "ability", shopable: true, item_tier: 1, name: "Habilidade", image_webp: "d.webp" },
+    ];
+    expect(trimItemIcons(raw)).toEqual([{ name: "Long Range", tier: 2, slot: "weapon", image: "a.webp" }]);
+    expect(trimItemIcons({})).toEqual([]);
+  });
+});
+
+describe("itens: draft e revelação", () => {
+  const four: ItemKey[] = ["Extra Health", "Swift Striker", "Sharpshooter", "Ricochet"];
+
+  it("no turno 5 os dois lados recebem 3 itens com os mesmos tiers, e a IA já escolhe", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const m = new Match(cfgWith(four), pool, seeded(seed));
+      playUntil(m, 5);
+      const tiers = (s: "p" | "a") => m.offer![s].map((k) => ITEMS[k].tier);
+      expect(m.offer!.p).toHaveLength(3);
+      expect(tiers("p")).toEqual(tiers("a"));
+      expect(new Set(tiers("p")).size).toBe(3);
+      expect(m.offer!.a).toContain(m.picked.a);
+    }
+  });
+
+  it("não fecha o turno 5 sem escolher; o item fica escondido até o turno 6 e é pago em almas", () => {
+    const m = new Match(cfgWith(four), pool, seeded(7));
+    playUntil(m, 5);
+    expect(m.needsPick).toBe(true);
+    expect(m.endTurn()).toEqual([]);
+    expect(m.busy).toBe(false);
+    const k = m.offer!.p.at(-1)!;
+    m.pick(k);
+    expect(m.picked.p).toBe(k);
+    expect(m.itemsOn).toBe(false);
+    m.runEndTurn();
+    expect(m.t).toBe(6);
+    expect(m.itemsOn).toBe(true);
+    expect(m.paid.p).toBe(ITEMS[k].tier);
+    expect(m.E).toBe(6 - ITEMS[k].tier);
+  });
+
+  it("desconto da loja reduz o preço, sem ficar negativo", () => {
+    const m = new Match(cfgWith(four), pool, seeded(3));
+    m.discount.p = 1;
+    expect(m.itemPrice("p", "Ricochet")).toBe(3);
+    m.discount.p = 9;
+    expect(m.itemPrice("p", "Ricochet")).toBe(0);
+  });
+
+  it("sem itens ligados não há loja", () => {
+    const m = new Match(cfgWith([]), pool, seeded(4));
+    playUntil(m, 5);
+    expect(m.offer).toBeNull();
+    expect(m.needsPick).toBe(false);
+  });
+
+  it("Swift Striker dá poder contínuo às cartas de custo 3 ou menos", () => {
+    const m = new Match(cfgWith(["Swift Striker"]), pool, seeded(5));
+    playUntil(m, 6);
+    const c = m.loc.flatMap((l) => l.s.p).find((x) => x.rev && x.cost <= 3);
+    if (!c) return;
+    const before = m.pow(c);
+    m.itemsOn = false;
+    expect(before - m.pow(c)).toBe(2);
+  });
+
+  it.each(ITEM_KEYS)("%s: partidas com o item terminam sem erro", (k) => {
+    for (let seed = 1; seed <= 25; seed++) {
+      const m = new Match(cfgWith([k], DEFAULT_LOCS), pool, seeded(seed));
+      let result = null;
+      while (!result) {
+        for (const c of [...m.hand].sort((a, b) => a.cost - b.cost)) {
+          const l = m.loc.find((x) => !m.canPlay(c, x));
+          if (l) m.play(c, l);
+        }
+        result = m.runEndTurn();
+      }
+      expect(m.picked.p).toBe(k);
+      expect(m.picked.a).toBe(k);
+      for (const l of m.loc) for (const s of ["p", "a"] as const) for (const c of l.s[s]) expect(m.pow(c, l)).toBeGreaterThanOrEqual(0);
     }
   });
 });
