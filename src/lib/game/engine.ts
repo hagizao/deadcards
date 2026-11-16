@@ -49,7 +49,7 @@ export type PlayError = "souls" | "frozen" | "full";
 /** Cartas que entram no baralho: jogadores ativos, uma por jogador (variantes ficam de fora). */
 export function cardPool(players: Player[]): PoolCard[] {
   const seen = new Set<string>();
-  return players
+  const pool = players
     .filter((p) => !p.inactive)
     .filter((p) => {
       const k = p.variantOf || p.id;
@@ -57,7 +57,10 @@ export function cardPool(players: Player[]): PoolCard[] {
       seen.add(k);
       return true;
     })
-    .map((p) => ({ id: p.id, name: p.name, position: ROLE_ABILITY[p.position] ? p.position : "Flex", hero: p.hero, c1: p.c1 || "#334155", c2: p.c2 || "#0f172a", ovr: getPlayerOvr(p) }));
+    .map((p) => ({ id: p.id, name: p.name, position: ROLE_ABILITY[p.position] ? p.position : "Flex", hero: p.hero, c1: p.c1 || "#334155", c2: p.c2 || "#0f172a", ovr: getPlayerOvr(p) || 0 }));
+  // custo pelo ranking de OVR: o baralho sempre tem a mesma curva de custos, por mais que os OVRs se aglomerem
+  const sorted = pool.map((p) => p.ovr).sort((a, b) => a - b);
+  return pool.map((p) => ({ ...p, rank: sorted.findIndex((o) => o >= p.ovr) / pool.length }));
 }
 
 const nst = (): Status => ({ tmp: [] });

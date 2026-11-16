@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_LOCS, ITEMS, ITEM_KEYS, cardStats, defaultCard, gameConfig, sanitizeGameConfig, trimItemIcons,
+  DEFAULT_LOCS, ITEMS, ITEM_KEYS, cardStats, costByRank, defaultCard, gameConfig, sanitizeGameConfig, trimItemIcons,
   type GameConfig, type GameLoc, type ItemKey, type PoolCard,
 } from "../src/lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool } from "../src/lib/game/engine";
@@ -50,6 +50,19 @@ describe("carta padrão", () => {
   it("custo fica entre 1 e 6 e cresce com o OVR", () => {
     expect(defaultCard({ ...base, ovr: 40 }).cost).toBe(1);
     expect(defaultCard({ ...base, ovr: 99 }).cost).toBe(6);
+  });
+
+  it("no baralho, o custo segue o ranking de OVR e cartas de custo 1 e 2 são as mais comuns", () => {
+    // OVRs aglomerados em cima, como nos dados reais
+    const list = cardPool(Array.from({ length: 50 }, (_, i) => player(`q${i}`, 80 + (i % 16))));
+    const costs = list.map((p) => defaultCard(p).cost);
+    const count = (c: number) => costs.filter((x) => x === c).length;
+    expect(count(1) + count(2)).toBeGreaterThanOrEqual(list.length * 0.35);
+    expect(count(6)).toBeGreaterThan(0);
+    const byOvr = [...list].sort((a, b) => a.ovr - b.ovr).map((p) => defaultCard(p).cost);
+    expect(byOvr).toEqual([...byOvr].sort((a, b) => a - b));
+    expect(costByRank(0)).toBe(1);
+    expect(costByRank(0.99)).toBe(6);
   });
 
   it("ajustes do admin sobrescrevem o padrão", () => {

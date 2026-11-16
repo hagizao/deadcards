@@ -125,13 +125,24 @@ export const MIN_LOCS = 3;
 const MAX_LOCS = 40;
 const MAX_CARDS = 2000;
 
-export type PoolCard = { id: string; name: string; position: string; hero: string; c1: string; c2: string; ovr: number };
+/** `rank`: fração do baralho com OVR menor que o desta carta (0 a 1); define o custo padrão. */
+export type PoolCard = { id: string; name: string; position: string; hero: string; c1: string; c2: string; ovr: number; rank?: number };
+
+/** Fatia do baralho em cada custo, do 1 ao 6: mais cartas baratas para os primeiros turnos. */
+export const COST_SHARE = [0.2, 0.22, 0.2, 0.16, 0.13, 0.09] as const;
+
+/** Custo pela posição no ranking de OVR do baralho, seguindo COST_SHARE. */
+export function costByRank(rank: number): number {
+  let acc = 0;
+  for (let i = 0; i < COST_SHARE.length; i++) { acc += COST_SHARE[i]; if (rank < acc - 1e-9) return i + 1; }
+  return COST_SHARE.length;
+}
 
 const nameHash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
 
 /** Custo, poder e habilidade padrão de uma carta, derivados do OVR, da função e do herói. */
 export function defaultCard(p: PoolCard): { cost: number; power: number; ab: AbilityKey; v: number } {
-  const cost = Math.max(1, Math.min(6, Math.round((p.ovr - 62) / 6)));
+  const cost = p.rank !== undefined ? costByRank(p.rank) : Math.max(1, Math.min(6, Math.round(((p.ovr || 62) - 62) / 6)));
   const ab: AbilityKey = isAbility(p.hero) ? p.hero : ROLE_ABILITY[p.position] ?? "draw";
   const power = Math.max(1, cost + 1 + Math.floor(cost * 0.8) + ((Math.abs(nameHash(p.name)) % 3) - 1) + ABILITIES[ab].pm);
   return { cost, power, ab, v: ABILITIES[ab].v };
