@@ -4,7 +4,7 @@ import { favorite, profileCard, publicProfile } from "./profile";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
-import { sanitizeGameConfig } from "./lib/game/config";
+import { sanitizeGameConfig, trimItemIcons } from "./lib/game/config";
 
 export interface Env {
   DB: D1Database;
@@ -42,10 +42,12 @@ const parse = <T>(s: string | null, fallback: T): T => {
   try { return JSON.parse(s) as T; } catch { return fallback; }
 };
 
-async function cachedFetch(env: Env, path: string): Promise<Response> {
+/** Busca na deadlock-api com cache no D1. Com `trim`, guarda só o resultado enxuto, sob a chave `key`. */
+async function cachedFetch(env: Env, path: string, trim?: { key: string; fn: (raw: unknown) => unknown }): Promise<Response> {
   const now = Math.floor(Date.now() / 1000);
+  const key = trim?.key ?? path;
   const row = await env.DB.prepare("SELECT body, fetched_at FROM api_cache WHERE cache_key = ?")
-    .bind(path)
+    .bind(key)
     .first<{ body: string; fetched_at: number }>();
   if (row && now - row.fetched_at < CACHE_TTL_SECONDS) {
     return new Response(row.body, { headers: { "content-type": "application/json", "x-cache": "hit" } });
@@ -55,8 +57,8 @@ async function cachedFetch(env: Env, path: string): Promise<Response> {
     if (row) return new Response(row.body, { headers: { "content-type": "application/json", "x-cache": "stale" } });
     return upstream;
   }
-  const body = await upstream.text();
-  await env.DB.prepare(UPSERT_CACHE).bind(path, body, now).run();
+  const body = trim ? JSON.stringify(trim.fn(await upstream.json())) : await upstream.text();
+  await env.DB.prepare(UPSERT_CACHE).bind(key, body, now).run();
   return new Response(body, { headers: { "content-type": "application/json", "x-cache": "miss" } });
 }
 
@@ -317,6 +319,8 @@ export default {
     if (url.pathname === "/api/locale") return Response.json({ country: request.cf?.country ?? null }, { headers: { "cache-control": "private, no-store" } });
     if (url.pathname === "/api/health") return Response.json({ ok: true });
     if (url.pathname === "/api/data") return appData(env);
+    // ícones dos itens da loja (Cardslock Game): a lista completa tem ~6 MB, então só nome, tier, categoria e imagem
+    if (url.pathname === "/api/items") return cachedFetch(env, "/v1/assets/items", { key: "items:icons", fn: trimItemIcons });
     if (url.pathname === "/api/deadlock") {
       const path = url.searchParams.get("path") ?? "";
       if (!ALLOWED_PATHS.includes(path)) return Response.json({ error: "path not allowed" }, { status: 400 });
