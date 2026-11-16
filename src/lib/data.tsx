@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AppData, HeroArt } from "./types";
+import type { AppData, BackfillCandidate, BackfillResult, EdlImportApply, EdlImportPreview, EdlImportResult, EdlMatch, EdlTeam, EdlTeamSeries, HeroArt, MatchLookup, PlayerMatch } from "./types";
 import { DEFAULT_TIER_CONFIG } from "./cards";
 import { strings, useT } from "./i18n";
 
-type ApiHero = { name: string; player_selectable?: boolean; images?: { icon_hero_card_webp?: string; icon_image_small_webp?: string } };
+type ApiHero = { id?: number; name: string; player_selectable?: boolean; images?: { icon_hero_card_webp?: string; icon_image_small_webp?: string } };
 
 export type Me = { id: string; handle: string | null; providers: string[]; name: string; image: string | null; admin: boolean } | null;
 
@@ -11,6 +11,8 @@ type Ctx = AppData & {
   heroNames: string[];
   heroArt: (name: string) => HeroArt | null;
   heroIcon: (name: string) => string | null;
+  /** Herói da deadlock-api pelo hero_id das partidas. */
+  heroById: (id: number) => { name: string; icon: string | null } | null;
   me: Me;
   reload: () => Promise<void>;
 };
@@ -37,6 +39,20 @@ export const api = {
   createCode: (body: { code: string; playerId: string; maxUses: number; startsAt: number | null; expiresAt: number | null }) =>
     call("/api/codes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   removeCode: (code: string) => call(`/api/codes/${encodeURIComponent(code)}`, { method: "DELETE" }),
+  matchLookup: async (matchId: number) => (await call(`/api/match-lookup/${matchId}`, {})) as unknown as MatchLookup,
+  edlMatches: async () => (await call("/api/edl/matches", {})) as unknown as EdlMatch[],
+  edlRefresh: async () => (await call("/api/edl/refresh", { method: "POST" })) as unknown as { total: number },
+  edlTeams: async (q = "") => (await call(`/api/edl/teams?q=${encodeURIComponent(q)}`, {})) as unknown as EdlTeam[],
+  edlImportPreview: async (teamId: string) => (await call(`/api/teams/${encodeURIComponent(teamId)}/edl-import`, {})) as unknown as EdlImportPreview,
+  edlImportApply: async (teamId: string, body: EdlImportApply) =>
+    (await call(`/api/teams/${encodeURIComponent(teamId)}/edl-import`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })) as unknown as EdlImportResult,
+  teamSeries: async (teamId: string) => (await call(`/api/teams/${encodeURIComponent(teamId)}/edl-series`, {})) as unknown as EdlTeamSeries[],
+  backfillCandidates: async (id: string) => (await call(`/api/players/${encodeURIComponent(id)}/backfill`, {})) as unknown as BackfillCandidate[],
+  backfillApply: async (id: string, playerIds: string[]) =>
+    (await call(`/api/players/${encodeURIComponent(id)}/backfill`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ playerIds }) })) as unknown as BackfillResult,
+  playerMatches: async (id: string, source: "edl" | "pub") =>
+    (await call(`/api/players/${encodeURIComponent(id)}/matches?source=${source}`, {})) as unknown as PlayerMatch[],
+  syncMatches: async (id: string) => (await call(`/api/players/${encodeURIComponent(id)}/sync`, { method: "POST" })) as unknown as { added: number },
   upload: async (folder: "players" | "teams" | "heroes" | "bg" | "home", file: File) =>
     (await call(`/api/upload/${folder}`, { method: "POST", headers: { "content-type": file.type }, body: file })).url!,
 };
@@ -66,6 +82,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx | null>(() => {
     if (!data) return null;
     const byName = new Map(apiHeroes.map((h) => [h.name.toLowerCase(), h]));
+    const byId = new Map(apiHeroes.map((h) => [h.id, h]));
     const settings = { ...data.settings, tierConfig: data.settings.tierConfig?.length ? data.settings.tierConfig : DEFAULT_TIER_CONFIG };
     return {
       ...data,
@@ -78,6 +95,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return url ? { name, url, zoom: 100, x: 50, y: 20 } : null;
       },
       heroIcon: (name) => byName.get(name.toLowerCase())?.images?.icon_image_small_webp ?? null,
+      heroById: (id) => {
+        const h = byId.get(id);
+        return h ? { name: h.name, icon: h.images?.icon_image_small_webp ?? null } : null;
+      },
       me,
       reload,
     };

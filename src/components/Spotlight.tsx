@@ -2,9 +2,10 @@ import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
-import { useData } from "../lib/data";
+import { api, useData } from "../lib/data";
+import type { PlayerMatch } from "../lib/types";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { STAT_KEYS, getPlayerHistory, getPlayerOvr, getPlayerTrend, isMainCard, teamOf, useLabel } from "../lib/cards";
+import { STAT_KEYS, effectiveAccountId, getPlayerHistory, getPlayerOvr, getPlayerTrend, isMainCard, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
@@ -15,13 +16,19 @@ import { easeOut, pill } from "../lib/ui";
 gsap.registerPlugin(SplitText);
 const revealed = new Set<string>();
 
+const M = strings({
+  pt: { matches: "Partidas de campeonato", games: (n: number) => `${n} ${n === 1 ? "partida" : "partidas"}`, wins: "V", losses: "D", win: "Vitória", loss: "Derrota", topHeroes: "Mais jogados", rate: (n: number) => `${n}% de vitórias`, minutes: (n: number) => `${n} min` },
+  en: { matches: "Tournament matches", games: (n: number) => `${n} ${n === 1 ? "match" : "matches"}`, wins: "W", losses: "L", win: "Win", loss: "Loss", topHeroes: "Most played", rate: (n: number) => `${n}% win rate`, minutes: (n: number) => `${n} min` },
+  es: { matches: "Partidas de campeonato", games: (n: number) => `${n} ${n === 1 ? "partida" : "partidas"}`, wins: "V", losses: "D", win: "Victoria", loss: "Derrota", topHeroes: "Más jugados", rate: (n: number) => `${n}% de victorias`, minutes: (n: number) => `${n} min` },
+});
+
 const S = strings({
   pt: { cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão",
-    stats: "Atributos", statNames: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" } },
+    stats: "Atributos", statNames: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" }, ...M.pt },
   en: { cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version",
-    stats: "Attributes", statNames: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" } },
+    stats: "Attributes", statNames: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" }, ...M.en },
   es: { cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión",
-    stats: "Atributos", statNames: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" } },
+    stats: "Atributos", statNames: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" }, ...M.es },
 });
 
 export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: string; onClose: () => void; onSwitch: (id: string) => void; onEdit?: (id: string) => void }) {
@@ -74,6 +81,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   const history = getPlayerHistory(player);
   const groupKey = player.variantOf || player.id;
   const versions = players.filter((p) => p.id === groupKey || p.variantOf === groupKey);
+  const accountId = effectiveAccountId(players, player);
 
   return (
     <motion.div
@@ -138,6 +146,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             <HistoryChart points={history} color={tier.c} />
           </div>
 
+          {accountId !== undefined && <TournamentMatches key={groupKey} playerId={groupKey} />}
+
           {versions.length > 1 && (
             <div>
               <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.versions} ({versions.length})</h3>
@@ -158,6 +168,76 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+// Resumo (V–D, heróis mais jogados) + últimas partidas de campeonato; some quando não há partidas.
+function TournamentMatches({ playerId }: { playerId: string }) {
+  const t = useT(M);
+  const locale = useLocale();
+  const { heroById } = useData();
+  const [list, setList] = useState<PlayerMatch[]>([]);
+
+  useEffect(() => {
+    let live = true;
+    api.playerMatches(playerId, "edl").then((l) => live && setList(l)).catch(() => {});
+    return () => { live = false; };
+  }, [playerId]);
+
+  if (!list.length) return null;
+  const wins = list.filter((m) => m.won).length;
+  const rate = Math.round((wins / list.length) * 100);
+  const counts = new Map<number, number>();
+  for (const m of list) counts.set(m.heroId, (counts.get(m.heroId) ?? 0) + 1);
+  const top = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const date = (unix: number) => new Date(unix * 1000).toLocaleDateString(locale, { day: "2-digit", month: "short" });
+
+  return (
+    <motion.section aria-label={t.matches} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: "easeOut" }}>
+      <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.matches}</h3>
+      <div className="space-y-3 rounded-xl border border-zinc-200/10 bg-black/40 p-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div>
+            <p className="font-display text-2xl leading-none font-black tracking-[0.08em] text-dl-text tabular-nums">
+              <span className="text-emerald-300">{wins}{t.wins}</span> – <span className="text-rose-300">{list.length - wins}{t.losses}</span>
+            </p>
+            <p className="mt-1 text-xs text-zinc-400">{t.games(list.length)} · {t.rate(rate)}</p>
+          </div>
+          <ul aria-label={t.topHeroes} className="ml-auto flex gap-1.5">
+            {top.map(([id, n]) => {
+              const h = heroById(id);
+              return (
+                <li key={id} title={`${h?.name ?? `#${id}`} ×${n}`} className="relative">
+                  {h?.icon ? <img src={h.icon} alt={h.name} className="size-9 rounded-lg border border-zinc-200/15 object-cover" /> : <span className="flex size-9 items-center justify-center rounded-lg border border-zinc-200/15 text-[10px] text-zinc-400">#{id}</span>}
+                  <span className="absolute -right-1 -bottom-1 rounded-full bg-zinc-950 px-1 text-[10px]/4 font-bold text-zinc-200 tabular-nums ring-1 ring-zinc-200/20">{n}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        <div aria-hidden="true" className="flex h-1.5 gap-px overflow-hidden rounded-full">
+          <div className="bg-emerald-400/80" style={{ flex: wins }} />
+          <div className="bg-rose-400/80" style={{ flex: list.length - wins }} />
+        </div>
+        <ul className="space-y-1.5">
+          {list.slice(0, 5).map((m, i) => {
+            const h = heroById(m.heroId);
+            return (
+              <motion.li key={m.matchId} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, delay: 0.05 + i * 0.03 }}
+                className={`flex min-h-11 items-center gap-2.5 rounded-lg border-l-[3px] bg-zinc-900/60 py-1 pr-2.5 pl-2 ${m.won ? "border-emerald-400" : "border-rose-400"}`}>
+                {h?.icon ? <img src={h.icon} alt="" className="size-8 shrink-0 rounded-md object-cover" /> : <span aria-hidden="true" className="size-8 shrink-0 rounded-md bg-zinc-800" />}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-zinc-100">{h?.name ?? `#${m.heroId}`}</p>
+                  <p className="truncate text-xs text-zinc-400">{[date(m.startTime), m.event, t.minutes(Math.round(m.durationS / 60))].filter(Boolean).join(" · ")}</p>
+                </div>
+                <span className="shrink-0 text-sm font-bold text-zinc-200 tabular-nums">{m.kills}/{m.deaths}/{m.assists}</span>
+                <span className={`w-14 shrink-0 text-right text-[11px] font-extrabold tracking-widest uppercase ${m.won ? "text-emerald-300" : "text-rose-300"}`}>{m.won ? t.win : t.loss}</span>
+              </motion.li>
+            );
+          })}
+        </ul>
+      </div>
+    </motion.section>
   );
 }
 
