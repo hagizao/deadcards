@@ -10,7 +10,8 @@ import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
 import {
   ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, LOC_V_RANGE, MIN_LOCS, NAME_MAX, POWER_RANGE,
-  cardStats, gameConfig, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type LocType, type PoolCard,
+  ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, ITEM_V_RANGE,
+  cardStats, gameConfig, itemCost, itemStats, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard,
 } from "../lib/game/config";
 import { cardPool } from "../lib/game/engine";
 import { GAME_TEXT } from "../lib/game/text";
@@ -691,6 +692,14 @@ function GameForm() {
       return { ...c, cards: { ...c.cards, [card.id]: o } };
     });
   };
+  const setItem = (k: ItemKey, patch: ItemOverride) => setCfg((c) => {
+    const o: ItemOverride = { ...c.items[k], ...patch };
+    if (!o.off) delete o.off;
+    if (o.v === ITEMS[k].v) delete o.v;
+    const items = { ...c.items, [k]: o };
+    if (!Object.keys(o).length) delete items[k];
+    return { ...c, items };
+  });
   const resetCard = () => {
     if (!card) return;
     setCfg((c) => { const cards = { ...c.cards }; delete cards[card.id]; return { ...c, cards }; });
@@ -809,9 +818,38 @@ function GameForm() {
         ) : <p className="text-xs text-zinc-400">Nenhuma carta para editar.</p>}
       </section>
 
+      <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Itens da loja</h2>
+        <p className="text-xs text-zinc-400">
+          No turno {ITEM_OFFER_TURN} cada lado escolhe 1 entre 3 itens (mesma combinação de tiers para você e a IA). O item é revelado e pago no turno {ITEM_REVEAL_TURN}: tier 1 a 4 custa 1 a 4 almas. Item desligado não aparece no sorteio.
+        </p>
+        {ITEM_TIERS.map((tier) => (
+          <div key={tier} className="flex flex-col gap-2">
+            <h3 className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Tier {tier} · custa {itemCost(tier)} {itemCost(tier) === 1 ? "alma" : "almas"}</h3>
+            <div className="grid gap-2 md:grid-cols-2">
+              {ITEM_KEYS.filter((k) => ITEMS[k].tier === tier).map((k) => {
+                const it = itemStats(k, cfg.items);
+                return (
+                  <div key={k} className={`flex flex-col gap-2 rounded-2xl bg-zinc-950/60 p-3 ${it.on ? "" : "opacity-60"}`}>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm font-bold text-zinc-100">
+                      <input type="checkbox" className="size-4 accent-zinc-100" checked={it.on} onChange={(e) => setItem(k, { off: !e.target.checked })} />
+                      {k} <span className="text-xs font-normal text-zinc-400">· {GT.slots[ITEMS[k].slot]}</span>
+                    </label>
+                    <p className="text-xs text-zinc-300">{GT.items[k](it.v)}</p>
+                    {ITEMS[k].usesV && (
+                      <div className="w-32"><NumField label="Valor" value={it.v} range={ITEM_V_RANGE} onChange={(v) => setItem(k, { v })} /></div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </section>
+
       <div className="noir-glass sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3">
         <button type="button" className={primary} disabled={busy} onClick={save}>{busy ? "Salvando…" : "Salvar"}</button>
-        <button type="button" className={ghost} onClick={() => { setCfg({ locs: structuredClone(DEFAULT_LOCS), cards: {} }); setLi(0); }}>Restaurar tudo ao padrão</button>
+        <button type="button" className={ghost} onClick={() => { setCfg({ locs: structuredClone(DEFAULT_LOCS), cards: {}, items: {} }); setLi(0); }}>Restaurar tudo ao padrão</button>
         <Toast msg={msg} />
       </div>
     </div>
