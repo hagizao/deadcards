@@ -26,6 +26,15 @@
   --color-dl-bevel-hover-from: #4c5561;
   --color-dl-bevel-hover-to: #6c7d88;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Cardslock Game: seu lado, lado da IA e o latão do poder */
+  --color-game-me: #5fd0c2;
+  --color-game-ai: #e0675a;
+  --color-game-brass: #e0b25a;
+}
+
+/* verso da carta da IA (listras diagonais) */
+@utility game-card-back {
+  background: repeating-linear-gradient(45deg, #2b1a1a, #2b1a1a 6px, #3b2323 6px, #3b2323 12px);
 }
 
 /* volume da logo: sombras encadeadas seguem o contorno da imagem e formam a "espessura"; a última é a sombra no chão */

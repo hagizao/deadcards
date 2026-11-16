@@ -16,6 +16,7 @@ import { Legal } from "./views/Legal";
 import { Compare } from "./views/Compare";
 import { LANGS, LANG_LABEL, LangProvider, type Lang, strings, useLang, useT } from "./lib/i18n";
 import { Feedback } from "./views/Feedback";
+import { Game } from "./views/Game";
 import { Icon } from "./components/Icon";
 import { Profile } from "./views/Profile";
 import { easeOut } from "./lib/ui";
@@ -32,12 +33,12 @@ function GitHubIcon() {
   );
 }
 
-type Tab = "home" | "teams" | "tierlist" | "collection" | "redeem" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "settings";
-const TABS = ["teams", "tierlist", "collection", "compare", "redeem"] as const;
+type Tab = "home" | "game" | "teams" | "tierlist" | "collection" | "redeem" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "settings";
+const TABS = ["teams", "tierlist", "collection", "compare", "redeem", "game"] as const;
 
 const S = strings({
   pt: {
-    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", compare: "Comparar", redeem: "Resgatar", editor: "Editor" },
+    tabs: { game: "Cardslock Game", teams: "Times", tierlist: "Tier List", collection: "Coleção", compare: "Comparar", redeem: "Resgatar", editor: "Editor" },
     mainNav: "Navegação principal",
     projectLinks: "Links do projeto",
     language: "Idioma",
@@ -54,7 +55,7 @@ const S = strings({
     rmClose: "Fechar aviso",
   },
   en: {
-    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", compare: "Compare", redeem: "Redeem", editor: "Editor" },
+    tabs: { game: "Cardslock Game", teams: "Teams", tierlist: "Tier List", collection: "Collection", compare: "Compare", redeem: "Redeem", editor: "Editor" },
     mainNav: "Main navigation",
     projectLinks: "Project links",
     language: "Language",
@@ -71,7 +72,7 @@ const S = strings({
     rmClose: "Dismiss notice",
   },
   es: {
-    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", compare: "Comparar", redeem: "Canjear", editor: "Editor" },
+    tabs: { game: "Cardslock Game", teams: "Equipos", tierlist: "Tier List", collection: "Colección", compare: "Comparar", redeem: "Canjear", editor: "Editor" },
     mainNav: "Navegación principal",
     projectLinks: "Enlaces del proyecto",
     language: "Idioma",
@@ -313,6 +314,7 @@ function Shell() {
             {tab === "collection" && <Collection onOpenCard={setSpotlight} />}
             {tab === "redeem" && <Redeem onOpenCard={setSpotlight} />}
             {tab === "compare" && <Compare onOpenCard={setSpotlight} />}
+            {tab === "game" && <Game />}
             {tab === "profile" && profileId && <Profile key={profileId} userId={profileId} onOpenCard={setSpotlight} onRedeem={() => setTab("redeem")} />}
             {tab === "settings" && me && <Settings link={linkResult} />}
             {tab === "editor" && me?.admin && <Editor editId={editId} onEditId={setEditId} />}
