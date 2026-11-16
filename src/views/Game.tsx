@@ -3,9 +3,10 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pageTitle, pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, gameConfig } from "../lib/game/config";
-import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Token } from "../lib/game/engine";
+import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, itemCost, type ItemKey, type ItemSlot } from "../lib/game/config";
+import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
 import { GAME_TEXT } from "../lib/game/text";
+import { useItemIcons } from "../lib/game/useItemIcons";
 
 const REVEAL_MS = 650;
 const END_MS = 750;
@@ -17,6 +18,9 @@ const record = { w: 0, l: 0 };
 let toastSeq = 0;
 
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text";
+// cor de cada categoria de item, como na loja do Deadlock
+const SLOT_RING: Record<ItemSlot, string> = { weapon: "ring-item-weapon", vitality: "ring-item-vitality", spirit: "ring-item-spirit" };
+const SLOT_TEXT: Record<ItemSlot, string> = { weapon: "text-item-weapon", vitality: "text-item-vitality", spirit: "text-item-spirit" };
 
 export function Game() {
   const { players, settings } = useData();
@@ -32,8 +36,10 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const { heroIcon, heroArt } = useData();
   const [m, setM] = useState(newMatch);
   const [, bump] = useReducer((x: number) => x + 1, 0);
+  const icons = useItemIcons();
   const [sel, setSel] = useState<GCard | null>(null);
   const [look, setLook] = useState<GCard | null>(null);
+  const [lookItem, setLookItem] = useState<ItemKey | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(() => ({ id: 0, text: t.ui.toast.turn(1) }));
   const [result, setResult] = useState<Result | null>(null);
   const [showEnd, setShowEnd] = useState(false);
@@ -55,6 +61,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const name = (c: GCard) => (c.p.token ? t.tokens[c.p.token] : c.p.name);
   const logName = (n: LogEntry["c"]) => (n === undefined ? "" : typeof n === "string" ? n : t.tokens[n.token]);
   const logLine = m.log[0] ? t.log[m.log[0].k](m.log[0], logName, (k) => t.abilities[k].name) : "";
+  const shopOpen = m.t === ITEM_OFFER_TURN && !!m.offer && !result;
   const errText: Record<PlayError, string> = { souls: t.ui.toast.souls, frozen: t.ui.toast.frozen, full: t.ui.toast.full };
 
   const restart = () => {
@@ -63,6 +70,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     setM(newMatch());
     setSel(null);
     setLook(null);
+    setLookItem(null);
     setResult(null);
     setShowEnd(false);
     say(t.ui.toast.turn(1));
@@ -70,9 +78,11 @@ function Board({ newMatch }: { newMatch: () => Match }) {
 
   const endTurn = () => {
     if (m.busy || result) return;
+    if (m.needsPick) return say(t.shop.pickFirst);
     const queue = m.endTurn();
     setSel(null);
     setLook(null);
+    setLookItem(null);
     bump();
     let i = 0;
     const step = () => {
@@ -105,11 +115,15 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     if (m.busy || result) return;
     setSel((s) => (s === c ? null : c));
     setLook(null);
+    setLookItem(null);
   };
   const pickBoard = (c: GCard) => {
     if (c.staged && c.side === "p" && !m.busy) { m.unstage(c); bump(); return; }
     setLook((x) => (x === c ? null : c));
+    setLookItem(null);
   };
+  const pickItem = (k: ItemKey) => { m.pick(k); bump(); };
+  const showItem = (k: ItemKey) => { setLookItem((x) => (x === k ? null : k)); setSel(null); setLook(null); };
   const playAt = (l: Loc) => {
     if (!sel) return;
     const err = m.play(sel, l);
@@ -137,6 +151,20 @@ function Board({ newMatch }: { newMatch: () => Match }) {
 
       <p className="min-h-5 w-full text-center text-xs text-zinc-300" aria-live="polite">{logLine}</p>
 
+      {m.offer && <ItemSlots m={m} t={t} icons={icons} looking={lookItem} onLook={showItem} />}
+
+      {shopOpen && m.offer && (
+        <section aria-labelledby="game-shop" className="noir-glass flex w-full flex-col gap-2 rounded-xl p-3">
+          <h2 id="game-shop" className="font-display text-lg font-extrabold tracking-wider">{t.shop.title}</h2>
+          <p className="text-xs text-zinc-400">{t.shop.hint}</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {m.offer.p.map((k) => (
+              <ItemOption key={k} k={k} m={m} t={t} icon={icons[k]} picked={m.picked.p === k} disabled={m.busy} onPick={() => pickItem(k)} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section aria-label={t.ui.hand} className="flex min-h-36 max-w-full scrollbar-none gap-2 overflow-x-auto px-1.5 pt-4 pb-1">
         {m.hand.map((c) => (
           <HandCard key={c.id} c={c} t={t} name={name(c)} art={art(c.p.hero)} selected={sel === c} affordable={c.cost <= m.E} disabled={m.busy || !!result} onClick={() => pickHand(c)} />
@@ -144,14 +172,19 @@ function Board({ newMatch }: { newMatch: () => Match }) {
       </section>
 
       <div className="noir-glass min-h-12 w-full rounded-xl px-3 py-2 text-sm/snug">
-        {focused ? <Detail c={focused} t={t} name={name(focused)} /> : <span className="text-zinc-400">{t.ui.hint}</span>}
+        {lookItem ? <ItemDetail k={lookItem} m={m} t={t} />
+          : focused ? <Detail c={focused} t={t} name={name(focused)} />
+          : <span className="text-zinc-400">{t.ui.hint}</span>}
       </div>
 
-      <div className="flex items-center gap-4">
-        <span className="font-display text-xl font-extrabold tracking-widest">{t.ui.souls(m.E)}</span>
-        {result && !showEnd
-          ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
-          : <button type="button" className={primaryBtn} onClick={endTurn} disabled={m.busy || !!result}>{t.ui.endTurn}</button>}
+      <div className="flex flex-col items-center gap-1">
+        <div className="flex items-center gap-4">
+          <span className="font-display text-xl font-extrabold tracking-widest">{t.ui.souls(m.E)}</span>
+          {result && !showEnd
+            ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
+            : <button type="button" className={primaryBtn} onClick={endTurn} disabled={m.busy || !!result || m.needsPick} aria-describedby={m.needsPick ? "game-pick-first" : undefined}>{t.ui.endTurn}</button>}
+        </div>
+        {m.needsPick && <p id="game-pick-first" className="text-xs text-game-brass">{t.shop.pickFirst}</p>}
       </div>
 
       <AnimatePresence>
@@ -286,6 +319,83 @@ function Detail({ c, t, name }: { c: GCard; t: T; name: string }) {
       {c.st.silenced && <> · <span className="text-game-brass">{t.ui.silenced}</span></>}
       <br />
       <span className="text-game-brass">{a.name}{kind ? ` (${kind})` : ""}:</span> {text}
+    </>
+  );
+}
+
+function ItemIconBox({ k, icon, size }: { k: ItemKey; icon?: string; size: string }) {
+  const slot = ITEMS[k].slot;
+  return (
+    <span className={`flex ${size} shrink-0 items-center justify-center overflow-hidden rounded-md bg-zinc-950/80 ring-2 ${SLOT_RING[slot]}`}>
+      {icon ? <img src={icon} alt="" className="size-full object-contain p-0.5" /> : <span className={`font-display text-xs font-extrabold ${SLOT_TEXT[slot]}`} aria-hidden="true">T{ITEMS[k].tier}</span>}
+    </span>
+  );
+}
+
+function ItemOption({ k, m, t, icon, picked, disabled, onPick }: { k: ItemKey; m: Match; t: T; icon?: string; picked: boolean; disabled: boolean; onPick: () => void }) {
+  const it = ITEMS[k];
+  const fit = m.itemFit("p", k);
+  return (
+    <button type="button" onClick={onPick} disabled={disabled} aria-pressed={picked} aria-label={`${t.shop.label(k, it.tier)}: ${t.items[k](m.itemV(k))}`}
+      className={`flex flex-1 cursor-pointer items-start gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-zinc-800/60 active:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 ${picked ? "bg-dl-text/10 outline-2 outline-game-brass" : "bg-zinc-950/50"} ${focus}`}>
+      <ItemIconBox k={k} icon={icon} size="size-12" />
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="flex flex-wrap items-baseline gap-x-2">
+          <b className="font-display tracking-wide">{k}</b>
+          <span className={`text-[11px] font-bold tracking-wider uppercase ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
+        </span>
+        <span className="text-xs text-zinc-200">{t.items[k](m.itemV(k))}</span>
+        <span className="text-[11px] text-game-brass">{t.shop.price(itemCost(it.tier))}</span>
+        {(fit.cards > 0 || fit.loc) && (
+          <span className="flex flex-wrap gap-1">
+            {fit.cards > 0 && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me">{t.shop.fitCards(fit.cards)}</span>}
+            {fit.loc && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me">{t.shop.fitLoc(fit.loc)}</span>}
+          </span>
+        )}
+        {picked && <span className="text-[11px] font-bold tracking-wider text-game-brass uppercase">{t.shop.picked}</span>}
+      </span>
+    </button>
+  );
+}
+
+function ItemSlots({ m, t, icons, looking, onLook }: { m: Match; t: T; icons: Record<string, string>; looking: ItemKey | null; onLook: (k: ItemKey) => void }) {
+  const slot = (s: Side) => {
+    const k = m.picked[s];
+    const shown = k && (s === "p" || m.itemsOn);
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-zinc-950/50 p-1.5">
+        {shown ? (
+          <button type="button" onClick={() => onLook(k)} aria-pressed={looking === k} aria-label={t.shop.label(k, ITEMS[k].tier)}
+            className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-md text-left hover:text-white ${focus}`}>
+            <ItemIconBox k={k} icon={icons[k]} size="size-8" />
+            <span className="flex min-w-0 flex-col">
+              <span className="text-[10px] tracking-wider text-zinc-400 uppercase">{s === "p" ? t.shop.mine : t.shop.ai}</span>
+              <span className="truncate text-xs font-bold">{k}</span>
+              <span className="text-[10px] text-zinc-400">{m.itemsOn ? t.shop.paid(m.paid[s]) : t.shop.hidden}</span>
+            </span>
+          </button>
+        ) : (
+          <>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-zinc-900 font-display text-sm text-zinc-500" aria-hidden="true">?</span>
+            <span className="flex min-w-0 flex-col">
+              <span className="text-[10px] tracking-wider text-zinc-400 uppercase">{s === "p" ? t.shop.mine : t.shop.ai}</span>
+              <span className="text-[10px] text-zinc-400">{s === "a" && m.t < ITEM_REVEAL_TURN ? t.shop.hidden : "—"}</span>
+            </span>
+          </>
+        )}
+      </div>
+    );
+  };
+  return <div className="flex w-full gap-2">{slot("a")}{slot("p")}</div>;
+}
+
+function ItemDetail({ k, m, t }: { k: ItemKey; m: Match; t: T }) {
+  const it = ITEMS[k];
+  return (
+    <>
+      <b className="font-display tracking-wide">{k}</b> · <span className={SLOT_TEXT[it.slot]}>{t.slots[it.slot]}</span> · {t.shop.tier(it.tier)}
+      <br />
+      {t.items[k](m.itemV(k))}
     </>
   );
 }

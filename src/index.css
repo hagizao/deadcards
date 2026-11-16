@@ -30,6 +30,10 @@
   --color-game-me: #5fd0c2;
   --color-game-ai: #e0675a;
   --color-game-brass: #e0b25a;
+  /* categorias dos itens da loja do Deadlock */
+  --color-item-weapon: #e9973a;
+  --color-item-vitality: #7cbb4d;
+  --color-item-spirit: #b77ce6;
 }
 
 /* verso da carta da IA (listras diagonais) */
