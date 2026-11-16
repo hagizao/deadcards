@@ -133,12 +133,13 @@ export function Intro({ onDone }: { onDone: () => void }) {
             className="absolute top-[12.571%] left-[31.209%] w-[38.681%] select-none"
           />
         </div>
-        <motion.p
+        <motion.img
+          src="/intro/nome.png"
+          alt="Cardslock"
+          draggable={false}
           {...flash}
-          className="bg-linear-to-b from-dl-text to-emerald-200 bg-clip-text font-display text-4xl font-extrabold tracking-[0.18em] text-transparent uppercase sm:text-6xl lg:text-7xl"
-        >
-          Cardslock
-        </motion.p>
+          className="w-80 max-w-full select-none sm:w-md lg:w-xl"
+        />
       </div>
 
       <motion.button
