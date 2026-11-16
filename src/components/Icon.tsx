@@ -1,4 +1,5 @@
 const PATHS = {
+  check: "m5 12.5 4.5 4.5L19 7",
   x: "M6 6l12 12M18 6 6 18",
   "chevron-down": "m6 9 6 6 6-6",
   "chevron-up": "m6 15 6-6 6 6",

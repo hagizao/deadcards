@@ -121,6 +121,11 @@ export function isMainCard(p: Player): boolean {
   return !p.variantOf || p.variantOf === p.id;
 }
 
+/** SteamID3 efetivo da carta: variantes herdam o da carta base. */
+export function effectiveAccountId(players: Player[], p: Player): number | undefined {
+  return (isMainCard(p) ? p : players.find((x) => x.id === p.variantOf))?.accountId;
+}
+
 export function teamOf(teams: Team[], p: Player): Team {
   return teams.find((t) => t.id === p.teamId) ?? { id: "", name: "Sem Time", tag: "FA", region: "Sem Time" };
 }

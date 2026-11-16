@@ -43,7 +43,56 @@ export type Player = {
   variantOf?: string;
   inactive?: boolean;
   art?: { url: string; zoom?: number; x?: number; y?: number };
+  /** SteamID3 (account_id da deadlock-api); só na carta base, variantes herdam pelo variantOf. */
+  accountId?: number;
 };
+
+export type MatchSource = "edl" | "pub";
+
+export type PlayerMatch = {
+  matchId: number;
+  source: MatchSource;
+  event?: string;
+  series?: string;
+  heroId: number;
+  startTime: number;
+  durationS: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  netWorth: number;
+  won: boolean;
+};
+
+export type MatchLookupPlayer = {
+  accountId: number;
+  team: number;
+  heroId: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  netWorth: number;
+  name?: string;
+  avatar?: string;
+};
+
+export type MatchLookup = { matchId: number; startTime: number; durationS: number; winningTeam: number; players: MatchLookupPlayer[] };
+
+/** Outra carta do mesmo jogador que pode receber o accountId da carta atual (backfill manual). */
+export type BackfillCandidate = {
+  playerId: string;
+  name: string;
+  teamId: string;
+  inactive?: boolean;
+  /** accountId atual da carta; se for diferente do da carta de origem é conflito e não pode ser marcada. */
+  accountId?: number;
+  /** variant: tem variantOf apontando para a carta; name: mesmo nome (sem diferenciar maiúsculas/espaços). */
+  by: "variant" | "name";
+};
+
+export type BackfillResult = { updated: string[]; skipped: { item: string; reason: string }[] };
+
+export type EdlMatch = { matchId: number; event: string; series: string; game?: number; teams?: string; startTime?: number };
 
 export type HeroArt = { name: string; url: string; zoom: number; x: number; y: number };
 
