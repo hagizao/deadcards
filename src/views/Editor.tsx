@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useAnimate } from "motion/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, useData } from "../lib/data";
 import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, getPlayerHistory, getPlayerOvr } from "../lib/cards";
 import { FRAME_PRESETS, getCardTier, type Tier } from "../lib/rarity";
@@ -8,6 +8,12 @@ import { Card } from "../components/Card";
 import { TeamLogo } from "../components/TeamLogo";
 import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
+import {
+  ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, LOC_V_RANGE, MIN_LOCS, NAME_MAX, POWER_RANGE,
+  cardStats, gameConfig, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type LocType, type PoolCard,
+} from "../lib/game/config";
+import { cardPool } from "../lib/game/engine";
+import { GAME_TEXT } from "../lib/game/text";
 
 const SECTIONS = [
   { id: "card", label: "Carta" },
@@ -15,6 +21,7 @@ const SECTIONS = [
   { id: "heroes", label: "Heróis" },
   { id: "look", label: "Aparência" },
   { id: "codes", label: "Códigos" },
+  { id: "game", label: "Cardslock Game" },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
 
@@ -104,6 +111,7 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
           {section === "heroes" && <HeroesForm />}
           {section === "look" && <LookForm />}
           {section === "codes" && <CodesForm />}
+          {section === "game" && <GameForm />}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -631,6 +639,180 @@ function CodesForm() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Cardslock Game ---------- */
+
+const GT = GAME_TEXT.pt;
+const LOC_N_LABEL: Partial<Record<LocType, string>> = { slots: "Espaços", costLow: "Custo", costHigh: "Custo", midboss: "Turno", chaos: "Poder máximo" };
+const clampTo = (x: number, [a, b]: [number, number]) => Math.max(a, Math.min(b, Math.round(x)));
+
+function NumField({ label, value, range, onChange }: { label: string; value: number; range: [number, number]; onChange: (v: number) => void }) {
+  return (
+    <Field label={label}>
+      <input type="number" inputMode="numeric" className={input} min={range[0]} max={range[1]} value={value}
+        onChange={(e) => { if (e.target.value !== "" && Number.isFinite(+e.target.value)) onChange(clampTo(+e.target.value, range)); }} />
+    </Field>
+  );
+}
+
+function GameForm() {
+  const { players, settings, heroIcon, heroArt, reload } = useData();
+  const pool = useMemo(() => cardPool(players).sort((a, b) => a.name.localeCompare(b.name)), [players]);
+  const [cfg, setCfg] = useState<GameConfig>(() => structuredClone(gameConfig(settings.game)));
+  const [li, setLi] = useState(0);
+  const [query, setQuery] = useState("");
+  const [cardId, setCardId] = useState(pool[0]?.id ?? "");
+  const { busy, msg, run } = useSaver(reload);
+
+  const loc = cfg.locs[li];
+  const setLoc = (patch: Partial<GameLoc>) => setCfg((c) => ({ ...c, locs: c.locs.map((l, i) => (i === li ? { ...l, ...patch } : l)) }));
+  const setType = (type: LocType) => {
+    const r = nRange(type);
+    setLoc({ type, n: clampTo(loc.n || r[0], r), v: LOC_FIELDS[type].includes("v") && !loc.v ? 1 : loc.v });
+  };
+  const addLoc = () => { setCfg((c) => ({ ...c, locs: [...c.locs, { id: newId("l"), name: "Novo local", type: "enter", v: 1, n: 1, desc: "" }] })); setLi(cfg.locs.length); };
+  const removeLoc = () => { setCfg((c) => ({ ...c, locs: c.locs.filter((_, i) => i !== li) })); setLi(Math.max(0, li - 1)); };
+
+  const q = query.trim().toLowerCase();
+  const shown = pool.filter((p) => !q || `${p.name} ${p.hero} ${p.position} ${GT.abilities[cardStats(p, cfg.cards).ab].name}`.toLowerCase().includes(q));
+  const card = shown.find((p) => p.id === cardId) ?? shown[0];
+  const stats = card && cardStats(card, cfg.cards);
+  const override = card ? cfg.cards[card.id] : undefined;
+  const setCard = (patch: CardOverride) => {
+    if (!card) return;
+    setCfg((c) => {
+      const o: CardOverride = { ...c.cards[card.id], ...patch };
+      if (!o.desc?.trim()) delete o.desc;
+      if (o.v === undefined) delete o.v;
+      return { ...c, cards: { ...c.cards, [card.id]: o } };
+    });
+  };
+  const resetCard = () => {
+    if (!card) return;
+    setCfg((c) => { const cards = { ...c.cards }; delete cards[card.id]; return { ...c, cards }; });
+  };
+
+  const save = () => {
+    if (cfg.locs.length < MIN_LOCS) return;
+    run(() => api.save("settings", "game", { game: cfg }), "Cardslock Game salvo! Vale a partir da próxima partida.");
+  };
+
+  const art = card ? heroIcon(card.hero) ?? heroArt(card.hero)?.url : undefined;
+  const optLabel = (p: PoolCard) => `${p.name} · ${p.hero} · ${p.position}${cfg.cards[p.id] ? " (editada)" : ""}`;
+  const kind = stats ? GT.kinds[ABILITIES[stats.ab].kind] : "";
+
+  return (
+    <div className="flex flex-col gap-6">
+      <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Localizações</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-[1_1_14rem]">
+            <Field label="Escolha o local">
+              <select className={input} value={li} onChange={(e) => setLi(+e.target.value)}>
+                {cfg.locs.map((l, i) => <option key={l.id + i} value={i}>{l.name || "Sem nome"} — {GT.locs[l.type].label}</option>)}
+              </select>
+            </Field>
+          </div>
+          <button type="button" className={ghost} onClick={addLoc}>+ Novo local</button>
+          <button type="button" className={ghost} onClick={removeLoc} disabled={cfg.locs.length <= MIN_LOCS}>Remover este local</button>
+        </div>
+        <p className="text-xs text-zinc-400">Cada partida sorteia 3 dos {cfg.locs.length} locais.</p>
+        {loc && (
+          <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_16rem]">
+            <div className="flex flex-col gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Nome"><input className={input} maxLength={NAME_MAX} value={loc.name} onChange={(e) => setLoc({ name: e.target.value })} /></Field>
+                <Field label="Efeito">
+                  <select className={input} value={loc.type} onChange={(e) => setType(e.target.value as LocType)}>
+                    {LOC_TYPES.map((k) => <option key={k} value={k}>{GT.locs[k].label}</option>)}
+                  </select>
+                </Field>
+              </div>
+              {LOC_FIELDS[loc.type].length > 0 && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {LOC_FIELDS[loc.type].includes("v") && <NumField label="Valor" value={loc.v} range={LOC_V_RANGE} onChange={(v) => setLoc({ v })} />}
+                  {LOC_FIELDS[loc.type].includes("n") && <NumField label={LOC_N_LABEL[loc.type] ?? "Número"} value={loc.n} range={nRange(loc.type)} onChange={(n) => setLoc({ n })} />}
+                </div>
+              )}
+              <Field label="Descrição">
+                <textarea className={`${input} min-h-16 resize-y`} rows={3} maxLength={DESC_MAX} placeholder={GT.locs[loc.type].text(loc)} value={loc.desc} onChange={(e) => setLoc({ desc: e.target.value })} />
+              </Field>
+              <p className="text-xs text-zinc-400">Em branco, o jogo mostra o texto automático do efeito (o texto cinza no campo).</p>
+            </div>
+            <div className="flex flex-col gap-1 rounded-2xl bg-zinc-950/60 p-4 text-center">
+              <b className="font-display tracking-wide text-dl-text">{loc.name || "Sem nome"}</b>
+              <span className="text-sm text-zinc-300">{loc.desc.trim() || GT.locs[loc.type].text(loc)}</span>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Cartas</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-[1_1_14rem]">
+            <Field label="Buscar"><input className={input} value={query} placeholder="Jogador, herói, role ou habilidade…" onChange={(e) => setQuery(e.target.value)} /></Field>
+          </div>
+          <div className="min-w-0 flex-[1_1_14rem]">
+            <Field label="Escolha a carta">
+              <select className={input} value={card?.id ?? ""} onChange={(e) => setCardId(e.target.value)}>
+                {shown.length ? shown.map((p) => <option key={p.id} value={p.id}>{optLabel(p)}</option>) : <option value="">Nenhuma carta encontrada</option>}
+              </select>
+            </Field>
+          </div>
+        </div>
+        {card && stats ? (
+          <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_16rem]">
+            <div className="flex flex-col gap-3">
+              {override && <span className="text-[10px] font-bold tracking-[0.12em] text-game-brass uppercase">Carta editada</span>}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <NumField label="Custo (almas)" value={stats.cost} range={COST_RANGE} onChange={(cost) => setCard({ cost })} />
+                <NumField label="Poder" value={stats.power} range={POWER_RANGE} onChange={(power) => setCard({ power })} />
+                {ABILITIES[stats.ab].usesV && <NumField label="Valor da habilidade" value={stats.v} range={ABILITY_V_RANGE} onChange={(v) => setCard({ v })} />}
+              </div>
+              <Field label="Habilidade">
+                <select className={input} value={stats.ab} onChange={(e) => setCard({ ab: e.target.value as AbilityKey, v: undefined })}>
+                  <optgroup label="Heróis do Deadlock">
+                    {ABILITY_KEYS.filter((k) => ABILITIES[k].hero).map((k) => <option key={k} value={k}>{k} — {GT.abilities[k].name}</option>)}
+                  </optgroup>
+                  <optgroup label="Genéricas">
+                    {ABILITY_KEYS.filter((k) => !ABILITIES[k].hero).map((k) => <option key={k} value={k}>{GT.abilities[k].name}</option>)}
+                  </optgroup>
+                </select>
+              </Field>
+              <p className="text-xs text-zinc-400">
+                Padrão desta carta: {GT.abilities[stats.def.ab].name}{ABILITIES[stats.def.ab].hero ? ` (${stats.def.ab})` : ""}, custo {stats.def.cost}, poder {stats.def.power}.
+              </p>
+              <Field label="Descrição">
+                <textarea className={`${input} min-h-16 resize-y`} rows={3} maxLength={DESC_MAX} placeholder={GT.abilities[stats.ab].text(stats.v)} value={override?.desc ?? ""} onChange={(e) => setCard({ desc: e.target.value })} />
+              </Field>
+              <p className="text-xs text-zinc-400">A descrição é só o texto da carta: quem decide o efeito é a habilidade escolhida. Em branco, usa o texto automático.</p>
+              <div><button type="button" className={ghost} onClick={resetCard} disabled={!override}>Voltar esta carta ao padrão</button></div>
+            </div>
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative h-60 w-44 overflow-hidden rounded-xl text-white ring-1 ring-white/40" style={{ background: `linear-gradient(160deg, ${card.c1}, ${card.c2})` }}>
+                {art && <img src={art} alt="" className="absolute inset-x-0 top-0 h-[72%] w-full object-cover" />}
+                <i className="absolute top-1.5 left-1.5 flex size-9 items-center justify-center rounded-full border-2 border-white bg-blue-600 font-display text-lg font-extrabold not-italic">{stats.cost}</i>
+                <b className="absolute top-1.5 right-1.5 flex size-9 items-center justify-center rounded-full border-2 border-white bg-game-brass font-display text-lg font-extrabold text-dl-black">{stats.power}</b>
+                <span className="absolute inset-x-0 bottom-0 bg-black/85 px-1.5 py-2 text-center font-display text-sm tracking-wide">{card.name}</span>
+              </div>
+              <p className="text-sm/snug">
+                <span className="font-bold text-game-brass">{GT.abilities[stats.ab].name}{kind ? ` (${kind})` : ""}:</span>{" "}
+                {stats.desc || GT.abilities[stats.ab].text(stats.v)}
+              </p>
+            </div>
+          </div>
+        ) : <p className="text-xs text-zinc-400">Nenhuma carta para editar.</p>}
+      </section>
+
+      <div className="noir-glass sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3">
+        <button type="button" className={primary} disabled={busy} onClick={save}>{busy ? "Salvando…" : "Salvar"}</button>
+        <button type="button" className={ghost} onClick={() => { setCfg({ locs: structuredClone(DEFAULT_LOCS), cards: {} }); setLi(0); }}>Restaurar tudo ao padrão</button>
+        <Toast msg={msg} />
       </div>
     </div>
   );
