@@ -1,4 +1,6 @@
-export type Stats = { MIR: number; MAC: number; SUP: number; MOV: number; POL: number; CON: number };
+import type { GameConfig } from "./game/config";
+
+export type Stats ={ MIR: number; MAC: number; SUP: number; MOV: number; POL: number; CON: number };
 
 export type HistoryPoint = { date: string; ovr: number; base?: boolean; note?: string };
 
@@ -53,6 +55,7 @@ export type Settings = {
   tierConfig?: TierBand[];
   bg?: BgSettings;
   homeHero?: string;
+  game?: GameConfig;
 };
 
 export type AppData = {
