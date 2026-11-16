@@ -190,21 +190,41 @@ describe("itens: draft e revelação", () => {
     }
   });
 
-  it("não fecha o turno 5 sem escolher; o item fica escondido até o turno 6 e é pago em almas", () => {
+  it("não fecha o turno 5 sem escolher; o item é pago no turno 5 e fica escondido até o turno 6", () => {
     const m = new Match(cfgWith(four), pool, seeded(7));
     playUntil(m, 5);
     expect(m.needsPick).toBe(true);
     expect(m.endTurn()).toEqual([]);
     expect(m.busy).toBe(false);
-    const k = m.offer!.p.at(-1)!;
+    const e = m.E;
+    const [cheap, , k] = m.offer!.p;
+    m.pick(cheap);
+    expect(m.E).toBe(e - ITEMS[cheap].tier);
     m.pick(k);
     expect(m.picked.p).toBe(k);
+    expect(m.E).toBe(e - ITEMS[k].tier);
+    expect(m.paid.p).toBe(ITEMS[k].tier);
     expect(m.itemsOn).toBe(false);
     m.runEndTurn();
     expect(m.t).toBe(6);
     expect(m.itemsOn).toBe(true);
-    expect(m.paid.p).toBe(ITEMS[k].tier);
-    expect(m.E).toBe(6 - ITEMS[k].tier);
+    expect(m.E).toBe(6);
+  });
+
+  it("sem almas para o item, a escolha é recusada; sem almas para nenhum, o turno fecha sem item", () => {
+    const m = new Match(cfgWith(four), pool, seeded(8));
+    playUntil(m, 5);
+    const [cheap, , dear] = m.offer!.p;
+    m.E = ITEMS[cheap].tier;
+    expect(m.canBuy(dear)).toBe(false);
+    m.pick(dear);
+    expect(m.picked.p).toBeNull();
+    expect(m.needsPick).toBe(true);
+    m.E = 0;
+    expect(m.needsPick).toBe(false);
+    m.runEndTurn();
+    expect(m.t).toBe(6);
+    expect(m.picked.p).toBeNull();
   });
 
   it("desconto da loja reduz o preço, sem ficar negativo", () => {
@@ -237,6 +257,7 @@ describe("itens: draft e revelação", () => {
       const m = new Match(cfgWith([k], DEFAULT_LOCS), pool, seeded(seed));
       let result = null;
       while (!result) {
+        if (m.needsPick) m.pick(k);
         for (const c of [...m.hand].sort((a, b) => a.cost - b.cost)) {
           const l = m.loc.find((x) => !m.canPlay(c, x));
           if (l) m.play(c, l);

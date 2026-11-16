@@ -447,16 +447,16 @@ export class Match {
     "Rescue Beam": (s, v) => {
       const c = this.weakest(this.mine(s));
       if (!c) return;
-      c.bonus += v;
+      this.mine(s).forEach((x) => (x.bonus += x === c ? v : 2));
       const from = this.locOf(c);
       const to = this.best(this.loc.filter((l) => l !== from && this.room(l, s) && this.leading(opp(s), l)), (l) => this.total(l, s) - this.total(l, opp(s)));
       this.move(c, from, to ?? undefined);
     },
-    "Glass Cannon": (s, v) => this.mine(s).forEach((c) => (c.bonus += isGun(c) ? v : 2)),
+    "Glass Cannon": (s, v) => this.mine(s).forEach((c) => (c.bonus += isGun(c) ? v : 4)),
     "Ricochet": (s, v) => this.loc.forEach((l) => this.hurt(this.strongest(this.tg(l.s[opp(s)].filter((c) => c.rev && !c.st.burrow))), v, null)),
     "Colossus": (s, v) => {
       const l = this.best(this.sh(this.loc), (L) => L.s[s].filter((c) => c.rev).length);
-      l?.s[s].forEach((c) => { if (c.rev) c.bonus += v + (isFront(c) ? v : 0); });
+      this.mine(s).forEach((c) => (c.bonus += this.locOf(c) === l ? v + (isFront(c) ? v : 0) : 3));
     },
     "Surge of Power": (s, v) => this.mine(s).filter((c) => ABILITIES[this.abilityOf(c)].kind === "r").forEach((c) => (c.bonus += v)),
     "Unstoppable": (s, v) => this.mine(s).forEach((c) => { c.st.chained = false; c.st.silenced = false; c.st.stun = 0; c.bonus += v; }),
@@ -502,14 +502,27 @@ export class Match {
       const fit = this.itemFit("a", k);
       return ITEMS[k].tier + 0.6 * fit.cards + (fit.loc ? 1.5 : 0) + this.rnd() * 1.5;
     });
+    this.pay("a", this.picked.a);
   }
 
+  /** Cobra o item na hora da escolha (turno 5), devolvendo o que tinha sido pago por outro. */
+  private pay(s: Side, k: ItemKey | null) {
+    const back = this.paid[s];
+    this.paid[s] = k ? this.itemPrice(s, k) : 0;
+    if (s === "p") this.E += back - this.paid.p;
+    else this.AE += back - this.paid.a;
+  }
+
+  /** Almas disponíveis para este item, contando a devolução do item já escolhido. */
+  canBuy = (k: ItemKey) => this.itemPrice("p", k) <= this.E + this.paid.p;
+
   /** O jogador ainda precisa escolher o item antes de fechar o turno. */
-  get needsPick() { return this.t === ITEM_OFFER_TURN && !!this.offer && !this.picked.p; }
+  get needsPick() { return this.t === ITEM_OFFER_TURN && !!this.offer && !this.picked.p && this.offer.p.some(this.canBuy); }
 
   pick(k: ItemKey) {
-    if (this.busy || this.t !== ITEM_OFFER_TURN || !this.offer?.p.includes(k)) return;
+    if (this.busy || this.t !== ITEM_OFFER_TURN || !this.offer?.p.includes(k) || !this.canBuy(k)) return;
     this.picked.p = k;
+    this.pay("p", k);
   }
 
   /** Custo final do item: tier em almas, menos o desconto da Loja Secreta. */
@@ -520,9 +533,6 @@ export class Match {
     for (const s of (this.t % 2 ? ["p", "a"] : ["a", "p"]) as Side[]) {
       const k = this.picked[s];
       if (!k) continue;
-      this.paid[s] = this.itemPrice(s, k);
-      if (s === "p") this.E = Math.max(0, this.E - this.paid.p);
-      else this.AE = Math.max(0, this.AE - this.paid.a);
       this.say({ k: "item", side: s, item: k });
       this.ITEM_FX[k]?.(s, this.itemV(k));
     }
@@ -639,7 +649,7 @@ export class Match {
       const p = this.total(l, "p"), a = this.total(l, "a"), lead: Side | null = p > a ? "p" : a > p ? "a" : null;
       if (this.ty(l, "endturn")) [...l.s.p, ...l.s.a].forEach((c) => { if (c.rev) c.bonus += l.L.v; });
       if (this.ty(l, "urn") && lead) { this.extra[lead] += l.L.v; this.say({ k: "urn", side: lead }); }
-      if (this.ty(l, "shop") && this.t === ITEM_OFFER_TURN && lead) { this.discount[lead] += l.L.v; this.say({ k: "shop", side: lead, v: l.L.v }); }
+      if (this.ty(l, "shop") && this.t === ITEM_OFFER_TURN - 1 && lead) { this.discount[lead] += l.L.v; this.say({ k: "shop", side: lead, v: l.L.v }); }
       if (this.ty(l, "midboss") && this.t === l.L.n && lead) { this.everywhere(lead).forEach(([x]) => (x.bonus += l.L.v)); this.say({ k: "boss", side: lead }); }
       if (this.ty(l, "zipline")) (["p", "a"] as const).forEach((s) => {
         const w = this.weakest(l.s[s].filter((x) => x.rev && !x.st.chained));
@@ -681,7 +691,7 @@ export class Match {
 
   /** Fecha o turno de uma vez, sem a pausa entre revelações (testes e simulação). Sem escolha feita, fica com o primeiro item. */
   runEndTurn(): Result | null {
-    if (this.needsPick) this.pick(this.offer!.p[0]);
+    if (this.needsPick) this.pick(this.offer!.p.find(this.canBuy)!);
     for (const [c, l] of this.endTurn()) this.reveal(c, l);
     this.endOfTurn();
     if (this.over) return this.finish();

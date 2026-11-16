@@ -3,7 +3,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pageTitle, pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, itemCost, type ItemKey, type ItemSlot } from "../lib/game/config";
+import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, type ItemKey, type ItemSlot } from "../lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
@@ -159,7 +159,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
           <p className="text-xs text-zinc-400">{t.shop.hint}</p>
           <div className="flex flex-col gap-2 sm:flex-row">
             {m.offer.p.map((k) => (
-              <ItemOption key={k} k={k} m={m} t={t} icon={icons[k]} picked={m.picked.p === k} disabled={m.busy} onPick={() => pickItem(k)} />
+              <ItemOption key={k} k={k} m={m} t={t} icon={icons[k]} picked={m.picked.p === k} disabled={m.busy || !m.canBuy(k)} onPick={() => pickItem(k)} />
             ))}
           </div>
         </section>
@@ -345,7 +345,7 @@ function ItemOption({ k, m, t, icon, picked, disabled, onPick }: { k: ItemKey; m
           <span className={`text-[11px] font-bold tracking-wider uppercase ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
         </span>
         <span className="text-xs text-zinc-200">{t.items[k](m.itemV(k))}</span>
-        <span className="text-[11px] text-game-brass">{t.shop.price(itemCost(it.tier))}</span>
+        <span className="text-[11px] text-game-brass">{t.shop.price(m.itemPrice("p", k))}{!picked && !m.canBuy(k) && ` · ${t.shop.noSouls}`}</span>
         {(fit.cards > 0 || fit.loc) && (
           <span className="flex flex-wrap gap-1">
             {fit.cards > 0 && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me">{t.shop.fitCards(fit.cards)}</span>}

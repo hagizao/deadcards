@@ -83,15 +83,15 @@ export const ITEMS = {
   "High-Velocity Rounds": I(1, "weapon", 3), "Close Quarters": I(1, "weapon", 3),
   "Extra Health": I(1, "vitality", 1), "Healing Rite": I(1, "vitality", 2),
   "Extra Spirit": I(1, "spirit", 1), "Golden Goose Egg": I(1, "spirit", 1),
-  "Swift Striker": I(2, "weapon", 3), "Long Range": I(2, "weapon", 9),
-  "Battle Vest": I(2, "vitality", 4), "Healing Booster": I(2, "vitality", 3),
-  "Arcane Surge": I(2, "spirit", 8), "Slowing Hex": I(2, "spirit", 7),
+  "Swift Striker": I(2, "weapon", 3), "Long Range": I(2, "weapon", 7),
+  "Battle Vest": I(2, "vitality", 5), "Healing Booster": I(2, "vitality", 4),
+  "Arcane Surge": I(2, "spirit", 10), "Slowing Hex": I(2, "spirit", 10),
   "Toxic Bullets": I(3, "weapon", 2), "Sharpshooter": I(3, "weapon", 10),
-  "Metal Skin": I(3, "vitality", 3), "Rescue Beam": I(3, "vitality", 7),
-  "Surge of Power": I(3, "spirit", 5), "Superior Cooldown": I(3, "spirit", 2),
-  "Glass Cannon": I(4, "weapon", 10), "Ricochet": I(4, "weapon", 7),
-  "Colossus": I(4, "vitality", 10), "Unstoppable": I(4, "vitality", 4),
-  "Echo Shard": I(4, "spirit", 6), "Refresher": I(4, "spirit", 3),
+  "Metal Skin": I(3, "vitality", 3), "Rescue Beam": I(3, "vitality", 8),
+  "Surge of Power": I(3, "spirit", 5), "Superior Cooldown": I(3, "spirit", 3),
+  "Glass Cannon": I(4, "weapon", 10), "Ricochet": I(4, "weapon", 10),
+  "Colossus": I(4, "vitality", 10), "Unstoppable": I(4, "vitality", 8),
+  "Echo Shard": I(4, "spirit", 10), "Refresher": I(4, "spirit", 5),
 } satisfies Record<string, ItemDef>;
 export type ItemKey = keyof typeof ITEMS;
 export const ITEM_KEYS = Object.keys(ITEMS) as ItemKey[];

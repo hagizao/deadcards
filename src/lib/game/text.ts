@@ -16,7 +16,7 @@ export type GameText = {
   items: Record<ItemKey, V>;
   slots: Record<ItemSlot, string>;
   shop: {
-    title: string; hint: string; tier: (t: number) => string; price: (n: number) => string; fitCards: (n: number) => string; fitLoc: (l: string) => string;
+    title: string; hint: string; tier: (t: number) => string; price: (n: number) => string; noSouls: string; fitCards: (n: number) => string; fitLoc: (l: string) => string;
     pick: string; picked: string; mine: string; ai: string; hidden: string; pickFirst: string; paid: (n: number) => string; label: (name: string, tier: number) => string;
   };
   log: Record<LogKey, Log>;
@@ -107,7 +107,7 @@ export const GAME_TEXT = strings<GameText>({
       patron: { label: "Desempate", text: () => "Se os locais empatarem, quem vencer aqui vence a partida." },
       ritual: { label: "Revelar em dobro", text: () => "Efeitos “Ao revelar” de cartas aqui acontecem duas vezes." },
       chaos: { label: "Poder aleatório", text: (o) => `Cartas reveladas aqui recebem um poder aleatório de 1 a ${o.n}.` },
-      shop: { label: "Loja (preço do item)", text: (o) => `Quem vencer aqui no fim do turno 5 paga ${Math.abs(o.v)} ${pl(Math.abs(o.v), "alma", "almas")} a ${o.v >= 0 ? "menos" : "mais"} pelo item.` },
+      shop: { label: "Loja (preço do item)", text: (o) => `Quem vencer aqui no fim do turno 4 paga ${Math.abs(o.v)} ${pl(Math.abs(o.v), "alma", "almas")} a ${o.v >= 0 ? "menos" : "mais"} pelo item.` },
     },
     tokens: { pigeon: "Pombo", ghoul: "Carniçal", turret: "Torreta", rat: "Rato" },
     items: {
@@ -126,12 +126,12 @@ export const GAME_TEXT = strings<GameText>({
       "Toxic Bullets": (v) => `Todas as inimigas em jogo queimam −${v} no fim de cada turno; em locais com Carry ou OffCarry seu, −${v + 3}.`,
       "Sharpshooter": (v) => `Sua carta mais forte ganha +${v}; suas outras cartas em jogo ganham +2.`,
       "Metal Skin": (v) => `Suas cartas ganham +${v} e ficam imunes a efeitos inimigos até o fim da partida, inclusive as que você revelar depois.`,
-      "Rescue Beam": (v) => `Sua carta mais fraca ganha +${v} e vai para um local onde você está perdendo.`,
+      "Rescue Beam": (v) => `Sua carta mais fraca ganha +${v} e vai para um local onde você está perdendo; suas outras cartas ganham +2.`,
       "Surge of Power": (v) => `Suas cartas em jogo com “Ao revelar” ganham +${v}.`,
       "Superior Cooldown": (v) => `Os efeitos “Fim do turno” das suas cartas acontecem duas vezes, e suas cartas ganham +${v} no fim de cada turno.`,
-      "Glass Cannon": (v) => `Seus Carry e OffCarry ganham +${v}; suas outras cartas em jogo ganham +2.`,
+      "Glass Cannon": (v) => `Seus Carry e OffCarry ganham +${v}; suas outras cartas em jogo ganham +4.`,
       "Ricochet": (v) => `Em cada local, a carta inimiga mais forte perde ${v}.`,
-      "Colossus": (v) => `Suas cartas no local onde você tem mais cartas ganham +${v} (Frontline ganham o dobro).`,
+      "Colossus": (v) => `Suas cartas no local onde você tem mais cartas ganham +${v} (Frontline ganham o dobro); as outras ganham +3.`,
       "Unstoppable": (v) => `Suas cartas se livram de correntes, anulação e atordoamento, e ganham +${v}.`,
       "Echo Shard": (v) => `Sua carta mais forte e mais duas cartas suas aleatórias ganham +${v}.`,
       "Refresher": (v) => `Todas as suas cartas em jogo ativam de novo o “Ao revelar” e ganham +${v}.`,
@@ -139,8 +139,8 @@ export const GAME_TEXT = strings<GameText>({
     slots: { weapon: "Arma", vitality: "Vitalidade", spirit: "Espírito" },
     shop: {
       title: "Loja: escolha 1 item",
-      hint: "O item fica escondido e é revelado no início do turno 6, quando você paga o custo em almas. A IA também escolhe um, com os mesmos tiers.",
-      tier: (t) => `Tier ${t}`, price: (n) => `Custa ${n} ${pl(n, "alma", "almas")} no turno 6`,
+      hint: "O custo em almas sai agora, deste turno; o item fica escondido e é revelado no início do turno 6. A IA também escolhe um, com os mesmos tiers.",
+      tier: (t) => `Tier ${t}`, price: (n) => `Custa ${n} ${pl(n, "alma", "almas")} agora`, noSouls: "Almas insuficientes",
       fitCards: (n) => `Combina com ${n} ${pl(n, "carta sua", "cartas suas")}`, fitLoc: (l) => `Sinergia: ${l}`,
       pick: "Escolher", picked: "Escolhido", mine: "Seu item", ai: "Item da IA", hidden: "Escondido até o turno 6",
       pickFirst: "Escolha um item na loja para fechar o turno.", paid: (n) => `pagou ${n} ${pl(n, "alma", "almas")}`,
@@ -284,7 +284,7 @@ export const GAME_TEXT = strings<GameText>({
       patron: { label: "Tiebreaker", text: () => "If locations are tied, whoever wins here wins the match." },
       ritual: { label: "Double reveal", text: () => "“On reveal” effects of cards here happen twice." },
       chaos: { label: "Random power", text: (o) => `Cards revealed here get a random power from 1 to ${o.n}.` },
-      shop: { label: "Shop (item price)", text: (o) => `Whoever is winning here at the end of turn 5 pays ${Math.abs(o.v)} ${pl(Math.abs(o.v), "soul", "souls")} ${o.v >= 0 ? "less" : "more"} for their item.` },
+      shop: { label: "Shop (item price)", text: (o) => `Whoever is winning here at the end of turn 4 pays ${Math.abs(o.v)} ${pl(Math.abs(o.v), "soul", "souls")} ${o.v >= 0 ? "less" : "more"} for their item.` },
     },
     tokens: { pigeon: "Pigeon", ghoul: "Ghoul", turret: "Turret", rat: "Rat" },
     items: {
@@ -303,12 +303,12 @@ export const GAME_TEXT = strings<GameText>({
       "Toxic Bullets": (v) => `All enemy cards in play burn −${v} at the end of each turn; −${v + 3} at locations with your Carry or OffCarry.`,
       "Sharpshooter": (v) => `Your strongest card gains +${v}; your other cards in play gain +2.`,
       "Metal Skin": (v) => `Your cards gain +${v} and become immune to enemy effects until the end of the match, including cards you reveal later.`,
-      "Rescue Beam": (v) => `Your weakest card gains +${v} and moves to a location where you're losing.`,
+      "Rescue Beam": (v) => `Your weakest card gains +${v} and moves to a location where you're losing; your other cards gain +2.`,
       "Surge of Power": (v) => `Your cards in play with “On reveal” gain +${v}.`,
       "Superior Cooldown": (v) => `“End of turn” effects of your cards happen twice, and your cards gain +${v} at the end of each turn.`,
-      "Glass Cannon": (v) => `Your Carry and OffCarry cards gain +${v}; your other cards in play gain +2.`,
+      "Glass Cannon": (v) => `Your Carry and OffCarry cards gain +${v}; your other cards in play gain +4.`,
       "Ricochet": (v) => `At each location, the strongest enemy card loses ${v}.`,
-      "Colossus": (v) => `Your cards at the location where you have the most cards gain +${v} (Frontline gain double).`,
+      "Colossus": (v) => `Your cards at the location where you have the most cards gain +${v} (Frontline gain double); the rest gain +3.`,
       "Unstoppable": (v) => `Your cards break free of chains, silence and stun, and gain +${v}.`,
       "Echo Shard": (v) => `Your strongest card and two other random cards of yours gain +${v}.`,
       "Refresher": (v) => `All your cards in play trigger their “On reveal” again and gain +${v}.`,
@@ -316,8 +316,8 @@ export const GAME_TEXT = strings<GameText>({
     slots: { weapon: "Weapon", vitality: "Vitality", spirit: "Spirit" },
     shop: {
       title: "Shop: pick 1 item",
-      hint: "Your item stays hidden and is revealed at the start of turn 6, when you pay its cost in souls. The AI picks one too, from the same tiers.",
-      tier: (t) => `Tier ${t}`, price: (n) => `Costs ${n} ${pl(n, "soul", "souls")} on turn 6`,
+      hint: "You pay the soul cost now, this turn; the item stays hidden and is revealed at the start of turn 6. The AI picks one too, from the same tiers.",
+      tier: (t) => `Tier ${t}`, price: (n) => `Costs ${n} ${pl(n, "soul", "souls")} now`, noSouls: "Not enough souls",
       fitCards: (n) => `Fits ${n} of your ${pl(n, "card", "cards")}`, fitLoc: (l) => `Synergy: ${l}`,
       pick: "Pick", picked: "Picked", mine: "Your item", ai: "AI item", hidden: "Hidden until turn 6",
       pickFirst: "Pick an item in the shop to end the turn.", paid: (n) => `paid ${n} ${pl(n, "soul", "souls")}`,
@@ -461,7 +461,7 @@ export const GAME_TEXT = strings<GameText>({
       patron: { label: "Desempate", text: () => "Si los lugares empatan, quien gane aquí gana la partida." },
       ritual: { label: "Revelar doble", text: () => "Los efectos «Al revelar» de las cartas aquí ocurren dos veces." },
       chaos: { label: "Poder aleatorio", text: (o) => `Las cartas reveladas aquí reciben un poder aleatorio de 1 a ${o.n}.` },
-      shop: { label: "Tienda (precio del objeto)", text: (o) => `Quien gane aquí al final del turno 5 paga ${Math.abs(o.v)} ${pl(Math.abs(o.v), "alma", "almas")} ${o.v >= 0 ? "menos" : "más"} por su objeto.` },
+      shop: { label: "Tienda (precio del objeto)", text: (o) => `Quien gane aquí al final del turno 4 paga ${Math.abs(o.v)} ${pl(Math.abs(o.v), "alma", "almas")} ${o.v >= 0 ? "menos" : "más"} por su objeto.` },
     },
     tokens: { pigeon: "Paloma", ghoul: "Necrófago", turret: "Torreta", rat: "Rata" },
     items: {
@@ -480,12 +480,12 @@ export const GAME_TEXT = strings<GameText>({
       "Toxic Bullets": (v) => `Todas las enemigas en juego arden −${v} al final de cada turno; −${v + 3} en lugares con tu Carry u OffCarry.`,
       "Sharpshooter": (v) => `Tu carta más fuerte gana +${v}; tus otras cartas en juego ganan +2.`,
       "Metal Skin": (v) => `Tus cartas ganan +${v} y quedan inmunes a efectos enemigos hasta el final de la partida, incluso las que reveles después.`,
-      "Rescue Beam": (v) => `Tu carta más débil gana +${v} y va a un lugar donde vas perdiendo.`,
+      "Rescue Beam": (v) => `Tu carta más débil gana +${v} y va a un lugar donde vas perdiendo; tus otras cartas ganan +2.`,
       "Surge of Power": (v) => `Tus cartas en juego con «Al revelar» ganan +${v}.`,
       "Superior Cooldown": (v) => `Los efectos «Fin del turno» de tus cartas ocurren dos veces, y tus cartas ganan +${v} al final de cada turno.`,
-      "Glass Cannon": (v) => `Tus Carry y OffCarry ganan +${v}; tus otras cartas en juego ganan +2.`,
+      "Glass Cannon": (v) => `Tus Carry y OffCarry ganan +${v}; tus otras cartas en juego ganan +4.`,
       "Ricochet": (v) => `En cada lugar, la carta enemiga más fuerte pierde ${v}.`,
-      "Colossus": (v) => `Tus cartas en el lugar donde tienes más cartas ganan +${v} (las Frontline ganan el doble).`,
+      "Colossus": (v) => `Tus cartas en el lugar donde tienes más cartas ganan +${v} (las Frontline ganan el doble); las demás ganan +3.`,
       "Unstoppable": (v) => `Tus cartas se libran de cadenas, anulación y aturdimiento, y ganan +${v}.`,
       "Echo Shard": (v) => `Tu carta más fuerte y otras dos cartas tuyas al azar ganan +${v}.`,
       "Refresher": (v) => `Todas tus cartas en juego activan de nuevo su «Al revelar» y ganan +${v}.`,
@@ -493,8 +493,8 @@ export const GAME_TEXT = strings<GameText>({
     slots: { weapon: "Arma", vitality: "Vitalidad", spirit: "Espíritu" },
     shop: {
       title: "Tienda: elige 1 objeto",
-      hint: "El objeto queda oculto y se revela al inicio del turno 6, cuando pagas su coste en almas. La IA también elige uno, con los mismos tiers.",
-      tier: (t) => `Tier ${t}`, price: (n) => `Cuesta ${n} ${pl(n, "alma", "almas")} en el turno 6`,
+      hint: "El coste en almas se paga ahora, en este turno; el objeto queda oculto y se revela al inicio del turno 6. La IA también elige uno, con los mismos tiers.",
+      tier: (t) => `Tier ${t}`, price: (n) => `Cuesta ${n} ${pl(n, "alma", "almas")} ahora`, noSouls: "Almas insuficientes",
       fitCards: (n) => `Combina con ${n} ${pl(n, "carta tuya", "cartas tuyas")}`, fitLoc: (l) => `Sinergia: ${l}`,
       pick: "Elegir", picked: "Elegido", mine: "Tu objeto", ai: "Objeto de la IA", hidden: "Oculto hasta el turno 6",
       pickFirst: "Elige un objeto en la tienda para terminar el turno.", paid: (n) => `pagó ${n} ${pl(n, "alma", "almas")}`,
