@@ -4,24 +4,22 @@ import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { STAT_KEYS, getPlayerHistory, getPlayerOvr, getPlayerTrend, isMainCard, teamOf, useLabel } from "../lib/cards";
+import { getPlayerHistory, getPlayerOvr, getPlayerTrend, isMainCard, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
 import { TrendBadge } from "./TrendBadge";
 import { Icon } from "./Icon";
+import { SpotlightHints } from "./SpotlightHints";
 import { easeOut, pill } from "../lib/ui";
 
 gsap.registerPlugin(SplitText);
 const revealed = new Set<string>();
 
 const S = strings({
-  pt: { cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão",
-    stats: "Atributos", statNames: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" } },
-  en: { cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version",
-    stats: "Attributes", statNames: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" } },
-  es: { cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión",
-    stats: "Atributos", statNames: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" } },
+  pt: { cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão" },
+  en: { cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version" },
+  es: { cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión" },
 });
 
 export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: string; onClose: () => void; onSwitch: (id: string) => void; onEdit?: (id: string) => void }) {
@@ -29,6 +27,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   const label = useLabel();
   const { teams, players, settings } = useData();
   const player = players.find((p) => p.id === playerId);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLSpanElement>(null);
@@ -39,6 +38,12 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
     () => !!tier && !revealed.has(playerId) && (tier.lvl >= 3 || !!tier.custom) && !matchMedia("(prefers-reduced-motion: reduce)").matches,
     [playerId], // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  useLayoutEffect(() => {
+    const previous = document.activeElement;
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => { if (previous instanceof HTMLElement) previous.focus({ preventScroll: true }); };
+  }, []);
 
   useLayoutEffect(() => {
     if (!reveal || !cardRef.current) return;
@@ -63,7 +68,19 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   }, [reveal, playerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const dialog = dialogRef.current;
+      const buttons = dialog.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      const focused = document.activeElement;
+      if (e.shiftKey ? focused === first || focused === dialog : focused === last) {
+        e.preventDefault();
+        (e.shiftKey ? last : first)?.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
@@ -87,6 +104,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
       aria-label={t.cardOf(player.name)}
     >
       <motion.div
+        ref={dialogRef}
+        tabIndex={-1}
         className="noir-glass-strong flex max-h-[92dvh] w-full max-w-4xl flex-col items-center gap-8 overflow-y-auto rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -96,7 +115,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
       >
         <motion.div key={player.id} className="relative max-w-full" initial={reveal ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15, ease: easeOut }}>
           {reveal && (
-            <div ref={flashRef} aria-hidden="true" className="pointer-events-none absolute -inset-16 rounded-full opacity-0" style={{ background: `radial-gradient(circle, ${tier.hi} 0%, ${tier.c}99 30%, transparent 68%)` }} />
+            <div aria-hidden="true" className="pointer-events-none absolute -inset-x-4 -inset-y-16 overflow-clip sm:-inset-x-8">
+              <div ref={flashRef} className="absolute -inset-x-12 inset-y-0 rounded-full opacity-0 sm:-inset-x-8" style={{ background: `radial-gradient(circle, ${tier.hi} 0%, ${tier.c}99 30%, transparent 68%)` }} />
+            </div>
           )}
           <div ref={cardRef} className="relative">
             <Card player={player} variant="editor" />
@@ -120,18 +141,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             {player.special && player.specialText && <span className="text-xs font-bold text-amber-200">✦ {player.specialText}</span>}
           </div>
 
-          <div>
-            <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.stats}</h3>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-3">
-              {STAT_KEYS.map((k) => (
-                <div key={k} className="flex items-baseline gap-2">
-                  <dt className="font-mono font-bold text-zinc-100">{k}</dt>
-                  <dd className="min-w-0 flex-1 truncate text-zinc-400">{t.statNames[k]}</dd>
-                  <dd className="font-bold text-zinc-100 tabular-nums">{player.stats[k]}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+          <SpotlightHints key={player.id} stats={player.stats} position={player.position || "Flex"} />
 
           <div>
             <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.history}</h3>

@@ -173,6 +173,8 @@
     .deadlock-card-shell {
       position: relative;
       padding: var(--rk-pad, 2px);
+      /* O gradiente metálico animado ultrapassa o contorno e não deve ampliar a área rolável. */
+      overflow: clip;
       clip-path: var(--rk-clip, polygon(0 0, 100% 0, 100% 88%, 50% 100%, 0 88%));
       background: var(--rk-bg, linear-gradient(145deg, rgba(244, 244, 245, 0.58), rgba(113, 113, 122, 0.2) 45%, rgba(228, 228, 231, 0.48)));
       transition: transform 0.2s var(--ease-out);
