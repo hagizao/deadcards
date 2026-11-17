@@ -36,7 +36,7 @@ Os até 2 maiores atributos do jogador, se forem **90 ou mais**, viram palavras-
 | --- | --- | --- |
 | Mira | Certeiro | Efeitos de alvo aleatório acertam a inimiga mais forte |
 | Macro | Lê o mapa | +2 ao revelar num local onde você está perdendo |
-| Suporte | Jogador de equipe | Ao revelar, seus aliados aqui ganham +1 |
+| Suporte | Jogador de equipe | Ao revelar, seu aliado mais fraco aqui ganha +1 |
 | Movimentação | Ágil | Pode se mover uma vez por partida |
 | Pool de heróis | Versátil | Ao revelar, você compra 1 carta |
 | Consistência | Constante | Imune a queimadura e veneno |
