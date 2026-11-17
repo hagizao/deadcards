@@ -392,7 +392,8 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
     [m.portals.some((x) => x.t >= m.t && (x.a === i || x.b === i)), "🚪", t.ui.chips.portal],
   ] as [boolean, string, string][]).filter((x) => x[0]);
   const desc = l.rev ? l.L.desc || t.locs[l.L.type].text(l.L) : t.ui.revealsOn(i + 1);
-  const side = "grid min-h-[calc(var(--spacing-gc)*2.95)] auto-rows-min content-center grid-cols-[repeat(2,var(--spacing-gc))] gap-1";
+  // uma fileira por lado: até 2 cartas lado a lado; com mais, elas se sobrepõem como um leque (cada vaga encolhe, a última fica inteira)
+  const side = "flex h-[calc(var(--spacing-gc)*1.46)] w-full justify-center gap-1";
   const ring = drop === "over" ? "bg-game-me/15 outline-2 outline-game-me" : drop === "ok" ? "outline-2 outline-game-me/50 outline-dashed" : "";
   return (
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
@@ -428,18 +429,21 @@ function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
   return list.filter((x) => x[0]).map((x) => [x[1], t.ui.status[x[2]], x[2]]);
 }
 
+/** Vaga da carta na fileira do local: encolhe quando não cabe (a carta transborda e fica por baixo da seguinte). */
+const slot = "min-w-0 max-w-gc flex-1 last:w-gc last:flex-none hover:z-10 focus-within:z-10";
+
 function BoardCard({ c, m, t, name, face, looking, target, acts, onClick, onPeek }: {
   c: GCard; m: Match; t: T; name: string; face: React.ReactNode; looking: boolean; target: boolean; acts: { label: string; run: () => void }[];
   /** Clique; no toque vem o retângulo da carta para ampliar (no mouse, o hover já amplia). */
   onClick: (r: DOMRect | null) => void; onPeek: (r: DOMRect | null) => void;
 }) {
   const touch = useRef(false);
-  if (c.side === "a" && !c.rev) return <div role="img" aria-label={t.ui.facedown}><CardBack className="w-gc" /></div>;
+  if (c.side === "a" && !c.rev) return <div role="img" aria-label={t.ui.facedown} className={slot}><CardBack className="w-gc" /></div>;
   const pw = c.rev ? m.pow(c) : c.base;
   const icons = statusIcons(c, m, t);
   const w = weight(c);
   return (
-    <div className="relative perspective-[40rem]" data-card={c.id} data-target={target ? "" : undefined}>
+    <div className={`relative perspective-[40rem] ${slot}`} data-card={c.id} data-target={target ? "" : undefined}>
     <motion.button type="button" onClick={(e) => onClick(touch.current ? e.currentTarget.getBoundingClientRect() : null)} aria-pressed={looking}
       onPointerDown={(e) => { touch.current = e.pointerType !== "mouse"; }}
       aria-label={`${target ? `${t.ui.act.target(name)}: ` : ""}${t.ui.cardLabel(name, c.cost, pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}

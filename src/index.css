@@ -31,13 +31,20 @@
   --color-game-ai: #e0675a;
   --color-game-brass: #e0b25a;
   /* largura das cartas na mesa do Cardslock Game (w-gc) */
-  --spacing-gc: clamp(2.5rem, min(10.5vw, 14.5dvh - 4rem), 6.75rem);
+  --spacing-gc: clamp(2.5rem, min((min(100vw, 64rem) - 3rem) / 3 - 1.25rem, 32dvh - 10.5rem), 9rem);
   /* almas do Deadlock (orbe de almas do HUD) */
   --color-game-soul: #6ff2d6;
   /* categorias dos itens da loja do Deadlock */
   --color-item-weapon: #e9973a;
   --color-item-vitality: #7cbb4d;
   --color-item-spirit: #b77ce6;
+}
+
+/* do sm para cima o orbe e o fim do turno dividem a linha com a mão, então sobra mais altura para a mesa */
+@media (width >= 40rem) {
+  :root {
+    --spacing-gc: clamp(2.5rem, min((min(100vw, 64rem) - 3rem) / 3 - 1.25rem, 32dvh - 9.5rem), 9rem);
+  }
 }
 
 /* verso da carta da IA (listras diagonais) */
