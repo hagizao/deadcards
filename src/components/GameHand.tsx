@@ -1,7 +1,7 @@
 // Mão do Cardslock Game, no estilo do Hearthstone: leque em arco, carta que sobe e amplia no hover,
 // arrastar até um local para jogar (a carta balança conforme a velocidade) e caixas de palavra-chave ao lado.
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, useVelocity } from "motion/react";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { GCard } from "../lib/game/engine";
 import { TipBoxes } from "./GameCard";
 
@@ -23,6 +23,9 @@ type Props = {
 
 const RATIO = 430 / 295;
 const TIP_W = 192;
+/** Parte da carta que fica à mostra; o resto afunda abaixo da borda e sobe no hover. */
+const SHOW = 0.62;
+const TOP = 8;
 
 /** Local (`data-drop`) sob o ponto da tela. */
 function dropAt(x: number, y: number): number | null {
@@ -38,6 +41,13 @@ export function GameHand(p: Props) {
   const [cw, setCw] = useState(0);
   const [hover, setHover] = useState<number | null>(null);
   const [drag, setDrag] = useState<number | null>(null);
+  const [vh, setVh] = useState(() => window.innerHeight);
+  const [vw, setVw] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const on = () => { setVh(window.innerHeight); setVw(window.innerWidth); };
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
   const measure = useCallback((el: HTMLDivElement | null) => {
     if (!el) return;
     const ro = new ResizeObserver(() => setCw(el.clientWidth));
@@ -47,9 +57,11 @@ export function GameHand(p: Props) {
   }, []);
 
   const n = p.cards.length;
-  const W = Math.round(Math.min(168, Math.max(92, cw * 0.2)));
+  const W = Math.round(Math.max(84, Math.min(168, cw * 0.22, vh * 0.16)));
   const H = W * RATIO;
-  const zoomW = Math.min(250, cw * 0.62);
+  const boxH = Math.round(H * SHOW + TOP);
+  // a ampliada usa a tela, não só a faixa da mão (no celular a mão divide a linha com o orbe e o botão)
+  const zoomW = Math.max(W, Math.min(250, vw * 0.6, vh * 0.4));
   const scale = Math.max(1, zoomW / W);
   const mid = (n - 1) / 2;
   const spacing = n > 1 ? Math.min(W * 0.78, (cw - W - 8) / (n - 1)) : 0;
@@ -62,7 +74,7 @@ export function GameHand(p: Props) {
     const d = i - mid;
     let x = d * spacing;
     if (li >= 0 && i !== li && spacing < W) x += (i < li ? -1 : 1) * Math.min(W * 0.32, W - spacing);
-    if (i === li) return { x: Math.max(-edge, Math.min(edge, x)), y: -H * 0.18, rotate: 0, scale };
+    if (i === li) return { x: Math.max(-edge, Math.min(edge, x)), y: boxH - TOP - H - 4, rotate: 0, scale };
     return { x, y: d * d * 2.4, rotate: d * step, scale: 1 };
   };
   const lifted = li >= 0 ? p.cards[li] : null;
@@ -72,11 +84,12 @@ export function GameHand(p: Props) {
   const tipLeft = lx + zw / 2 + 8 + TIP_W <= cw ? lx + zw / 2 + 8 : lx - zw / 2 - 8 - TIP_W >= 0 ? lx - zw / 2 - 8 - TIP_W : null;
 
   return (
-    <div ref={measure} className="relative w-full" style={{ height: H + 28 }}>
+    // corta só embaixo: a carta afunda na borda, mas a ampliada pode subir por cima da mesa
+    <div ref={measure} className="relative w-full [clip-path:inset(-100vh_-100vw_0_-100vw)]" style={{ height: boxH }}>
       {cw > 0 && (
         <AnimatePresence initial={false}>
           {p.cards.map((c, i) => (
-            <motion.div key={c.id} className="absolute bottom-1 origin-bottom" style={{ left: cw / 2 - W / 2, width: W, zIndex: c.id === drag ? 60 : i === li ? 50 : i + 1 }}
+            <motion.div key={c.id} className="absolute origin-bottom" style={{ top: TOP, left: cw / 2 - W / 2, width: W, zIndex: c.id === drag ? 60 : i === li ? 50 : i + 1 }}
               initial={{ x: cw / 2, y: -H, rotate: 25, opacity: 0 }} animate={{ ...pose(i), opacity: 1 }} exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.18 } }}
               transition={{ type: "spring", stiffness: 380, damping: 30 }}>
               <HandCard c={c} p={p} zoomed={i === li} dragging={c.id === drag}
@@ -89,7 +102,7 @@ export function GameHand(p: Props) {
       <AnimatePresence>
         {lifted && tipLeft !== null && tips.length > 0 && (
           <motion.div key={lifted.id} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
-            className="pointer-events-none absolute z-70" style={{ left: tipLeft, bottom: H * 0.18 + 8 }}>
+            className="pointer-events-none absolute z-70" style={{ left: tipLeft, bottom: 8 }}>
             <TipBoxes tips={tips} />
           </motion.div>
         )}

@@ -31,7 +31,9 @@
   --color-game-ai: #e0675a;
   --color-game-brass: #e0b25a;
   /* largura das cartas na mesa do Cardslock Game (w-gc) */
-  --spacing-gc: clamp(3rem, 10.5vw, 6.75rem);
+  --spacing-gc: clamp(2.5rem, min(10.5vw, 14.5dvh - 4rem), 6.75rem);
+  /* almas do Deadlock (orbe de almas do HUD) */
+  --color-game-soul: #6ff2d6;
   /* categorias dos itens da loja do Deadlock */
   --color-item-weapon: #e9973a;
   --color-item-vitality: #7cbb4d;
@@ -89,4 +91,29 @@
 @keyframes fav-ring {
   from { transform: scale(0.6); opacity: 1; }
   to { transform: scale(1.6); opacity: 0; }
+}
+
+/* Cardslock Game: a seta de mira corre na direção do alvo e o anel do alvo pulsa */
+@utility aim-dash {
+  animation: aim-dash 0.5s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@utility aim-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: aim-ring 0.9s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes aim-dash {
+  to { stroke-dashoffset: -14; }
+}
+
+@keyframes aim-ring {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.6; }
 }

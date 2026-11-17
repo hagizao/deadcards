@@ -1,18 +1,25 @@
-import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { AnimatePresence, MotionConfig, motion, useAnimate, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { CardBack, GameCard, TipBoxes } from "../components/GameCard";
 import { GameHand } from "../components/GameHand";
+import { TargetArrow } from "../components/TargetArrow";
+import { EndTurnButton, SoulOrb } from "../components/GameHud";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
-import { pageTitle, pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, type ItemKey, type ItemSlot, type StatKey } from "../lib/game/config";
+import { pill, primaryBtn } from "../lib/ui";
+import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, type ItemKey, type ItemSlot } from "../lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
+import { setMuted, sfx, thump, useMuted } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
 
 const REVEAL_MS = 650;
 const END_MS = 750;
 const TOAST_MS = 1300;
+/** Peso da carta pelo custo: 1 cai perto, 2 cai do alto, 3 vem do céu e treme a mesa. */
+const weight = (c: GCard) => (c.cost >= 5 ? 3 : c.cost >= 3 ? 2 : 1);
+/** Quanto a queda leva até tocar a mesa, por peso (ms). */
+const FALL_MS = { 1: 200, 2: 260, 3: 340 } as const;
 const TOKEN_GLYPH: Record<Token, string> = { pigeon: "🐦", ghoul: "💀", turret: "⚙️", rat: "🐀", illusion: "👤" };
 
 // placar da sessão: sobrevive à troca de aba, zera ao recarregar a página
@@ -42,7 +49,8 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const icons = useItemIcons();
   const [sel, setSel] = useState<GCard | null>(null);
   const [look, setLook] = useState<GCard | null>(null);
-  const [lookItem, setLookItem] = useState<ItemKey | null>(null);
+  const [shopHidden, setShopHidden] = useState(false);
+  const muted = useMuted();
   const [toast, setToast] = useState<{ id: number; text: string } | null>(() => ({ id: 0, text: t.ui.toast.turn(1) }));
   const [result, setResult] = useState<Result | null>(null);
   const [showEnd, setShowEnd] = useState(false);
@@ -53,6 +61,8 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   // carta da mesa ampliada no hover
   const [peek, setPeek] = useState<{ c: GCard; r: DOMRect } | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [arena, shake] = useAnimate<HTMLDivElement>();
+  const still = useReducedMotion();
 
   useEffect(() => {
     const list = timers.current;
@@ -96,12 +106,13 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     timers.current.forEach(clearTimeout);
     timers.current = [];
     setM(newMatch());
+    sfx("shuffle");
     setSel(null);
     setLook(null);
-    setLookItem(null);
     setResult(null);
     setShowEnd(false);
     setMode(null);
+    setShopHidden(false);
     say(t.ui.toast.turn(1));
   };
 
@@ -109,16 +120,18 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     if (m.busy || result) return;
     if (m.needsPick) return say(t.shop.pickFirst);
     const queue = m.endTurn();
+    sfx("endTurn");
     setSel(null);
     setMode(null);
     setLook(null);
-    setLookItem(null);
     bump();
     let i = 0;
     const step = () => {
       if (i < queue.length) {
-        m.act(queue[i++]);
+        const a = queue[i++];
+        m.act(a);
         bump();
+        if (!a.exec) land(a.c);
         return later(step, REVEAL_MS);
       }
       m.endOfTurn();
@@ -130,9 +143,12 @@ function Board({ newMatch }: { newMatch: () => Match }) {
           else if (r.outcome === "loss") record.l++;
           setResult(r);
           setShowEnd(true);
+          if (r.outcome !== "draw") sfx(r.outcome === "win" ? "win" : "loss");
         } else {
           m.nextTurn();
           say(t.ui.toast.turn(m.t));
+          sfx("draw");
+          later(() => sfx("soul", 0.8), 180);
         }
         bump();
       }, END_MS);
@@ -140,26 +156,41 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     step();
   };
 
+  /** Som (e tremor, nas pesadas) quando a carta revelada toca a mesa. */
+  const land = (c: GCard) => {
+    const w = weight(c);
+    later(() => {
+      if (w === 1) return sfx("land", 0.8);
+      sfx("slam", w === 3 ? 1 : 0.7);
+      thump(w === 3 ? 1 : 0.5);
+      if (w === 3 && !still && arena.current) shake(arena.current, { x: [0, -7, 6, -4, 3, 0], y: [0, 3, -2, 1, 0, 0] }, { duration: 0.35 });
+    }, FALL_MS[w]);
+  };
+
   const pickHand = (c: GCard) => {
     if (m.busy || result) return;
     setMode(null);
     setSel((s) => (s === c ? null : c));
     setLook(null);
-    setLookItem(null);
   };
   const pickBoard = (c: GCard) => {
     if (mode && targets.includes(c)) return hitCard(c);
     if (mode) setMode(null);
-    if (c.staged && c.side === "p" && !m.busy) { m.unstage(c); bump(); return; }
+    if (c.staged && c.side === "p" && !m.busy) {
+      // carta com escolha: clicar de novo reabre a mira; sem escolha, volta para a mão
+      const spec = m.choiceOf(c);
+      if (spec?.card && m.choiceCards(c).length) return setMode({ k: "card", c });
+      if (spec?.loc) return setMode({ k: "loc", c });
+      m.unstage(c); bump(); return;
+    }
     setLook((x) => (x === c ? null : c));
-    setLookItem(null);
   };
   const pickItem = (k: ItemKey) => { m.pick(k); bump(); };
-  const showItem = (k: ItemKey) => { setLookItem((x) => (x === k ? null : k)); setSel(null); setLook(null); };
   const playCard = (c: GCard, l: Loc) => {
     if (m.busy || result) return;
     const err = m.play(c, l);
-    if (err) return say(errText[err]);
+    if (err) { sfx("error"); return say(errText[err]); }
+    sfx("place");
     const spec = m.choiceOf(c);
     if (spec?.card && m.choiceCards(c).length) setMode({ k: "card", c });
     else if (spec?.loc) setMode({ k: "loc", c });
@@ -174,6 +205,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const dests = !mode ? [] : mode.k === "loc" ? m.choiceLocs(mode.c) : mode.k === "move" ? m.moveOptions(mode.c) : [];
   const hitCard = (x: GCard) => {
     if (!mode) return;
+    sfx("target");
     if (mode.k === "mark") { m.mark(mode.c, x); setMode(null); }
     else {
       m.choose(mode.c, { card: x });
@@ -183,8 +215,8 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   };
   const hitLoc = (l: Loc) => {
     if (!mode) return;
-    if (mode.k === "move") { if (!m.moveCard(mode.c, l)) return; setLook(null); }
-    else m.choose(mode.c, { loc: l });
+    if (mode.k === "move") { if (!m.moveCard(mode.c, l)) return; setLook(null); sfx("place"); }
+    else { m.choose(mode.c, { loc: l }); sfx("target"); }
     setMode(null);
     bump();
   };
@@ -193,79 +225,120 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const modeHint = !mode ? "" : mode.k === "card" ? t.ui.act.pickFoe(name(mode.c)) : mode.k === "loc" ? t.ui.act.pickLoc(name(mode.c))
     : mode.k === "move" ? t.ui.act.moveHint(name(mode.c)) : t.ui.act.markHint(name(mode.c));
 
-  const focused = sel ?? look;
+  // linhas das escolhas já feitas no turno (alvo do Vindicta, local da Holliday, marca do Shiv...)
+  const aimLines = m.loc.flatMap((l) => l.s.p).flatMap((c) => {
+    const from = `[data-card="${c.id}"]`;
+    const out: { from: string; to: string }[] = [];
+    if (c.staged && c.ch?.card !== undefined) out.push({ from, to: `[data-card="${c.ch.card}"]` });
+    if (c.staged && c.ch?.loc !== undefined) out.push({ from, to: `[data-drop="${c.ch.loc}"]` });
+    if (c.st.exec?.u === m.t && c.st.exec.target !== undefined) out.push({ from, to: `[data-card="${c.st.exec.target}"]` });
+    return out;
+  });
+  const handReady = !m.busy && !result && !m.hand.some((c) => m.loc.some((l) => !m.canPlay(c, l)));
+  /** Mover e marcar: botões sobre a carta da mesa escolhida. */
+  const actsOf = (c: GCard) => {
+    if (look !== c || c.side !== "p" || m.busy || result) return [];
+    return [
+      m.moveOptions(c).length > 0 && { label: t.ui.act.move, run: () => startMode("move", c) },
+      m.markOptions(c).length > 0 && { label: t.ui.act.mark, run: () => startMode("mark", c) },
+    ].filter(Boolean) as { label: string; run: () => void }[];
+  };
   const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && sel.cost <= m.E && m.room(l, "p") && l.lock.p < m.t;
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 text-dl-text">
-      <div className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h1 className={pageTitle}>{t.ui.title}</h1>
-        <p className="text-sm text-zinc-300">{t.ui.you} · {t.ui.ai} · {t.ui.turn(Math.min(m.t, TURNS), TURNS)} · <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr> · {t.ui.record(record.w, record.l)}</p>
-      </div>
-
-      <AiHand n={m.ahand.length} t={t} />
-
-      <section aria-label={t.ui.arena} className="flex w-full gap-1.5 sm:gap-2">
-        {m.loc.map((l, i) => (
-          <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
-            drop={!drag || m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok"}
-            card={(c) => (
-              <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} onClick={() => pickBoard(c)}
-                onPeek={(r) => setPeek(r && !drag ? { c, r } : null)} />
-            )} />
-        ))}
-      </section>
-
-      {mode ? (
-        <div className="flex w-full flex-wrap items-center justify-center gap-2 rounded-xl bg-game-me/10 px-3 py-2 text-sm" role="status">
-          <span className="font-bold text-game-me">{modeHint}</span>
-          {(mode.k === "card" || mode.k === "loc") && <button type="button" className={pill(false)} onClick={() => setMode(null)}>{t.ui.act.auto}</button>}
-          {(mode.k === "card" || mode.k === "loc") && mode.c.staged && <button type="button" className={pill(false)} onClick={undoPlay}>{t.ui.act.undo}</button>}
-          {(mode.k === "move" || mode.k === "mark") && <button type="button" className={pill(false)} onClick={() => setMode(null)}>{t.ui.act.cancel}</button>}
+    <div className="mx-auto flex h-[calc(100dvh-7rem)] min-h-120 max-w-5xl flex-col gap-1.5 text-dl-text sm:h-[calc(100dvh-10rem)]">
+      <div className="flex w-full items-center justify-between gap-2">
+        <h1 className="font-display text-sm font-extrabold tracking-[0.11em] whitespace-nowrap uppercase sm:text-xl">{t.ui.title}</h1>
+        <div className="flex flex-wrap items-center justify-end gap-x-2 text-xs text-zinc-300">
+          <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr>
+          <span aria-hidden="true">·</span>
+          <span>{t.ui.record(record.w, record.l)}</span>
+          <button type="button" onClick={() => setMuted(!muted)} aria-label={t.ui.sound(!muted)} aria-pressed={muted}
+            className={`grid size-11 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
+            <span aria-hidden="true">{muted ? "🔇" : "🔊"}</span>
+          </button>
         </div>
-      ) : <p className="min-h-5 w-full text-center text-xs text-zinc-300" aria-live="polite">{logLine}</p>}
-
-      {m.offer && <ItemSlots m={m} t={t} icons={icons} looking={lookItem} onLook={showItem} />}
-
-      {shopOpen && m.offer && (
-        <section aria-labelledby="game-shop" className="noir-glass flex w-full flex-col gap-2 rounded-xl p-3">
-          <h2 id="game-shop" className="font-display text-lg font-extrabold tracking-wider">{t.shop.title}</h2>
-          <p className="text-xs text-zinc-400">{t.shop.hint}</p>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {m.offer.p.map((k) => (
-              <ItemOption key={k} k={k} m={m} t={t} icon={icons[k]} picked={m.picked.p === k} disabled={m.busy || !m.canBuy(k)} onPick={() => pickItem(k)} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section aria-label={t.ui.hand} className="w-full">
-        <GameHand cards={m.hand} selected={sel} disabled={m.busy || !!result}
-          playable={(c) => !m.busy && !result && m.loc.some((l) => !m.canPlay(c, l))}
-          label={(c) => t.ui.cardLabel(name(c), c.cost, c.base)} tips={tipsOf} render={(c, zoomed) => face(c, true, zoomed)}
-          onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => setDrag(c ? { c, over } : null)} />
-      </section>
-
-      <div className="noir-glass min-h-12 w-full rounded-xl px-3 py-2 text-sm/snug">
-        {lookItem ? <ItemDetail k={lookItem} m={m} t={t} />
-          : focused ? <Detail c={focused} m={m} t={t} name={name(focused)} onAct={result ? undefined : startMode} />
-          : <span className="text-zinc-400">{t.ui.hint}</span>}
       </div>
 
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex items-center gap-4">
-          <span className="font-display text-xl font-extrabold tracking-widest">{t.ui.souls(m.E)}</span>
+      <div className="flex w-full items-start gap-2">
+        <ItemSlot s="a" m={m} t={t} icons={icons} />
+        <AiHand n={m.ahand.length} t={t} />
+        <span className="w-9 shrink-0" aria-hidden="true" />
+      </div>
+
+      <div ref={arena} className="relative flex min-h-0 w-full flex-1 flex-col justify-center">
+        <section aria-label={t.ui.arena} className="flex w-full gap-1.5 sm:gap-2">
+          {m.loc.map((l, i) => (
+            <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
+              drop={!drag || m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok"}
+              card={(c) => (
+                <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} acts={actsOf(c)}
+                  onClick={(r) => { pickBoard(c); setPeek(r && look !== c ? { c, r } : null); }}
+                  onPeek={(r) => setPeek(r && !drag ? { c, r } : null)} />
+              )} />
+          ))}
+        </section>
+
+        <AnimatePresence>
+          {shopOpen && m.offer && !shopHidden && (
+            <motion.section aria-labelledby="game-shop" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.2 }}
+              className="noir-glass-strong absolute inset-x-0 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-2 rounded-xl p-3 shadow-2xl">
+              <div className="flex items-center justify-between gap-2">
+                <h2 id="game-shop" className="font-display text-lg font-extrabold tracking-wider">{t.shop.title}</h2>
+                <button type="button" className={pill(false)} onClick={() => setShopHidden(true)}>{t.ui.viewBoard}</button>
+              </div>
+              <p className="text-xs text-zinc-400">{t.shop.hint}</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {m.offer.p.map((k) => (
+                  <ItemOption key={k} k={k} m={m} t={t} icon={icons[k]} picked={m.picked.p === k} disabled={m.busy || !m.canBuy(k)} onPick={() => pickItem(k)} />
+                ))}
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="flex min-h-6 w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-xs" role="status" aria-live="polite">
+        {mode ? (
+          <>
+            <span className="font-bold text-game-me">{modeHint}</span>
+            <span className="hidden text-zinc-400 sm:inline">{t.ui.aim}</span>
+            {(mode.k === "card" || mode.k === "loc") && <button type="button" className={pill(false)} onClick={() => setMode(null)}>{t.ui.act.auto}</button>}
+            {(mode.k === "card" || mode.k === "loc") && mode.c.staged && <button type="button" className={pill(false)} onClick={undoPlay}>{t.ui.act.undo}</button>}
+            {(mode.k === "move" || mode.k === "mark") && <button type="button" className={pill(false)} onClick={() => setMode(null)}>{t.ui.act.cancel}</button>}
+          </>
+        ) : shopOpen && shopHidden ? (
+          <button type="button" className={pill(false)} onClick={() => setShopHidden(false)}>{t.shop.title}</button>
+        ) : m.needsPick ? (
+          <span id="game-pick-first" className="text-game-brass">{t.shop.pickFirst}</span>
+        ) : <span className="line-clamp-1 text-zinc-300">{logLine || t.ui.hint}</span>}
+      </div>
+
+      <div className="flex w-full flex-wrap items-end justify-between gap-x-2 sm:flex-nowrap">
+        <div className="flex shrink-0 flex-col items-center gap-1 pb-1">
+          <ItemSlot s="p" m={m} t={t} icons={icons} />
+          <SoulOrb n={m.E} label={t.ui.souls(m.E)} />
+        </div>
+        <section aria-label={t.ui.hand} className="relative z-10 order-last w-full min-w-0 sm:order-0 sm:w-auto sm:flex-1">
+          <GameHand cards={m.hand} selected={sel} disabled={m.busy || !!result}
+            playable={(c) => !m.busy && !result && m.loc.some((l) => !m.canPlay(c, l))}
+            label={(c) => t.ui.cardLabel(name(c), c.cost, c.base)} tips={tipsOf} render={(c, zoomed) => face(c, true, zoomed)}
+            onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => { if (c && !drag) sfx("grab", 0.7); setDrag(c ? { c, over } : null); }} />
+        </section>
+        <div className="flex shrink-0 flex-col items-center gap-1 pb-1">
           {result && !showEnd
             ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
-            : <button type="button" className={primaryBtn} onClick={endTurn} disabled={m.busy || !!result || m.needsPick} aria-describedby={m.needsPick ? "game-pick-first" : undefined}>{t.ui.endTurn}</button>}
+            : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady && !m.needsPick}
+                disabled={m.busy || !!result || m.needsPick} describedBy={m.needsPick ? "game-pick-first" : undefined} onClick={endTurn} />}
         </div>
-        {m.needsPick && <p id="game-pick-first" className="text-xs text-game-brass">{t.shop.pickFirst}</p>}
       </div>
 
       <AnimatePresence>
         {peek && !drag && <Peek key={peek.c.id} r={peek.r} card={face(peek.c, true, true)} tips={tipsOf(peek.c)} />}
       </AnimatePresence>
+
+      <TargetArrow from={mode ? `[data-card="${mode.c.id}"]` : null} lines={result ? [] : aimLines} onCancel={() => setMode(null)} />
 
       <AnimatePresence>
         {toast && (
@@ -305,38 +378,27 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
 }) {
   const a = m.total(l, "a"), p = m.total(l, "p");
   const nm = l.rev ? l.L.name : t.ui.hiddenLoc;
-  const chips = [
-    l.lock.p >= m.t && `❄️ ${t.ui.chips.frozenMe}`,
-    l.lock.a >= m.t && `❄️ ${t.ui.chips.frozenAi}`,
-    m.hook.p?.i === i && `🪝 ${t.ui.chips.hookMe}`,
-    m.hook.a?.i === i && `🪝 ${t.ui.chips.hookAi}`,
-    l.trap.p > 0 && `🪤 ${t.ui.chips.trapMe}`,
-    l.trap.a > 0 && `🪤 ${t.ui.chips.trapAi}`,
-    l.shield.p >= m.t && `🧊 ${t.ui.chips.shieldMe}`,
-    l.shield.a >= m.t && `🧊 ${t.ui.chips.shieldAi}`,
-    !!l.petri.p && `🗿 ${t.ui.chips.petriMe}`,
-    !!l.petri.a && `🗿 ${t.ui.chips.petriAi}`,
-    m.portals.some((x) => x.t >= m.t && (x.a === i || x.b === i)) && `🚪 ${t.ui.chips.portal}`,
-  ].filter(Boolean) as string[];
-  const side = "grid min-h-[calc(var(--spacing-gc)*2.95)] auto-rows-min grid-cols-[repeat(2,var(--spacing-gc))] gap-1";
+  const chips = ([
+    [l.lock.p >= m.t, "❄️", t.ui.chips.frozenMe],
+    [l.lock.a >= m.t, "❄️", t.ui.chips.frozenAi],
+    [m.hook.p?.i === i, "🪝", t.ui.chips.hookMe],
+    [m.hook.a?.i === i, "🪝", t.ui.chips.hookAi],
+    [l.trap.p > 0, "🪤", t.ui.chips.trapMe],
+    [l.trap.a > 0, "🪤", t.ui.chips.trapAi],
+    [l.shield.p >= m.t, "🧊", t.ui.chips.shieldMe],
+    [l.shield.a >= m.t, "🧊", t.ui.chips.shieldAi],
+    [!!l.petri.p, "🗿", t.ui.chips.petriMe],
+    [!!l.petri.a, "🗿", t.ui.chips.petriAi],
+    [m.portals.some((x) => x.t >= m.t && (x.a === i || x.b === i)), "🚪", t.ui.chips.portal],
+  ] as [boolean, string, string][]).filter((x) => x[0]);
+  const desc = l.rev ? l.L.desc || t.locs[l.L.type].text(l.L) : t.ui.revealsOn(i + 1);
+  const side = "grid min-h-[calc(var(--spacing-gc)*2.95)] auto-rows-min content-center grid-cols-[repeat(2,var(--spacing-gc))] gap-1";
   const ring = drop === "over" ? "bg-game-me/15 outline-2 outline-game-me" : drop === "ok" ? "outline-2 outline-game-me/50 outline-dashed" : "";
   return (
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
-      className={`noir-glass relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl p-1 transition-colors duration-150 sm:p-1.5 ${ring}`}>
+      className={`noir-glass relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl p-1 transition-colors duration-150 sm:p-1.5 ${ring}`}>
       <div className={side} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
-      <div className="flex min-h-19 w-full flex-col items-center gap-0.5 text-center leading-tight">
-        <strong className="font-display text-xs tracking-wide sm:text-sm">{nm}</strong>
-        <span className="text-[11px] text-zinc-400">{l.rev ? l.L.desc || t.locs[l.L.type].text(l.L) : t.ui.revealsOn(i + 1)}</span>
-        {chips.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1">
-            {chips.map((c) => <span key={c} className="rounded-full bg-dl-text/10 px-1.5 text-[10px]">{c}</span>)}
-          </div>
-        )}
-        <div className="mt-auto flex w-full justify-between font-display text-lg font-extrabold">
-          <em className={`rounded-md px-1.5 text-game-ai not-italic ${a > p ? "bg-dl-text/15" : ""}`}>{a}</em>
-          <em className={`rounded-md px-1.5 text-game-me not-italic ${p > a ? "bg-dl-text/15" : ""}`}>{p}</em>
-        </div>
-      </div>
+      <LocTile nm={nm} desc={desc} chips={chips} a={a} p={p} />
       <div className={`relative ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
         {l.s.p.map(card)}
         {canPlay && (
@@ -345,7 +407,7 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
         )}
       </div>
       {dest && (
-        <button type="button" onClick={onDest} aria-label={t.ui.act.dest(nm)}
+        <button type="button" onClick={onDest} aria-label={t.ui.act.dest(nm)} data-target=""
           className={`absolute inset-0 z-10 cursor-pointer rounded-xl outline-2 -outline-offset-2 outline-game-me outline-dashed hover:bg-game-me/15 active:bg-game-me/25 ${focus}`} />
       )}
     </div>
@@ -366,24 +428,79 @@ function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
   return list.filter((x) => x[0]).map((x) => [x[1], t.ui.status[x[2]], x[2]]);
 }
 
-function BoardCard({ c, m, t, name, face, looking, target, onClick, onPeek }: {
-  c: GCard; m: Match; t: T; name: string; face: React.ReactNode; looking: boolean; target: boolean; onClick: () => void; onPeek: (r: DOMRect | null) => void;
+function BoardCard({ c, m, t, name, face, looking, target, acts, onClick, onPeek }: {
+  c: GCard; m: Match; t: T; name: string; face: React.ReactNode; looking: boolean; target: boolean; acts: { label: string; run: () => void }[];
+  /** Clique; no toque vem o retângulo da carta para ampliar (no mouse, o hover já amplia). */
+  onClick: (r: DOMRect | null) => void; onPeek: (r: DOMRect | null) => void;
 }) {
+  const touch = useRef(false);
   if (c.side === "a" && !c.rev) return <div role="img" aria-label={t.ui.facedown}><CardBack className="w-gc" /></div>;
   const pw = c.rev ? m.pow(c) : c.base;
   const icons = statusIcons(c, m, t);
+  const w = weight(c);
   return (
-    <motion.button type="button" onClick={onClick} aria-pressed={looking}
+    <div className="relative perspective-[40rem]" data-card={c.id} data-target={target ? "" : undefined}>
+    <motion.button type="button" onClick={(e) => onClick(touch.current ? e.currentTarget.getBoundingClientRect() : null)} aria-pressed={looking}
+      onPointerDown={(e) => { touch.current = e.pointerType !== "mouse"; }}
       aria-label={`${target ? `${t.ui.act.target(name)}: ` : ""}${t.ui.cardLabel(name, c.cost, pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}
       onPointerEnter={(e) => { if (e.pointerType === "mouse") onPeek(e.currentTarget.getBoundingClientRect()); }} onPointerLeave={() => onPeek(null)} onBlur={() => onPeek(null)}
-      initial={c.rev ? { scale: 1.5, y: -18, opacity: 0 } : { scale: 0.85, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 420, damping: 22 }}
+      initial={c.rev ? { ...FALL[w], opacity: 0, rotateY: c.side === "a" ? 100 : 0 } : { y: 24, scale: 1.08, opacity: 0 }}
+      animate={{ scale: 1, y: 0, rotate: 0, rotateY: 0, opacity: 1 }}
+      transition={c.rev ? { duration: FALL_MS[w] / 1000, ease: "easeIn", opacity: { duration: 0.1 } } : { type: "spring", stiffness: 420, damping: 26 }}
       className={`relative block w-gc cursor-pointer rounded-lg ${c.staged ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
       {face}
-      {c.rev && (
-        <motion.span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-dl-text/70"
-          initial={{ opacity: 0.9, scale: 0.9 }} animate={{ opacity: 0, scale: 1.35 }} transition={{ duration: 0.4, delay: 0.12, ease: "easeOut" }} />
-      )}
     </motion.button>
+    {c.rev && <Impact w={w} />}
+    {acts.length > 0 && (
+      <div className="absolute inset-x-0 bottom-1 z-20 flex flex-col items-center gap-1">
+        {acts.map((x) => (
+          <button key={x.label} type="button" onClick={x.run}
+            className={`min-h-7 cursor-pointer rounded-full bg-game-me px-2 text-[10px] font-extrabold tracking-wider text-dl-black uppercase shadow-lg transition hover:brightness-110 active:scale-95 ${focus}`}>
+            {x.label}
+          </button>
+        ))}
+      </div>
+    )}
+    </div>
+  );
+}
+
+/** De onde a carta cai, por peso. */
+const FALL = {
+  1: { y: -26, scale: 1.15, rotate: 0 },
+  2: { y: -90, scale: 1.4, rotate: 3 },
+  3: { y: -220, scale: 1.8, rotate: -6 },
+} as const;
+
+/** Poeira (e sombra que cresce antes do impacto) quando a carta toca a mesa; anel de choque nas pesadas. */
+function Impact({ w }: { w: 1 | 2 | 3 }) {
+  const fall = FALL_MS[w] / 1000;
+  const dust = w === 1 ? 4 : w === 2 ? 6 : 10;
+  return (
+    <span aria-hidden="true" className="pointer-events-none absolute inset-0">
+      {w > 1 && (
+        <motion.span className="absolute inset-x-[5%] -bottom-1 h-3 rounded-full bg-black/70 blur-sm"
+          initial={{ scaleX: 0.3, opacity: 0 }} animate={{ scaleX: [0.3, 1, 1.1], opacity: [0, 0.8, 0] }} transition={{ duration: fall + 0.3, times: [0, 0.55, 1] }} />
+      )}
+      {Array.from({ length: dust }, (_, i) => {
+        const side = i % 2 ? 1 : -1;
+        const k = (i >> 1) / Math.max(1, dust / 2 - 1);
+        return (
+          <motion.span key={i} className="absolute bottom-0 left-1/2 size-2.5 rounded-full bg-stone-300/60 blur-[2px]"
+            initial={{ x: 0, y: 0, scale: 0.4, opacity: 0 }}
+            animate={{ x: side * (14 + k * 26 * w), y: -(4 + k * 10 + w * 3), scale: 1.2 + w * 0.5, opacity: [0, 0.8, 0] }}
+            transition={{ duration: 0.5 + w * 0.08, delay: fall, ease: "easeOut" }} />
+        );
+      })}
+      {w === 3 && (
+        <motion.span className="absolute inset-0 rounded-xl ring-4 ring-game-brass/80"
+          initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: [0, 0.9, 0], scale: [0.9, 1, 1.6] }} transition={{ duration: 0.45, delay: fall, ease: "easeOut" }} />
+      )}
+      {w < 3 && (
+        <motion.span className="absolute inset-0 rounded-xl ring-2 ring-dl-text/70"
+          initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: [0, 0.9, 0], scale: [0.9, 1, 1.3] }} transition={{ duration: 0.4, delay: fall, ease: "easeOut" }} />
+      )}
+    </span>
   );
 }
 
@@ -410,45 +527,12 @@ function Peek({ r, card, tips }: { r: DOMRect; card: React.ReactNode; tips: { ti
 function AiHand({ n, t }: { n: number; t: T }) {
   const mid = (n - 1) / 2;
   return (
-    <div role="img" aria-label={t.ui.aiHand(n)} className="relative h-12 w-full">
+    <div role="img" aria-label={t.ui.aiHand(n)} className="relative h-9 min-w-0 flex-1">
       {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="absolute top-0 w-8 origin-top" style={{ left: `calc(50% - 1rem + ${(i - mid) * 18}px)`, transform: `rotate(${(mid - i) * 5}deg) translateY(${Math.abs(i - mid) * 2}px)` }}>
+        <div key={i} className="absolute top-0 w-6 origin-top" style={{ left: `calc(50% - 0.75rem + ${(i - mid) * 14}px)`, transform: `rotate(${(mid - i) * 5}deg) translateY(${Math.abs(i - mid) * 2}px)` }}>
           <CardBack />
         </div>
       ))}
-    </div>
-  );
-}
-
-function Detail({ c, m, t, name, onAct }: { c: GCard; m: Match; t: T; name: string; onAct?: (k: "move" | "mark", c: GCard) => void }) {
-  const key = m.abilityOf(c);
-  const a = t.abilities[key];
-  const kind = t.kinds[ABILITIES[key].kind];
-  const text = key === "none" && c.ab !== "none" ? t.ui.noAbility : c.tok && c.ab === "none" ? t.ui.tokenDesc : c.desc || a.text(c.v);
-  const master = t.abilities[c.ab].master();
-  const mine = c.side === "p" && !m.busy;
-  const canMove = mine && !!onAct && m.moveOptions(c).length > 0;
-  const canMark = mine && !!onAct && m.markOptions(c).length > 0;
-  const kw = (k: StatKey) => `${t.keywords[k].name}: ${t.keywords[k].text}`;
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-baseline gap-x-2">
-        <b className="font-display tracking-wide">{name}</b>
-        <span>{t.ui.cost} {c.cost} · {t.ui.power} {c.base}</span>
-        {c.main && <span className="text-zinc-300">{t.ui.mastery}: <b className="text-game-brass">{t.levels[c.lvl]}</b> · {t.ui.main}: {t.stats[c.main]}{c.stats ? ` ${c.stats[c.main]}` : ""}</span>}
-        {key !== c.ab && <span className="text-game-brass">{t.ui.silenced}</span>}
-      </div>
-      <p><span className="text-game-brass">{a.name}{kind ? ` (${kind})` : ""}:</span> {text}</p>
-      {master && key === c.ab && (
-        <p className={c.lvl === 2 ? "" : "text-zinc-500"}><span className="text-game-brass">★★ {t.ui.masterLine}:</span> {master}{c.lvl < 2 && ` (${t.ui.locked})`}</p>
-      )}
-      {c.kw.length > 0 && <p className="text-xs text-zinc-300"><span className="text-game-me">{t.ui.kw}:</span> {c.kw.map(kw).join(" · ")}</p>}
-      {(canMove || canMark) && (
-        <div className="flex flex-wrap gap-2 pt-1">
-          {canMove && <button type="button" className={pill(false)} onClick={() => onAct?.("move", c)}>{t.ui.act.move}</button>}
-          {canMark && <button type="button" className={pill(false)} onClick={() => onAct?.("mark", c)}>{t.ui.act.mark}</button>}
-        </div>
-      )}
     </div>
   );
 }
@@ -488,44 +572,65 @@ function ItemOption({ k, m, t, icon, picked, disabled, onPick }: { k: ItemKey; m
   );
 }
 
-function ItemSlots({ m, t, icons, looking, onLook }: { m: Match; t: T; icons: Record<string, string>; looking: ItemKey | null; onLook: (k: ItemKey) => void }) {
-  const slot = (s: Side) => {
-    const k = m.picked[s];
-    const shown = k && (s === "p" || m.itemsOn);
+/** Item comprado (seu ou da IA): ícone pequeno, com o texto numa caixa no hover/foco/toque. */
+function ItemSlot({ s, m, t, icons }: { s: Side; m: Match; t: T; icons: Record<string, string> }) {
+  const [open, setOpen] = useState(false);
+  const k = m.picked[s];
+  const who = s === "p" ? t.shop.mine : t.shop.ai;
+  if (!m.offer) return <span className="w-9 shrink-0" aria-hidden="true" />;
+  if (!k || (s === "a" && !m.itemsOn)) {
     return (
-      <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-zinc-950/50 p-1.5">
-        {shown ? (
-          <button type="button" onClick={() => onLook(k)} aria-pressed={looking === k} aria-label={t.shop.label(k, ITEMS[k].tier)}
-            className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-md text-left hover:text-white ${focus}`}>
-            <ItemIconBox k={k} icon={icons[k]} size="size-8" />
-            <span className="flex min-w-0 flex-col">
-              <span className="text-[10px] tracking-wider text-zinc-400 uppercase">{s === "p" ? t.shop.mine : t.shop.ai}</span>
-              <span className="truncate text-xs font-bold">{k}</span>
-              <span className="text-[10px] text-zinc-400">{m.itemsOn ? t.shop.paid(m.paid[s]) : t.shop.hidden}</span>
-            </span>
-          </button>
-        ) : (
-          <>
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-zinc-900 font-display text-sm text-zinc-500" aria-hidden="true">?</span>
-            <span className="flex min-w-0 flex-col">
-              <span className="text-[10px] tracking-wider text-zinc-400 uppercase">{s === "p" ? t.shop.mine : t.shop.ai}</span>
-              <span className="text-[10px] text-zinc-400">{s === "a" && m.t < ITEM_REVEAL_TURN ? t.shop.hidden : "—"}</span>
-            </span>
-          </>
-        )}
-      </div>
+      <span title={`${who}: ${s === "a" && m.t < ITEM_REVEAL_TURN ? t.shop.hidden : "—"}`}
+        className="flex size-9 shrink-0 items-center justify-center rounded-md bg-zinc-950/70 font-display text-sm text-zinc-500">?</span>
     );
-  };
-  return <div className="flex w-full gap-2">{slot("a")}{slot("p")}</div>;
-}
-
-function ItemDetail({ k, m, t }: { k: ItemKey; m: Match; t: T }) {
+  }
   const it = ITEMS[k];
   return (
-    <>
-      <b className="font-display tracking-wide">{k}</b> · <span className={SLOT_TEXT[it.slot]}>{t.slots[it.slot]}</span> · {t.shop.tier(it.tier)}
-      <br />
-      {t.items[k](m.itemV(k))}
-    </>
+    <span className="relative shrink-0">
+      <button type="button" onClick={() => setOpen((x) => !x)} onPointerEnter={(e) => { if (e.pointerType === "mouse") setOpen(true); }}
+        onPointerLeave={(e) => { if (e.pointerType === "mouse") setOpen(false); }} onBlur={() => setOpen(false)}
+        aria-expanded={open} aria-label={`${who}: ${t.shop.label(k, it.tier)}`}
+        className={`block cursor-pointer rounded-md transition hover:brightness-125 active:scale-95 ${focus}`}>
+        <ItemIconBox k={k} icon={icons[k]} size="size-9" />
+      </button>
+      {open && (
+        <TipBoxes className={`absolute z-70 ${s === "a" ? "top-full left-0 pt-1" : "bottom-full left-0 pb-1"}`}
+          tips={[{ title: `${who}: ${k} · ${t.slots[it.slot]} ${t.shop.tier(it.tier)}`, text: `${t.items[k](m.itemV(k))}${m.itemsOn ? ` (${t.shop.paid(m.paid[s])})` : ""}` }]} />
+      )}
+    </span>
+  );
+}
+
+/** Placa do local entre os dois lados: placar da IA, nome e placar seu; o efeito embaixo (toque para ler inteiro). */
+function LocTile({ nm, desc, chips, a, p }: { nm: string; desc: string; chips: [boolean, string, string][]; a: number; p: number }) {
+  const [full, setFull] = useState(false);
+  return (
+    <div className="flex w-full flex-col items-center gap-0.5 rounded-lg bg-zinc-950/70 p-1 text-center leading-tight shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]">
+      <div className="flex w-full flex-wrap items-center justify-between gap-1 sm:flex-nowrap">
+        <Score v={a} lead={a > p} tone="text-game-ai" />
+        <strong className="order-first line-clamp-2 w-full min-w-0 font-display text-[11px] tracking-wide sm:order-0 sm:w-auto sm:flex-1 sm:text-sm">{nm}</strong>
+        <Score v={p} lead={p > a} tone="text-game-me" />
+      </div>
+      <button type="button" onClick={() => setFull((x) => !x)} aria-expanded={full} title={desc}
+        className={`w-full cursor-pointer rounded-sm text-[10px] text-zinc-400 hover:text-zinc-200 sm:text-[11px] ${full ? "" : "line-clamp-2"} ${focus}`}>
+        {desc}
+      </button>
+      {chips.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-0.5 text-xs">
+          {chips.map(([, icon, label]) => <span key={label} role="img" title={label} aria-label={label}>{icon}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Score({ v, lead, tone }: { v: number; lead: boolean; tone: string }) {
+  return (
+    <AnimatePresence mode="popLayout" initial={false}>
+      <motion.em key={v} initial={{ scale: 1.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={{ type: "spring", stiffness: 500, damping: 22 }}
+        className={`min-w-6 shrink-0 rounded-md px-1 font-display text-base font-extrabold not-italic sm:text-lg ${tone} ${lead ? "bg-dl-text/15" : ""}`}>
+        {v}
+      </motion.em>
+    </AnimatePresence>
   );
 }
