@@ -215,8 +215,8 @@ describe("itens: lojas e alvo", () => {
     }
   };
 
-  it("lojas abrem nos rounds 2, 4 e 7, com 3 itens dos tiers da fase e os mesmos tiers para os dois lados", () => {
-    expect(SHOPS).toEqual({ 2: [1], 4: [2, 3], 7: [3, 4] });
+  it("lojas abrem nos rounds 3 e 6, com 3 itens dos tiers da fase e os mesmos tiers para os dois lados", () => {
+    expect(SHOPS).toEqual({ 3: [1, 2], 6: [3, 4] });
     expect([1, 2, 3, 4].map((t) => itemCost(t as 1 | 2 | 3 | 4))).toEqual([1, 2, 4, 6]);
     for (let seed = 1; seed <= 20; seed++) {
       const m = new Match(cfgWith(all), pool, seeded(seed));
@@ -234,7 +234,7 @@ describe("itens: lojas e alvo", () => {
 
   it("comprar mira uma carta sua, cobra na hora e age só nela no fim do turno; desfazer devolve", () => {
     const m = new Match(cfgWith(["Extra Health"]), pool, seeded(7));
-    playTo(m, 2);
+    playTo(m, 3);
     const mine = m.loc.flatMap((l) => l.s.p);
     expect(mine.length).toBeGreaterThan(0);
     const [target] = mine;
@@ -255,7 +255,7 @@ describe("itens: lojas e alvo", () => {
 
   it("item de ataque mira uma inimiga; sem alvo ou sem almas, não compra", () => {
     const m = new Match(cfgWith(["Slowing Hex", "Toxic Bullets", "Ricochet"]), pool, seeded(9));
-    playTo(m, 4);
+    playTo(m, 3);
     const k = m.offer!.p.find((x) => ITEMS[x].tier === 2)!;
     expect(k).toBe("Slowing Hex");
     expect(m.itemTargets("p", k).every((c) => c.side === "a")).toBe(true);
@@ -267,10 +267,10 @@ describe("itens: lojas e alvo", () => {
 
   it("a loja é opcional: o turno fecha sem comprar", () => {
     const m = new Match(cfgWith(all), pool, seeded(4));
-    playTo(m, 2);
+    playTo(m, 3);
     expect(m.offer).not.toBeNull();
     m.runEndTurn();
-    expect(m.t).toBe(3);
+    expect(m.t).toBe(4);
     expect(m.owned.p).toEqual([]);
   });
 
@@ -284,7 +284,7 @@ describe("itens: lojas e alvo", () => {
 
   it("sem itens ligados não há loja", () => {
     const m = new Match(cfgWith([]), pool, seeded(4));
-    playTo(m, 2);
+    playTo(m, 3);
     expect(m.offer).toBeNull();
   });
 

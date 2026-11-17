@@ -165,9 +165,9 @@ export const MASTERY_BONUS = 1;
 export const PRO_ON_POWER: ReadonlySet<AbilityKey> = new Set<AbilityKey>(["Warden", "Paige"]);
 
 /* ---------- itens da loja ---------- */
-
+/** Lojas: em que round abrem e de quais tiers são os 3 itens oferecidos (início do mid e início do late). */
 /** Lojas: em que round abrem e de quais tiers são os 3 itens oferecidos (early, mid e late). */
-export const SHOPS: Record<number, ItemTier[]> = { 2: [1], 4: [2, 3], 7: [3, 4] };
+export const SHOPS: Record<number, ItemTier[]> = { 3: [1, 2], 6: [3, 4] };
 export const SHOP_ROUNDS = Object.keys(SHOPS).map(Number);
 export const ITEM_TIERS = [1, 2, 3, 4] as const;
 export type ItemTier = (typeof ITEM_TIERS)[number];
