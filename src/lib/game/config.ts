@@ -254,6 +254,28 @@ export function defaultCard(p: PoolCard, heroes: GameConfig["heroes"] = {}): { c
   return { cost: h.cost, power, ab, v };
 }
 
+/**
+ * De onde vem o poder de uma versão, para explicar na tela de deck: base do herói, faixa de OVR (inteira no perfil poder, metade no
+ * perfil habilidade), perda da versão de afinidade, piso de 1 e ajuste do admin. A soma das partes dá o poder final.
+ */
+export type PowerPart = { k: "hero" | "ovr" | "alt" | "floor" | "admin"; n: number };
+export function powerParts(p: PoolCard, cfg: Pick<GameConfig, "cards" | "heroes">): { parts: PowerPart[]; power: number; prof: Profile; vBonus: boolean } {
+  const ab: AbilityKey = isAbility(p.hero) ? p.hero : ROLE_ABILITY[p.position] ?? "draw";
+  const h = heroCard(ab, cfg.heroes);
+  const band = ovrBand(p.ovr);
+  const ovr = h.prof === "P" ? band : Math.floor(band / 2);
+  const alt = p.alt && (p.stats?.POL ?? 0) < ALT_POL ? -ALT_MALUS : 0;
+  const raw = h.base + ovr + alt;
+  const def = defaultCard(p, cfg.heroes);
+  const final = cardStats(p, cfg.cards, cfg.heroes).power;
+  const parts: PowerPart[] = [{ k: "hero", n: h.base }, { k: "ovr", n: ovr }];
+  // versão de afinidade com POL alto entra com 0: a tela explica por que não perdeu
+  if (p.alt) parts.push({ k: "alt", n: alt });
+  if (def.power > raw) parts.push({ k: "floor", n: def.power - raw });
+  if (final !== def.power) parts.push({ k: "admin", n: final - def.power });
+  return { parts, power: final, prof: h.prof, vBonus: h.prof === "H" && ABILITIES[ab].usesV && p.ovr >= HABILITY_AT };
+}
+
 export type CardStats = { cost: number; power: number; ab: AbilityKey; v: number; desc: string; def: ReturnType<typeof defaultCard> };
 
 /** Carta final: padrão + ajustes do admin. `desc` vazio = usar o texto automático da habilidade. */
