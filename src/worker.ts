@@ -4,6 +4,7 @@ import { favorite, profileCard, publicProfile } from "./profile";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
+import { sanitizeGameConfig, sanitizeHeroPool, trimItemIcons } from "./lib/game/config";
 import type { ArtCredit } from "./lib/types";
 
 export interface Env {
@@ -23,7 +24,7 @@ export interface Env {
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art"];
+const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art", "heroPool"];
 const ID_RE = /^[\w-]{1,64}$/;
 
 const keyOf = (url: unknown) => (typeof url === "string" && url.startsWith("/img/") ? url.slice(5) : null);
@@ -55,10 +56,12 @@ const parse = <T>(s: string | null, fallback: T): T => {
   try { return JSON.parse(s) as T; } catch { return fallback; }
 };
 
-async function cachedFetch(env: Env, path: string): Promise<Response> {
+/** Busca na deadlock-api com cache no D1. Com `trim`, guarda só o resultado enxuto, sob a chave `key`. */
+async function cachedFetch(env: Env, path: string, trim?: { key: string; fn: (raw: unknown) => unknown }): Promise<Response> {
   const now = Math.floor(Date.now() / 1000);
+  const key = trim?.key ?? path;
   const row = await env.DB.prepare("SELECT body, fetched_at FROM api_cache WHERE cache_key = ?")
-    .bind(path)
+    .bind(key)
     .first<{ body: string; fetched_at: number }>();
   if (row && now - row.fetched_at < CACHE_TTL_SECONDS) {
     return new Response(row.body, { headers: { "content-type": "application/json", "x-cache": "hit" } });
@@ -68,8 +71,8 @@ async function cachedFetch(env: Env, path: string): Promise<Response> {
     if (row) return new Response(row.body, { headers: { "content-type": "application/json", "x-cache": "stale" } });
     return upstream;
   }
-  const body = await upstream.text();
-  await env.DB.prepare(UPSERT_CACHE).bind(path, body, now).run();
+  const body = trim ? JSON.stringify(trim.fn(await upstream.json())) : await upstream.text();
+  await env.DB.prepare(UPSERT_CACHE).bind(key, body, now).run();
   return new Response(body, { headers: { "content-type": "application/json", "x-cache": "miss" } });
 }
 
@@ -107,6 +110,7 @@ async function appData(env: Env): Promise<Response> {
       tierConfig: s.tierConfig ?? undefined,
       bg: bg ? { ...bg, imageUrl: imgUrl((s.bgImageKey as string) ?? null) } : undefined,
       homeHero: imgUrl((s.homeHeroKey as string) ?? null),
+      game: s.game ?? undefined,
     },
   });
 }
@@ -147,6 +151,8 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
     if (del) await db.prepare("DELETE FROM players WHERE id = ?").bind(id).run();
     else {
       if (!b.name || !b.teamId || !b.stats) return bad("jogador incompleto");
+      const heroPool = sanitizeHeroPool(b.heroPool, typeof b.hero === "string" ? b.hero : "Abrams");
+      b.heroPool = heroPool.length ? heroPool : undefined;
       if (b.art && typeof b.art === "object") {
         const credit = artCredit((b.art as { credit?: unknown }).credit);
         if (credit === null) return bad("crédito da arte inválido: nome até 60 caracteres e link http(s)");
@@ -181,6 +187,11 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
     if (b.tierConfig !== undefined) rows.tierConfig = b.tierConfig;
     if (b.bg !== undefined) { const bg = b.bg as Record<string, unknown> | null; rows.bg = bg ? { ...bg, imageUrl: "" } : null; rows.bgImageKey = keyOf(bg?.imageUrl); }
     if (b.homeHero !== undefined) rows.homeHeroKey = keyOf(b.homeHero);
+    if (b.game !== undefined) {
+      const game = sanitizeGameConfig(b.game);
+      if (!game) return bad("configuração do jogo inválida");
+      rows.game = game;
+    }
     await db.batch(Object.entries(rows).map(([k, v]) => db.prepare("INSERT INTO settings (key, value_json) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").bind(k, JSON.stringify(v))));
   } else return bad("rota inválida", 404);
   return Response.json({ ok: true });
@@ -329,6 +340,8 @@ export default {
     if (url.pathname === "/api/locale") return Response.json({ country: request.cf?.country ?? null }, { headers: { "cache-control": "private, no-store" } });
     if (url.pathname === "/api/health") return Response.json({ ok: true });
     if (url.pathname === "/api/data") return appData(env);
+    // ícones dos itens da loja (Cardslock Game): a lista completa tem ~6 MB, então só nome, tier, categoria e imagem
+    if (url.pathname === "/api/items") return cachedFetch(env, "/v1/assets/items", { key: "items:icons", fn: trimItemIcons });
     if (url.pathname === "/api/deadlock") {
       const path = url.searchParams.get("path") ?? "";
       if (!ALLOWED_PATHS.includes(path)) return Response.json({ error: "path not allowed" }, { status: 400 });

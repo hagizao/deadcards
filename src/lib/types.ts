@@ -1,4 +1,6 @@
-export type Stats = { MIR: number; MAC: number; SUP: number; MOV: number; POL: number; CON: number };
+import type { GameConfig } from "./game/config";
+
+export type Stats ={ MIR: number; MAC: number; SUP: number; MOV: number; POL: number; CON: number };
 
 export type HistoryPoint = { date: string; ovr: number; base?: boolean; note?: string };
 
@@ -42,6 +44,8 @@ export type Player = {
   frame?: Frame;
   variantOf?: string;
   inactive?: boolean;
+  /** Heróis de afinidade: outras versões que o jogador pode usar no deck do jogo. */
+  heroPool?: string[];
   art?: { url: string; zoom?: number; x?: number; y?: number; credit?: ArtCredit };
 };
 
@@ -55,6 +59,7 @@ export type Settings = {
   tierConfig?: TierBand[];
   bg?: BgSettings;
   homeHero?: string;
+  game?: GameConfig;
 };
 
 export type AppData = {

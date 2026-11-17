@@ -129,3 +129,8 @@ export function formatDateBR(iso: string): string {
   const [y, m, d] = iso.split("-");
   return d ? `${d}/${m}/${y}` : iso;
 }
+
+/** Arte da carta: a personalizada do jogador ou, sem ela, a do herói. */
+export function playerArt(player: Player, heroArt: (name: string) => { url: string; zoom: number; x: number; y: number } | null) {
+  return player.art?.url ? { url: player.art.url, zoom: player.art.zoom ?? 100, x: player.art.x ?? 50, y: player.art.y ?? 50 } : heroArt(player.hero);
+}
