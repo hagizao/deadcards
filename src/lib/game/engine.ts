@@ -76,30 +76,31 @@ export type LogKey =
 export type Result = { outcome: "win" | "loss" | "draw"; won: number; lost: number; myPower: number; aiPower: number; patron: boolean };
 export type PlayError = "souls" | "frozen" | "full";
 
-/** Cartas que entram no baralho: jogadores ativos, uma por jogador (variantes ficam de fora). */
+/** Carta de uma linha do cadastro no formato do jogo, agrupada pela chave do jogador. */
 const toPool = (p: Player, key: string): PoolCard => ({
   id: p.id, key, name: p.name, position: ROLE_ABILITY[p.position] ? p.position : "Flex", hero: p.hero, c1: p.c1 || "#334155", c2: p.c2 || "#0f172a", ovr: getPlayerOvr(p) || 0, stats: p.stats,
 });
 
 /**
- * Todas as versões jogáveis de cada jogador ativo: a carta principal, as variantes já cadastradas e uma versão por herói de afinidade
- * (que ainda não tenha variante). A principal vem primeiro.
+ * Todas as versões jogáveis de cada jogador: a carta principal, as variantes cadastradas (inclusive as guardadas, fora do elenco)
+ * e uma versão por herói de afinidade de cada uma dessas cartas. Duas cartas do mesmo herói convivem (a especial e a normal, por
+ * exemplo): quem monta o baralho escolhe qual. Jogador só entra se alguma carta dele estiver no elenco; a ativa principal vem primeiro.
  */
 export function cardVersions(players: Player[]): Map<string, PoolCard[]> {
-  const out = new Map<string, PoolCard[]>();
-  const active = players.filter((p) => !p.inactive);
-  for (const p of [...active].sort((a, b) => Number(!!a.variantOf) - Number(!!b.variantOf))) {
-    const key = p.variantOf || p.id;
-    const list = out.get(key) ?? [];
-    if (!list.some((c) => c.hero === p.hero)) list.push(toPool(p, key));
-    out.set(key, list);
+  const groups = new Map<string, Player[]>();
+  for (const p of players) {
+    const k = p.variantOf || p.id;
+    groups.set(k, [...(groups.get(k) ?? []), p]);
   }
-  for (const p of active) {
-    const list = out.get(p.id);
-    if (p.variantOf || !list) continue;
-    for (const hero of sanitizeHeroPool(p.heroPool, p.hero)) {
-      if (!list.some((c) => c.hero === hero)) list.push({ ...list[0], id: `${p.id}~${hero}`, hero, alt: true });
+  const out = new Map<string, PoolCard[]>();
+  for (const [key, g] of groups) {
+    if (g.every((p) => p.inactive)) continue;
+    const real = [...g].sort((x, y) => Number(!!x.inactive) - Number(!!y.inactive) || Number(!!x.variantOf) - Number(!!y.variantOf));
+    const list = real.map((p) => toPool(p, key));
+    for (const p of real) {
+      for (const hero of sanitizeHeroPool(p.heroPool, p.hero)) list.push({ ...toPool(p, key), id: `${p.id}~${hero}`, hero, alt: true });
     }
+    out.set(key, list);
   }
   return out;
 }

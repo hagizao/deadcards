@@ -622,7 +622,7 @@ describe("balanceamento das habilidades", () => {
 });
 
 describe("versões e heróis de afinidade", () => {
-  it("cada jogador tem a principal, as variantes cadastradas e uma versão por herói de afinidade", () => {
+  it("cada jogador tem a principal, as variantes cadastradas e uma versão por herói de afinidade (mesmo herói de uma variante convive)", () => {
     const list = [
       player("a", 80, { hero: "Haze", heroPool: ["Wraith", "Haze", "Inexistente", "Wraith", "Vindicta"] }),
       player("a2", 82, { hero: "Wraith", variantOf: "a" }),
@@ -631,7 +631,7 @@ describe("versões e heróis de afinidade", () => {
     ];
     const v = cardVersions(list);
     expect([...v.keys()]).toEqual(["a", "b"]);
-    expect(v.get("a")!.map((c) => [c.id, c.hero, !!c.alt])).toEqual([["a", "Haze", false], ["a2", "Wraith", false], ["a~Vindicta", "Vindicta", true]]);
+    expect(v.get("a")!.map((c) => [c.id, c.hero, !!c.alt])).toEqual([["a", "Haze", false], ["a2", "Wraith", false], ["a~Wraith", "Wraith", true], ["a~Vindicta", "Vindicta", true]]);
     expect(v.get("a")!.every((c) => c.key === "a")).toBe(true);
     expect(cardPool(list).map((c) => c.id)).toEqual(["a", "b"]);
   });
@@ -821,5 +821,28 @@ describe("troca de herói repetido no baralho", () => {
     const b = sanitizeBook({ decks: [{ name: "x", cards: [], look: "deco" }, { name: "y", cards: [], look: "<script>" }] }, (n) => `B${n}`);
     expect(b.decks[0].look).toBe("deco");
     expect(b.decks[1].look).toBeUndefined();
+  });
+});
+
+describe("versões guardadas e duas cartas do mesmo herói", () => {
+  const list = [
+    player("s", 87, { hero: "Holliday", special: true }),
+    player("s2", 83, { hero: "Pocket", variantOf: "s", inactive: true, heroPool: ["Holliday", "Pocket"] }),
+    player("x", 80, { hero: "Haze", inactive: true }),
+    player("y2", 80, { hero: "Paige", variantOf: "y", inactive: true }),
+    player("y", 80, { hero: "Wraith", inactive: true }),
+  ];
+  const v = cardVersions(list);
+  it("variante guardada continua sendo carta do jogador e tem afinidade própria", () => {
+    expect(v.get("s")!.map((c) => [c.id, c.hero, !!c.alt])).toEqual([["s", "Holliday", false], ["s2", "Pocket", false], ["s2~Holliday", "Holliday", true]]);
+    expect(v.get("s")!.every((c) => c.key === "s")).toBe(true);
+  });
+  it("jogador todo fora do elenco não entra", () => {
+    expect([...v.keys()]).toEqual(["s"]);
+  });
+  it("a versão de afinidade usa a carta de onde veio", () => {
+    const byId = new Map(list.map((p) => [p.id, p]));
+    expect(versionPlayer(byId, { id: "s2~Holliday", hero: "Holliday" })).toMatchObject({ id: "s2", hero: "Holliday" });
+    expect(v.get("s")!.find((c) => c.id === "s2~Holliday")!.ovr).toBe(83);
   });
 });

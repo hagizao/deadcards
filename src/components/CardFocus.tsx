@@ -55,6 +55,8 @@ export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, taken, 
     return () => { window.removeEventListener("keydown", key); opener?.focus?.(); };
   }, [onClose]);
 
+  const heroes = [...new Set(versions.map((v) => v.hero))];
+  const twins = versions.filter((v) => v.hero === shown.hero);
   const ab: AbilityKey = isAbility(shown.hero) ? shown.hero : ROLE_ABILITY[shown.position] ?? "draw";
   const s = cardStats(shown, cfg.cards, cfg.heroes);
   const a = t.abilities[s.ab];
@@ -94,13 +96,16 @@ export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, taken, 
               className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-full text-xl text-zinc-300 transition hover:bg-white/10 hover:text-white active:bg-white/20 sm:size-9 ${focus}`}>×</button>
           </header>
 
-          {versions.length > 1 && (
+          {heroes.length > 1 && (
             <section className="flex flex-col gap-2" aria-labelledby="focus-heroes">
               <h3 id="focus-heroes" className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">{t.deck.heroes}</h3>
               <div className="flex flex-wrap gap-1.5">
-                {versions.map((v) => {
+                {heroes.map((hero) => {
+                  const same = versions.filter((x) => x.hero === hero);
+                  // herói com mais de uma carta: o botão leva à que já está à mostra ou à primeira
+                  const v = same.find((x) => x.id === shown.id) ?? same[0];
                   const vs = cardStats(v, cfg.cards, cfg.heroes);
-                  const on = v.id === shown.id;
+                  const on = hero === shown.hero;
                   const dup = taken(v);
                   const icon = heroIcon(v.hero);
                   return (
@@ -109,8 +114,29 @@ export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, taken, 
                       {icon ? <img src={icon} alt="" className="size-8 rounded-md object-cover" /> : <span className="size-8" />}
                       <span className="flex flex-col leading-tight">
                         <span className="text-xs font-bold">{v.hero}{dup && <span className={on ? "text-rose-700" : "text-rose-300"} aria-hidden="true"> ⇄</span>}</span>
-                        <span className={`text-[10px] ${on ? "text-dl-black/70" : "text-zinc-400"}`}>{vs.cost} · {vs.power}</span>
+                        <span className={`text-[10px] ${on ? "text-dl-black/70" : "text-zinc-400"}`}>{same.length > 1 ? t.deck.cards(same.length) : `${vs.cost} · ${vs.power}`}</span>
                       </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {twins.length > 1 && (
+            <section className="flex flex-col gap-2" aria-labelledby="focus-twins">
+              <h3 id="focus-twins" className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">{t.deck.whichCard(shown.hero)}</h3>
+              <div className="flex flex-wrap gap-2">
+                {twins.map((v) => {
+                  const vs = cardStats(v, cfg.cards, cfg.heroes);
+                  const p = versionPlayer(byId, v);
+                  const on = v.id === shown.id;
+                  const kind = v.alt ? t.deck.cardKind.alt : p?.special ? t.deck.cardKind.special : t.deck.cardKind.normal;
+                  return (
+                    <button key={v.id} type="button" onClick={() => onShow(v)} aria-pressed={on} aria-label={`${t.deck.version(v.name, v.hero)} · ${kind}`}
+                      className={`flex w-20 cursor-pointer flex-col items-center gap-1 rounded-lg p-1.5 transition active:scale-95 ${focus} ${on ? "bg-dl-text text-dl-black" : "bg-zinc-900/80 text-zinc-200 hover:bg-zinc-800"}`}>
+                      <span className="w-full"><GameCard player={p} name={v.name} cost={vs.cost} power={vs.power} base={vs.power} text={null} /></span>
+                      <span className="text-[10px] font-bold uppercase">{kind}</span>
                     </button>
                   );
                 })}

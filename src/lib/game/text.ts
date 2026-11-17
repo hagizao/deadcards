@@ -38,6 +38,7 @@ export type GameText = {
     costFrom: (hero: string) => string; vBonus: (at: number) => string; mastery: (stat: string, v: number, level: string) => string; emptyDeck: string; cards: (n: number) => string;
     moreHeroes: (n: number) => string; swapTitle: string; swapBtn: (hero: string, holder: string) => string; swapNote: string;
     look: string; looks: Record<DeckLook, string>;
+    whichCard: (hero: string) => string; cardKind: { special: string; normal: string; alt: string };
   };
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
@@ -269,6 +270,7 @@ export const GAME_TEXT = strings<GameText>({
       moreHeroes: (n) => `+${n} ${pl(n, "herói", "heróis")}`, swapTitle: "Herói repetido", swapBtn: (hero, holder) => `Trocar ${hero} de ${holder} por esta`,
       swapNote: "A carta nova entra no lugar da antiga.",
       look: "Verso do baralho", looks: { noir: "Noir", deco: "Art Déco", sepia: "Sépia", amber: "Mão Âmbar", sapphire: "Chama Safira" },
+      whichCard: (hero) => `Qual carta de ${hero}?`, cardKind: { special: "Especial", normal: "Normal", alt: "Afinidade" },
     },
     ui: {
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
@@ -508,6 +510,7 @@ export const GAME_TEXT = strings<GameText>({
       moreHeroes: (n) => `+${n} ${pl(n, "hero", "heroes")}`, swapTitle: "Repeated hero", swapBtn: (hero, holder) => `Swap ${holder}’s ${hero} for this one`,
       swapNote: "The new card takes the old one’s place.",
       look: "Deck back", looks: { noir: "Noir", deco: "Art Deco", sepia: "Sepia", amber: "Amber Hand", sapphire: "Sapphire Flame" },
+      whichCard: (hero) => `Which ${hero} card?`, cardKind: { special: "Special", normal: "Regular", alt: "Affinity" },
     },
     ui: {
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
@@ -747,6 +750,7 @@ export const GAME_TEXT = strings<GameText>({
       moreHeroes: (n) => `+${n} ${pl(n, "héroe", "héroes")}`, swapTitle: "Héroe repetido", swapBtn: (hero, holder) => `Cambiar ${hero} de ${holder} por esta`,
       swapNote: "La carta nueva entra en el lugar de la antigua.",
       look: "Reverso del mazo", looks: { noir: "Noir", deco: "Art Déco", sepia: "Sepia", amber: "Mano Ámbar", sapphire: "Llama Zafiro" },
+      whichCard: (hero) => `¿Qué carta de ${hero}?`, cardKind: { special: "Especial", normal: "Normal", alt: "Afinidad" },
     },
     ui: {
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",
