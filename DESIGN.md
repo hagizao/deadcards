@@ -40,6 +40,9 @@ Fonte do design system: `src/index.css` (tokens `@theme`, `noir-glass`, `noir-gl
 - 2026-11-17 — As cartas em destaque são escolhidas pelo admin (até 5, Editor › Aparência); sem escolha, a Home mostra as 5 maiores OVR — a vitrine nunca fica vazia.
 - 2026-11-17 — O leque só existe a partir de `xl`; abaixo disso a vitrine rola na horizontal começando pela carta principal, sem rotação — 5 cartas não cabem lado a lado em telas menores.
 - 2026-11-17 — O carrossel de heróis saiu da Home; a imagem da capa (`homeHero`) virou o fundo da vitrine.
+- 2026-11-17 — Header = opção A: abaixo de `lg` as 5 áreas ficam numa barra fixa embaixo (ícone + nome) e o topo mostra só marca, idioma e conta; a partir de `lg` as áreas são abas de texto e só a ativa tem a pílula clara — no celular todas as áreas ficam visíveis e ao alcance do polegar, e no desktop sobra um único destaque. Escolhida entre 3 direções (B: menu em folha; C: abas em formato de carta).
+- 2026-11-17 — A marca aparece sempre como "Cardslock" (o "CL" do celular saiu) e o Editor saiu das abas para o menu da conta — é ferramenta de admin e libera espaço para as áreas.
+- 2026-11-17 — Ícones novos no `Icon`: `shield` (Times), `bars` (Tier List), `cards` (Coleção), `versus` (Comparar), `ticket` (Resgatar).
 
 ## Perguntas abertas
 - A tarefa principal é achar e mostrar a sua carta ou a do streamer? (assumido) A Home ainda não personaliza nada para quem está logado ("sua carta").

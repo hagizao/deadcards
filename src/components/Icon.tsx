@@ -5,6 +5,11 @@ const PATHS = {
   "chevron-right": "m9 5 7 7-7 7",
   "arrow-down": "M12 5v14m-6-6 6 6 6-6",
   "arrow-up": "M12 19V5m-6 6 6-6 6 6",
+  shield: "M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z",
+  bars: "M4 6h16M4 12h11M4 18h6",
+  cards: "M7 4h11v14H7zM4 7v13h11",
+  versus: "M8 4v16M16 4v16M3 9l5-5 5 5M11 15l5 5 5-5",
+  ticket: "M4 8a2 2 0 0 0 0 4v4h16v-4a2 2 0 0 1 0-4V4H4zM10 4v12",
   star: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z",
 };
 

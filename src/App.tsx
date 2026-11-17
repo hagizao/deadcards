@@ -34,10 +34,11 @@ function GitHubIcon() {
 
 type Tab = "home" | "teams" | "tierlist" | "collection" | "redeem" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "settings";
 const TABS = ["teams", "tierlist", "collection", "compare", "redeem"] as const;
+const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", compare: "versus", redeem: "ticket" } as const;
 
 const S = strings({
   pt: {
-    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", compare: "Comparar", redeem: "Resgatar", editor: "Editor" },
+    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", compare: "Comparar", redeem: "Resgatar" },
     mainNav: "Navegação principal",
     projectLinks: "Links do projeto",
     language: "Idioma",
@@ -54,7 +55,7 @@ const S = strings({
     rmClose: "Fechar aviso",
   },
   en: {
-    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", compare: "Compare", redeem: "Redeem", editor: "Editor" },
+    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", compare: "Compare", redeem: "Redeem" },
     mainNav: "Main navigation",
     projectLinks: "Project links",
     language: "Language",
@@ -71,7 +72,7 @@ const S = strings({
     rmClose: "Dismiss notice",
   },
   es: {
-    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", compare: "Comparar", redeem: "Canjear", editor: "Editor" },
+    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", compare: "Comparar", redeem: "Canjear" },
     mainNav: "Navegación principal",
     projectLinks: "Enlaces del proyecto",
     language: "Idioma",
@@ -254,7 +255,7 @@ function Shell() {
   const [editId, setEditId] = useState<string | null>(null);
   const { me } = useData();
   const t = useT(S);
-  const tabs = me?.admin ? [...TABS, "editor" as const] : TABS;
+  const go = (id: Tab) => { setFocusTeam(undefined); setTab(id); };
   const openTeam = (id: string) => { setFocusTeam(id); setTab("teams"); };
   const editCard = (id: string) => { setSpotlight(null); setEditId(id); setTab("editor"); };
   const openProfile = (id: string) => { setProfileId(id); setTab("profile"); };
@@ -273,29 +274,29 @@ function Shell() {
     <>
       <Background />
       <header className="noir-glass sticky top-0 z-40 border-b border-zinc-200/15">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:h-20 sm:px-6 lg:px-8">
-          <button type="button" onClick={() => setTab("home")} className="brand-badge flex shrink-0 items-center gap-3 rounded-xl px-4 py-2.5 text-left sm:px-6 sm:py-3">
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:h-20 sm:px-6 lg:px-8">
+          <button type="button" onClick={() => setTab("home")} className="brand-badge flex shrink-0 items-center gap-2.5 rounded-xl px-4 py-2.5 text-left sm:gap-3 sm:px-6 sm:py-3">
             <span className="size-2.5 rounded-full bg-zinc-100 shadow-[0_0_12px_rgba(255,255,255,0.9)]" />
-            <span className="font-display text-base font-extrabold tracking-[0.18em] text-zinc-100 uppercase sm:text-xl"><span className="sm:hidden">CL</span><span className="hidden sm:inline">Cardslock</span></span>
+            <span className="font-display text-base font-extrabold tracking-[0.18em] text-zinc-100 uppercase sm:text-xl">Cardslock</span>
           </button>
-          <nav className="relative ml-auto flex min-w-0 scrollbar-none items-center gap-2 overflow-x-auto mask-x-from-[calc(100%-1.5rem)] px-6 py-1" aria-label={t.mainNav}>
-            {tabs.map((id) => (
+          <nav className="hidden flex-1 items-center justify-center gap-1 lg:flex" aria-label={t.mainNav}>
+            {TABS.map((id) => (
               <button
                 key={id}
                 type="button"
-                onClick={(e) => { setFocusTeam(undefined); setTab(id); e.currentTarget.scrollIntoView({ inline: "nearest", block: "nearest" }); }}
+                onClick={() => go(id)}
                 aria-current={tab === id ? "page" : undefined}
-                className={`relative flex min-h-11 shrink-0 cursor-pointer items-center rounded-lg border px-3 text-xs font-bold tracking-widest whitespace-nowrap uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 sm:min-h-10 sm:px-4 sm:text-sm ${
-                  tab === id ? "border-dl-text text-dl-black" : "border-black/50 bg-linear-to-b from-dl-bevel-from to-dl-bevel-to text-white text-shadow-xs hover:from-dl-bevel-hover-from hover:to-dl-bevel-hover-to"
-                }`}
+                className={`relative flex min-h-10 cursor-pointer items-center rounded-lg px-3 text-sm font-bold tracking-widest whitespace-nowrap uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 xl:px-4 ${tab === id ? "text-dl-black" : "text-zinc-300 hover:bg-zinc-100/10 hover:text-white"}`}
               >
                 {tab === id && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-dl-text shadow-[0_0_18px_rgba(255,239,215,0.35)]" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
                 <span className="relative">{t.tabs[id]}</span>
               </button>
             ))}
           </nav>
-          <LangMenu />
-          <div className="shrink-0"><Account onProfile={() => { if (me) openProfile(me.handle ?? me.id); }} onSettings={() => setTab("settings")} /></div>
+          <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
+            <LangMenu />
+            <Account onProfile={() => { if (me) openProfile(me.handle ?? me.id); }} onSettings={() => setTab("settings")} onEditor={() => setTab("editor")} />
+          </div>
         </div>
       </header>
 
@@ -307,7 +308,7 @@ function Shell() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.15, ease: easeOut }}
           >
-            {tab === "home" && <Home onOpenTeam={openTeam} onOpenCard={setSpotlight} onNavigate={(id) => { setFocusTeam(undefined); setTab(id); }} />}
+            {tab === "home" && <Home onOpenTeam={openTeam} onOpenCard={setSpotlight} onNavigate={go} />}
             {tab === "teams" && <Teams focusTeamId={focusTeam} onOpenCard={setSpotlight} />}
             {tab === "tierlist" && <TierList onOpenCard={setSpotlight} onOpenTeam={openTeam} />}
             {tab === "collection" && <Collection onOpenCard={setSpotlight} />}
@@ -321,7 +322,7 @@ function Shell() {
           </motion.div>
       </main>
 
-      <footer className="mt-6 border-t border-zinc-200/10">
+      <footer className="mt-6 border-t border-zinc-200/10 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-zinc-400 sm:px-6 lg:px-8">
           <a href={REPO} target="_blank" rel="noreferrer" className="flex items-center gap-2 font-bold tracking-wider text-zinc-300 uppercase hover:text-white">
             <GitHubIcon /> {t.github}
@@ -341,6 +342,24 @@ function Shell() {
           {t.notAffiliated}
         </p>
       </footer>
+
+      <nav className="noir-glass-strong fixed inset-x-0 bottom-0 z-40 flex border-t border-zinc-200/15 pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label={t.mainNav}>
+        {TABS.map((id) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => go(id)}
+            aria-current={tab === id ? "page" : undefined}
+            className={`flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 text-[10px] font-bold tracking-wider uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 ${tab === id ? "text-dl-text" : "text-zinc-400 hover:text-zinc-100"}`}
+          >
+            <span className="relative flex h-7 w-12 items-center justify-center">
+              {tab === id && <motion.span layoutId="nav-pill-bottom" className="absolute inset-0 rounded-full bg-dl-text/15" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+              <Icon name={NAV_ICON[id]} className="relative size-5" />
+            </span>
+            <span className="max-w-full truncate px-0.5">{t.tabs[id]}</span>
+          </button>
+        ))}
+      </nav>
 
       <AnimatePresence>
         {spotlight && <Spotlight key="spotlight" playerId={spotlight} onClose={() => setSpotlight(null)} onSwitch={setSpotlight} onEdit={me?.admin ? editCard : undefined} />}
