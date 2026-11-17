@@ -3,7 +3,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pageTitle, pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, type ItemKey, type ItemSlot } from "../lib/game/config";
+import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, type ItemKey, type ItemSlot, type StatKey } from "../lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
@@ -11,7 +11,7 @@ import { useItemIcons } from "../lib/game/useItemIcons";
 const REVEAL_MS = 650;
 const END_MS = 750;
 const TOAST_MS = 1300;
-const TOKEN_GLYPH: Record<Token, string> = { pigeon: "🐦", ghoul: "💀", turret: "⚙️", rat: "🐀" };
+const TOKEN_GLYPH: Record<Token, string> = { pigeon: "🐦", ghoul: "💀", turret: "⚙️", rat: "🐀", illusion: "👤" };
 
 // placar da sessão: sobrevive à troca de aba, zera ao recarregar a página
 const record = { w: 0, l: 0 };
@@ -43,6 +43,8 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(() => ({ id: 0, text: t.ui.toast.turn(1) }));
   const [result, setResult] = useState<Result | null>(null);
   const [showEnd, setShowEnd] = useState(false);
+  // escolha de alvo ao jogar, movimento ou marca do Shiv em andamento
+  const [mode, setMode] = useState<Mode | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -73,6 +75,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     setLookItem(null);
     setResult(null);
     setShowEnd(false);
+    setMode(null);
     say(t.ui.toast.turn(1));
   };
 
@@ -81,14 +84,14 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     if (m.needsPick) return say(t.shop.pickFirst);
     const queue = m.endTurn();
     setSel(null);
+    setMode(null);
     setLook(null);
     setLookItem(null);
     bump();
     let i = 0;
     const step = () => {
       if (i < queue.length) {
-        const [c, l] = queue[i++];
-        m.reveal(c, l);
+        m.act(queue[i++]);
         bump();
         return later(step, REVEAL_MS);
       }
@@ -113,11 +116,14 @@ function Board({ newMatch }: { newMatch: () => Match }) {
 
   const pickHand = (c: GCard) => {
     if (m.busy || result) return;
+    setMode(null);
     setSel((s) => (s === c ? null : c));
     setLook(null);
     setLookItem(null);
   };
   const pickBoard = (c: GCard) => {
+    if (mode && targets.includes(c)) return hitCard(c);
+    if (mode) setMode(null);
     if (c.staged && c.side === "p" && !m.busy) { m.unstage(c); bump(); return; }
     setLook((x) => (x === c ? null : c));
     setLookItem(null);
@@ -128,9 +134,35 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     if (!sel) return;
     const err = m.play(sel, l);
     if (err) return say(errText[err]);
+    const spec = m.choiceOf(sel);
+    if (spec?.card && m.choiceCards(sel).length) setMode({ k: "card", c: sel });
+    else if (spec?.loc) setMode({ k: "loc", c: sel });
     setSel(null);
     bump();
   };
+
+  const targets = !mode ? [] : mode.k === "card" ? m.choiceCards(mode.c) : mode.k === "mark" ? m.markOptions(mode.c) : [];
+  const dests = !mode ? [] : mode.k === "loc" ? m.choiceLocs(mode.c) : mode.k === "move" ? m.moveOptions(mode.c) : [];
+  const hitCard = (x: GCard) => {
+    if (!mode) return;
+    if (mode.k === "mark") { m.mark(mode.c, x); setMode(null); }
+    else {
+      m.choose(mode.c, { card: x });
+      setMode(m.choiceOf(mode.c)?.loc ? { k: "loc", c: mode.c } : null);
+    }
+    bump();
+  };
+  const hitLoc = (l: Loc) => {
+    if (!mode) return;
+    if (mode.k === "move") { if (!m.moveCard(mode.c, l)) return; setLook(null); }
+    else m.choose(mode.c, { loc: l });
+    setMode(null);
+    bump();
+  };
+  const undoPlay = () => { if (mode && mode.c.staged) m.unstage(mode.c); setMode(null); bump(); };
+  const startMode = (k: "move" | "mark", c: GCard) => setMode({ k, c });
+  const modeHint = !mode ? "" : mode.k === "card" ? t.ui.act.pickFoe(name(mode.c)) : mode.k === "loc" ? t.ui.act.pickLoc(name(mode.c))
+    : mode.k === "move" ? t.ui.act.moveHint(name(mode.c)) : t.ui.act.markHint(name(mode.c));
 
   const focused = sel ?? look;
   const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && sel.cost <= m.E && m.room(l, "p") && l.lock.p < m.t;
@@ -139,17 +171,24 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 text-dl-text">
       <div className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h1 className={pageTitle}>{t.ui.title}</h1>
-        <p className="text-sm text-zinc-300">{t.ui.you} · {t.ui.ai} · {t.ui.turn(Math.min(m.t, TURNS), TURNS)} · {t.ui.record(record.w, record.l)}</p>
+        <p className="text-sm text-zinc-300">{t.ui.you} · {t.ui.ai} · {t.ui.turn(Math.min(m.t, TURNS), TURNS)} · <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr> · {t.ui.record(record.w, record.l)}</p>
       </div>
 
       <section aria-label={t.ui.arena} className="flex w-full gap-1.5 sm:gap-2">
         {m.loc.map((l, i) => (
-          <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)}
-            card={(c) => <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} art={art(c.p.hero)} looking={look === c} onClick={() => pickBoard(c)} />} />
+          <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
+            card={(c) => <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} art={art(c.p.hero)} looking={look === c} target={targets.includes(c)} onClick={() => pickBoard(c)} />} />
         ))}
       </section>
 
-      <p className="min-h-5 w-full text-center text-xs text-zinc-300" aria-live="polite">{logLine}</p>
+      {mode ? (
+        <div className="flex w-full flex-wrap items-center justify-center gap-2 rounded-xl bg-game-me/10 px-3 py-2 text-sm" role="status">
+          <span className="font-bold text-game-me">{modeHint}</span>
+          {(mode.k === "card" || mode.k === "loc") && <button type="button" className={pill(false)} onClick={() => setMode(null)}>{t.ui.act.auto}</button>}
+          {(mode.k === "card" || mode.k === "loc") && mode.c.staged && <button type="button" className={pill(false)} onClick={undoPlay}>{t.ui.act.undo}</button>}
+          {(mode.k === "move" || mode.k === "mark") && <button type="button" className={pill(false)} onClick={() => setMode(null)}>{t.ui.act.cancel}</button>}
+        </div>
+      ) : <p className="min-h-5 w-full text-center text-xs text-zinc-300" aria-live="polite">{logLine}</p>}
 
       {m.offer && <ItemSlots m={m} t={t} icons={icons} looking={lookItem} onLook={showItem} />}
 
@@ -173,7 +212,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
 
       <div className="noir-glass min-h-12 w-full rounded-xl px-3 py-2 text-sm/snug">
         {lookItem ? <ItemDetail k={lookItem} m={m} t={t} />
-          : focused ? <Detail c={focused} t={t} name={name(focused)} />
+          : focused ? <Detail c={focused} m={m} t={t} name={name(focused)} onAct={result ? undefined : startMode} />
           : <span className="text-zinc-400">{t.ui.hint}</span>}
       </div>
 
@@ -217,21 +256,27 @@ function Board({ newMatch }: { newMatch: () => Match }) {
 }
 
 type T = (typeof GAME_TEXT)["pt"];
+type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
-function Location({ m, l, i, t, canPlay, onPlay, card }: { m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; card: (c: GCard) => React.ReactNode }) {
+function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, card }: { m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; card: (c: GCard) => React.ReactNode }) {
   const a = m.total(l, "a"), p = m.total(l, "p");
   const nm = l.rev ? l.L.name : t.ui.hiddenLoc;
   const chips = [
     l.lock.p >= m.t && `❄️ ${t.ui.chips.frozenMe}`,
     l.lock.a >= m.t && `❄️ ${t.ui.chips.frozenAi}`,
-    m.hook.p === i && `🪝 ${t.ui.chips.hookMe}`,
-    m.hook.a === i && `🪝 ${t.ui.chips.hookAi}`,
+    m.hook.p?.i === i && `🪝 ${t.ui.chips.hookMe}`,
+    m.hook.a?.i === i && `🪝 ${t.ui.chips.hookAi}`,
     l.trap.p > 0 && `🪤 ${t.ui.chips.trapMe}`,
     l.trap.a > 0 && `🪤 ${t.ui.chips.trapAi}`,
+    l.shield.p >= m.t && `🧊 ${t.ui.chips.shieldMe}`,
+    l.shield.a >= m.t && `🧊 ${t.ui.chips.shieldAi}`,
+    !!l.petri.p && `🗿 ${t.ui.chips.petriMe}`,
+    !!l.petri.a && `🗿 ${t.ui.chips.petriAi}`,
+    m.portals.some((x) => x.t >= m.t && (x.a === i || x.b === i)) && `🚪 ${t.ui.chips.portal}`,
   ].filter(Boolean) as string[];
   const side = "grid min-h-[clamp(7.9rem,34vw,12.4rem)] auto-rows-min grid-cols-[repeat(2,clamp(2.75rem,12vw,4.375rem))] gap-0.5";
   return (
-    <div className="noir-glass flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl p-1 sm:p-1.5">
+    <div className="noir-glass relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl p-1 sm:p-1.5">
       <div className={side} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
       <div className="flex min-h-19 w-full flex-col items-center gap-0.5 text-center leading-tight">
         <strong className="font-display text-xs tracking-wide sm:text-sm">{nm}</strong>
@@ -253,16 +298,22 @@ function Location({ m, l, i, t, canPlay, onPlay, card }: { m: Match; l: Loc; i: 
             className={`absolute inset-0 cursor-pointer rounded-md outline-2 outline-offset-2 outline-game-me outline-dashed hover:bg-game-me/10 active:bg-game-me/20 ${focus}`} />
         )}
       </div>
+      {dest && (
+        <button type="button" onClick={onDest} aria-label={t.ui.act.dest(nm)}
+          className={`absolute inset-0 z-10 cursor-pointer rounded-xl outline-2 -outline-offset-2 outline-game-me outline-dashed hover:bg-game-me/15 active:bg-game-me/25 ${focus}`} />
+      )}
     </div>
   );
 }
 
 function statusIcons(c: GCard, m: Match, t: T): [string, string][] {
-  const s = c.st;
+  const s = c.st, now = (u?: number) => (u ?? 0) >= m.t;
   return ([
-    [!!s.burn, "🔥", t.ui.status.burn], [(s.stun ?? 0) >= m.t, "💫", t.ui.status.stun], [!!s.immune, "🛡️", t.ui.status.immune],
-    [!!s.chained, "⛓️", t.ui.status.chained], [!!s.burrow && !m.final, "⛏️", t.ui.status.burrow], [!!s.poison, "☠️", t.ui.status.poison],
-    [s.tmp.some((x) => m.t <= x.u), "💤", t.ui.status.sleep], [!!s.riposte, "⚔️", t.ui.status.riposte], [!!s.wolf, "🐺", t.ui.status.wolf],
+    [!!s.burn || !!s.tburn?.some((x) => x.u >= m.t), "🔥", t.ui.status.burn], [now(s.stun), "💫", t.ui.status.stun], [m.immune(c), "🛡️", t.ui.status.immune],
+    [!!s.chained, "⛓️", t.ui.status.chained], [!!s.burrow && !m.final, "⛏️", t.ui.status.burrow], [now(s.sleep), "💤", t.ui.status.sleep],
+    [(s.rip ?? 0) > 0, "⚔️", t.ui.status.riposte], [!!s.wolf, "🐺", t.ui.status.wolf], [now(s.vuln), "🎯", t.ui.status.vuln],
+    [!!s.petri, "🗿", t.ui.status.petri], [!!s.unstop, "⚡", t.ui.status.unstop], [now(s.chan?.u), "🌩️", t.ui.status.chan],
+    [now(s.root), "📌", t.ui.status.root], [s.exec?.u === m.t, "🗡️", t.ui.status.exec],
   ] as const).filter((x) => x[0]).map((x) => [x[1], x[2]]);
 }
 
@@ -273,7 +324,7 @@ function Art({ c, art }: { c: GCard; art: string }) {
 
 const badge = "absolute top-0.5 flex size-5 items-center justify-center rounded-full border border-white font-display text-xs font-extrabold not-italic";
 
-function BoardCard({ c, m, t, name, art, looking, onClick }: { c: GCard; m: Match; t: T; name: string; art: string; looking: boolean; onClick: () => void }) {
+function BoardCard({ c, m, t, name, art, looking, target, onClick }: { c: GCard; m: Match; t: T; name: string; art: string; looking: boolean; target: boolean; onClick: () => void }) {
   const size = "relative aspect-5/7 w-[clamp(2.75rem,12vw,4.375rem)] overflow-hidden rounded-md";
   if (c.side === "a" && !c.rev) return <div className={`${size} ring-1 ring-game-ai game-card-back`} role="img" aria-label={t.ui.facedown} />;
   const pw = c.rev ? m.pow(c) : c.base;
@@ -281,14 +332,15 @@ function BoardCard({ c, m, t, name, art, looking, onClick }: { c: GCard; m: Matc
   const icons = statusIcons(c, m, t);
   return (
     <motion.button type="button" onClick={onClick} aria-pressed={looking}
-      aria-label={`${t.ui.cardLabel(name, c.cost, hidden ? 0 : pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}
+      aria-label={`${target ? `${t.ui.act.target(name)}: ` : ""}${t.ui.cardLabel(name, c.cost, hidden ? 0 : pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}
       initial={c.rev ? { scale: 1.4, rotate: -4, filter: "brightness(2)" } : false} animate={{ scale: 1, rotate: 0, filter: "brightness(1)" }} transition={{ duration: 0.25 }}
-      className={`${size} cursor-pointer text-white ring-1 ring-white/30 ${c.staged ? "opacity-70 outline-1 outline-white outline-dashed" : ""} ${looking ? "outline-2 outline-dl-text" : ""} ${focus}`}
+      className={`${size} cursor-pointer text-white ring-1 ring-white/30 ${c.staged ? "opacity-70 outline-1 outline-white outline-dashed" : ""} ${looking ? "outline-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-1 outline-game-me" : ""} ${focus}`}
       style={{ background: `linear-gradient(160deg, ${c.p.c1}, ${c.p.c2})` }}>
       <Art c={c} art={art} />
       <i className={`${badge} left-0.5 bg-blue-600`}>{c.cost}</i>
       <b className={`${badge} right-0.5 ${pw > c.base ? "bg-emerald-300" : pw < c.base ? "bg-red-300" : "bg-game-brass"} text-dl-black`}>{hidden ? "?" : pw}</b>
       <span className="absolute bottom-4 left-0.5 text-[10px] leading-none drop-shadow-sm" aria-hidden="true">{icons.map((x) => x[0]).join("")}</span>
+      <Pips lvl={c.lvl} className="top-0.5 text-[8px]" />
       <span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-px py-0.5 text-center text-[9px]">{name}</span>
     </motion.button>
   );
@@ -302,24 +354,49 @@ function HandCard({ c, t, name, art, selected, affordable, disabled, onClick }: 
       <Art c={c} art={art} />
       <i className={`${badge} left-0.5 size-6 bg-blue-600 text-sm`}>{c.cost}</i>
       <b className={`${badge} right-0.5 size-6 bg-game-brass text-sm text-dl-black`}>{c.base}</b>
+      <Pips lvl={c.lvl} className="top-1 text-[10px]" />
       <span className="absolute inset-x-0 bottom-5 truncate bg-black/80 p-0.5 text-center text-[11px]">{name}</span>
       <small className="absolute inset-x-0 bottom-0 h-5 truncate bg-black/90 px-1 text-center text-[10px]/5 text-game-brass">{t.abilities[c.ab].name}</small>
     </button>
   );
 }
 
-function Detail({ c, t, name }: { c: GCard; t: T; name: string }) {
-  const key = c.st.silenced ? "none" : c.ab;
+/** Estrelas de Maestria: nenhuma no Aprendiz, 1 no Profissional, 2 no Mestre. */
+function Pips({ lvl, className }: { lvl: number; className: string }) {
+  if (!lvl) return null;
+  return <span className={`absolute inset-x-0 text-center leading-none text-game-brass drop-shadow-sm ${className}`} aria-hidden="true">{"★".repeat(lvl)}</span>;
+}
+
+function Detail({ c, m, t, name, onAct }: { c: GCard; m: Match; t: T; name: string; onAct?: (k: "move" | "mark", c: GCard) => void }) {
+  const key = m.abilityOf(c);
   const a = t.abilities[key];
   const kind = t.kinds[ABILITIES[key].kind];
-  const text = c.st.silenced ? t.ui.noAbility : c.tok && c.ab === "none" ? t.ui.tokenDesc : c.desc || a.text(c.v);
+  const text = key === "none" && c.ab !== "none" ? t.ui.noAbility : c.tok && c.ab === "none" ? t.ui.tokenDesc : c.desc || a.text(c.v);
+  const master = t.abilities[c.ab].master();
+  const mine = c.side === "p" && !m.busy;
+  const canMove = mine && !!onAct && m.moveOptions(c).length > 0;
+  const canMark = mine && !!onAct && m.markOptions(c).length > 0;
+  const kw = (k: StatKey) => `${t.keywords[k].name}: ${t.keywords[k].text}`;
   return (
-    <>
-      <b className="font-display tracking-wide">{name}</b> · {t.ui.cost} {c.cost} · {t.ui.power} {c.base}
-      {c.st.silenced && <> · <span className="text-game-brass">{t.ui.silenced}</span></>}
-      <br />
-      <span className="text-game-brass">{a.name}{kind ? ` (${kind})` : ""}:</span> {text}
-    </>
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <b className="font-display tracking-wide">{name}</b>
+        <span>{t.ui.cost} {c.cost} · {t.ui.power} {c.base}</span>
+        {c.main && <span className="text-zinc-300">{t.ui.mastery}: <b className="text-game-brass">{t.levels[c.lvl]}</b> · {t.ui.main}: {t.stats[c.main]}{c.stats ? ` ${c.stats[c.main]}` : ""}</span>}
+        {key !== c.ab && <span className="text-game-brass">{t.ui.silenced}</span>}
+      </div>
+      <p><span className="text-game-brass">{a.name}{kind ? ` (${kind})` : ""}:</span> {text}</p>
+      {master && key === c.ab && (
+        <p className={c.lvl === 2 ? "" : "text-zinc-500"}><span className="text-game-brass">★★ {t.ui.masterLine}:</span> {master}{c.lvl < 2 && ` (${t.ui.locked})`}</p>
+      )}
+      {c.kw.length > 0 && <p className="text-xs text-zinc-300"><span className="text-game-me">{t.ui.kw}:</span> {c.kw.map(kw).join(" · ")}</p>}
+      {(canMove || canMark) && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {canMove && <button type="button" className={pill(false)} onClick={() => onAct?.("move", c)}>{t.ui.act.move}</button>}
+          {canMark && <button type="button" className={pill(false)} onClick={() => onAct?.("mark", c)}>{t.ui.act.mark}</button>}
+        </div>
+      )}
+    </div>
   );
 }
 
