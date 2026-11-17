@@ -1,5 +1,7 @@
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { CardBack, GameCard, TipBoxes } from "../components/GameCard";
+import { GameHand } from "../components/GameHand";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pageTitle, pill, primaryBtn } from "../lib/ui";
@@ -33,7 +35,8 @@ export function Game() {
 
 function Board({ newMatch }: { newMatch: () => Match }) {
   const t = useT(GAME_TEXT);
-  const { heroIcon, heroArt } = useData();
+  const { players } = useData();
+  const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
   const [m, setM] = useState(newMatch);
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const icons = useItemIcons();
@@ -45,6 +48,10 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const [showEnd, setShowEnd] = useState(false);
   // escolha de alvo ao jogar, movimento ou marca do Shiv em andamento
   const [mode, setMode] = useState<Mode | null>(null);
+  // carta sendo arrastada da mão e o local sob o cursor
+  const [drag, setDrag] = useState<{ c: GCard; over: number | null } | null>(null);
+  // carta da mesa ampliada no hover
+  const [peek, setPeek] = useState<{ c: GCard; r: DOMRect } | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -59,12 +66,31 @@ function Board({ newMatch }: { newMatch: () => Match }) {
 
   const later = (fn: () => void, ms: number) => { timers.current.push(setTimeout(fn, ms)); };
   const say = (text: string) => setToast({ id: ++toastSeq, text });
-  const art = (hero: string | null) => (hero ? heroIcon(hero) ?? heroArt(hero)?.url ?? "" : "");
   const name = (c: GCard) => (c.p.token ? t.tokens[c.p.token] : c.p.name);
   const logName = (n: LogEntry["c"]) => (n === undefined ? "" : typeof n === "string" ? n : t.tokens[n.token]);
   const logLine = m.log[0] ? t.log[m.log[0].k](m.log[0], logName, (k) => t.abilities[k].name) : "";
   const shopOpen = m.t === ITEM_OFFER_TURN && !!m.offer && !result;
   const errText: Record<PlayError, string> = { souls: t.ui.toast.souls, frozen: t.ui.toast.frozen, full: t.ui.toast.full };
+
+  /** Carta desenhada a partir da carta da coleção; `text` mostra a habilidade (mão e zoom), `fx` liga partículas e brilho. */
+  const face = (c: GCard, text: boolean, fx = false) => {
+    const key = m.abilityOf(c);
+    const a = t.abilities[key];
+    const body = key === "none" && c.ab !== "none" ? t.ui.noAbility : c.tok && c.ab === "none" ? t.ui.tokenDesc : c.desc || a.text(c.v);
+    const ms = t.abilities[c.ab].master();
+    const icons = c.rev ? statusIcons(c, m, t) : [];
+    return (
+      <GameCard player={c.p.token || !c.p.id ? null : byId.get(c.p.id) ?? null} name={name(c)} cost={c.cost} power={c.rev ? m.pow(c) : c.base} base={c.base}
+        glyph={c.p.token ? TOKEN_GLYPH[c.p.token] : undefined} master={c.lvl === 2 ? t.levels[2] : undefined} fx={fx}
+        status={icons.map((x) => x[0]).join("") || undefined}
+        text={text ? { name: a.name, kind: t.kinds[ABILITIES[key].kind], body, master: c.lvl === 2 && key === c.ab && ms ? ms : undefined, masterLabel: t.ui.masterLine } : null} />
+    );
+  };
+  /** Caixas ao lado da carta ampliada: palavras-chave e status. */
+  const tipsOf = (c: GCard) => [
+    ...c.kw.map((k) => ({ title: t.keywords[k].name, text: t.keywords[k].text })),
+    ...(c.rev ? statusIcons(c, m, t).map(([icon, nm, k]) => ({ title: `${icon} ${nm}`, text: t.ui.statusTip[k] })) : []),
+  ];
 
   const restart = () => {
     timers.current.forEach(clearTimeout);
@@ -130,16 +156,19 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   };
   const pickItem = (k: ItemKey) => { m.pick(k); bump(); };
   const showItem = (k: ItemKey) => { setLookItem((x) => (x === k ? null : k)); setSel(null); setLook(null); };
-  const playAt = (l: Loc) => {
-    if (!sel) return;
-    const err = m.play(sel, l);
+  const playCard = (c: GCard, l: Loc) => {
+    if (m.busy || result) return;
+    const err = m.play(c, l);
     if (err) return say(errText[err]);
-    const spec = m.choiceOf(sel);
-    if (spec?.card && m.choiceCards(sel).length) setMode({ k: "card", c: sel });
-    else if (spec?.loc) setMode({ k: "loc", c: sel });
+    const spec = m.choiceOf(c);
+    if (spec?.card && m.choiceCards(c).length) setMode({ k: "card", c });
+    else if (spec?.loc) setMode({ k: "loc", c });
+    else setMode(null);
     setSel(null);
+    setLook(null);
     bump();
   };
+  const playAt = (l: Loc) => { if (sel) playCard(sel, l); };
 
   const targets = !mode ? [] : mode.k === "card" ? m.choiceCards(mode.c) : mode.k === "mark" ? m.markOptions(mode.c) : [];
   const dests = !mode ? [] : mode.k === "loc" ? m.choiceLocs(mode.c) : mode.k === "move" ? m.moveOptions(mode.c) : [];
@@ -168,16 +197,23 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && sel.cost <= m.E && m.room(l, "p") && l.lock.p < m.t;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 text-dl-text">
+    <MotionConfig reducedMotion="user">
+    <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 text-dl-text">
       <div className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h1 className={pageTitle}>{t.ui.title}</h1>
         <p className="text-sm text-zinc-300">{t.ui.you} · {t.ui.ai} · {t.ui.turn(Math.min(m.t, TURNS), TURNS)} · <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr> · {t.ui.record(record.w, record.l)}</p>
       </div>
 
+      <AiHand n={m.ahand.length} t={t} />
+
       <section aria-label={t.ui.arena} className="flex w-full gap-1.5 sm:gap-2">
         {m.loc.map((l, i) => (
           <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
-            card={(c) => <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} art={art(c.p.hero)} looking={look === c} target={targets.includes(c)} onClick={() => pickBoard(c)} />} />
+            drop={!drag || m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok"}
+            card={(c) => (
+              <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} onClick={() => pickBoard(c)}
+                onPeek={(r) => setPeek(r && !drag ? { c, r } : null)} />
+            )} />
         ))}
       </section>
 
@@ -204,10 +240,11 @@ function Board({ newMatch }: { newMatch: () => Match }) {
         </section>
       )}
 
-      <section aria-label={t.ui.hand} className="flex min-h-36 max-w-full scrollbar-none gap-2 overflow-x-auto px-1.5 pt-4 pb-1">
-        {m.hand.map((c) => (
-          <HandCard key={c.id} c={c} t={t} name={name(c)} art={art(c.p.hero)} selected={sel === c} affordable={c.cost <= m.E} disabled={m.busy || !!result} onClick={() => pickHand(c)} />
-        ))}
+      <section aria-label={t.ui.hand} className="w-full">
+        <GameHand cards={m.hand} selected={sel} disabled={m.busy || !!result}
+          playable={(c) => !m.busy && !result && m.loc.some((l) => !m.canPlay(c, l))}
+          label={(c) => t.ui.cardLabel(name(c), c.cost, c.base)} tips={tipsOf} render={(c, zoomed) => face(c, true, zoomed)}
+          onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => setDrag(c ? { c, over } : null)} />
       </section>
 
       <div className="noir-glass min-h-12 w-full rounded-xl px-3 py-2 text-sm/snug">
@@ -225,6 +262,10 @@ function Board({ newMatch }: { newMatch: () => Match }) {
         </div>
         {m.needsPick && <p id="game-pick-first" className="text-xs text-game-brass">{t.shop.pickFirst}</p>}
       </div>
+
+      <AnimatePresence>
+        {peek && !drag && <Peek key={peek.c.id} r={peek.r} card={face(peek.c, true, true)} tips={tipsOf(peek.c)} />}
+      </AnimatePresence>
 
       <AnimatePresence>
         {toast && (
@@ -252,13 +293,16 @@ function Board({ newMatch }: { newMatch: () => Match }) {
         )}
       </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }
 
 type T = (typeof GAME_TEXT)["pt"];
 type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
-function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, card }: { m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; card: (c: GCard) => React.ReactNode }) {
+function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
+  m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: "off" | "ok" | "over"; card: (c: GCard) => React.ReactNode;
+}) {
   const a = m.total(l, "a"), p = m.total(l, "p");
   const nm = l.rev ? l.L.name : t.ui.hiddenLoc;
   const chips = [
@@ -274,9 +318,11 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, card }: { m: Matc
     !!l.petri.a && `🗿 ${t.ui.chips.petriAi}`,
     m.portals.some((x) => x.t >= m.t && (x.a === i || x.b === i)) && `🚪 ${t.ui.chips.portal}`,
   ].filter(Boolean) as string[];
-  const side = "grid min-h-[clamp(7.9rem,34vw,12.4rem)] auto-rows-min grid-cols-[repeat(2,clamp(2.75rem,12vw,4.375rem))] gap-0.5";
+  const side = "grid min-h-[calc(var(--spacing-gc)*2.95)] auto-rows-min grid-cols-[repeat(2,var(--spacing-gc))] gap-1";
+  const ring = drop === "over" ? "bg-game-me/15 outline-2 outline-game-me" : drop === "ok" ? "outline-2 outline-game-me/50 outline-dashed" : "";
   return (
-    <div className="noir-glass relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl p-1 sm:p-1.5">
+    <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
+      className={`noir-glass relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl p-1 transition-colors duration-150 sm:p-1.5 ${ring}`}>
       <div className={side} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
       <div className="flex min-h-19 w-full flex-col items-center gap-0.5 text-center leading-tight">
         <strong className="font-display text-xs tracking-wide sm:text-sm">{nm}</strong>
@@ -306,65 +352,72 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, card }: { m: Matc
   );
 }
 
-function statusIcons(c: GCard, m: Match, t: T): [string, string][] {
+type StatusKey = keyof T["ui"]["status"];
+
+function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
   const s = c.st, now = (u?: number) => (u ?? 0) >= m.t;
-  return ([
-    [!!s.burn || !!s.tburn?.some((x) => x.u >= m.t), "🔥", t.ui.status.burn], [now(s.stun), "💫", t.ui.status.stun], [m.immune(c), "🛡️", t.ui.status.immune],
-    [!!s.chained, "⛓️", t.ui.status.chained], [!!s.burrow && !m.final, "⛏️", t.ui.status.burrow], [now(s.sleep), "💤", t.ui.status.sleep],
-    [(s.rip ?? 0) > 0, "⚔️", t.ui.status.riposte], [!!s.wolf, "🐺", t.ui.status.wolf], [now(s.vuln), "🎯", t.ui.status.vuln],
-    [!!s.petri, "🗿", t.ui.status.petri], [!!s.unstop, "⚡", t.ui.status.unstop], [now(s.chan?.u), "🌩️", t.ui.status.chan],
-    [now(s.root), "📌", t.ui.status.root], [s.exec?.u === m.t, "🗡️", t.ui.status.exec],
-  ] as const).filter((x) => x[0]).map((x) => [x[1], x[2]]);
+  const list: [boolean, string, StatusKey][] = [
+    [!!s.burn || !!s.tburn?.some((x) => x.u >= m.t), "🔥", "burn"], [now(s.stun), "💫", "stun"], [m.immune(c), "🛡️", "immune"],
+    [!!s.chained, "⛓️", "chained"], [!!s.burrow && !m.final, "⛏️", "burrow"], [now(s.sleep), "💤", "sleep"],
+    [(s.rip ?? 0) > 0, "⚔️", "riposte"], [!!s.wolf, "🐺", "wolf"], [now(s.vuln), "🎯", "vuln"],
+    [!!s.petri, "🗿", "petri"], [!!s.unstop, "⚡", "unstop"], [now(s.chan?.u), "🌩️", "chan"],
+    [now(s.root), "📌", "root"], [s.exec?.u === m.t, "🗡️", "exec"],
+  ];
+  return list.filter((x) => x[0]).map((x) => [x[1], t.ui.status[x[2]], x[2]]);
 }
 
-function Art({ c, art }: { c: GCard; art: string }) {
-  if (c.p.token) return <span className="absolute inset-x-0 top-0 bottom-[30%] flex items-center justify-center text-2xl" aria-hidden="true">{TOKEN_GLYPH[c.p.token]}</span>;
-  return art ? <img src={art} alt="" className="absolute inset-x-0 top-0 h-[68%] w-full object-cover" /> : null;
-}
-
-const badge = "absolute top-0.5 flex size-5 items-center justify-center rounded-full border border-white font-display text-xs font-extrabold not-italic";
-
-function BoardCard({ c, m, t, name, art, looking, target, onClick }: { c: GCard; m: Match; t: T; name: string; art: string; looking: boolean; target: boolean; onClick: () => void }) {
-  const size = "relative aspect-5/7 w-[clamp(2.75rem,12vw,4.375rem)] overflow-hidden rounded-md";
-  if (c.side === "a" && !c.rev) return <div className={`${size} ring-1 ring-game-ai game-card-back`} role="img" aria-label={t.ui.facedown} />;
+function BoardCard({ c, m, t, name, face, looking, target, onClick, onPeek }: {
+  c: GCard; m: Match; t: T; name: string; face: React.ReactNode; looking: boolean; target: boolean; onClick: () => void; onPeek: (r: DOMRect | null) => void;
+}) {
+  if (c.side === "a" && !c.rev) return <div role="img" aria-label={t.ui.facedown}><CardBack className="w-gc" /></div>;
   const pw = c.rev ? m.pow(c) : c.base;
-  const hidden = !!c.st.burrow && !m.final && c.rev;
   const icons = statusIcons(c, m, t);
   return (
     <motion.button type="button" onClick={onClick} aria-pressed={looking}
-      aria-label={`${target ? `${t.ui.act.target(name)}: ` : ""}${t.ui.cardLabel(name, c.cost, hidden ? 0 : pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}
-      initial={c.rev ? { scale: 1.4, rotate: -4, filter: "brightness(2)" } : false} animate={{ scale: 1, rotate: 0, filter: "brightness(1)" }} transition={{ duration: 0.25 }}
-      className={`${size} cursor-pointer text-white ring-1 ring-white/30 ${c.staged ? "opacity-70 outline-1 outline-white outline-dashed" : ""} ${looking ? "outline-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-1 outline-game-me" : ""} ${focus}`}
-      style={{ background: `linear-gradient(160deg, ${c.p.c1}, ${c.p.c2})` }}>
-      <Art c={c} art={art} />
-      <i className={`${badge} left-0.5 bg-blue-600`}>{c.cost}</i>
-      <b className={`${badge} right-0.5 ${pw > c.base ? "bg-emerald-300" : pw < c.base ? "bg-red-300" : "bg-game-brass"} text-dl-black`}>{hidden ? "?" : pw}</b>
-      <span className="absolute bottom-4 left-0.5 text-[10px] leading-none drop-shadow-sm" aria-hidden="true">{icons.map((x) => x[0]).join("")}</span>
-      <Pips lvl={c.lvl} className="top-0.5 text-[8px]" />
-      <span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-px py-0.5 text-center text-[9px]">{name}</span>
+      aria-label={`${target ? `${t.ui.act.target(name)}: ` : ""}${t.ui.cardLabel(name, c.cost, pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}
+      onPointerEnter={(e) => { if (e.pointerType === "mouse") onPeek(e.currentTarget.getBoundingClientRect()); }} onPointerLeave={() => onPeek(null)} onBlur={() => onPeek(null)}
+      initial={c.rev ? { scale: 1.5, y: -18, opacity: 0 } : { scale: 0.85, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 420, damping: 22 }}
+      className={`relative block w-gc cursor-pointer rounded-lg ${c.staged ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
+      {face}
+      {c.rev && (
+        <motion.span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-dl-text/70"
+          initial={{ opacity: 0.9, scale: 0.9 }} animate={{ opacity: 0, scale: 1.35 }} transition={{ duration: 0.4, delay: 0.12, ease: "easeOut" }} />
+      )}
     </motion.button>
   );
 }
 
-function HandCard({ c, t, name, art, selected, affordable, disabled, onClick }: { c: GCard; t: T; name: string; art: string; selected: boolean; affordable: boolean; disabled: boolean; onClick: () => void }) {
+const PEEK_W = 208;
+const TIP_W = 192;
+
+/** Carta da mesa ampliada ao lado dela, com as caixas de palavra-chave e status. */
+function Peek({ r, card, tips }: { r: DOMRect; card: React.ReactNode; tips: { title: string; text: string }[] }) {
+  const h = (PEEK_W * 430) / 295;
+  const extra = tips.length ? TIP_W + 8 : 0;
+  const right = r.right + 12 + PEEK_W + extra <= window.innerWidth;
+  const left = Math.max(8, right ? r.right + 12 : r.left - 12 - PEEK_W - extra);
+  const top = Math.max(8, Math.min(window.innerHeight - h - 8, r.top + r.height / 2 - h / 2));
   return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={selected} aria-label={t.ui.cardLabel(name, c.cost, c.base)}
-      className={`relative h-30 w-22 flex-none cursor-pointer overflow-hidden rounded-md text-white ring-1 ring-white/30 transition-transform duration-150 hover:-translate-y-1 disabled:cursor-not-allowed ${selected ? "-translate-y-3 outline-2 outline-game-brass" : ""} ${affordable ? "" : "opacity-45"} ${focus}`}
-      style={{ background: `linear-gradient(160deg, ${c.p.c1}, ${c.p.c2})` }}>
-      <Art c={c} art={art} />
-      <i className={`${badge} left-0.5 size-6 bg-blue-600 text-sm`}>{c.cost}</i>
-      <b className={`${badge} right-0.5 size-6 bg-game-brass text-sm text-dl-black`}>{c.base}</b>
-      <Pips lvl={c.lvl} className="top-1 text-[10px]" />
-      <span className="absolute inset-x-0 bottom-5 truncate bg-black/80 p-0.5 text-center text-[11px]">{name}</span>
-      <small className="absolute inset-x-0 bottom-0 h-5 truncate bg-black/90 px-1 text-center text-[10px]/5 text-game-brass">{t.abilities[c.ab].name}</small>
-    </button>
+    <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}
+      className={`pointer-events-none fixed z-60 flex items-start gap-2 ${right ? "" : "flex-row-reverse"}`} style={{ left, top }} aria-hidden="true">
+      <div style={{ width: PEEK_W }}>{card}</div>
+      <TipBoxes tips={tips} />
+    </motion.div>
   );
 }
 
-/** Estrelas de Maestria: nenhuma no Aprendiz, 1 no Profissional, 2 no Mestre. */
-function Pips({ lvl, className }: { lvl: number; className: string }) {
-  if (!lvl) return null;
-  return <span className={`absolute inset-x-0 text-center leading-none text-game-brass drop-shadow-sm ${className}`} aria-hidden="true">{"★".repeat(lvl)}</span>;
+/** Mão da IA: versos de carta em leque no topo. */
+function AiHand({ n, t }: { n: number; t: T }) {
+  const mid = (n - 1) / 2;
+  return (
+    <div role="img" aria-label={t.ui.aiHand(n)} className="relative h-12 w-full">
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className="absolute top-0 w-8 origin-top" style={{ left: `calc(50% - 1rem + ${(i - mid) * 18}px)`, transform: `rotate(${(mid - i) * 5}deg) translateY(${Math.abs(i - mid) * 2}px)` }}>
+          <CardBack />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function Detail({ c, m, t, name, onAct }: { c: GCard; m: Match; t: T; name: string; onAct?: (k: "move" | "mark", c: GCard) => void }) {

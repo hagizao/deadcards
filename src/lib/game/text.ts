@@ -40,6 +40,9 @@ export type GameText = {
     mastery: string; main: string; masterLine: string; locked: string; attrs: string; kw: string;
     yourSide: (loc: string) => string; aiSide: (loc: string) => string; facedown: string; playHere: (loc: string) => string;
     cardLabel: (name: string, cost: number, power: number) => string;
+    /** O que cada status faz (caixa ao lado da carta ampliada). */
+    statusTip: Record<keyof GameText["ui"]["status"], string>;
+    aiHand: (n: number) => string; dropHere: (loc: string) => string;
   };
 };
 
@@ -232,7 +235,7 @@ export const GAME_TEXT = strings<GameText>({
       needCards: (n) => `Cadastre pelo menos ${n} cartas para jogar.`, you: "Você: Rei Oculto", ai: "IA: Arquimãe",
       turn: (t, total) => `Turno ${t}/${total}`, prio: (me) => `Prioridade: ${me ? "você" : "IA"}`, prioHint: "Quem tem prioridade revela primeiro. No turno 1 é o Rei Oculto; depois, quem estiver ganhando a partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`,
       endTurn: "Fim do turno", newMatch: "Nova partida", again: "Jogar de novo", viewBoard: "Ver tabuleiro",
-      hint: "Toque numa carta para ver a habilidade. A energia aqui são as almas.", hiddenLoc: "Local oculto", revealsOn: (t) => `Revela no turno ${t}`,
+      hint: "Arraste uma carta até um local para jogar (ou toque nela e depois no local). Passe o mouse para ler.", hiddenLoc: "Local oculto", revealsOn: (t) => `Revela no turno ${t}`,
       cost: "custo", power: "poder", silenced: "habilidade anulada", noAbility: "Sem habilidade.", tokenDesc: "Ficha criada por uma habilidade.",
       hand: "Sua mão", arena: "Locais",
       win: "Vitória!", loss: "Derrota", draw: "Empate",
@@ -248,6 +251,14 @@ export const GAME_TEXT = strings<GameText>({
       mastery: "Maestria", main: "Atributo principal", masterLine: "Mestre", locked: "desbloqueia no nível Mestre", attrs: "Atributos", kw: "Palavras-chave",
       yourSide: (l) => `Seu lado em ${l}`, aiSide: (l) => `Lado da IA em ${l}`, facedown: "Carta virada", playHere: (l) => `Jogar em ${l}`,
       cardLabel: (name, cost, power) => `${name}, custo ${cost}, poder ${power}`,
+      statusTip: {
+        burn: "Perde poder no fim do turno.", stun: "Erguida pela Wraith: o poder conta como 0.", immune: "Não sofre efeitos inimigos.",
+        chained: "Não pode ser movida.", burrow: "Debaixo da terra: não soma poder até o fim da partida.", sleep: "Dormindo: poder reduzido até acordar.",
+        riposte: "Anula o próximo efeito inimigo e devolve o golpe.", wolf: "Lobisomem: poder extra permanente.", vuln: "O próximo dano que sofrer é dobrado.",
+        petri: "Sem habilidade e não pode ser movida.", unstop: "Não sofre efeitos inimigos nem é interrompida.", chan: "Efeito canalizado: acaba se sofrer dano, for movida ou silenciada.",
+        root: "Não pode ser movida neste turno.", exec: "Pode marcar uma inimiga aqui para executar.",
+      },
+      aiHand: (n) => `Mão da IA: ${n} ${pl(n, "carta", "cartas")}`, dropHere: (l) => `Solte para jogar em ${l}`,
     },
   },
   en: {
@@ -435,7 +446,7 @@ export const GAME_TEXT = strings<GameText>({
       needCards: (n) => `Add at least ${n} cards to play.`, you: "You: Hidden King", ai: "AI: Archmother",
       turn: (t, total) => `Turn ${t}/${total}`, prio: (me) => `Priority: ${me ? "you" : "AI"}`, prioHint: "Whoever has priority reveals first. On turn 1 it's the Hidden King; after that, whoever is winning the match.", record: (w, l) => `${w}W ${l}L`, souls: (n) => `${n} ${pl(n, "soul", "souls")}`,
       endTurn: "End turn", newMatch: "New match", again: "Play again", viewBoard: "View board",
-      hint: "Tap a card to see its ability. Your energy here is souls.", hiddenLoc: "Hidden location", revealsOn: (t) => `Reveals on turn ${t}`,
+      hint: "Drag a card onto a location to play it (or tap it, then the location). Hover to read.", hiddenLoc: "Hidden location", revealsOn: (t) => `Reveals on turn ${t}`,
       cost: "cost", power: "power", silenced: "ability canceled", noAbility: "No ability.", tokenDesc: "Token created by an ability.",
       hand: "Your hand", arena: "Locations",
       win: "Victory!", loss: "Defeat", draw: "Draw",
@@ -451,6 +462,14 @@ export const GAME_TEXT = strings<GameText>({
       mastery: "Mastery", main: "Main attribute", masterLine: "Master", locked: "unlocks at Master level", attrs: "Attributes", kw: "Keywords",
       yourSide: (l) => `Your side at ${l}`, aiSide: (l) => `AI side at ${l}`, facedown: "Face-down card", playHere: (l) => `Play at ${l}`,
       cardLabel: (name, cost, power) => `${name}, cost ${cost}, power ${power}`,
+      statusTip: {
+        burn: "Loses power at the end of the turn.", stun: "Lifted by Wraith: its power counts as 0.", immune: "Unaffected by enemy effects.",
+        chained: "Can't be moved.", burrow: "Underground: adds no power until the end of the match.", sleep: "Asleep: reduced power until it wakes up.",
+        riposte: "Cancels the next enemy effect and strikes back.", wolf: "Werewolf: permanent extra power.", vuln: "The next damage it takes is doubled.",
+        petri: "No ability and can't be moved.", unstop: "Unaffected by enemy effects and can't be interrupted.", chan: "Channeled effect: ends if it takes damage, is moved or silenced.",
+        root: "Can't be moved this turn.", exec: "Can mark an enemy here for execution.",
+      },
+      aiHand: (n) => `AI hand: ${n} ${pl(n, "card", "cards")}`, dropHere: (l) => `Drop to play at ${l}`,
     },
   },
   es: {
@@ -638,7 +657,7 @@ export const GAME_TEXT = strings<GameText>({
       needCards: (n) => `Registra al menos ${n} cartas para jugar.`, you: "Tú: Rey Oculto", ai: "IA: Archimadre",
       turn: (t, total) => `Turno ${t}/${total}`, prio: (me) => `Prioridad: ${me ? "tú" : "IA"}`, prioHint: "Quien tiene la prioridad revela primero. En el turno 1 es el Rey Oculto; después, quien vaya ganando la partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`,
       endTurn: "Fin del turno", newMatch: "Nueva partida", again: "Jugar de nuevo", viewBoard: "Ver tablero",
-      hint: "Toca una carta para ver su habilidad. Aquí la energía son las almas.", hiddenLoc: "Lugar oculto", revealsOn: (t) => `Se revela en el turno ${t}`,
+      hint: "Arrastra una carta a un lugar para jugarla (o tócala y luego el lugar). Pasa el ratón para leer.", hiddenLoc: "Lugar oculto", revealsOn: (t) => `Se revela en el turno ${t}`,
       cost: "coste", power: "poder", silenced: "habilidad anulada", noAbility: "Sin habilidad.", tokenDesc: "Ficha creada por una habilidad.",
       hand: "Tu mano", arena: "Lugares",
       win: "¡Victoria!", loss: "Derrota", draw: "Empate",
@@ -654,6 +673,14 @@ export const GAME_TEXT = strings<GameText>({
       mastery: "Maestría", main: "Atributo principal", masterLine: "Maestro", locked: "se desbloquea en el nivel Maestro", attrs: "Atributos", kw: "Palabras clave",
       yourSide: (l) => `Tu lado en ${l}`, aiSide: (l) => `Lado de la IA en ${l}`, facedown: "Carta boca abajo", playHere: (l) => `Jugar en ${l}`,
       cardLabel: (name, cost, power) => `${name}, coste ${cost}, poder ${power}`,
+      statusTip: {
+        burn: "Pierde poder al final del turno.", stun: "Levantada por Wraith: su poder cuenta como 0.", immune: "No le afectan los efectos enemigos.",
+        chained: "No se puede mover.", burrow: "Bajo tierra: no suma poder hasta el final de la partida.", sleep: "Dormida: poder reducido hasta despertar.",
+        riposte: "Anula el próximo efecto enemigo y devuelve el golpe.", wolf: "Loba: poder extra permanente.", vuln: "El próximo daño que reciba se duplica.",
+        petri: "Sin habilidad y no se puede mover.", unstop: "No le afectan los efectos enemigos ni se interrumpe.", chan: "Efecto canalizado: termina si recibe daño, es movida o silenciada.",
+        root: "No se puede mover este turno.", exec: "Puede marcar una enemiga aquí para ejecutarla.",
+      },
+      aiHand: (n) => `Mano de la IA: ${n} ${pl(n, "carta", "cartas")}`, dropHere: (l) => `Suelta para jugar en ${l}`,
     },
   },
 });

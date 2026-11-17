@@ -30,6 +30,8 @@
   --color-game-me: #5fd0c2;
   --color-game-ai: #e0675a;
   --color-game-brass: #e0b25a;
+  /* largura das cartas na mesa do Cardslock Game (w-gc) */
+  --spacing-gc: clamp(3rem, 10.5vw, 6.75rem);
   /* categorias dos itens da loja do Deadlock */
   --color-item-weapon: #e9973a;
   --color-item-vitality: #7cbb4d;
