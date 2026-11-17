@@ -9,6 +9,7 @@ import { useT } from "../lib/i18n";
 import { pill, primaryBtn } from "../lib/ui";
 import { ABILITIES, ITEMS, gameConfig, phaseOf, type ItemKey, type ItemSlot, type PoolCard } from "../lib/game/config";
 import { DeckBuilder } from "../components/DeckBuilder";
+import { DeckPile } from "../components/DeckPile";
 import { versionPlayer } from "../lib/game/deck";
 import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
 import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
@@ -317,6 +318,7 @@ function Board({ newMatch, onDeck }: { newMatch: () => Match; onDeck: () => void
           <ItemSlot s="a" m={m} t={t} icons={icons} on={boughtOn} />
           <AiHand n={m.ahand.length} t={t} />
         </div>
+        <div className="flex items-start justify-end gap-2">
         <div className="flex flex-wrap items-center justify-end gap-x-2 text-xs text-zinc-300">
           <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr>
           <span aria-hidden="true">·</span>
@@ -330,6 +332,8 @@ function Board({ newMatch, onDeck }: { newMatch: () => Match; onDeck: () => void
               </svg>
             </button>
           </span>
+        </div>
+        <DeckPile n={m.adeck.length} tone="ai" label={t.deck.aiLeft(m.adeck.length)} tipSide="left" out={{ x: -80, y: -10 }} className="w-8 sm:w-11" />
         </div>
       </div>
 
@@ -395,7 +399,8 @@ function Board({ newMatch, onDeck }: { newMatch: () => Match; onDeck: () => void
             label={(c) => t.ui.cardLabel(name(c), c.cost, c.base)} tips={tipsOf} render={(c, zoomed) => face(c, true, zoomed)}
             onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => { if (c && !drag) sfx("grab", 0.7); setDrag(c ? { c, over } : null); }} />
         </section>
-        <div className="flex shrink-0 flex-col items-center gap-1 pb-1">
+        <div className="flex shrink-0 items-end gap-2 pb-1">
+          <DeckPile n={m.deck.length} label={t.deck.left(m.deck.length)} tipSide="top" out={{ x: -120, y: 0 }} className="w-10 sm:w-14" />
           {result && !showEnd
             ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
             : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady}
