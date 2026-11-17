@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, SHOPS, cardStats, defaultCard, itemCost, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
+  ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, SHOPS, ALT_MALUS, ALT_POL, cardStats, defaultCard, itemCost, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
   type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type PoolCard,
 } from "../src/lib/game/config";
-import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Side } from "../src/lib/game/engine";
+import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type GCard, type Side } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
 
 function player(id: string, ovr: number, extra: Partial<Player> = {}): Player {
@@ -40,7 +40,7 @@ describe("cardPool", () => {
 });
 
 describe("carta padrão", () => {
-  const base: PoolCard = { id: "x", name: "Fulano", position: "Carry", hero: "Haze", c1: "#000", c2: "#fff", ovr: 92 };
+  const base: PoolCard = { id: "x", key: "x", name: "Fulano", position: "Carry", hero: "Haze", c1: "#000", c2: "#fff", ovr: 92 };
 
   it("usa a habilidade do herói, ou a da função quando o herói não tem", () => {
     expect(defaultCard(base).ab).toBe("Haze");
@@ -334,7 +334,7 @@ describe("comeback e recompensa", () => {
 
 const flat = (v: number, extra: Partial<CardStatsBlock> = {}): CardStatsBlock => ({ MIR: v, MAC: v, SUP: v, MOV: v, POL: v, CON: v, ...extra });
 const heroCfg = (heroes: GameConfig["heroes"] = {}): GameConfig => ({ locs: plainLocs, cards: {}, items: only([]), heroes });
-const pc = (id: string, hero: string, stats: CardStatsBlock): PoolCard => ({ id, name: id, position: "Flex", hero, c1: "#000", c2: "#fff", ovr: 80, stats });
+const pc = (id: string, hero: string, stats: CardStatsBlock): PoolCard => ({ id, key: id, name: id, position: "Flex", hero, c1: "#000", c2: "#fff", ovr: 80, stats });
 type Priv = { mk(p: PoolCard, cfg: GameConfig, side: Side): GCard };
 
 /** Partida de teste com os 3 locais revelados e o tabuleiro vazio. `t` = round (7 = late, com a Maestria toda liberada). */
@@ -617,5 +617,29 @@ describe("balanceamento das habilidades", () => {
     const t = dummy(put, "a", 0, 3);
     put(pc("s", "Shiv", flat(70)), "p", 0);
     expect(m.locOf(t)).toBeUndefined();
+  });
+});
+
+describe("versões e heróis de afinidade", () => {
+  it("cada jogador tem a principal, as variantes cadastradas e uma versão por herói de afinidade", () => {
+    const list = [
+      player("a", 80, { hero: "Haze", heroPool: ["Wraith", "Haze", "Inexistente", "Wraith", "Vindicta"] }),
+      player("a2", 82, { hero: "Wraith", variantOf: "a" }),
+      player("b", 75, { hero: "Abrams" }),
+      player("c", 90, { hero: "Paige", inactive: true }),
+    ];
+    const v = cardVersions(list);
+    expect([...v.keys()]).toEqual(["a", "b"]);
+    expect(v.get("a")!.map((c) => [c.id, c.hero, !!c.alt])).toEqual([["a", "Haze", false], ["a2", "Wraith", false], ["a~Vindicta", "Vindicta", true]]);
+    expect(v.get("a")!.every((c) => c.key === "a")).toBe(true);
+    expect(cardPool(list).map((c) => c.id)).toEqual(["a", "b"]);
+  });
+
+  it("versão de afinidade perde poder, a não ser com POL alto", () => {
+    const sig = { id: "x", key: "x", name: "X", position: "Carry", hero: "Haze", c1: "#000", c2: "#fff", ovr: 80, stats: flat(80) };
+    const alt = { ...sig, alt: true };
+    expect(defaultCard(alt).power).toBe(defaultCard(sig).power - ALT_MALUS);
+    const pro = { ...alt, stats: flat(80, { POL: ALT_POL }) };
+    expect(defaultCard(pro).power).toBe(defaultCard({ ...sig, stats: pro.stats }).power);
   });
 });

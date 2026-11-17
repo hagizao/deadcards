@@ -44,6 +44,8 @@ export type Player = {
   frame?: Frame;
   variantOf?: string;
   inactive?: boolean;
+  /** Heróis de afinidade: outras versões que o jogador pode usar no deck do jogo. */
+  heroPool?: string[];
   art?: { url: string; zoom?: number; x?: number; y?: number };
 };
 

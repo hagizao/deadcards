@@ -225,14 +225,28 @@ export const MIN_LOCS = 3;
 const MAX_LOCS = 40;
 const MAX_CARDS = 2000;
 
-export type PoolCard = { id: string; name: string; position: string; hero: string; c1: string; c2: string; ovr: number; stats?: CardStatsBlock };
+/** Carta do pool. `key` identifica o jogador (todas as versões dele têm a mesma); `alt` marca a versão de um herói de afinidade. */
+export type PoolCard = { id: string; key: string; name: string; position: string; hero: string; c1: string; c2: string; ovr: number; stats?: CardStatsBlock; alt?: boolean };
+
+/** Versão de afinidade perde 1 de poder, a não ser que o jogador tenha POL alto (joga bem com qualquer herói). */
+export const ALT_POL = 90;
+export const ALT_MALUS = 1;
+export const HERO_POOL_MAX = 6;
+
+/** Lista de heróis de afinidade limpa: só heróis com habilidade própria, sem repetir, no máximo HERO_POOL_MAX. */
+export function sanitizeHeroPool(raw: unknown, main?: string): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out = [...new Set(raw.filter((h): h is string => typeof h === "string" && (HERO_KEYS as readonly string[]).includes(h) && h !== main))];
+  return out.slice(0, HERO_POOL_MAX);
+}
 
 /** Custo, poder e habilidade padrão de uma carta: o custo vem do herói, o poder do herói mais a faixa de OVR do jogador. */
 export function defaultCard(p: PoolCard, heroes: GameConfig["heroes"] = {}): { cost: number; power: number; ab: AbilityKey; v: number } {
   const ab: AbilityKey = isAbility(p.hero) ? p.hero : ROLE_ABILITY[p.position] ?? "draw";
   const h = heroCard(ab, heroes);
   const band = ovrBand(p.ovr);
-  const power = Math.max(1, h.base + (h.prof === "P" ? band : Math.floor(band / 2)));
+  const malus = p.alt && (p.stats?.POL ?? 0) < ALT_POL ? ALT_MALUS : 0;
+  const power = Math.max(1, h.base + (h.prof === "P" ? band : Math.floor(band / 2)) - malus);
   const a = ABILITIES[ab];
   const v = a.v + (h.prof === "H" && a.usesV && p.ovr >= HABILITY_AT ? 1 : 0);
   return { cost: h.cost, power, ab, v };

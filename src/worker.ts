@@ -4,7 +4,7 @@ import { favorite, profileCard, publicProfile } from "./profile";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
-import { sanitizeGameConfig, trimItemIcons } from "./lib/game/config";
+import { sanitizeGameConfig, sanitizeHeroPool, trimItemIcons } from "./lib/game/config";
 
 export interface Env {
   DB: D1Database;
@@ -23,7 +23,7 @@ export interface Env {
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art"];
+const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art", "heroPool"];
 const ID_RE = /^[\w-]{1,64}$/;
 
 const keyOf = (url: unknown) => (typeof url === "string" && url.startsWith("/img/") ? url.slice(5) : null);
@@ -137,6 +137,8 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
     if (del) await db.prepare("DELETE FROM players WHERE id = ?").bind(id).run();
     else {
       if (!b.name || !b.teamId || !b.stats) return bad("jogador incompleto");
+      const heroPool = sanitizeHeroPool(b.heroPool, typeof b.hero === "string" ? b.hero : "Abrams");
+      b.heroPool = heroPool.length ? heroPool : undefined;
       const extra = Object.fromEntries(PLAYER_EXTRA.filter((k) => b[k] !== undefined && b[k] !== null).map((k) => [k, b[k]]));
       await db.prepare(
         "INSERT INTO players (id, team_id, name, position, hero, stats_json, ovr, c1, c2, history_json, extra_json) VALUES (?,?,?,?,?,?,?,?,?,?,?) " +

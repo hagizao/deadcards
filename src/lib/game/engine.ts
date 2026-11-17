@@ -4,7 +4,7 @@ import { getPlayerOvr } from "../cards";
 import type { Player } from "../types";
 import {
   ABILITIES, ITEMS, ITEM_KEYS, SHOPS, MASTERY_BONUS, phaseOf, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
-  type AbilityKey, type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type ItemTier, type LocType, type Mastery, type PoolCard, type StatKey,
+  sanitizeHeroPool, type AbilityKey, type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type ItemTier, type LocType, type Mastery, type PoolCard, type StatKey,
 } from "./config";
 
 export type Side = "p" | "a";
@@ -77,17 +77,36 @@ export type Result = { outcome: "win" | "loss" | "draw"; won: number; lost: numb
 export type PlayError = "souls" | "frozen" | "full";
 
 /** Cartas que entram no baralho: jogadores ativos, uma por jogador (variantes ficam de fora). */
+const toPool = (p: Player, key: string): PoolCard => ({
+  id: p.id, key, name: p.name, position: ROLE_ABILITY[p.position] ? p.position : "Flex", hero: p.hero, c1: p.c1 || "#334155", c2: p.c2 || "#0f172a", ovr: getPlayerOvr(p) || 0, stats: p.stats,
+});
+
+/**
+ * Todas as versões jogáveis de cada jogador ativo: a carta principal, as variantes já cadastradas e uma versão por herói de afinidade
+ * (que ainda não tenha variante). A principal vem primeiro.
+ */
+export function cardVersions(players: Player[]): Map<string, PoolCard[]> {
+  const out = new Map<string, PoolCard[]>();
+  const active = players.filter((p) => !p.inactive);
+  for (const p of [...active].sort((a, b) => Number(!!a.variantOf) - Number(!!b.variantOf))) {
+    const key = p.variantOf || p.id;
+    const list = out.get(key) ?? [];
+    if (!list.some((c) => c.hero === p.hero)) list.push(toPool(p, key));
+    out.set(key, list);
+  }
+  for (const p of active) {
+    const list = out.get(p.id);
+    if (p.variantOf || !list) continue;
+    for (const hero of sanitizeHeroPool(p.heroPool, p.hero)) {
+      if (!list.some((c) => c.hero === hero)) list.push({ ...list[0], id: `${p.id}~${hero}`, hero, alt: true });
+    }
+  }
+  return out;
+}
+
+/** Uma carta por jogador (a versão principal). */
 export function cardPool(players: Player[]): PoolCard[] {
-  const seen = new Set<string>();
-  return players
-    .filter((p) => !p.inactive)
-    .filter((p) => {
-      const k = p.variantOf || p.id;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    })
-    .map((p) => ({ id: p.id, name: p.name, position: ROLE_ABILITY[p.position] ? p.position : "Flex", hero: p.hero, c1: p.c1 || "#334155", c2: p.c2 || "#0f172a", ovr: getPlayerOvr(p) || 0, stats: p.stats }));
+  return [...cardVersions(players).values()].map((l) => l[0]);
 }
 
 const nst = (): Status => ({ tmp: [] });

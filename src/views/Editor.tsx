@@ -10,7 +10,7 @@ import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
 import {
   ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, LOC_V_RANGE, MIN_LOCS, NAME_MAX, POWER_RANGE,
-  ITEMS, ITEM_KEYS, SHOP_ROUNDS, SHOPS, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, HERO_CARD, BASE_RANGE, HABILITY_AT, heroCard, MASTERY_AT, STAT_KEYS as GAME_STATS,
+  ITEMS, ITEM_KEYS, SHOP_ROUNDS, SHOPS, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, HERO_CARD, HERO_POOL_MAX, ALT_POL, ALT_MALUS, BASE_RANGE, HABILITY_AT, heroCard, MASTERY_AT, STAT_KEYS as GAME_STATS,
   cardStats, gameConfig, itemCost, itemStats, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey, type HeroOverride, type Profile,
 } from "../lib/game/config";
 import { cardPool } from "../lib/game/engine";
@@ -134,6 +134,34 @@ function withHistory(p: Player, date: string, rebase: boolean): Player {
   return { ...p, ovr, history };
 }
 
+/** Heróis de afinidade: viram versões extras do jogador no deck do jogo (−1 de poder, salvo POL alto). */
+function AffinityPicker({ hero, pool, pol, icon, onChange }: { hero: string; pool: string[]; pol: number; icon: (h: string) => string | null; onChange: (pool: string[]) => void }) {
+  const list = pool.filter((h) => h !== hero);
+  const full = list.length >= HERO_POOL_MAX;
+  const toggle = (h: string) => onChange(list.includes(h) ? list.filter((x) => x !== h) : [...list, h]);
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Heróis de afinidade <span className="text-zinc-100">{list.length}/{HERO_POOL_MAX}</span></span>
+        <span className="text-xs text-zinc-500">{pol >= ALT_POL ? `POL ${pol}: versões sem perda de poder` : `Versões com −${ALT_MALUS} de poder (POL ${ALT_POL}+ não perde)`}</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {HERO_KEYS.filter((h) => h !== hero).map((h) => {
+          const on = list.includes(h);
+          const src = icon(h);
+          return (
+            <button key={h} type="button" onClick={() => toggle(h)} aria-pressed={on} disabled={!on && full} title={h}
+              className={`flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg py-1 pr-2.5 pl-1 text-xs font-bold transition focus-visible:outline-2 focus-visible:outline-zinc-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 ${on ? "bg-zinc-100 text-zinc-950" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"}`}>
+              {src ? <img src={src} alt="" className="size-7 rounded-md object-cover" loading="lazy" /> : <span className="size-7" />}
+              {h}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PlayerForm({ editId, onEditId }: { editId: string | null; onEditId: (id: string | null) => void }) {
   const { players, teams, heroNames, heroIcon, settings, reload } = useData();
   const existing = editId ? players.find((p) => p.id === editId) : undefined;
@@ -207,6 +235,8 @@ function PlayerForm({ editId, onEditId }: { editId: string | null; onEditId: (id
             })}
           </div>
         </div>
+
+        <AffinityPicker hero={d.hero} pool={d.heroPool ?? []} pol={d.stats.POL} icon={heroIcon} onChange={(heroPool) => set({ heroPool: heroPool.length ? heroPool : undefined })} />
 
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {STAT_KEYS.map((k) => <Range key={k} label={k} value={d.stats[k]} min={1} max={99} onChange={(v) => setStat(k, v)} />)}
