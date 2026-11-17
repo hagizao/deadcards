@@ -3,14 +3,14 @@
 import { getPlayerOvr } from "../cards";
 import type { Player } from "../types";
 import {
-  ABILITIES, ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, MASTERY_BONUS, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
+  ABILITIES, ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, MASTERY_BONUS, phaseOf, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
   type AbilityKey, type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type ItemTier, type LocType, type Mastery, type PoolCard, type StatKey,
 } from "./config";
 
 export type Side = "p" | "a";
 export const opp = (s: Side): Side => (s === "p" ? "a" : "p");
 
-export const TURNS = 6;
+export const TURNS = 8;
 export const HAND_MAX = 7;
 const DECK_SIZE = 12;
 const START_HAND = 3;
@@ -40,6 +40,8 @@ export type GCard = {
   bonus: number; side: Side; rev: boolean; staged: boolean; st: Status; tok?: boolean;
   /** Atributos do jogador, atributo principal do herói, nível de Maestria (0 a 2) e palavras-chave. */
   stats?: CardStatsBlock; main: StatKey | null; lvl: Mastery;
+  /** Maestria máxima pelo atributo; a fase da partida libera um nível por vez (Profissional no mid, Mestre no late). */
+  top: Mastery;
   /** Escolha feita ao jogar a carta: id da carta alvo e/ou índice do local. */
   ch?: { card?: number; loc?: number };
   mv: MoveCharge[];
@@ -62,7 +64,7 @@ export type LogKey =
   | "haze" | "dance" | "holliday" | "infernus" | "ivy" | "kelvin" | "geist" | "lash" | "turret" | "move" | "burrow" | "harrow" | "paige"
   | "paradox" | "pocket" | "rats" | "rem" | "storm" | "shiv" | "mark" | "wolf" | "illusion" | "portal" | "trap" | "vindicta" | "fall"
   | "cube" | "petrify" | "wraith" | "liftEnd" | "yamato" | "chanEnd" | "extraSouls" | "hookPull" | "trapHit" | "urn" | "boss" | "zipline"
-  | "item" | "shop" | "prio" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves";
+  | "item" | "shop" | "prio" | "phase" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves";
 
 export type Result = { outcome: "win" | "loss" | "draw"; won: number; lost: number; myPower: number; aiPower: number; patron: boolean };
 export type PlayError = "souls" | "frozen" | "full";
@@ -161,9 +163,10 @@ export class Match {
     const card: GCard = {
       id: ++this.uid, p: { id: p.id, name: p.name, hero: p.hero, c1: p.c1, c2: p.c2, role: p.position }, cost: c.cost, base: c.power, ab: c.ab,
       v: Number(c.v) || 0, desc: c.desc, bonus: 0, side, rev: false, staged: false, st: nst(),
-      stats: p.stats, main, lvl: 0, mv: [],
+      stats: p.stats, main, lvl: 0, top: 0, mv: [],
     };
-    this.levelTo(card, main && p.stats ? mastery(p.stats[main] ?? 0) : 0);
+    card.top = main && p.stats ? mastery(p.stats[main] ?? 0) : 0;
+    this.levelTo(card, Math.min(card.top, phaseOf(this.t)) as Mastery);
     return card;
   }
   /** Sobe a Maestria: Profissional dá +1 no valor (ou no poder, se a habilidade não usa valor); Mestre libera a frase extra. */
@@ -174,7 +177,7 @@ export class Match {
     }
   }
   private token(side: Side, token: Token, power: number): GCard {
-    return { id: ++this.uid, p: { name: "", hero: null, c1: "#44403c", c2: "#1c1917", token }, cost: 1, base: power, ab: "none", v: 0, desc: "", bonus: 0, side, rev: false, staged: false, st: nst(), tok: true, main: null, lvl: 0, mv: [] };
+    return { id: ++this.uid, p: { name: "", hero: null, c1: "#44403c", c2: "#1c1917", token }, cost: 1, base: power, ab: "none", v: 0, desc: "", bonus: 0, side, rev: false, staged: false, st: nst(), tok: true, main: null, lvl: 0, top: 0, mv: [] };
   }
   private N = (c: GCard): Name => (c.p.token ? { token: c.p.token } : c.p.name);
   private say(e: LogEntry) { this.log.unshift(e); this.log.length = Math.min(this.log.length, 3); }
@@ -832,6 +835,12 @@ export class Match {
   /* ---------- turnos ---------- */
   nextTurn() {
     this.t++;
+    // troca de fase: todas as cartas sobem até o nível que o atributo permite
+    const ph = phaseOf(this.t);
+    if (ph > phaseOf(this.t - 1)) {
+      [...this.deck, ...this.adeck, ...this.hand, ...this.ahand, ...this.all()].forEach((c) => { if (!c.tok) this.levelTo(c, Math.min(c.top, ph) as Mastery); });
+      this.say({ k: "phase", n: ph });
+    }
     this.E = this.t + this.extra.p;
     this.AE = this.t + this.extra.a;
     if (this.extra.p) this.say({ k: "extraSouls", n: this.extra.p });

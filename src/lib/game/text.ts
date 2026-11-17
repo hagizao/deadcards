@@ -27,7 +27,7 @@ export type GameText = {
   log: Record<LogKey, Log>;
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
-    turn: (t: number, total: number) => string; prio: (me: boolean) => string; prioHint: string; record: (w: number, l: number) => string; souls: (n: number) => string;
+    turn: (t: number, total: number) => string; phase: (p: number) => string; phaseHint: string; prio: (me: boolean) => string; prioHint: string; record: (w: number, l: number) => string; souls: (n: number) => string;
     endTurn: string; newMatch: string; again: string; viewBoard: string; hint: string; hiddenLoc: string; revealsOn: (t: number) => string;
     cost: string; power: string; silenced: string; noAbility: string; tokenDesc: string; hand: string; arena: string;
     win: string; loss: string; draw: string; summary: (w: number, l: number, me: number, ai: number) => string; patron: string;
@@ -218,6 +218,7 @@ export const GAME_TEXT = strings<GameText>({
       yamato: (e, n) => `${n(e.c)} entrou na Transformação Sombria!`,
       chanEnd: (e, n) => `O efeito canalizado de ${n(e.c)} foi interrompido.`,
       extraSouls: (e) => `Você ganhou +${e.n} ${pl(e.n ?? 0, "alma", "almas")} extra.`,
+      phase: (e) => (e.n === 2 ? "Late game: as cartas sobem para Mestre e as ultimates estão liberadas." : "Mid game: as cartas sobem para Profissional."),
       hookPull: (e, n) => `Gancho! ${n(e.c)} foi puxado para ${e.loc}.`,
       trapHit: (e, n) => `${n(e.c)} caiu na armadilha (−${e.v}).`,
       urn: (e) => `${e.side === "p" ? "Você levou" : "A IA levou"} a Urna de Almas.`,
@@ -236,7 +237,7 @@ export const GAME_TEXT = strings<GameText>({
     ui: {
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
       needCards: (n) => `Cadastre pelo menos ${n} cartas para jogar.`, you: "Você: Rei Oculto", ai: "IA: Arquimãe",
-      turn: (t, total) => `Turno ${t}/${total}`, prio: (me) => `Prioridade: ${me ? "você" : "IA"}`, prioHint: "Quem tem prioridade revela primeiro. No turno 1 é o Rei Oculto; depois, quem estiver ganhando a partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`,
+      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 a 3 · Mid: 4 a 6 (cartas sobem para Profissional) · Late: 7 e 8 (Mestre e ultimates).", prio: (me) => `Prioridade: ${me ? "você" : "IA"}`, prioHint: "Quem tem prioridade revela primeiro. No turno 1 é o Rei Oculto; depois, quem estiver ganhando a partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`,
       endTurn: "Fim do turno", newMatch: "Nova partida", again: "Jogar de novo", viewBoard: "Ver tabuleiro",
       hint: "Arraste uma carta até um local para jogar (ou toque nela e depois no local). Passe o mouse para ler.", hiddenLoc: "Local oculto", revealsOn: (t) => `Revela no turno ${t}`,
       cost: "custo", power: "poder", silenced: "habilidade anulada", noAbility: "Sem habilidade.", tokenDesc: "Ficha criada por uma habilidade.",
@@ -434,6 +435,7 @@ export const GAME_TEXT = strings<GameText>({
       yamato: (e, n) => `${n(e.c)} entered Shadow Transformation!`,
       chanEnd: (e, n) => `${n(e.c)}'s channeled effect was interrupted.`,
       extraSouls: (e) => `You got +${e.n} extra ${pl(e.n ?? 0, "soul", "souls")}.`,
+      phase: (e) => (e.n === 2 ? "Late game: cards rise to Master and ultimates are unlocked." : "Mid game: cards rise to Pro."),
       hookPull: (e, n) => `Hook! ${n(e.c)} was pulled to ${e.loc}.`,
       trapHit: (e, n) => `${n(e.c)} stepped on the trap (−${e.v}).`,
       urn: (e) => `${e.side === "p" ? "You took" : "The AI took"} the Soul Urn.`,
@@ -452,7 +454,7 @@ export const GAME_TEXT = strings<GameText>({
     ui: {
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
       needCards: (n) => `Add at least ${n} cards to play.`, you: "You: Hidden King", ai: "AI: Archmother",
-      turn: (t, total) => `Turn ${t}/${total}`, prio: (me) => `Priority: ${me ? "you" : "AI"}`, prioHint: "Whoever has priority reveals first. On turn 1 it's the Hidden King; after that, whoever is winning the match.", record: (w, l) => `${w}W ${l}L`, souls: (n) => `${n} ${pl(n, "soul", "souls")}`,
+      turn: (t, total) => `Turn ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 to 3 · Mid: 4 to 6 (cards rise to Pro) · Late: 7 and 8 (Master and ultimates).", prio: (me) => `Priority: ${me ? "you" : "AI"}`, prioHint: "Whoever has priority reveals first. On turn 1 it's the Hidden King; after that, whoever is winning the match.", record: (w, l) => `${w}W ${l}L`, souls: (n) => `${n} ${pl(n, "soul", "souls")}`,
       endTurn: "End turn", newMatch: "New match", again: "Play again", viewBoard: "View board",
       hint: "Drag a card onto a location to play it (or tap it, then the location). Hover to read.", hiddenLoc: "Hidden location", revealsOn: (t) => `Reveals on turn ${t}`,
       cost: "cost", power: "power", silenced: "ability canceled", noAbility: "No ability.", tokenDesc: "Token created by an ability.",
@@ -650,6 +652,7 @@ export const GAME_TEXT = strings<GameText>({
       yamato: (e, n) => `¡${n(e.c)} entró en Transformación Sombría!`,
       chanEnd: (e, n) => `El efecto canalizado de ${n(e.c)} fue interrumpido.`,
       extraSouls: (e) => `Ganaste +${e.n} ${pl(e.n ?? 0, "alma extra", "almas extra")}.`,
+      phase: (e) => (e.n === 2 ? "Late game: las cartas suben a Maestro y las ultimates quedan liberadas." : "Mid game: las cartas suben a Profesional."),
       hookPull: (e, n) => `¡Gancho! ${n(e.c)} fue arrastrada a ${e.loc}.`,
       trapHit: (e, n) => `${n(e.c)} cayó en la trampa (−${e.v}).`,
       urn: (e) => `${e.side === "p" ? "Te llevaste" : "La IA se llevó"} la Urna de Almas.`,
@@ -668,7 +671,7 @@ export const GAME_TEXT = strings<GameText>({
     ui: {
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",
       needCards: (n) => `Registra al menos ${n} cartas para jugar.`, you: "Tú: Rey Oculto", ai: "IA: Archimadre",
-      turn: (t, total) => `Turno ${t}/${total}`, prio: (me) => `Prioridad: ${me ? "tú" : "IA"}`, prioHint: "Quien tiene la prioridad revela primero. En el turno 1 es el Rey Oculto; después, quien vaya ganando la partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`,
+      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rondas 1 a 3 · Mid: 4 a 6 (las cartas suben a Profesional) · Late: 7 y 8 (Maestro y ultimates).", prio: (me) => `Prioridad: ${me ? "tú" : "IA"}`, prioHint: "Quien tiene la prioridad revela primero. En el turno 1 es el Rey Oculto; después, quien vaya ganando la partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`,
       endTurn: "Fin del turno", newMatch: "Nueva partida", again: "Jugar de nuevo", viewBoard: "Ver tablero",
       hint: "Arrastra una carta a un lugar para jugarla (o tócala y luego el lugar). Pasa el ratón para leer.", hiddenLoc: "Lugar oculto", revealsOn: (t) => `Se revela en el turno ${t}`,
       cost: "coste", power: "poder", silenced: "habilidad anulada", noAbility: "Sin habilidad.", tokenDesc: "Ficha creada por una habilidad.",

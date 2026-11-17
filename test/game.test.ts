@@ -310,9 +310,10 @@ const heroCfg = (heroes: GameConfig["heroes"] = {}): GameConfig => ({ locs: plai
 const pc = (id: string, hero: string, stats: CardStatsBlock): PoolCard => ({ id, name: id, position: "Flex", hero, c1: "#000", c2: "#fff", ovr: 80, stats });
 type Priv = { mk(p: PoolCard, cfg: GameConfig, side: Side): GCard };
 
-/** Partida de teste com os 3 locais revelados e o tabuleiro vazio. */
-function arena(cfg = heroCfg()) {
+/** Partida de teste com os 3 locais revelados e o tabuleiro vazio. `t` = round (7 = late, com a Maestria toda liberada). */
+function arena(cfg = heroCfg(), t = 1) {
   const m = new Match(cfg, pool, seeded(11));
+  m.t = t;
   m.loc.forEach((l) => { l.rev = true; l.s.p = []; l.s.a = []; });
   const mk = (p: PoolCard, side: Side) => (m as unknown as Priv).mk(p, cfg, side);
   /** Coloca a carta no local e revela (como no fim do turno). */
@@ -340,7 +341,7 @@ describe("atributos e Maestria", () => {
   });
 
   it("Profissional ganha +1 no valor da habilidade; quem não usa valor ganha +1 de poder", () => {
-    const { mk } = arena();
+    const { mk } = arena(heroCfg(), 7);
     const pocket = (v: number) => mk(pc("x", "Pocket", flat(70, { MOV: v })), "p");
     expect(pocket(85).v - pocket(70).v).toBe(1);
     expect(pocket(95).lvl).toBe(2);
@@ -350,12 +351,12 @@ describe("atributos e Maestria", () => {
 
   it("o admin troca o atributo principal e a Maestria acompanha", () => {
     const stats = flat(70, { POL: 95 });
-    expect(arena().mk(pc("x", "Haze", stats), "p").lvl).toBe(0);
-    expect(arena(heroCfg({ Haze: { stat: "POL" } })).mk(pc("x", "Haze", stats), "p").lvl).toBe(2);
+    expect(arena(heroCfg(), 7).mk(pc("x", "Haze", stats), "p").lvl).toBe(0);
+    expect(arena(heroCfg({ Haze: { stat: "POL" } }), 7).mk(pc("x", "Haze", stats), "p").lvl).toBe(2);
   });
 
   it("duelo de espelho: quem tem mais Maestria ganha +2 por nível e anula o rival no turno", () => {
-    const { m, put } = arena();
+    const { m, put } = arena(heroCfg(), 7);
     const ai = put(pc("a", "Pocket", flat(70)), "a", 0);
     const me = put(pc("b", "Pocket", flat(70, { MOV: 95 })), "p", 0);
     expect(me.bonus).toBe(4);
@@ -377,6 +378,17 @@ describe("atributos e Maestria", () => {
     const pupil = put(pc("b", "Haze", flat(70)), "p", 0);
     expect(pupil.lvl).toBe(1);
     expect(pupil.bonus).toBe(1);
+  });
+
+  it("fases: a Maestria sobe para Profissional no round 4 e para Mestre no round 7", () => {
+    const m = new Match(heroCfg(), cardPool(HEROES.map((hero, i) => player(`f${i}`, 95, { hero }))), seeded(3));
+    const all = () => [...m.hand, ...m.loc.flatMap((l) => l.s.p)];
+    expect(all().every((c) => c.lvl === 0)).toBe(true);
+    while (m.t < 4) m.runEndTurn();
+    expect(all().filter((c) => !c.tok).every((c) => c.lvl === Math.min(1, c.top))).toBe(true);
+    while (m.t < 7) m.runEndTurn();
+    expect(all().filter((c) => !c.tok).some((c) => c.lvl === 2)).toBe(true);
+    expect(m.log.some((e) => e.k === "phase" && e.n === 2)).toBe(true);
   });
 
   it("atributos altos não dão efeito extra (sem palavras-chave de atributo)", () => {

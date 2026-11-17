@@ -7,7 +7,7 @@ import { AudioMenu, EndTurnButton, SoulOrb } from "../components/GameHud";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, type ItemKey, type ItemSlot } from "../lib/game/config";
+import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, phaseOf, type ItemKey, type ItemSlot } from "../lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
 import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
@@ -17,7 +17,7 @@ const REVEAL_MS = 650;
 const END_MS = 750;
 const TOAST_MS = 1300;
 /** Peso da carta pelo custo: 1 cai perto, 2 cai do alto, 3 vem do céu e treme a mesa. */
-const weight = (c: GCard) => (c.cost >= 5 ? 3 : c.cost >= 3 ? 2 : 1);
+const weight = (c: GCard) => (c.cost >= 6 ? 3 : c.cost >= 3 ? 2 : 1);
 /** Quanto a queda leva até tocar a mesa, por peso (ms). */
 const FALL_MS = { 1: 200, 2: 260, 3: 340 } as const;
 const TOKEN_GLYPH: Record<Token, string> = { pigeon: "🐦", ghoul: "💀", turret: "⚙️", rat: "🐀", illusion: "👤" };
@@ -30,6 +30,8 @@ const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 // cor de cada categoria de item, como na loja do Deadlock
 const SLOT_RING: Record<ItemSlot, string> = { weapon: "ring-item-weapon", vitality: "ring-item-vitality", spirit: "ring-item-spirit" };
 const SLOT_TEXT: Record<ItemSlot, string> = { weapon: "text-item-weapon", vitality: "text-item-vitality", spirit: "text-item-spirit" };
+/** Cor do selo de cada fase da partida (early, mid, late). */
+const PHASE_TONE = ["bg-emerald-500/20 text-emerald-300", "bg-amber-500/20 text-amber-300", "bg-rose-500/20 text-rose-300"] as const;
 
 export function Game() {
   const { players, settings } = useData();
@@ -278,7 +280,12 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     <div className={full ? "game-full fixed inset-0 z-50 overflow-hidden bg-dl-black/90 px-3 pt-1 backdrop-blur-xl sm:px-6" : "contents"}>
     <div className={`mx-auto flex flex-col gap-1.5 text-dl-text ${full ? "h-full max-w-7xl" : "h-[calc(100dvh-5.5rem)] min-h-120 max-w-7xl sm:h-[calc(100dvh-7.5rem)]"}`}>
       <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
-        <h1 className="pt-1 font-display text-sm font-extrabold tracking-[0.11em] uppercase sm:text-xl">{t.ui.title}</h1>
+        <div className="flex flex-col items-start gap-1 pt-1">
+          <h1 className="font-display text-sm font-extrabold tracking-[0.11em] uppercase sm:text-xl">{t.ui.title}</h1>
+          <abbr title={t.ui.phaseHint} className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold tracking-widest uppercase no-underline sm:text-xs ${PHASE_TONE[phaseOf(Math.min(m.t, TURNS))]}`}>
+            {t.ui.phase(phaseOf(Math.min(m.t, TURNS)))}
+          </abbr>
+        </div>
         <div className="order-last col-span-2 flex items-start justify-center gap-2 sm:order-0 sm:col-span-1">
           <ItemSlot s="a" m={m} t={t} icons={icons} />
           <AiHand n={m.ahand.length} t={t} />

@@ -155,6 +155,10 @@ export function heroStat(hero: string, heroes: GameConfig["heroes"], stats?: Car
 export type Mastery = 0 | 1 | 2;
 export const MASTERY_AT = [82, 90] as const;
 export const mastery = (v: number): Mastery => (v >= MASTERY_AT[1] ? 2 : v >= MASTERY_AT[0] ? 1 : 0);
+/** Fases da partida: early (rounds 1–3), mid (4–6) e late (7–8). Cada fase libera um nível de Maestria. */
+export type Phase = 0 | 1 | 2;
+export const PHASE_FROM = [1, 4, 7] as const;
+export const phaseOf = (t: number): Phase => (t >= PHASE_FROM[2] ? 2 : t >= PHASE_FROM[1] ? 1 : 0);
 /** Bônus de Profissional e Mestre: +1 no valor da habilidade (ou +1 de poder, se ela não tem valor). */
 export const MASTERY_BONUS = 1;
 
