@@ -51,10 +51,13 @@ export type HeroArt = { name: string; url: string; zoom: number; x: number; y: n
 
 export type TierBand = { key: string; min: number; max: number; bg: string; text: string };
 
+export const HOME_FEATURED_MAX = 5;
+
 export type Settings = {
   tierConfig?: TierBand[];
   bg?: BgSettings;
   homeHero?: string;
+  homeFeatured?: string[];
 };
 
 export type AppData = {

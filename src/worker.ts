@@ -4,7 +4,7 @@ import { favorite, profileCard, publicProfile } from "./profile";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
-import type { ArtCredit } from "./lib/types";
+import { HOME_FEATURED_MAX, type ArtCredit } from "./lib/types";
 
 export interface Env {
   DB: D1Database;
@@ -107,6 +107,7 @@ async function appData(env: Env): Promise<Response> {
       tierConfig: s.tierConfig ?? undefined,
       bg: bg ? { ...bg, imageUrl: imgUrl((s.bgImageKey as string) ?? null) } : undefined,
       homeHero: imgUrl((s.homeHeroKey as string) ?? null),
+      homeFeatured: (s.homeFeatured as string[] | null) ?? undefined,
     },
   });
 }
@@ -204,6 +205,11 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
     if (b.tierConfig !== undefined) rows.tierConfig = b.tierConfig;
     if (b.bg !== undefined) { const bg = b.bg as Record<string, unknown> | null; rows.bg = bg ? { ...bg, imageUrl: "" } : null; rows.bgImageKey = keyOf(bg?.imageUrl); }
     if (b.homeHero !== undefined) rows.homeHeroKey = keyOf(b.homeHero);
+    if (b.homeFeatured !== undefined) {
+      const f = b.homeFeatured;
+      if (!Array.isArray(f) || f.length > HOME_FEATURED_MAX || f.some((x) => typeof x !== "string" || !x || x.length > 64) || new Set(f).size !== f.length) return bad("destaques inválidos");
+      rows.homeFeatured = f;
+    }
     await db.batch(Object.entries(rows).map(([k, v]) => db.prepare("INSERT INTO settings (key, value_json) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").bind(k, JSON.stringify(v))));
   } else return bad("rota inválida", 404);
   return Response.json({ ok: true });

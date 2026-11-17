@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, useData } from "../lib/data";
 import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isMainCard } from "../lib/cards";
 import { FRAME_PRESETS, getCardTier, type Tier } from "../lib/rarity";
-import type { BgSettings, Player, Stats, Team, TierBand } from "../lib/types";
+import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
 import { Card } from "../components/Card";
 import { TeamLogo } from "../components/TeamLogo";
 import { HoldButton } from "../components/HoldButton";
@@ -503,9 +503,12 @@ function HeroesForm() {
 }
 
 function LookForm() {
-  const { settings, reload } = useData();
+  const { settings, players, teams, reload } = useData();
   const [bg, setBg] = useState(settings.bg);
   const [homeHero, setHomeHero] = useState(settings.homeHero);
+  const [featured, setFeatured] = useState(() => Array.from({ length: HOME_FEATURED_MAX }, (_, i) => settings.homeFeatured?.[i] ?? ""));
+  const options = [...players].sort((a, b) => a.name.localeCompare(b.name));
+  const tagOf = (p: Player) => teams.find((t) => t.id === p.teamId)?.tag ?? "FA";
   const [tiers, setTiers] = useState<TierBand[]>(() => structuredClone(settings.tierConfig ?? DEFAULT_TIER_CONFIG));
   const { busy, msg, run } = useSaver(reload);
   const setTier = (i: number, patch: Partial<TierBand>) => setTiers((t) => t.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -523,6 +526,20 @@ function LookForm() {
             {homeHero && <button type="button" className={ghost} onClick={() => setHomeHero(undefined)}>Remover</button>}
           </div>
         </div>
+        <fieldset className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
+          <legend className="px-1 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Cartas em destaque (Home)</legend>
+          <p className="text-xs text-zinc-400">A primeira fica no centro. Sem nenhuma escolhida, a Home mostra as maiores OVR.</p>
+          {featured.map((id, i) => (
+            <select key={i} className={input} value={id} aria-label={`Destaque ${i + 1}`} onChange={(e) => setFeatured((f) => f.map((x, j) => (j === i ? e.target.value : x)))}>
+              <option value="">{i + 1}. —</option>
+              {options.map((p) => (
+                <option key={p.id} value={p.id} disabled={p.id !== id && featured.includes(p.id)}>
+                  {i + 1}. {p.name} · {tagOf(p)} · {getPlayerOvr(p)}{p.special ? " · especial" : ""}
+                </option>
+              ))}
+            </select>
+          ))}
+        </fieldset>
       </div>
       <div className="noir-glass space-y-3 rounded-3xl p-5">
         <div className="flex items-center justify-between">
@@ -540,7 +557,7 @@ function LookForm() {
         ))}
       </div>
       <div className="flex items-center gap-3 lg:col-span-2">
-        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { bg: bg ?? null, homeHero: homeHero ?? null, tierConfig: tiers }), "Aparência salva!")}>
+        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { bg: bg ?? null, homeHero: homeHero ?? null, homeFeatured: featured.filter(Boolean), tierConfig: tiers }), "Aparência salva!")}>
           {busy ? "Salvando…" : "Salvar aparência"}
         </button>
         <Toast msg={msg} />
