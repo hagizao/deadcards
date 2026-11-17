@@ -24,6 +24,8 @@ type Props = {
   inDeck: boolean;
   full: boolean;
   isCover: boolean;
+  /** O herói da versão já está no baralho em outro jogador. */
+  taken: (v: PoolCard) => boolean;
   onShow: (v: PoolCard) => void;
   onToggle: (v: PoolCard, from: DOMRect | null) => void;
   onCover: (v: PoolCard) => void;
@@ -34,7 +36,7 @@ type Props = {
  * Carta em destaque na montagem do baralho: a carta grande com o texto da habilidade, os heróis do jogador para trocar de versão
  * (o texto troca junto) e, em letra pequena, de onde vem o poder dela.
  */
-export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, onShow, onToggle, onCover, onClose }: Props) {
+export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, taken, onShow, onToggle, onCover, onClose }: Props) {
   const t = useT(GAME_TEXT);
   const { players, heroIcon } = useData();
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
@@ -96,10 +98,11 @@ export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, onShow,
                 {versions.map((v) => {
                   const vs = cardStats(v, cfg.cards, cfg.heroes);
                   const on = v.id === shown.id;
+                  const blocked = inDeck && taken(v);
                   const icon = heroIcon(v.hero);
                   return (
-                    <button key={v.id} type="button" onClick={() => onShow(v)} aria-pressed={on} aria-label={t.deck.version(v.name, v.hero)}
-                      className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg py-1 pr-3 pl-1 text-left transition active:scale-95 ${focus} ${on ? "bg-dl-text text-dl-black" : "bg-zinc-900/80 text-zinc-200 hover:bg-zinc-800"}`}>
+                    <button key={v.id} type="button" onClick={() => onShow(v)} aria-pressed={on} aria-label={t.deck.version(v.name, v.hero)} disabled={blocked} title={blocked ? t.deck.dupHero(v.hero) : undefined}
+                      className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg py-1 pr-3 pl-1 text-left transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${focus} ${on ? "bg-dl-text text-dl-black" : "bg-zinc-900/80 text-zinc-200 hover:bg-zinc-800"}`}>
                       {icon ? <img src={icon} alt="" className="size-8 rounded-md object-cover" /> : <span className="size-8" />}
                       <span className="flex flex-col leading-tight">
                         <span className="text-xs font-bold">{v.hero}</span>
@@ -134,8 +137,10 @@ export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, onShow,
             </ul>
           </section>
 
+          {!inDeck && taken(shown) && <p className="text-xs text-rose-300">{t.deck.dupHero(shown.hero)}</p>}
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={primaryBtn} disabled={!inDeck && full} title={!inDeck && full ? t.deck.full(DECK_SIZE) : undefined}
+            <button type="button" className={primaryBtn} disabled={!inDeck && (full || taken(shown))}
+              title={!inDeck && taken(shown) ? t.deck.dupHero(shown.hero) : !inDeck && full ? t.deck.full(DECK_SIZE) : undefined}
               onClick={() => onToggle(shown, cardRef.current?.getBoundingClientRect() ?? null)}>
               {inDeck ? t.deck.takeBtn : t.deck.addBtn}
             </button>

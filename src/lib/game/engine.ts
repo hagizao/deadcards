@@ -114,7 +114,7 @@ const avgOvr = (d: PoolCard[]) => d.reduce((a, c) => a + c.ovr, 0) / Math.max(1,
 export const AI_OVR_GAP = 1;
 
 /**
- * Deck da IA espelhando o seu: para cada carta sua, uma do pool com o mesmo custo e OVR parecido (a IA pode repetir jogadores seus).
+ * Deck da IA espelhando o seu (sem repetir herói dentro dele): para cada carta sua, uma do pool com o mesmo custo e OVR parecido (a IA pode repetir jogadores seus).
  * Depois troca cartas de mesmo custo até o OVR médio ficar a no máximo AI_OVR_GAP do seu.
  */
 export function aiDeck(pool: PoolCard[], mine: PoolCard[], cfg: GameConfig, rnd: () => number = Math.random): PoolCard[] {
@@ -126,8 +126,11 @@ export function aiDeck(pool: PoolCard[], mine: PoolCard[], cfg: GameConfig, rnd:
     if (!free.length) break;
     const c = costOf(m);
     const score = (p: PoolCard) => Math.abs(costOf(p) - c) * 20 + Math.abs(p.ovr - m.ovr) + rnd() * 4;
-    let best = 0;
-    for (let i = 1; i < free.length; i++) if (score(free[i]) < score(free[best])) best = i;
+    // sem herói repetido no deck da IA (se o pool permitir)
+    const used = new Set(out.map((x) => x.hero));
+    let best = -1;
+    for (let i = 0; i < free.length; i++) if (!used.has(free[i].hero) && (best < 0 || score(free[i]) < score(free[best]))) best = i;
+    if (best < 0) best = free.reduce((b, p, i) => (score(p) < score(free[b]) ? i : b), 0);
     out.push(free.splice(best, 1)[0]);
   }
   const goal = avgOvr(mine);
@@ -138,6 +141,7 @@ export function aiDeck(pool: PoolCard[], mine: PoolCard[], cfg: GameConfig, rnd:
       for (let j = 0; j < free.length; j++) {
         const d = free[j].ovr - out[i].ovr;
         if ((high ? d >= 0 : d <= 0) || costOf(free[j]) !== costOf(out[i])) continue;
+        if (free[j].hero !== out[i].hero && out.some((x) => x.hero === free[j].hero)) continue;
         const gap = Math.abs(avgOvr(out) + d / out.length - goal);
         if (!swap || gap < swap[2]) swap = [i, j, gap];
       }
@@ -569,7 +573,8 @@ export class Match {
         const L = this.locOf(c);
         if (!L || !c.st.chan) return;
         c.st.chan = undefined;
-        this.foes(c, L).filter((x) => x !== t).forEach((x) => this.hurt(x, 3, c));
+        // só a dorminhoca, se ainda estiver aqui: o sono ainda vale, então o dano sai dobrado
+        if (t && this.locOf(t) === L) this.hurt(t, 3, c);
         this.say({ k: "dance", c: this.N(c) });
       });
     } },

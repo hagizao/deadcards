@@ -53,29 +53,41 @@ export function saveBook(b: DeckBook) {
   }
 }
 
-/** Deck a partir de ids salvos: só versões que ainda existem, uma por jogador, no máximo DECK_SIZE. */
+/** Deck a partir de ids salvos: só versões que ainda existem, uma por jogador, sem herói repetido, no máximo DECK_SIZE. */
 export function resolveDeck(ids: unknown, versions: Map<string, PoolCard[]>): PoolCard[] {
   if (!Array.isArray(ids)) return [];
   const byId = new Map([...versions.values()].flat().map((c) => [c.id, c]));
   const seen = new Set<string>();
+  const heroes = new Set<string>();
   const out: PoolCard[] = [];
   for (const id of ids) {
     const c = typeof id === "string" ? byId.get(id) : undefined;
-    if (!c || seen.has(c.key) || out.length >= DECK_SIZE) continue;
+    if (!c || seen.has(c.key) || heroes.has(c.hero) || out.length >= DECK_SIZE) continue;
     seen.add(c.key);
+    heroes.add(c.hero);
     out.push(c);
   }
   return out;
 }
 
-/** Completa o deck com jogadores aleatórios (na versão principal) que ainda não estão nele. */
+/** Completa o deck com jogadores aleatórios que ainda não estão nele, numa versão de herói que o deck ainda não tem (a principal, se der). */
 export function fillDeck(deck: PoolCard[], versions: Map<string, PoolCard[]>, rnd: () => number = Math.random): PoolCard[] {
   const used = new Set(deck.map((c) => c.key));
-  const rest = [...versions.values()].map((l) => l[0]).filter((c) => !used.has(c.key));
+  const heroes = new Set(deck.map((c) => c.hero));
+  const rest = [...versions.values()].filter((l) => !used.has(l[0].key));
   const out = [...deck];
-  while (out.length < DECK_SIZE && rest.length) out.push(rest.splice(Math.floor(rnd() * rest.length), 1)[0]);
+  while (out.length < DECK_SIZE && rest.length) {
+    const l = rest.splice(Math.floor(rnd() * rest.length), 1)[0];
+    const c = l.find((v) => !heroes.has(v.hero));
+    if (!c) continue;
+    heroes.add(c.hero);
+    out.push(c);
+  }
   return out;
 }
+
+/** O herói da versão já está no deck em outro jogador? */
+export const heroTaken = (deck: PoolCard[], c: PoolCard) => deck.some((x) => x.hero === c.hero && x.key !== c.key);
 
 /** Jogador a desenhar na carta de uma versão: a versão de afinidade usa o herói dela (e a arte do herói, não a arte própria da carta). */
 export function versionPlayer(byId: Map<string, Player>, c: { id?: string; hero: string | null }): Player | null {

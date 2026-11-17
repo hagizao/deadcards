@@ -758,3 +758,43 @@ describe("baralhos salvos e poder explicado", () => {
     expect(w.parts.find((x) => x.k === "admin")?.n).toBe(20 - defaultCard(y).power);
   });
 });
+
+describe("Haze Mestre", () => {
+  it("Dança das Balas acerta só a carta que ela fez dormir, com o dano dobrado pelo sono", () => {
+    const { m, put } = arena(heroCfg(), 7);
+    const dummy = (power: number) => { const c = put(pc(`h${power}`, "Herói Novo", flat(70)), "a", 0); c.ab = "none"; c.base = power; c.bonus = 0; return c; };
+    const big = dummy(10);
+    const small = dummy(5);
+    const haze = put(pc("z", "Haze", flat(95)), "p", 0);
+    expect(haze.lvl).toBe(2);
+    m.t = 8;
+    m.endOfTurn();
+    expect(m.pow(big)).toBe(4);
+    expect(m.pow(small)).toBe(5);
+  });
+});
+
+describe("sem herói repetido no baralho", () => {
+  const list = [
+    player("a", 80, { hero: "Pocket", heroPool: ["Haze"] }),
+    player("b", 85, { hero: "Pocket" }),
+    ...HEROES.slice(0, 16).filter((h) => h !== "Pocket" && h !== "Haze").map((hero, i) => player(`r${i}`, 75, { hero })),
+  ];
+  const v = cardVersions(list);
+
+  it("deck salvo descarta o segundo Pocket; completar troca de versão para não repetir", () => {
+    expect(resolveDeck(["a", "b"], v).map((c) => c.id)).toEqual(["a"]);
+    const f = fillDeck(resolveDeck(["b"], v), v, seeded(3));
+    expect(new Set(f.map((c) => c.hero)).size).toBe(f.length);
+    const a = f.find((c) => c.key === "a");
+    if (a) expect(a.hero).toBe("Haze");
+  });
+
+  it("deck da IA não repete herói", () => {
+    const cfg = gameConfig(undefined);
+    for (let s = 1; s <= 20; s++) {
+      const ai = aiDeck(cardPool(list), cardPool(list).slice(0, 12), cfg, seeded(s));
+      expect(new Set(ai.map((c) => c.hero)).size).toBe(ai.length);
+    }
+  });
+});

@@ -30,7 +30,7 @@ export type GameText = {
     title: string; hint: string; count: (n: number, max: number) => string; avg: (n: number) => string; curve: string; search: string;
     random: string; clear: string; play: string; change: string; full: (max: number) => string; versions: string; alt: (n: number) => string; altPro: string;
     add: (name: string) => string; version: (name: string, hero: string) => string; empty: string; aiNote: string;
-    defaultName: (n: number) => string; decks: string; newDeck: string; maxDecks: (n: number) => string; rename: string; duplicate: string; remove: string;
+    defaultName: (n: number) => string; dupHero: (hero: string) => string; decks: string; newDeck: string; maxDecks: (n: number) => string; rename: string; duplicate: string; remove: string;
     cover: string; isCover: string; left: (n: number) => string; aiLeft: (n: number) => string; list: string; showList: (n: number) => string;
     open: (name: string) => string; take: (name: string) => string; addBtn: string; takeBtn: string; close: string; heroes: string; why: string;
     parts: { hero: (hero: string) => string; ovr: (ovr: number, half: boolean) => string; alt: string; floor: string; admin: string };
@@ -78,7 +78,7 @@ export const GAME_TEXT = strings<GameText>({
       "Dynamo": { name: "Singularidade", text: (v) => `Puxa a carta inimiga mais fraca de cada outro local para cá; elas perdem ${v}.`, master: () => "Suas cartas aqui ganham +1 por inimiga puxada." },
       "Graves": { name: "Lápide Emprestada", text: (v) => `No fim de cada turno, um Carniçal com ${v} de poder nasce aqui para você e outro para o inimigo (se houver espaço).`, master: () => "O Carniçal do inimigo nasce com 0 de poder." },
       "Grey Talon": { name: "Coruja Guiada", text: (v) => `Escolha uma carta inimiga em qualquer local: ela perde ${v}. Se zerar, o Grey Talon ganha +2 permanente.`, master: () => "O bônus é +4." },
-      "Haze": { name: "Adaga do Sono", text: () => "Escolha uma carta inimiga daqui para dormir: ela fica vulnerável (o próximo dano é dobrado) até o fim do próximo turno.", master: () => "Dança das Balas: no fim do próximo turno, as outras inimigas daqui perdem 3 (canalizada)." },
+      "Haze": { name: "Adaga do Sono", text: () => "Escolha uma carta inimiga daqui para dormir: ela fica vulnerável (o próximo dano é dobrado) até o fim do próximo turno.", master: () => "Dança das Balas: no fim do próximo turno, a carta que ela fez dormir perde 3 (dobrado pelo sono) se ainda estiver aqui (canalizada)." },
       "Holliday": { name: "Plataforma de Salto", text: () => "Escolha uma carta inimiga daqui e um local: ela e a Holliday vão para lá.", master: () => "A inimiga perde 3." },
       "Infernus": { name: "Pós-combustão", text: (v) => `A carta inimiga mais forte daqui queima −${v} no fim deste turno e do próximo.`, master: () => "Combustão Concussiva: ela também perde a habilidade e não pode ser movida até o fim do próximo turno." },
       "Ivy": { name: "Pacto do Vigia", text: (v) => `Liga-se ao seu aliado mais forte em outro local: os dois ganham +${v}.`, master: () => "Os dois ficam imunes até o fim do próximo turno." },
@@ -255,7 +255,7 @@ export const GAME_TEXT = strings<GameText>({
       versions: "Versões", alt: (n) => `Versão de afinidade: −${n} de poder`, altPro: "Versão de afinidade: POL alto, sem perda",
       add: (name) => `Colocar ${name} no deck`, version: (name, hero) => `${name} com ${hero}`, empty: "Nenhum jogador encontrado.",
       aiNote: "A IA monta um deck com o mesmo OVR médio e curva parecida.",
-      defaultName: (n) => `Baralho ${n}`, decks: "Seus baralhos", newDeck: "Novo baralho", maxDecks: (n) => `Limite de ${n} baralhos.`, rename: "Nome do baralho",
+      defaultName: (n) => `Baralho ${n}`, dupHero: (hero) => `Seu baralho já tem ${hero}`, decks: "Seus baralhos", newDeck: "Novo baralho", maxDecks: (n) => `Limite de ${n} baralhos.`, rename: "Nome do baralho",
       duplicate: "Duplicar", remove: "Segure para excluir", cover: "Usar como capa", isCover: "Capa do baralho",
       left: (n) => `${pl(n, "Falta", "Faltam")} ${n} ${pl(n, "carta", "cartas")} no seu baralho`, aiLeft: (n) => `Baralho da IA: ${n} ${pl(n, "carta", "cartas")}`,
       list: "Cartas do baralho", showList: (n) => `Ver baralho (${n})`, open: (name) => `Ver detalhes de ${name}`, take: (name) => `Tirar ${name} do baralho`,
@@ -314,7 +314,7 @@ export const GAME_TEXT = strings<GameText>({
       "Dynamo": { name: "Singularity", text: (v) => `Pulls the weakest enemy card from each other location here; they lose ${v}.`, master: () => "Your cards here gain +1 per enemy pulled." },
       "Graves": { name: "Borrowed Tombstone", text: (v) => `At the end of each turn, a Ghoul with ${v} power rises here for you and another for your opponent (if there's room).`, master: () => "Your opponent's Ghoul has 0 power." },
       "Grey Talon": { name: "Guided Owl", text: (v) => `Choose an enemy card anywhere: it loses ${v}. If it drops to zero, Grey Talon gains +2 permanently.`, master: () => "The bonus is +4." },
-      "Haze": { name: "Sleep Dagger", text: () => "Choose an enemy card here to put to sleep: it becomes vulnerable (the next damage is doubled) until the end of next turn.", master: () => "Bullet Dance: at the end of next turn, the other enemies here lose 3 (channeled)." },
+      "Haze": { name: "Sleep Dagger", text: () => "Choose an enemy card here to put to sleep: it becomes vulnerable (the next damage is doubled) until the end of next turn.", master: () => "Bullet Dance: at the end of next turn, the card she put to sleep loses 3 (doubled by sleep) if it is still here (channeled)." },
       "Holliday": { name: "Bounce Pad", text: () => "Choose an enemy card here and a location: it and Holliday go there.", master: () => "The enemy loses 3." },
       "Infernus": { name: "Afterburn", text: (v) => `The strongest enemy card here burns −${v} at the end of this turn and the next.`, master: () => "Concussive Combustion: it also loses its ability and can't be moved until the end of next turn." },
       "Ivy": { name: "Watcher's Covenant", text: (v) => `Links to your strongest ally at another location: both gain +${v}.`, master: () => "Both become immune until the end of next turn." },
@@ -491,7 +491,7 @@ export const GAME_TEXT = strings<GameText>({
       versions: "Versions", alt: (n) => `Affinity version: −${n} power`, altPro: "Affinity version: high POL, no loss",
       add: (name) => `Add ${name} to the deck`, version: (name, hero) => `${name} as ${hero}`, empty: "No players found.",
       aiNote: "The AI builds a deck with the same average OVR and a similar curve.",
-      defaultName: (n) => `Deck ${n}`, decks: "Your decks", newDeck: "New deck", maxDecks: (n) => `Up to ${n} decks.`, rename: "Deck name",
+      defaultName: (n) => `Deck ${n}`, dupHero: (hero) => `Your deck already has ${hero}`, decks: "Your decks", newDeck: "New deck", maxDecks: (n) => `Up to ${n} decks.`, rename: "Deck name",
       duplicate: "Duplicate", remove: "Hold to delete", cover: "Use as cover", isCover: "Deck cover",
       left: (n) => `${n} ${pl(n, "card", "cards")} left in your deck`, aiLeft: (n) => `AI deck: ${n} ${pl(n, "card", "cards")}`,
       list: "Deck cards", showList: (n) => `Show deck (${n})`, open: (name) => `See ${name} details`, take: (name) => `Remove ${name} from the deck`,
@@ -550,7 +550,7 @@ export const GAME_TEXT = strings<GameText>({
       "Dynamo": { name: "Singularidad", text: (v) => `Atrae aquí la carta enemiga más débil de cada otro lugar; pierden ${v}.`, master: () => "Tus cartas de aquí ganan +1 por enemiga atraída." },
       "Graves": { name: "Lápida Prestada", text: (v) => `Al final de cada turno, nace aquí un Necrófago con ${v} de poder para ti y otro para el rival (si hay espacio).`, master: () => "El Necrófago del rival nace con 0 de poder." },
       "Grey Talon": { name: "Búho Guiado", text: (v) => `Elige una carta enemiga en cualquier lugar: pierde ${v}. Si queda en cero, Grey Talon gana +2 permanente.`, master: () => "El bono es +4." },
-      "Haze": { name: "Daga del Sueño", text: () => "Elige una carta enemiga de aquí para dormirla: queda vulnerable (el próximo daño se duplica) hasta el final del próximo turno.", master: () => "Danza de Balas: al final del próximo turno, las otras enemigas de aquí pierden 3 (canalizada)." },
+      "Haze": { name: "Daga del Sueño", text: () => "Elige una carta enemiga de aquí para dormirla: queda vulnerable (el próximo daño se duplica) hasta el final del próximo turno.", master: () => "Danza de Balas: al final del próximo turno, la carta que durmió pierde 3 (duplicado por el sueño) si sigue aquí (canalizada)." },
       "Holliday": { name: "Plataforma de Salto", text: () => "Elige una carta enemiga de aquí y un lugar: ella y Holliday van allí.", master: () => "La enemiga pierde 3." },
       "Infernus": { name: "Postcombustión", text: (v) => `La carta enemiga más fuerte de aquí arde −${v} al final de este turno y del próximo.`, master: () => "Combustión Contundente: también pierde su habilidad y no se puede mover hasta el final del próximo turno." },
       "Ivy": { name: "Pacto del Vigía", text: (v) => `Se une a tu aliado más fuerte en otro lugar: los dos ganan +${v}.`, master: () => "Los dos quedan inmunes hasta el final del próximo turno." },
@@ -727,7 +727,7 @@ export const GAME_TEXT = strings<GameText>({
       versions: "Versiones", alt: (n) => `Versión de afinidad: −${n} de poder`, altPro: "Versión de afinidad: POL alto, sin pérdida",
       add: (name) => `Añadir a ${name} al mazo`, version: (name, hero) => `${name} con ${hero}`, empty: "No se encontró ningún jugador.",
       aiNote: "La IA arma un mazo con el mismo OVR medio y una curva parecida.",
-      defaultName: (n) => `Mazo ${n}`, decks: "Tus mazos", newDeck: "Nuevo mazo", maxDecks: (n) => `Hasta ${n} mazos.`, rename: "Nombre del mazo",
+      defaultName: (n) => `Mazo ${n}`, dupHero: (hero) => `Tu mazo ya tiene a ${hero}`, decks: "Tus mazos", newDeck: "Nuevo mazo", maxDecks: (n) => `Hasta ${n} mazos.`, rename: "Nombre del mazo",
       duplicate: "Duplicar", remove: "Mantén para borrar", cover: "Usar de portada", isCover: "Portada del mazo",
       left: (n) => `${pl(n, "Queda", "Quedan")} ${n} ${pl(n, "carta", "cartas")} en tu mazo`, aiLeft: (n) => `Mazo de la IA: ${n} ${pl(n, "carta", "cartas")}`,
       list: "Cartas del mazo", showList: (n) => `Ver mazo (${n})`, open: (name) => `Ver detalles de ${name}`, take: (name) => `Quitar a ${name} del mazo`,

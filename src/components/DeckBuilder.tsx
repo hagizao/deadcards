@@ -9,7 +9,7 @@ import { useT } from "../lib/i18n";
 import { field, pill, primaryBtn } from "../lib/ui";
 import { ALT_MALUS, ALT_POL, cardStats, type GameConfig, type PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
-import { DECK_NAME_MAX, MAX_DECKS, fillDeck, loadBook, newDeck, resolveDeck, saveBook, versionPlayer, type DeckBook } from "../lib/game/deck";
+import { DECK_NAME_MAX, MAX_DECKS, fillDeck, heroTaken, loadBook, newDeck, resolveDeck, saveBook, versionPlayer, type DeckBook } from "../lib/game/deck";
 import { GAME_TEXT } from "../lib/game/text";
 
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text";
@@ -69,13 +69,15 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
   const tileRect = (key: string) => document.querySelector(`[data-tile="${CSS.escape(key)}"]`)?.getBoundingClientRect() ?? null;
   const toggle = (c: PoolCard, from: DOMRect | null = tileRect(c.key)) => {
     const on = inDeck.has(c.key);
-    if (!on && full) return;
+    if (!on && (full || heroTaken(deck, c))) return;
     const p = pile.current?.getBoundingClientRect() ?? null;
     if (on) fly(c, p, from);
     else fly(c, from, p);
     setCards((d) => (on ? d.filter((x) => x.key !== c.key) : [...d, c]));
   };
   const choose = (c: PoolCard) => {
+    // trocar a versão de quem está no baralho para um herói que outro jogador já usa repetiria o herói
+    if (inDeck.has(c.key) && heroTaken(deck, c)) return;
     setShown((s) => ({ ...s, [c.key]: c.id }));
     setCards((d) => d.map((x) => (x.key === c.key ? c : x)));
   };
@@ -213,6 +215,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
               {list.map((l) => {
                 const c = current(l);
                 const on = inDeck.has(c.key);
+                const taken = !on && heroTaken(deck, c);
                 return (
                   <li key={c.key} className="flex flex-col gap-1.5">
                     <div className="relative" data-tile={c.key}>
@@ -221,11 +224,12 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
                         <span className={`block rounded-xl ${on ? "ring-3 ring-game-me" : ""}`}>{face(c)}</span>
                       </motion.button>
                       <button type="button" onClick={() => toggle(c)} aria-pressed={on} aria-label={on ? t.deck.take(c.name) : t.deck.add(t.deck.version(c.name, c.hero))}
-                        disabled={!on && full} title={!on && full ? t.deck.full(DECK_SIZE) : undefined}
+                        disabled={!on && (full || taken)} title={taken ? t.deck.dupHero(c.hero) : !on && full ? t.deck.full(DECK_SIZE) : undefined}
                         className={`absolute -right-2 -bottom-2 z-10 grid size-11 cursor-pointer place-items-center rounded-full font-display text-lg font-black shadow-lg transition hover:brightness-110 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 sm:size-8 sm:text-base ${focus} ${on ? "bg-game-me text-dl-black" : "bg-dl-text text-dl-black"}`}>
                         {on ? "✓" : "+"}
                       </button>
                     </div>
+                    {taken && <span className="text-center text-[10px] leading-tight text-rose-300">{t.deck.dupHero(c.hero)}</span>}
                     {c.alt && <span className="text-center text-[10px] leading-tight text-zinc-400">{(c.stats?.POL ?? 0) >= ALT_POL ? t.deck.altPro : t.deck.alt(ALT_MALUS)}</span>}
                     {l.length > 1 && <VersionChips list={l} shown={c} onPick={(v) => { choose(v); setFocusKey(v.key); }} />}
                   </li>
@@ -239,7 +243,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
       <AnimatePresence>
         {focusList && (
           <CardFocus key="focus" versions={focusList} shown={current(focusList)} cfg={cfg} inDeck={inDeck.has(focusList[0].key)} full={full}
-            isCover={current(focusList).id === cover?.id} onShow={choose} onCover={(v) => patchCur({ cover: v.id })} onClose={closeFocus}
+            isCover={current(focusList).id === cover?.id} taken={(v) => heroTaken(deck, v)} onShow={choose} onCover={(v) => patchCur({ cover: v.id })} onClose={closeFocus}
             onToggle={(v, from) => toggle(v, from)} />
         )}
       </AnimatePresence>
