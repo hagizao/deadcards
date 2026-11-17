@@ -1,7 +1,8 @@
 // HUD do Cardslock Game: orbe de almas (como as almas que saem dos tropas no Deadlock) e o botão de fim do turno com o contador.
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import soulsIcon from "../assets/game/souls.png";
+import { setAudio, useAudio } from "../lib/game/sfx";
 
 /** Posição pseudoaleatória estável para as partículas (sem Math.random no render). */
 const rnd = (seed: number) => {
@@ -90,5 +91,57 @@ export function EndTurnButton({ label, turn, total, busy, busyLabel, ready, disa
         <span className="text-base opacity-70 sm:text-lg">/{total}</span>
       </span>
     </button>
+  );
+}
+
+type AudioText = { title: string; sfx: string; music: string; mute: (what: string, on: boolean) => string; volume: (what: string) => string; credit: string };
+
+/** Botão de áudio com o painel de volume: efeitos e música separados, cada um com mudo. */
+export function AudioMenu({ t }: { t: AudioText }) {
+  const a = useAudio();
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const out = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("pointerdown", out);
+    window.addEventListener("keydown", key);
+    return () => { window.removeEventListener("pointerdown", out); window.removeEventListener("keydown", key); };
+  }, [open]);
+  const silent = (!a.sfxOn || !a.sfx) && (!a.musicOn || !a.music);
+  const row = (name: string, v: number, on: boolean, set: (p: { v?: number; on?: boolean }) => void) => (
+    <div className="flex items-center gap-2">
+      <button type="button" onClick={() => set({ on: !on })} aria-pressed={!on} aria-label={t.mute(name, on)} title={t.mute(name, on)}
+        className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
+        <span aria-hidden="true">{on && v ? (name === t.music ? "🎵" : "🔊") : "🔇"}</span>
+      </button>
+      <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-bold tracking-wider text-zinc-300 uppercase">
+        {name}
+        <input type="range" min={0} max={100} step={5} value={Math.round(v * 100)} aria-label={t.volume(name)}
+          onChange={(e) => set({ v: Number(e.target.value) / 100, on: true })}
+          className={`h-6 w-full cursor-pointer accent-game-me disabled:cursor-not-allowed ${on ? "" : "opacity-50"} ${focus}`} />
+      </label>
+    </div>
+  );
+  return (
+    <div ref={root} className="relative">
+      <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} aria-haspopup="dialog" aria-label={t.title} title={t.title}
+        className={`grid size-11 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
+        <span aria-hidden="true">{silent ? "🔇" : "🔊"}</span>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div role="dialog" aria-label={t.title} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }}
+            className="noir-glass-strong absolute top-full right-0 z-80 flex w-64 flex-col gap-2 rounded-xl p-3 text-left normal-case shadow-2xl">
+            {row(t.sfx, a.sfx, a.sfxOn, ({ v, on }) => setAudio({ ...(v !== undefined && { sfx: v }), ...(on !== undefined && { sfxOn: on }) }))}
+            {row(t.music, a.music, a.musicOn, ({ v, on }) => setAudio({ ...(v !== undefined && { music: v }), ...(on !== undefined && { musicOn: on }) }))}
+            <p className="text-[10px] leading-snug text-zinc-400">
+              <a href="https://opengameart.org/content/midnight-on-miller-street" target="_blank" rel="noreferrer" className={`underline-offset-2 hover:text-zinc-200 hover:underline ${focus}`}>{t.credit}</a>
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

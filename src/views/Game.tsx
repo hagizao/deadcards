@@ -3,13 +3,13 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { CardBack, GameCard, TipBoxes } from "../components/GameCard";
 import { GameHand } from "../components/GameHand";
 import { TargetArrow } from "../components/TargetArrow";
-import { EndTurnButton, SoulOrb } from "../components/GameHud";
+import { AudioMenu, EndTurnButton, SoulOrb } from "../components/GameHud";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pill, primaryBtn } from "../lib/ui";
 import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, type ItemKey, type ItemSlot } from "../lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
-import { setMuted, sfx, thump, useMuted } from "../lib/game/sfx";
+import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
 
@@ -70,10 +70,18 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     setFull(true);
     document.documentElement.requestFullscreen?.().catch(() => {});
   };
-  const muted = useMuted();
+  // música: começa no primeiro gesto na partida (o navegador bloqueia som automático) e sai em fade ao deixar a tela
+  useEffect(() => {
+    const go = () => startMusic();
+    window.addEventListener("pointerdown", go, { once: true });
+    window.addEventListener("keydown", go, { once: true });
+    return () => { window.removeEventListener("pointerdown", go); window.removeEventListener("keydown", go); stopMusic(); };
+  }, []);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(() => ({ id: 0, text: t.ui.toast.turn(1) }));
   const [result, setResult] = useState<Result | null>(null);
   const [showEnd, setShowEnd] = useState(false);
+  // a música abaixa por baixo do resultado da partida
+  useEffect(() => { duckMusic(showEnd); }, [showEnd]);
   // escolha de alvo ao jogar, movimento ou marca do Shiv em andamento
   const [mode, setMode] = useState<Mode | null>(null);
   // carta sendo arrastada da mão e o local sob o cursor
@@ -280,10 +288,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
           <span aria-hidden="true">·</span>
           <span>{t.ui.record(record.w, record.l)}</span>
           <span className="flex">
-            <button type="button" onClick={() => setMuted(!muted)} aria-label={t.ui.sound(!muted)} aria-pressed={muted}
-              className={`grid size-11 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
-              <span aria-hidden="true">{muted ? "🔇" : "🔊"}</span>
-            </button>
+            <AudioMenu t={t.ui.audio} />
             <button type="button" onClick={toggleFull} aria-label={t.ui.fullscreen(full)} aria-pressed={full} title={t.ui.fullscreen(full)}
               className={`grid size-11 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
               <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden="true">

@@ -43,7 +43,8 @@ export type GameText = {
     /** O que cada status faz (caixa ao lado da carta ampliada). */
     statusTip: Record<keyof GameText["ui"]["status"], string>;
     aiHand: (n: number) => string; dropHere: (loc: string) => string;
-    revealing: string; sound: (on: boolean) => string; aim: string; fullscreen: (on: boolean) => string;
+    revealing: string; aim: string;
+    audio: { title: string; sfx: string; music: string; mute: (what: string, on: boolean) => string; volume: (what: string) => string; credit: string }; fullscreen: (on: boolean) => string;
   };
 };
 
@@ -260,7 +261,11 @@ export const GAME_TEXT = strings<GameText>({
         root: "Não pode ser movida neste turno.", exec: "Pode marcar uma inimiga aqui para executar.",
       },
       aiHand: (n) => `Mão da IA: ${n} ${pl(n, "carta", "cartas")}`, dropHere: (l) => `Solte para jogar em ${l}`,
-      revealing: "Revelando…", sound: (on) => (on ? "Desligar som" : "Ligar som"), aim: "Clique no alvo · Esc ou botão direito: automático", fullscreen: (on) => (on ? "Sair da tela cheia" : "Tela cheia"),
+      revealing: "Revelando…", aim: "Clique no alvo · Esc ou botão direito: automático", fullscreen: (on) => (on ? "Sair da tela cheia" : "Tela cheia"),
+      audio: {
+        title: "Áudio", sfx: "Efeitos", music: "Música", mute: (w, on) => `${on ? "Silenciar" : "Ativar"} ${w.toLowerCase()}`, volume: (w) => `Volume: ${w.toLowerCase()}`,
+        credit: "Música: “Midnight on Miller Street”, de tcarisland (CC BY 4.0)",
+      },
     },
   },
   en: {
@@ -472,7 +477,11 @@ export const GAME_TEXT = strings<GameText>({
         root: "Can't be moved this turn.", exec: "Can mark an enemy here for execution.",
       },
       aiHand: (n) => `AI hand: ${n} ${pl(n, "card", "cards")}`, dropHere: (l) => `Drop to play at ${l}`,
-      revealing: "Revealing…", sound: (on) => (on ? "Mute sound" : "Unmute sound"), aim: "Click the target · Esc or right-click: automatic", fullscreen: (on) => (on ? "Exit full screen" : "Full screen"),
+      revealing: "Revealing…", aim: "Click the target · Esc or right-click: automatic", fullscreen: (on) => (on ? "Exit full screen" : "Full screen"),
+      audio: {
+        title: "Audio", sfx: "Effects", music: "Music", mute: (w, on) => `${on ? "Mute" : "Unmute"} ${w.toLowerCase()}`, volume: (w) => `${w} volume`,
+        credit: "Music: “Midnight on Miller Street” by tcarisland (CC BY 4.0)",
+      },
     },
   },
   es: {
@@ -684,7 +693,11 @@ export const GAME_TEXT = strings<GameText>({
         root: "No se puede mover este turno.", exec: "Puede marcar una enemiga aquí para ejecutarla.",
       },
       aiHand: (n) => `Mano de la IA: ${n} ${pl(n, "carta", "cartas")}`, dropHere: (l) => `Suelta para jugar en ${l}`,
-      revealing: "Revelando…", sound: (on) => (on ? "Silenciar" : "Activar sonido"), aim: "Haz clic en el objetivo · Esc o botón derecho: automático", fullscreen: (on) => (on ? "Salir de pantalla completa" : "Pantalla completa"),
+      revealing: "Revelando…", aim: "Haz clic en el objetivo · Esc o botón derecho: automático", fullscreen: (on) => (on ? "Salir de pantalla completa" : "Pantalla completa"),
+      audio: {
+        title: "Audio", sfx: "Efectos", music: "Música", mute: (w, on) => `${on ? "Silenciar" : "Activar"} ${w.toLowerCase()}`, volume: (w) => `Volumen: ${w.toLowerCase()}`,
+        credit: "Música: «Midnight on Miller Street», de tcarisland (CC BY 4.0)",
+      },
     },
   },
 });
