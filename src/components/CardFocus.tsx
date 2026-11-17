@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GameCard } from "./GameCard";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
@@ -26,6 +26,9 @@ type Props = {
   isCover: boolean;
   /** O herói da versão já está no baralho em outro jogador. */
   taken: (v: PoolCard) => boolean;
+  /** Carta do baralho que já usa o herói da versão mostrada. */
+  holder?: PoolCard;
+  onSwap: (v: PoolCard, from: DOMRect | null) => void;
   onShow: (v: PoolCard) => void;
   onToggle: (v: PoolCard, from: DOMRect | null) => void;
   onCover: (v: PoolCard) => void;
@@ -36,7 +39,7 @@ type Props = {
  * Carta em destaque na montagem do baralho: a carta grande com o texto da habilidade, os heróis do jogador para trocar de versão
  * (o texto troca junto) e, em letra pequena, de onde vem o poder dela.
  */
-export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, taken, onShow, onToggle, onCover, onClose }: Props) {
+export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, taken, holder, onSwap, onShow, onToggle, onCover, onClose }: Props) {
   const t = useT(GAME_TEXT);
   const { players, heroIcon } = useData();
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
@@ -98,14 +101,14 @@ export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, taken, 
                 {versions.map((v) => {
                   const vs = cardStats(v, cfg.cards, cfg.heroes);
                   const on = v.id === shown.id;
-                  const blocked = inDeck && taken(v);
+                  const dup = taken(v);
                   const icon = heroIcon(v.hero);
                   return (
-                    <button key={v.id} type="button" onClick={() => onShow(v)} aria-pressed={on} aria-label={t.deck.version(v.name, v.hero)} disabled={blocked} title={blocked ? t.deck.dupHero(v.hero) : undefined}
-                      className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg py-1 pr-3 pl-1 text-left transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${focus} ${on ? "bg-dl-text text-dl-black" : "bg-zinc-900/80 text-zinc-200 hover:bg-zinc-800"}`}>
+                    <button key={v.id} type="button" onClick={() => onShow(v)} aria-pressed={on} aria-label={t.deck.version(v.name, v.hero)} title={dup ? t.deck.dupHero(v.hero) : undefined}
+                      className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg py-1 pr-3 pl-1 text-left transition active:scale-95 ${focus} ${on ? "bg-dl-text text-dl-black" : "bg-zinc-900/80 text-zinc-200 hover:bg-zinc-800"}`}>
                       {icon ? <img src={icon} alt="" className="size-8 rounded-md object-cover" /> : <span className="size-8" />}
                       <span className="flex flex-col leading-tight">
-                        <span className="text-xs font-bold">{v.hero}</span>
+                        <span className="text-xs font-bold">{v.hero}{dup && <span className={on ? "text-rose-700" : "text-rose-300"} aria-hidden="true"> ⇄</span>}</span>
                         <span className={`text-[10px] ${on ? "text-dl-black/70" : "text-zinc-400"}`}>{vs.cost} · {vs.power}</span>
                       </span>
                     </button>
@@ -137,7 +140,7 @@ export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, taken, 
             </ul>
           </section>
 
-          {!inDeck && taken(shown) && <p className="text-xs text-rose-300">{t.deck.dupHero(shown.hero)}</p>}
+          {holder ? <SwapPanel holder={holder} shown={shown} cfg={cfg} onSwap={() => onSwap(shown, cardRef.current?.getBoundingClientRect() ?? null)} /> : (
           <div className="flex flex-wrap gap-2">
             <button type="button" className={primaryBtn} disabled={!inDeck && (full || taken(shown))}
               title={!inDeck && taken(shown) ? t.deck.dupHero(shown.hero) : !inDeck && full ? t.deck.full(DECK_SIZE) : undefined}
@@ -150,8 +153,50 @@ export function CardFocus({ versions, shown, cfg, inDeck, full, isCover, taken, 
               </button>
             )}
           </div>
+          )}
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/**
+ * Herói repetido: a carta do baralho que usa o herói, uma seta e a carta mostrada. Ao trocar, as duas cruzam de lugar
+ * antes de a troca valer (direto, com movimento reduzido).
+ */
+function SwapPanel({ holder, shown, cfg, onSwap }: { holder: PoolCard; shown: PoolCard; cfg: GameConfig; onSwap: () => void }) {
+  const t = useT(GAME_TEXT);
+  const { players } = useData();
+  const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  const still = useReducedMotion();
+  const [going, setGoing] = useState(false);
+  const mini = (c: PoolCard, dx: 1 | -1) => {
+    const s = cardStats(c, cfg.cards, cfg.heroes);
+    return (
+      <motion.figure className="flex w-16 flex-col items-center gap-1 sm:w-20" animate={going ? { x: `${dx * 165}%`, rotate: dx * 6 } : { x: 0, rotate: 0 }}
+        transition={{ duration: 0.26, ease: "easeInOut" }}>
+        <div className="w-full"><GameCard player={versionPlayer(byId, c)} name={c.name} cost={s.cost} power={s.power} base={s.power} text={null} /></div>
+        <figcaption className="max-w-full truncate text-[10px] font-bold text-zinc-300">{c.name}</figcaption>
+      </motion.figure>
+    );
+  };
+  const go = () => {
+    if (going) return;
+    if (still) return onSwap();
+    setGoing(true);
+    window.setTimeout(onSwap, 280);
+  };
+  return (
+    <section aria-labelledby="swap-title" className="flex flex-col gap-3 rounded-xl bg-rose-950/35 p-3">
+      <h3 id="swap-title" className="text-[11px] font-bold tracking-[0.18em] text-rose-200 uppercase">{t.deck.swapTitle} · {t.deck.dupHero(shown.hero)}</h3>
+      <div className="flex items-center justify-center gap-3 sm:gap-5">
+        {mini(holder, 1)}
+        <motion.span aria-hidden="true" className="font-display text-2xl text-rose-200"
+          animate={still || going ? { x: 0, opacity: going ? 0 : 1 } : { x: [-4, 4, -4] }} transition={still || going ? { duration: 0.15 } : { duration: 1.4, repeat: Infinity, ease: "easeInOut" }}>⇄</motion.span>
+        {mini(shown, -1)}
+      </div>
+      <button type="button" className={primaryBtn} onClick={go} disabled={going}>{t.deck.swapBtn(shown.hero, holder.name)}</button>
+      <p className="text-[11px] text-zinc-400">{t.deck.swapNote}</p>
+    </section>
   );
 }

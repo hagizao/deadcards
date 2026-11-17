@@ -2,14 +2,16 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CardFocus } from "./CardFocus";
 import { DeckPile } from "./DeckPile";
-import { GameCard } from "./GameCard";
+import { CardBack, GameCard } from "./GameCard";
 import { HoldButton } from "./HoldButton";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { field, pill, primaryBtn } from "../lib/ui";
 import { ALT_MALUS, ALT_POL, cardStats, type GameConfig, type PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
-import { DECK_NAME_MAX, MAX_DECKS, fillDeck, heroTaken, loadBook, newDeck, resolveDeck, saveBook, versionPlayer, type DeckBook } from "../lib/game/deck";
+import {
+  DECK_LOOKS, DECK_NAME_MAX, MAX_DECKS, fillDeck, heroHolder, heroTaken, loadBook, newDeck, resolveDeck, saveBook, swapHero, versionPlayer, type DeckBook, type DeckLook,
+} from "../lib/game/deck";
 import { GAME_TEXT } from "../lib/game/text";
 
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text";
@@ -23,7 +25,7 @@ let flightSeq = 0;
  * Tela antes da partida: os baralhos salvos (como no Marvel Snap), o baralho escolhido como uma pilha de verdade e a coleção.
  * Tocar numa carta abre a carta em destaque; o botão do canto põe ou tira do baralho, com a carta voando até a pilha.
  */
-export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, PoolCard[]>; cfg: GameConfig; onPlay: (deck: PoolCard[]) => void }) {
+export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, PoolCard[]>; cfg: GameConfig; onPlay: (deck: PoolCard[], look: DeckLook) => void }) {
   const t = useT(GAME_TEXT);
   const { players } = useData();
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
@@ -35,6 +37,8 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
   const [shown, setShown] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
   const [focusKey, setFocusKey] = useState<string | null>(null);
+  // versão vista na carta em destaque: pode ser uma de herói repetido, só para ver e trocar
+  const [focusId, setFocusId] = useState<string | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [flights, setFlights] = useState<Flight[]>([]);
   const pile = useRef<HTMLButtonElement>(null);
@@ -52,6 +56,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
   const sorted = [...deck].sort((a, b) => stats(a).cost - stats(b).cost || a.name.localeCompare(b.name));
   const coverOf = (cards: PoolCard[], id?: string) => cards.find((c) => c.id === id) ?? [...cards].sort((a, b) => stats(b).cost - stats(a).cost || b.ovr - a.ovr)[0];
   const cover = coverOf(deck, cur.cover);
+  const look: DeckLook = cur.look ?? "noir";
 
   const current = (l: PoolCard[]) => inDeck.get(l[0].key) ?? l.find((c) => c.id === shown[l[0].key]) ?? l[0];
   const setCards = (fn: (d: PoolCard[]) => PoolCard[]) =>
@@ -93,10 +98,26 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
     return { decks, current: decks[0].id };
   });
   const focusList = focusKey ? versions.get(focusKey) : undefined;
+  const focusShown = focusList && (focusList.find((v) => v.id === focusId) ?? current(focusList));
+  const openFocus = (key: string) => { setFocusKey(key); setFocusId(null); };
   const closeFocus = useCallback(() => setFocusKey(null), []);
+  const showVersion = (v: PoolCard) => {
+    setFocusId(v.id);
+    if (!heroTaken(deck, v)) choose(v);
+  };
+  /** Troca a carta do baralho que usa o herói de v por v, com as duas voando entre a pilha e a coleção. */
+  const swap = (v: PoolCard, from: DOMRect | null) => {
+    const holder = heroHolder(deck, v);
+    if (!holder) return;
+    const p = pile.current?.getBoundingClientRect() ?? null;
+    fly(v, from, p);
+    fly(holder, p, tileRect(holder.key));
+    setShown((s) => ({ ...s, [v.key]: v.id }));
+    setCards((d) => swapHero(d, v));
+  };
 
   const playBar = (
-    <button type="button" className={`${primaryBtn} min-h-12 px-8 text-sm`} disabled={!full} onClick={() => onPlay(deck)}>{t.deck.play}</button>
+    <button type="button" className={`${primaryBtn} min-h-12 px-8 text-sm`} disabled={!full} onClick={() => onPlay(deck, look)}>{t.deck.play}</button>
   );
 
   return (
@@ -109,18 +130,23 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
       {/* baralhos salvos */}
       <section aria-labelledby="deck-shelf" className="flex flex-col gap-2">
         <h2 id="deck-shelf" className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">{t.deck.decks}</h2>
-        <ul className="flex snap-x gap-3 overflow-x-auto pb-2">
+        <ul className="flex snap-x gap-4 overflow-x-auto px-2 pt-3 pb-2">
           {book.decks.map((d) => {
             const cards = resolveDeck(d.cards, versions);
             const cv = coverOf(cards, d.cover);
             const on = d.id === book.current;
             return (
-              <li key={d.id} className="w-24 shrink-0 snap-start sm:w-28">
+              <li key={d.id} className="w-28 shrink-0 snap-start sm:w-36">
                 <button type="button" onClick={() => setBook((b) => ({ ...b, current: d.id }))} aria-pressed={on} aria-label={`${d.name} · ${t.deck.cards(cards.length)}`}
                   className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-xl p-1.5 text-left transition active:scale-95 ${focus} ${on ? "bg-white/12" : "opacity-75 hover:bg-white/6 hover:opacity-100"}`}>
                   {/* o brilho da moldura (pseudo-elementos da carta) vaza para baixo e criava rolagem vertical na prateleira: corta só na miniatura */}
-                  <span className={`block overflow-clip rounded-lg ${on ? "ring-2 ring-game-me" : ""}`}>
-                    {cv ? face(cv) : <span className="flex aspect-295/430 items-center justify-center rounded-lg bg-black/30 text-xs text-zinc-500">{t.deck.emptyDeck}</span>}
+                  {/* baralho em leque: dois versos do estilo dele atrás da capa */}
+                  <span className="relative block">
+                    <CardBack look={d.look ?? "noir"} className="absolute inset-x-0 top-0 origin-bottom rotate-6 opacity-80" />
+                    <CardBack look={d.look ?? "noir"} className="absolute inset-x-0 top-0 origin-bottom -rotate-4" />
+                    <span className={`relative block overflow-clip rounded-lg ${on ? "ring-2 ring-game-me" : ""}`}>
+                      {cv ? face(cv) : <CardBack look={d.look ?? "noir"} />}
+                    </span>
                   </span>
                   <span className="truncate text-xs font-bold">{d.name}</span>
                   <span className={`text-[10px] ${cards.length === DECK_SIZE ? "text-game-me" : "text-zinc-400"}`}>{cards.length}/{DECK_SIZE}</span>
@@ -128,7 +154,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
               </li>
             );
           })}
-          <li className="w-24 shrink-0 snap-start sm:w-28">
+          <li className="w-28 shrink-0 snap-start sm:w-36">
             <button type="button" onClick={() => addDeck()} disabled={book.decks.length >= MAX_DECKS} title={book.decks.length >= MAX_DECKS ? t.deck.maxDecks(MAX_DECKS) : undefined}
               className={`flex aspect-295/430 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-black/30 text-zinc-300 transition hover:bg-white/8 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${focus}`}>
               <span className="font-display text-3xl leading-none" aria-hidden="true">+</span>
@@ -142,7 +168,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
         {/* baralho atual: pilha, nome, curva, lista e jogar */}
         <aside aria-label={cur.name} className="noir-glass sticky top-2 z-20 flex flex-col gap-3 rounded-2xl p-3 lg:order-last lg:w-80 lg:shrink-0">
           <div className="flex items-center gap-3">
-            <DeckPile ref={pile} n={deck.length} label={t.deck.left(DECK_SIZE - deck.length)} tipSide="bottom" className="w-11 sm:w-14" out={{ x: 0, y: -40 }} />
+            <DeckPile ref={pile} n={deck.length} look={look} label={t.deck.left(DECK_SIZE - deck.length)} tipSide="bottom" className="w-16 sm:w-20 lg:w-24" out={{ x: 0, y: -40 }} />
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate font-display text-base font-extrabold">{cur.name}</span>
               <span className="text-xs text-zinc-400" aria-live="polite">{t.deck.count(deck.length, DECK_SIZE)}{deck.length ? ` · ${t.deck.avg(avg)}` : ""}</span>
@@ -154,6 +180,17 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
           </button>
 
           <div id="deck-panel" className={`${listOpen ? "flex" : "hidden"} max-h-[60dvh] flex-col gap-3 overflow-y-auto lg:flex lg:max-h-[calc(100dvh-9rem)]`}>
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="pb-1.5 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">{t.deck.look}: <span className="text-zinc-200">{t.deck.looks[look]}</span></legend>
+              <div className="flex gap-2">
+                {DECK_LOOKS.map((k) => (
+                  <button key={k} type="button" onClick={() => patchCur({ look: k })} aria-pressed={k === look} aria-label={t.deck.looks[k]} title={t.deck.looks[k]}
+                    className={`min-w-0 flex-1 cursor-pointer rounded-md p-0.5 transition hover:-translate-y-0.5 active:scale-95 motion-reduce:hover:translate-y-0 ${focus} ${k === look ? "bg-dl-text/80" : "opacity-70 hover:opacity-100"}`}>
+                    <CardBack look={k} />
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <label className="flex flex-col gap-1 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
               {t.deck.rename}
               <input className={field} maxLength={DECK_NAME_MAX} value={cur.name}
@@ -177,7 +214,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
                   return (
                     <motion.li key={c.key} layout={!still} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}
                       className="flex items-center gap-1 rounded-lg bg-black/30">
-                      <button type="button" onClick={() => setFocusKey(c.key)} aria-label={t.deck.open(c.name)}
+                      <button type="button" onClick={() => openFocus(c.key)} aria-label={t.deck.open(c.name)}
                         className={`flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm transition hover:bg-white/8 active:bg-white/12 sm:min-h-9 ${focus}`}>
                         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 font-display text-xs font-extrabold text-white">{s.cost}</span>
                         <span className="min-w-0 flex-1 truncate font-bold">{c.name}</span>
@@ -219,19 +256,29 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
                 return (
                   <li key={c.key} className="flex flex-col gap-1.5">
                     <div className="relative" data-tile={c.key}>
-                      <motion.button type="button" onClick={() => setFocusKey(c.key)} aria-label={t.deck.open(t.deck.version(c.name, c.hero))} whileTap={{ scale: 0.96 }}
-                        className={`block w-full cursor-pointer rounded-xl transition-[filter,opacity] duration-150 hover:brightness-110 ${focus} ${on ? "" : "opacity-80"}`}>
+                      {l.length > 1 && (
+                        <>
+                          <span aria-hidden="true" className="card-stack-edge absolute inset-1 origin-bottom rotate-4 bg-zinc-400/30" />
+                          <span aria-hidden="true" className="card-stack-edge absolute inset-1 origin-bottom -rotate-3 bg-zinc-300/40" />
+                        </>
+                      )}
+                      <motion.button type="button" onClick={() => openFocus(c.key)} aria-label={`${t.deck.open(t.deck.version(c.name, c.hero))}${l.length > 1 ? ` · ${t.deck.moreHeroes(l.length - 1)}` : ""}`} whileTap={{ scale: 0.96 }}
+                        className={`relative block w-full cursor-pointer rounded-xl transition-[filter,opacity] duration-150 hover:brightness-110 ${focus} ${on ? "" : "opacity-80"}`}>
                         <span className={`block rounded-xl ${on ? "ring-3 ring-game-me" : ""}`}>{face(c)}</span>
                       </motion.button>
-                      <button type="button" onClick={() => toggle(c)} aria-pressed={on} aria-label={on ? t.deck.take(c.name) : t.deck.add(t.deck.version(c.name, c.hero))}
-                        disabled={!on && (full || taken)} title={taken ? t.deck.dupHero(c.hero) : !on && full ? t.deck.full(DECK_SIZE) : undefined}
+                      <button type="button" onClick={() => (taken ? openFocus(c.key) : toggle(c))} aria-pressed={on} aria-label={on ? t.deck.take(c.name) : t.deck.add(t.deck.version(c.name, c.hero))}
+                        disabled={!on && full && !taken} title={taken ? t.deck.dupHero(c.hero) : !on && full ? t.deck.full(DECK_SIZE) : undefined}
                         className={`absolute -right-2 -bottom-2 z-10 grid size-11 cursor-pointer place-items-center rounded-full font-display text-lg font-black shadow-lg transition hover:brightness-110 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 sm:size-8 sm:text-base ${focus} ${on ? "bg-game-me text-dl-black" : "bg-dl-text text-dl-black"}`}>
                         {on ? "✓" : "+"}
                       </button>
                     </div>
                     {taken && <span className="text-center text-[10px] leading-tight text-rose-300">{t.deck.dupHero(c.hero)}</span>}
                     {c.alt && <span className="text-center text-[10px] leading-tight text-zinc-400">{(c.stats?.POL ?? 0) >= ALT_POL ? t.deck.altPro : t.deck.alt(ALT_MALUS)}</span>}
-                    {l.length > 1 && <VersionChips list={l} shown={c} onPick={(v) => { choose(v); setFocusKey(v.key); }} />}
+                    {l.length > 1 && (
+                      <span aria-hidden="true" className="flex items-center justify-center gap-1 text-[11px] font-bold text-zinc-400">
+                        <span className="text-zinc-500">⇄</span>{t.deck.moreHeroes(l.length - 1)}
+                      </span>
+                    )}
                   </li>
                 );
               })}
@@ -242,9 +289,9 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
 
       <AnimatePresence>
         {focusList && (
-          <CardFocus key="focus" versions={focusList} shown={current(focusList)} cfg={cfg} inDeck={inDeck.has(focusList[0].key)} full={full}
-            isCover={current(focusList).id === cover?.id} taken={(v) => heroTaken(deck, v)} onShow={choose} onCover={(v) => patchCur({ cover: v.id })} onClose={closeFocus}
-            onToggle={(v, from) => toggle(v, from)} />
+          <CardFocus key="focus" versions={focusList} shown={focusShown ?? focusList[0]} cfg={cfg} inDeck={inDeck.has(focusList[0].key)} full={full}
+            isCover={focusShown?.id === cover?.id} taken={(v) => heroTaken(deck, v)} holder={focusShown && heroHolder(deck, focusShown)}
+            onShow={showVersion} onSwap={swap} onCover={(v) => patchCur({ cover: v.id })} onClose={closeFocus} onToggle={(v, from) => toggle(v, from)} />
         )}
       </AnimatePresence>
 
@@ -264,21 +311,3 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
   );
 }
 
-/** Heróis do jogador embaixo da carta: escolher um abre a carta em destaque nessa versão. */
-function VersionChips({ list, shown, onPick }: { list: PoolCard[]; shown: PoolCard; onPick: (v: PoolCard) => void }) {
-  const t = useT(GAME_TEXT);
-  const { heroIcon } = useData();
-  return (
-    <div role="group" aria-label={`${t.deck.versions}: ${shown.name}`} className="flex flex-wrap justify-center gap-1">
-      {list.map((v) => {
-        const icon = heroIcon(v.hero);
-        return (
-          <button key={v.id} type="button" onClick={() => onPick(v)} aria-pressed={v.id === shown.id} title={t.deck.version(v.name, v.hero)} aria-label={t.deck.version(v.name, v.hero)}
-            className={`size-11 cursor-pointer overflow-hidden rounded-md bg-zinc-900 transition hover:brightness-125 active:scale-95 sm:size-8 ${focus} ${v.id === shown.id ? "ring-2 ring-dl-text" : "opacity-60"}`}>
-            {icon ? <img src={icon} alt="" className="size-full object-cover" loading="lazy" /> : <span className="text-[9px]">{v.hero.slice(0, 3)}</span>}
-          </button>
-        );
-      })}
-    </div>
-  );
-}

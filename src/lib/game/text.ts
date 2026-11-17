@@ -2,6 +2,7 @@
 import { strings } from "../i18n";
 import type { AbilityKey, AbilityKind, ItemKey, ItemSlot, LocType, StatKey } from "./config";
 import type { LogEntry, LogKey, Token } from "./engine";
+import type { DeckLook } from "./deck";
 
 type V = (v: number) => string;
 type LocText = { label: string; text: (l: { v: number; n: number }) => string };
@@ -35,6 +36,8 @@ export type GameText = {
     open: (name: string) => string; take: (name: string) => string; addBtn: string; takeBtn: string; close: string; heroes: string; why: string;
     parts: { hero: (hero: string) => string; ovr: (ovr: number, half: boolean) => string; alt: string; floor: string; admin: string };
     costFrom: (hero: string) => string; vBonus: (at: number) => string; mastery: (stat: string, v: number, level: string) => string; emptyDeck: string; cards: (n: number) => string;
+    moreHeroes: (n: number) => string; swapTitle: string; swapBtn: (hero: string, holder: string) => string; swapNote: string;
+    look: string; looks: Record<DeckLook, string>;
   };
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
@@ -263,6 +266,9 @@ export const GAME_TEXT = strings<GameText>({
       parts: { hero: (hero) => `Base de ${hero}`, ovr: (ovr, half) => `OVR ${ovr}${half ? " (metade: perfil habilidade)" : ""}`, alt: "Fora do herói principal", floor: "Mínimo de 1", admin: "Ajuste do admin" },
       costFrom: (hero) => `Custo de ${hero}`, vBonus: (at) => `Habilidade +1 com OVR ${at}+`, mastery: (stat, v, level) => `${stat} ${v}: chega a ${level}`,
       emptyDeck: "Baralho vazio", cards: (n) => `${n} ${pl(n, "carta", "cartas")}`,
+      moreHeroes: (n) => `+${n} ${pl(n, "herói", "heróis")}`, swapTitle: "Herói repetido", swapBtn: (hero, holder) => `Trocar ${hero} de ${holder} por esta`,
+      swapNote: "A carta nova entra no lugar da antiga.",
+      look: "Verso do baralho", looks: { noir: "Noir", deco: "Art Déco", sepia: "Sépia", amber: "Mão Âmbar", sapphire: "Chama Safira" },
     },
     ui: {
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
@@ -499,6 +505,9 @@ export const GAME_TEXT = strings<GameText>({
       parts: { hero: (hero) => `${hero} base`, ovr: (ovr, half) => `OVR ${ovr}${half ? " (half: ability profile)" : ""}`, alt: "Off their main hero", floor: "Minimum of 1", admin: "Admin tweak" },
       costFrom: (hero) => `${hero} cost`, vBonus: (at) => `Ability +1 at OVR ${at}+`, mastery: (stat, v, level) => `${stat} ${v}: reaches ${level}`,
       emptyDeck: "Empty deck", cards: (n) => `${n} ${pl(n, "card", "cards")}`,
+      moreHeroes: (n) => `+${n} ${pl(n, "hero", "heroes")}`, swapTitle: "Repeated hero", swapBtn: (hero, holder) => `Swap ${holder}’s ${hero} for this one`,
+      swapNote: "The new card takes the old one’s place.",
+      look: "Deck back", looks: { noir: "Noir", deco: "Art Deco", sepia: "Sepia", amber: "Amber Hand", sapphire: "Sapphire Flame" },
     },
     ui: {
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
@@ -735,6 +744,9 @@ export const GAME_TEXT = strings<GameText>({
       parts: { hero: (hero) => `Base de ${hero}`, ovr: (ovr, half) => `OVR ${ovr}${half ? " (mitad: perfil habilidad)" : ""}`, alt: "Fuera de su héroe principal", floor: "Mínimo de 1", admin: "Ajuste del admin" },
       costFrom: (hero) => `Coste de ${hero}`, vBonus: (at) => `Habilidad +1 con OVR ${at}+`, mastery: (stat, v, level) => `${stat} ${v}: llega a ${level}`,
       emptyDeck: "Mazo vacío", cards: (n) => `${n} ${pl(n, "carta", "cartas")}`,
+      moreHeroes: (n) => `+${n} ${pl(n, "héroe", "héroes")}`, swapTitle: "Héroe repetido", swapBtn: (hero, holder) => `Cambiar ${hero} de ${holder} por esta`,
+      swapNote: "La carta nueva entra en el lugar de la antigua.",
+      look: "Reverso del mazo", looks: { noir: "Noir", deco: "Art Déco", sepia: "Sepia", amber: "Mano Ámbar", sapphire: "Llama Zafiro" },
     },
     ui: {
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",

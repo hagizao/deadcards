@@ -5,6 +5,7 @@ import { playerArt } from "../lib/cards";
 import { useData } from "../lib/data";
 import { getCardTier, rarityStyleVars } from "../lib/rarity";
 import type { Player } from "../lib/types";
+import type { DeckLook } from "../lib/game/deck";
 import { CardArt } from "./Card";
 
 export type GameCardText = { name: string; kind: string; body: string; master?: string; masterLabel: string };
@@ -110,7 +111,32 @@ function PowerGem({ power, base }: { power: number; base: number }) {
 
 /** Verso da carta (cartas viradas da IA e a mão dela). */
 /** Verso da carta; `tone` pinta o losango com a cor do lado (IA por padrão). */
-export function CardBack({ className = "", tone = "ai" }: { className?: string; tone?: "me" | "ai" }) {
+/** Classe de cada verso de baralho (cards.css). */
+const LOOK: Record<DeckLook, string> = { noir: "deck-look-noir", deco: "deck-look-deco", sepia: "deck-look-sepia", amber: "deck-look-amber", sapphire: "deck-look-sapphire" };
+
+export function CardBack({ className = "", tone = "ai", look }: { className?: string; tone?: "me" | "ai"; look?: DeckLook }) {
+  if (look) {
+    return (
+      <div className={`@container aspect-295/430 ${LOOK[look]} ${className}`}>
+        <div className="deadlock-card-shell size-full">
+          <div className="deadlock-card-inner deck-back">
+            {/* moldura e emblema em traço, na cor do verso (currentColor) */}
+            <svg viewBox="0 0 295 430" className="absolute inset-0 size-full" aria-hidden="true" fill="none" stroke="currentColor">
+              <polygon points="14,14 281,14 281,370 147.5,415 14,370" strokeWidth="2" opacity="0.7" />
+              <polygon points="22,22 273,22 273,364 147.5,406 22,364" strokeWidth="1" opacity="0.35" />
+              <g transform="translate(147.5 200)">
+                <circle r="58" strokeWidth="1.5" opacity="0.45" />
+                <circle r="46" strokeWidth="1" opacity="0.3" />
+                <path d="M0 -40 L28 0 L0 40 L-28 0 Z" strokeWidth="3" />
+                <path d="M0 -22 L15 0 L0 22 L-15 0 Z" fill="currentColor" stroke="none" />
+                <path d="M0 -58 V-74 M0 58 V74 M-58 0 H-74 M58 0 H74" strokeWidth="2" opacity="0.7" />
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={`@container aspect-295/430 ${className}`}>
       <div className="deadlock-card-shell size-full">

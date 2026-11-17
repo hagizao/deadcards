@@ -10,7 +10,7 @@ import { pill, primaryBtn } from "../lib/ui";
 import { ABILITIES, ITEMS, gameConfig, phaseOf, type ItemKey, type ItemSlot, type PoolCard } from "../lib/game/config";
 import { DeckBuilder } from "../components/DeckBuilder";
 import { DeckPile } from "../components/DeckPile";
-import { versionPlayer } from "../lib/game/deck";
+import { versionPlayer, type DeckLook } from "../lib/game/deck";
 import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
 import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
@@ -43,13 +43,13 @@ export function Game() {
   const versions = useMemo(() => cardVersions(players), [players]);
   const pool = useMemo(() => cardPool(players), [players]);
   // deck escolhido na tela de deck; null = mostrar a tela
-  const [deck, setDeck] = useState<PoolCard[] | null>(null);
+  const [deck, setDeck] = useState<{ cards: PoolCard[]; look?: DeckLook } | null>(null);
   if (pool.length < MIN_POOL) return <p className="text-sm text-zinc-300">{t.ui.needCards(MIN_POOL)}</p>;
-  if (!deck) return <DeckBuilder versions={versions} cfg={cfg} onPlay={setDeck} />;
-  return <Board key={JSON.stringify(cfg)} newMatch={() => new Match(cfg, pool, Math.random, { p: deck })} onDeck={() => setDeck(null)} />;
+  if (!deck) return <DeckBuilder versions={versions} cfg={cfg} onPlay={(cards, look) => setDeck({ cards, look })} />;
+  return <Board key={JSON.stringify(cfg)} newMatch={() => new Match(cfg, pool, Math.random, { p: deck.cards })} deckLook={deck.look} onDeck={() => setDeck(null)} />;
 }
 
-function Board({ newMatch, onDeck }: { newMatch: () => Match; onDeck: () => void }) {
+function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook?: DeckLook; onDeck: () => void }) {
   const t = useT(GAME_TEXT);
   const { players } = useData();
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
@@ -400,7 +400,7 @@ function Board({ newMatch, onDeck }: { newMatch: () => Match; onDeck: () => void
             onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => { if (c && !drag) sfx("grab", 0.7); setDrag(c ? { c, over } : null); }} />
         </section>
         <div className="flex shrink-0 items-end gap-2 pb-1">
-          <DeckPile n={m.deck.length} label={t.deck.left(m.deck.length)} tipSide="top" out={{ x: -120, y: 0 }} className="w-10 sm:w-14" />
+          <DeckPile n={m.deck.length} look={deckLook} label={t.deck.left(m.deck.length)} tipSide="top" out={{ x: -120, y: 0 }} className="w-10 sm:w-14" />
           {result && !showEnd
             ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
             : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady}

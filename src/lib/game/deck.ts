@@ -9,8 +9,13 @@ export const DECKS_KEY = "cardslock-decks";
 export const MAX_DECKS = 12;
 export const DECK_NAME_MAX = 24;
 
-/** Baralho salvo: ids das versões escolhidas e a carta de capa. */
-export type SavedDeck = { id: string; name: string; cards: string[]; cover?: string };
+/** Versos do baralho (desenhados em cards.css). */
+export const DECK_LOOKS = ["noir", "deco", "sepia", "amber", "sapphire"] as const;
+export type DeckLook = (typeof DECK_LOOKS)[number];
+const isLook = (x: unknown): x is DeckLook => DECK_LOOKS.includes(x as DeckLook);
+
+/** Baralho salvo: ids das versões escolhidas, a carta de capa e o verso. */
+export type SavedDeck = { id: string; name: string; cards: string[]; cover?: string; look?: DeckLook };
 export type DeckBook = { decks: SavedDeck[]; current: string };
 
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -26,7 +31,7 @@ export function sanitizeBook(raw: unknown, name: (n: number) => string): DeckBoo
     seen.add(id);
     const cards = Array.isArray(d.cards) ? [...new Set(d.cards.filter((c): c is string => typeof c === "string"))].slice(0, DECK_SIZE) : [];
     const nm = typeof d.name === "string" && d.name.trim() ? d.name.trim().slice(0, DECK_NAME_MAX) : name(seen.size);
-    return [{ id, name: nm, cards, ...(typeof d.cover === "string" && cards.includes(d.cover) ? { cover: d.cover } : {}) }];
+    return [{ id, name: nm, cards, ...(typeof d.cover === "string" && cards.includes(d.cover) ? { cover: d.cover } : {}), ...(isLook(d.look) ? { look: d.look } : {}) }];
   }).slice(0, MAX_DECKS);
   if (!decks.length) decks.push(newDeck(name(1)));
   const current = typeof r.current === "string" && decks.some((d) => d.id === r.current) ? r.current : decks[0].id;
@@ -88,6 +93,18 @@ export function fillDeck(deck: PoolCard[], versions: Map<string, PoolCard[]>, rn
 
 /** O herói da versão já está no deck em outro jogador? */
 export const heroTaken = (deck: PoolCard[], c: PoolCard) => deck.some((x) => x.hero === c.hero && x.key !== c.key);
+/** Carta do deck (de outro jogador) que já usa o herói da versão. */
+export const heroHolder = (deck: PoolCard[], c: PoolCard) => deck.find((x) => x.hero === c.hero && x.key !== c.key);
+
+/**
+ * Troca a carta que usa o herói de c por c, no mesmo lugar do deck. Se o jogador de c já estava no deck com outra versão,
+ * essa versão sai (o jogador continua uma vez só).
+ */
+export function swapHero(deck: PoolCard[], c: PoolCard): PoolCard[] {
+  const holder = heroHolder(deck, c);
+  if (!holder) return deck;
+  return deck.filter((x) => x.key !== c.key).map((x) => (x.key === holder.key ? c : x));
+}
 
 /** Jogador a desenhar na carta de uma versão: a versão de afinidade usa o herói dela (e a arte do herói, não a arte própria da carta). */
 export function versionPlayer(byId: Map<string, Player>, c: { id?: string; hero: string | null }): Player | null {

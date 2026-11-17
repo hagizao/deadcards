@@ -5,7 +5,7 @@ import {
 } from "../src/lib/game/config";
 import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Side } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
-import { MAX_DECKS, fillDeck, resolveDeck, sanitizeBook, versionPlayer } from "../src/lib/game/deck";
+import { MAX_DECKS, fillDeck, heroHolder, resolveDeck, sanitizeBook, swapHero, versionPlayer } from "../src/lib/game/deck";
 
 function player(id: string, ovr: number, extra: Partial<Player> = {}): Player {
   return {
@@ -796,5 +796,30 @@ describe("sem herói repetido no baralho", () => {
       const ai = aiDeck(cardPool(list), cardPool(list).slice(0, 12), cfg, seeded(s));
       expect(new Set(ai.map((c) => c.hero)).size).toBe(ai.length);
     }
+  });
+});
+
+describe("troca de herói repetido no baralho", () => {
+  const v = (key: string, hero: string, alt = false): PoolCard => ({ id: alt ? `${key}~${hero}` : key, key, name: key, position: "Flex", hero, c1: "#000", c2: "#fff", ovr: 80, ...(alt ? { alt } : {}) });
+  it("troca a carta que usa o herói, no mesmo lugar", () => {
+    const deck = [v("a", "Haze"), v("b", "Holliday"), v("c", "Paige")];
+    const nova = v("d", "Holliday", true);
+    expect(heroHolder(deck, nova)?.key).toBe("b");
+    expect(swapHero(deck, nova).map((c) => c.id)).toEqual(["a", "d~Holliday", "c"]);
+  });
+  it("jogador que já estava no baralho com outra versão aparece uma vez só", () => {
+    const deck = [v("a", "Haze"), v("b", "Holliday"), v("c", "Paige")];
+    const out = swapHero(deck, v("a", "Holliday", true));
+    expect(out.map((c) => c.id)).toEqual(["a~Holliday", "c"]);
+    expect(new Set(out.map((c) => c.hero)).size).toBe(out.length);
+  });
+  it("sem herói repetido não muda nada", () => {
+    const deck = [v("a", "Haze")];
+    expect(swapHero(deck, v("b", "Paige"))).toBe(deck);
+  });
+  it("o verso salvo do baralho é validado", () => {
+    const b = sanitizeBook({ decks: [{ name: "x", cards: [], look: "deco" }, { name: "y", cards: [], look: "<script>" }] }, (n) => `B${n}`);
+    expect(b.decks[0].look).toBe("deco");
+    expect(b.decks[1].look).toBeUndefined();
   });
 });
