@@ -12,8 +12,9 @@ export type GameText = {
   stats: Record<StatKey, string>;
   /** Aprendiz, Profissional, Mestre. */
   levels: string[];
-  keywords: Record<StatKey, { name: string; text: string }>;
   kinds: Record<AbilityKind, string>;
+  /** Explicação de cada selo de momento (no detalhe da carta). */
+  kindTips: Record<AbilityKind, string>;
   locs: Record<LocType, LocText>;
   tokens: Record<Token, string>;
   /** Efeito de cada item (o nome fica em inglês, como no jogo e na API). */
@@ -90,7 +91,7 @@ export const GAME_TEXT = strings<GameText>({
       "Solomon": { name: "Xeque-mate", text: (v) => `Se o seu lado deste local estiver cheio, ganha +${v}.`, master: () => "Funciona com 1 carta a menos." },
       "The Doorman": { name: "Portas do Hotel", text: () => "Escolha outro local: no próximo turno, até 2 cartas suas daqui e de lá podem viajar entre os dois.", master: () => "Elas ganham +1 ao viajar." },
       "Venator": { name: "Armadilha de Mola", text: (v) => `Arma uma armadilha aqui: a próxima carta inimiga revelada neste local perde ${v}.`, master: () => "Arma uma segunda armadilha num local aleatório." },
-      "Victor": { name: "Campo de Dor", text: (v) => `Contínuo: todas as outras cartas daqui, dos dois lados, têm −${v}.`, master: () => "Só as inimigas." },
+      "Victor": { name: "Campo de Dor", text: (v) => `Todas as outras cartas daqui, dos dois lados, têm −${v}.`, master: () => "Só as inimigas." },
       "Vindicta": { name: "Assassinar", text: (v) => `Escolha uma carta inimiga em qualquer local: ela perde ${v}. Se não zerar, a Vindicta cai do céu e perde ${v}.`, master: () => "Ela não cai do céu." },
       "Violet": { name: "Natureza-morta", text: (v) => `No fim de cada turno ganha +${v} permanente para cada local que você está vencendo (até +4 no total).`, master: () => "Locais empatados contam como vencidos." },
       "Viscous": { name: "O Cubo", text: (v) => `Seu aliado mais fraco aqui (ou o próprio Viscous) fica imune a efeitos inimigos e ganha +${v}.`, master: () => "Protege também um segundo aliado daqui." },
@@ -107,15 +108,15 @@ export const GAME_TEXT = strings<GameText>({
     },
     stats: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" },
     levels: ["Aprendiz", "Profissional", "Mestre"],
-    keywords: {
-      MIR: { name: "Certeiro", text: "Efeitos de alvo aleatório acertam a inimiga mais forte." },
-      MAC: { name: "Lê o mapa", text: "+2 ao revelar num local onde você está perdendo." },
-      SUP: { name: "Jogador de equipe", text: "Ao revelar, seu aliado mais fraco aqui ganha +1." },
-      MOV: { name: "Ágil", text: "Pode se mover uma vez por partida." },
-      POL: { name: "Versátil", text: "Ao revelar, você compra 1 carta." },
-      CON: { name: "Constante", text: "Imune a queimadura." },
+    kinds: { r: "Ao revelar", c: "Constante", f: "Fim do turno", x: "Movimento", a: "Reação", "-": "" },
+    kindTips: {
+      r: "Age uma vez, quando a carta vira no fim do turno.",
+      c: "Vale o tempo todo enquanto a carta estiver no local e com a habilidade.",
+      f: "Age no fim de cada turno em que a carta estiver na mesa.",
+      x: "A carta pode se mover entre locais durante o seu turno.",
+      a: "Age quando algo acontece com a carta.",
+      "-": "",
     },
-    kinds: { r: "Ao revelar", c: "Contínuo", f: "Fim do turno", x: "Especial", "-": "" },
     locs: {
       none: { label: "Sem efeito", text: () => "Sem efeito." },
       enter: { label: "Bônus ao entrar", text: (o) => `Cartas ganham ${sg(o.v)} de poder ao entrar.` },
@@ -306,7 +307,7 @@ export const GAME_TEXT = strings<GameText>({
       "Solomon": { name: "Checkmate", text: (v) => `If your side of this location is full, gains +${v}.`, master: () => "Works with 1 card fewer." },
       "The Doorman": { name: "Hotel Doors", text: () => "Choose another location: next turn, up to 2 of your cards here and there can travel between the two.", master: () => "They gain +1 when they travel." },
       "Venator": { name: "Spring Trap", text: (v) => `Sets a trap here: the next enemy card revealed at this location loses ${v}.`, master: () => "Sets a second trap at a random location." },
-      "Victor": { name: "Pain Field", text: (v) => `Ongoing: every other card here, on both sides, has −${v}.`, master: () => "Enemies only." },
+      "Victor": { name: "Pain Field", text: (v) => `Every other card here, on both sides, has −${v}.`, master: () => "Enemies only." },
       "Vindicta": { name: "Assassinate", text: (v) => `Choose an enemy card anywhere: it loses ${v}. If it doesn't drop to zero, Vindicta falls from the sky and loses ${v}.`, master: () => "She doesn't fall." },
       "Violet": { name: "Still Life", text: (v) => `At the end of each turn, gains +${v} permanently for each location you're winning (up to +4 total).`, master: () => "Tied locations count as won." },
       "Viscous": { name: "The Cube", text: (v) => `Your weakest ally here (or Viscous himself) becomes immune to enemy effects and gains +${v}.`, master: () => "Also protects a second ally here." },
@@ -323,15 +324,15 @@ export const GAME_TEXT = strings<GameText>({
     },
     stats: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" },
     levels: ["Apprentice", "Pro", "Master"],
-    keywords: {
-      MIR: { name: "Sharpshot", text: "Random-target effects hit the strongest enemy." },
-      MAC: { name: "Map reader", text: "+2 when revealed at a location you're losing." },
-      SUP: { name: "Team player", text: "When revealed, your weakest ally here gains +1." },
-      MOV: { name: "Agile", text: "Can move once per match." },
-      POL: { name: "Versatile", text: "When revealed, you draw 1 card." },
-      CON: { name: "Steady", text: "Immune to burn." },
+    kinds: { r: "On reveal", c: "Ongoing", f: "End of turn", x: "Movement", a: "Reaction", "-": "" },
+    kindTips: {
+      r: "Acts once, when the card flips at the end of the turn.",
+      c: "Works all the time while the card is at the location and keeps its ability.",
+      f: "Acts at the end of every turn the card is on the board.",
+      x: "The card can move between locations during your turn.",
+      a: "Acts when something happens to the card.",
+      "-": "",
     },
-    kinds: { r: "On reveal", c: "Ongoing", f: "End of turn", x: "Special", "-": "" },
     locs: {
       none: { label: "No effect", text: () => "No effect." },
       enter: { label: "Bonus on entry", text: (o) => `Cards get ${sg(o.v)} power when they enter.` },
@@ -522,7 +523,7 @@ export const GAME_TEXT = strings<GameText>({
       "Solomon": { name: "Jaque Mate", text: (v) => `Si tu lado de este lugar está lleno, gana +${v}.`, master: () => "Funciona con 1 carta menos." },
       "The Doorman": { name: "Puertas del Hotel", text: () => "Elige otro lugar: el próximo turno, hasta 2 cartas tuyas de aquí y de allí pueden viajar entre los dos.", master: () => "Ganan +1 al viajar." },
       "Venator": { name: "Trampa de Resorte", text: (v) => `Coloca una trampa aquí: la próxima carta enemiga revelada en este lugar pierde ${v}.`, master: () => "Coloca una segunda trampa en un lugar al azar." },
-      "Victor": { name: "Campo de Dolor", text: (v) => `Continuo: todas las demás cartas de aquí, de ambos lados, tienen −${v}.`, master: () => "Solo las enemigas." },
+      "Victor": { name: "Campo de Dolor", text: (v) => `Todas las demás cartas de aquí, de ambos lados, tienen −${v}.`, master: () => "Solo las enemigas." },
       "Vindicta": { name: "Asesinar", text: (v) => `Elige una carta enemiga en cualquier lugar: pierde ${v}. Si no queda en cero, Vindicta cae del cielo y pierde ${v}.`, master: () => "No cae del cielo." },
       "Violet": { name: "Naturaleza Muerta", text: (v) => `Al final de cada turno gana +${v} permanente por cada lugar que vas ganando (hasta +4 en total).`, master: () => "Los lugares empatados cuentan como ganados." },
       "Viscous": { name: "El Cubo", text: (v) => `Tu aliado más débil de aquí (o el propio Viscous) queda inmune a efectos enemigos y gana +${v}.`, master: () => "También protege a un segundo aliado de aquí." },
@@ -539,15 +540,15 @@ export const GAME_TEXT = strings<GameText>({
     },
     stats: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" },
     levels: ["Aprendiz", "Profesional", "Maestro"],
-    keywords: {
-      MIR: { name: "Certero", text: "Los efectos de objetivo al azar golpean a la enemiga más fuerte." },
-      MAC: { name: "Lee el mapa", text: "+2 al revelarse en un lugar donde vas perdiendo." },
-      SUP: { name: "Jugador de equipo", text: "Al revelarse, tu aliado más débil de aquí gana +1." },
-      MOV: { name: "Ágil", text: "Puede moverse una vez por partida." },
-      POL: { name: "Versátil", text: "Al revelarse, robas 1 carta." },
-      CON: { name: "Constante", text: "Inmune a quemaduras." },
+    kinds: { r: "Al revelar", c: "Constante", f: "Fin del turno", x: "Movimiento", a: "Reacción", "-": "" },
+    kindTips: {
+      r: "Actúa una vez, cuando la carta se voltea al final del turno.",
+      c: "Vale todo el tiempo mientras la carta esté en el lugar y con la habilidad.",
+      f: "Actúa al final de cada turno en que la carta esté en la mesa.",
+      x: "La carta puede moverse entre lugares durante tu turno.",
+      a: "Actúa cuando algo le pasa a la carta.",
+      "-": "",
     },
-    kinds: { r: "Al revelar", c: "Continuo", f: "Fin del turno", x: "Especial", "-": "" },
     locs: {
       none: { label: "Sin efecto", text: () => "Sin efecto." },
       enter: { label: "Bonus al entrar", text: (o) => `Las cartas ganan ${sg(o.v)} de poder al entrar.` },

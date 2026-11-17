@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, cardStats, defaultCard, ovrBand, gameConfig, heroStat, keywords, mastery, sanitizeGameConfig, trimItemIcons,
+  ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, cardStats, defaultCard, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
   type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type PoolCard,
 } from "../src/lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Side } from "../src/lib/game/engine";
@@ -333,11 +333,6 @@ describe("atributos e Maestria", () => {
     expect(heroStat("Herói Novo", {}, flat(70, { SUP: 88 }))).toBe("SUP");
   });
 
-  it("palavras-chave: até 2 atributos a partir de 90, do maior para o menor", () => {
-    expect(keywords(flat(80))).toEqual([]);
-    expect(keywords(flat(80, { MAC: 91, CON: 95, MOV: 90 }))).toEqual(["CON", "MAC"]);
-  });
-
   it("configuração dos heróis: só heróis e atributos conhecidos", () => {
     const g = sanitizeGameConfig({ locs: DEFAULT_LOCS, heroes: { Haze: { stat: "SUP" }, Bob: { stat: "MIR" }, Ivy: { stat: "XYZ" } } })!;
     expect(g.heroes).toEqual({ Haze: { stat: "SUP" } });
@@ -384,39 +379,19 @@ describe("atributos e Maestria", () => {
     expect(pupil.bonus).toBe(1);
   });
 
-  it("Certeiro (Mira 90+): efeito de alvo aleatório acerta a inimiga mais forte", () => {
-    const { m, put, mk } = arena();
-    const weak = put(pc("w", "Herói Novo", flat(50)), "a", 0);
-    const strong = put(pc("s", "Herói Novo", flat(50)), "a", 0);
-    weak.base = 2; strong.base = 9; weak.bonus = 0; strong.bonus = 0;
-    const hitter = mk(pc("h", "Herói Novo", flat(70, { MIR: 95 })), "p");
-    hitter.ab = "hit"; hitter.v = 3;
-    m.loc[0].s.p.push(hitter);
-    m.reveal(hitter, m.loc[0]);
-    expect(m.pow(strong)).toBe(6);
-    expect(m.pow(weak)).toBe(2);
-  });
-
-  it("Ágil (Movimento 90+): a carta pode se mover uma vez por partida", () => {
+  it("atributos altos não dão efeito extra (sem palavras-chave de atributo)", () => {
     const { m, put } = arena();
-    const c = put(pc("a", "Herói Novo", flat(70, { MOV: 92 })), "p", 0);
-    expect(m.moveOptions(c)).toHaveLength(2);
-    expect(m.moveCard(c, m.loc[2])).toBe(true);
-    expect(m.locOf(c)).toBe(m.loc[2]);
+    const c = put(pc("a", "Herói Novo", flat(99)), "p", 0);
     expect(m.moveOptions(c)).toEqual([]);
-    m.t++;
-    expect(m.moveOptions(c)).toEqual([]);
-  });
-
-  it("Constante (Consistência 90+): imune a queimadura", () => {
-    const { m, put } = arena();
-    const a = put(pc("a", "Herói Novo", flat(70, { CON: 92 })), "p", 0);
-    const b = put(pc("b", "Herói Novo", flat(70)), "p", 0);
-    a.st.burn = 2; b.st.burn = 2;
-    const [pa, pb] = [m.pow(a), m.pow(b)];
+    c.st.burn = 2;
+    const p = m.pow(c);
     m.endOfTurn();
-    expect(m.pow(a)).toBe(pa);
-    expect(m.pow(b)).toBe(pb - 2);
+    expect(m.pow(c)).toBe(p - 2);
+  });
+
+  it("selo de momento: cada herói tem um, e os suportes Paige e Nurse Harrow são constantes", () => {
+    for (const k of HERO_KEYS) expect(ABILITY_KINDS).toContain(ABILITIES[k].kind);
+    expect([ABILITIES.Paige.kind, ABILITIES["Nurse Harrow"].kind, ABILITIES.Apollo.kind, ABILITIES.Mirage.kind, ABILITIES.Mina.kind]).toEqual(["c", "c", "a", "x", "f"]);
   });
 });
 

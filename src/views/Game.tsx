@@ -124,9 +124,9 @@ function Board({ newMatch }: { newMatch: () => Match }) {
         text={text ? { name: a.name, kind: t.kinds[ABILITIES[key].kind], body, master: c.lvl === 2 && key === c.ab && ms ? ms : undefined, masterLabel: t.ui.masterLine } : null} />
     );
   };
-  /** Caixas ao lado da carta ampliada: palavras-chave e status. */
+  /** Caixas ao lado da carta ampliada: selo de momento e status. */
   const tipsOf = (c: GCard) => [
-    ...c.kw.map((k) => ({ title: t.keywords[k].name, text: t.keywords[k].text })),
+    ...(ABILITIES[m.abilityOf(c)].kind !== "-" ? [{ title: t.kinds[ABILITIES[m.abilityOf(c)].kind], text: t.kindTips[ABILITIES[m.abilityOf(c)].kind] }] : []),
     ...(c.rev ? statusIcons(c, m, t).map(([icon, nm, k]) => ({ title: `${icon} ${nm}`, text: t.ui.statusTip[k] })) : []),
   ];
 
@@ -547,7 +547,7 @@ function Impact({ w }: { w: 1 | 2 | 3 }) {
 const PEEK_W = 208;
 const TIP_W = 192;
 
-/** Carta da mesa ampliada ao lado dela, com as caixas de palavra-chave e status. */
+/** Carta da mesa ampliada ao lado dela, com as caixas do selo de momento e de status. */
 function Peek({ r, card, tips }: { r: DOMRect; card: React.ReactNode; tips: { title: string; text: string }[] }) {
   const h = (PEEK_W * 430) / 295;
   const extra = tips.length ? TIP_W + 8 : 0;

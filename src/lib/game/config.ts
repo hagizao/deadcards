@@ -31,8 +31,12 @@ export const DEFAULT_LOCS: GameLoc[] = [
   { id: "l13", name: "Loja Secreta", type: "shop", v: 1, n: 1 },
 ].map((l) => ({ ...l, type: l.type as LocType, desc: "" }));
 
-/** Momento da habilidade: r = ao revelar, c = constante, f = fim do turno, x = especial, - = nenhum. */
-export type AbilityKind = "r" | "c" | "f" | "x" | "-";
+/**
+ * Momento da habilidade, mostrado como selo na carta: r = ao revelar, c = constante (enquanto estiver no local),
+ * f = fim do turno, x = movimento, a = reação (quando algo acontece com ela), - = nenhum.
+ */
+export type AbilityKind = "r" | "c" | "f" | "x" | "a" | "-";
+export const ABILITY_KINDS: AbilityKind[] = ["r", "c", "f", "x", "a"];
 type AbilityDef = { hero: boolean; kind: AbilityKind; v: number; pm: number; usesV: boolean };
 
 const H = (kind: AbilityKind, v: number, pm: number, usesV = true): AbilityDef => ({ hero: true, kind, v, pm, usesV });
@@ -43,14 +47,14 @@ const G = (kind: AbilityKind, v: number, pm: number, usesV = true): AbilityDef =
  * usesV = o texto usa o valor; sem valor, a Maestria dá poder em vez de valor. Regras completas em docs/cardslock-herois.md.
  */
 export const ABILITIES = {
-  "Abrams": H("r", 3, 0), "Apollo": H("c", 2, 0), "Baba": H("r", 1, -2), "Bebop": H("r", 0, 0, false),
+  "Abrams": H("r", 3, 0), "Apollo": H("a", 2, 0), "Baba": H("r", 1, -2), "Bebop": H("r", 0, 0, false),
   "Billy": H("r", 2, 0), "Calico": H("r", 1, 0), "Celeste": H("r", 2, 0), "Deadman Danny": H("r", 1, -1),
   "Drifter": H("r", 3, 0), "Dynamo": H("r", 1, -1), "Graves": H("f", 1, -1), "Grey Talon": H("r", 2, -1),
   "Haze": H("r", 0, 0, false), "Holliday": H("r", 0, -1, false), "Infernus": H("r", 2, -1), "Ivy": H("r", 2, -1),
   "Kelvin": H("r", 0, -1, false), "Lady Geist": H("r", 5, -3), "Lash": H("r", 1, -1), "McGinnis": H("r", 2, -1),
   "Mina": H("f", 1, -1), "Mirage": H("x", 2, 0), "Mo & Krill": H("c", 4, 0), "Nurse Harrow": H("c", 1, 0),
   "Paige": H("c", 1, -2), "Paradox": H("r", 0, 0, false), "Pocket": H("r", 2, -2), "Rat King": H("r", 0, 0, false),
-  "Rem": H("r", 2, -1), "Seven": H("f", 1, -1), "Shiv": H("r", 3, 0), "Silver": H("x", 6, -2),
+  "Rem": H("r", 2, -1), "Seven": H("f", 1, -1), "Shiv": H("r", 3, 0), "Silver": H("a", 6, -2),
   "Sinclair": H("x", 0, 0, false), "Solomon": H("c", 5, -1), "The Doorman": H("r", 0, 0, false), "Venator": H("r", 3, 0),
   "Victor": H("c", 2, 2), "Vindicta": H("r", 3, 0), "Violet": H("f", 1, -2), "Viscous": H("r", 2, 0),
   "Vyper": H("r", 0, 0, false), "Warden": H("c", 1, -1), "Wraith": H("r", 0, -1, false), "Yamato": H("r", 4, 0),
@@ -70,7 +74,7 @@ export type ItemOverride = { off?: boolean; v?: number };
 export type HeroOverride = { stat?: StatKey; cost?: number; prof?: Profile; base?: number };
 export type GameConfig = { locs: GameLoc[]; cards: Record<string, CardOverride>; items: Record<string, ItemOverride>; heroes: Record<string, HeroOverride> };
 
-/* ---------- atributos, Maestria e palavras-chave ---------- */
+/* ---------- atributos e Maestria ---------- */
 
 /** Mesma ordem de src/lib/cards.ts (não importado aqui para o worker não puxar React). */
 export const STAT_KEYS = ["MIR", "MAC", "SUP", "MOV", "POL", "CON"] as const;
@@ -153,13 +157,6 @@ export const MASTERY_AT = [82, 90] as const;
 export const mastery = (v: number): Mastery => (v >= MASTERY_AT[1] ? 2 : v >= MASTERY_AT[0] ? 1 : 0);
 /** Bônus de Profissional e Mestre: +1 no valor da habilidade (ou +1 de poder, se ela não tem valor). */
 export const MASTERY_BONUS = 1;
-
-/** Palavras-chave: os até 2 maiores atributos do jogador, se forem pelo menos KEYWORD_AT. */
-export const KEYWORD_AT = 90;
-export function keywords(stats: CardStatsBlock | undefined): StatKey[] {
-  if (!stats) return [];
-  return [...STAT_KEYS].filter((k) => (stats[k] ?? 0) >= KEYWORD_AT).sort((a, b) => (stats[b] ?? 0) - (stats[a] ?? 0)).slice(0, 2);
-}
 
 /* ---------- itens da loja ---------- */
 

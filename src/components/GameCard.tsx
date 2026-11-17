@@ -59,7 +59,8 @@ export function GameCard({ player, name, cost, power, base, glyph, master, text,
               <div className="gc-plaque absolute inset-x-[4cqw] bottom-[5cqw] h-[64cqw] bg-zinc-500 bg-(image:--rk-bg) p-[0.8cqw]">
                 <div className="gc-plaque flex size-full items-center bg-zinc-950/95 px-[4cqw] pt-[7cqw] pb-[2cqw]">
                   <p className="line-clamp-8 w-full text-center text-[5.2cqw] leading-[1.2] font-semibold text-zinc-100">
-                    <span className="text-game-brass">{text.name}{text.kind ? ` (${text.kind})` : ""}:</span> {text.body}
+                    {text.kind && <span className="mr-[1.5cqw] inline-block rounded-full bg-game-brass/20 px-[2cqw] align-[0.3cqw] text-[3.8cqw] leading-normal font-extrabold tracking-wider text-game-brass uppercase">{text.kind}</span>}
+                    <span className="text-game-brass">{text.name}:</span> {text.body}
                     {text.master && <><br /><span className="text-game-brass">★ {text.masterLabel}:</span> {text.master}</>}
                   </p>
                 </div>

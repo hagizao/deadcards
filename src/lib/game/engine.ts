@@ -3,7 +3,7 @@
 import { getPlayerOvr } from "../cards";
 import type { Player } from "../types";
 import {
-  ABILITIES, ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, MASTERY_BONUS, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, keywords, mastery,
+  ABILITIES, ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, MASTERY_BONUS, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
   type AbilityKey, type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type ItemTier, type LocType, type Mastery, type PoolCard, type StatKey,
 } from "./config";
 
@@ -39,7 +39,7 @@ export type GCard = {
   id: number; p: CardFace; cost: number; base: number; ab: AbilityKey; v: number; desc: string;
   bonus: number; side: Side; rev: boolean; staged: boolean; st: Status; tok?: boolean;
   /** Atributos do jogador, atributo principal do herói, nível de Maestria (0 a 2) e palavras-chave. */
-  stats?: CardStatsBlock; main: StatKey | null; lvl: Mastery; kw: StatKey[];
+  stats?: CardStatsBlock; main: StatKey | null; lvl: Mastery;
   /** Escolha feita ao jogar a carta: id da carta alvo e/ou índice do local. */
   ch?: { card?: number; loc?: number };
   mv: MoveCharge[];
@@ -158,11 +158,10 @@ export class Match {
   private mk(p: PoolCard, cfg: GameConfig, side: Side): GCard {
     const c = cardStats(p, cfg.cards, cfg.heroes);
     const main = p.hero ? heroStat(p.hero, cfg.heroes, p.stats) : null;
-    const kw = keywords(p.stats);
     const card: GCard = {
       id: ++this.uid, p: { id: p.id, name: p.name, hero: p.hero, c1: p.c1, c2: p.c2, role: p.position }, cost: c.cost, base: c.power, ab: c.ab,
       v: Number(c.v) || 0, desc: c.desc, bonus: 0, side, rev: false, staged: false, st: nst(),
-      stats: p.stats, main, lvl: 0, kw, mv: kw.includes("MOV") ? [{ n: 1, u: Infinity, bonus: 0 }] : [],
+      stats: p.stats, main, lvl: 0, mv: [],
     };
     this.levelTo(card, main && p.stats ? mastery(p.stats[main] ?? 0) : 0);
     return card;
@@ -175,7 +174,7 @@ export class Match {
     }
   }
   private token(side: Side, token: Token, power: number): GCard {
-    return { id: ++this.uid, p: { name: "", hero: null, c1: "#44403c", c2: "#1c1917", token }, cost: 1, base: power, ab: "none", v: 0, desc: "", bonus: 0, side, rev: false, staged: false, st: nst(), tok: true, main: null, lvl: 0, kw: [], mv: [] };
+    return { id: ++this.uid, p: { name: "", hero: null, c1: "#44403c", c2: "#1c1917", token }, cost: 1, base: power, ab: "none", v: 0, desc: "", bonus: 0, side, rev: false, staged: false, st: nst(), tok: true, main: null, lvl: 0, mv: [] };
   }
   private N = (c: GCard): Name => (c.p.token ? { token: c.p.token } : c.p.name);
   private say(e: LogEntry) { this.log.unshift(e); this.log.length = Math.min(this.log.length, 3); }
@@ -205,8 +204,8 @@ export class Match {
   }
   private strongest = (a: GCard[]) => this.best(this.sh(a), (x) => this.pow(x));
   private weakest = (a: GCard[]) => this.best(this.sh(a), (x) => -this.pow(x));
-  /** Alvo "aleatório": com a palavra-chave Certeiro (Mira), acerta o mais forte. */
-  private pickFoe = (src: GCard, a: GCard[]) => (src.kw.includes("MIR") ? this.strongest(a) : this.sh(a)[0] ?? null);
+  /** Alvo aleatório entre as inimigas válidas. */
+  private pickFoe = (a: GCard[]) => this.sh(a)[0] ?? null;
   private pickLoc = (from: Loc, s: Side) => this.sh(this.loc.filter((L) => L !== from && this.room(L, s)))[0];
   private losing = (s: Side, l: Loc) => this.total(l, s) < this.total(l, opp(s));
   /** Alvos dentro do teto de remoção da carta (poder até CAP_PER_COST × custo). */
@@ -457,7 +456,7 @@ export class Match {
       const t = this.strongest(this.tg(this.foes(c, l)));
       if (!t) return;
       this.hurt(t, v, c);
-      for (let i = 0, n = this.master(c) ? 2 : 1; i < n; i++) this.hurt(this.pickFoe(c, this.tg(this.foeCards(c)).filter((x) => x !== t)), 1, c);
+      for (let i = 0, n = this.master(c) ? 2 : 1; i < n; i++) this.hurt(this.pickFoe(this.tg(this.foeCards(c)).filter((x) => x !== t)), 1, c);
       this.say({ k: "celeste", c: this.N(c) });
     } },
     "Deadman Danny": { r: (c, l, v) => {
@@ -542,7 +541,7 @@ export class Match {
     "Lash": { r: (c, l, v) => {
       const pick = this.master(c) ? this.chosenLoc(c, l) : null;
       const ts: GCard[] = [];
-      for (let i = 0; i < 2; i++) { const t = this.pickFoe(c, this.tg(this.foes(c, l)).filter((x) => !ts.includes(x))); if (t) ts.push(t); }
+      for (let i = 0; i < 2; i++) { const t = this.pickFoe(this.tg(this.foes(c, l)).filter((x) => !ts.includes(x))); if (t) ts.push(t); }
       ts.forEach((t) => {
         const d = pick && this.room(pick, t.side) ? pick : this.pickLoc(l, t.side);
         if (d && this.move(t, l, d)) { this.hurt(t, v, c); this.say({ k: "lash", c: this.N(c), t: this.N(t), loc: d.L.name }); }
@@ -561,7 +560,7 @@ export class Match {
       r: (c) => { c.st.drainU = this.t + MINA_TURNS - 1; if (this.master(c)) c.mv.push({ n: 1, u: this.t + 1, bonus: 0 }); },
       f: (c, l, v) => {
         if ((c.st.drainU ?? 0) < this.t) return;
-        const t = this.pickFoe(c, this.tg(this.foes(c, l)));
+        const t = this.pickFoe(this.tg(this.foes(c, l)));
         if (t && this.hurt(t, v, c)) c.bonus += v;
       },
     },
@@ -656,7 +655,7 @@ export class Match {
       this.later(() => { const L = this.locOf(c); if (L && this.losing(c.side, L)) c.mv.push({ n: 1, u: this.t + 1, bonus: 0, foes: true }); });
     } },
     self: { r: (c, _l, v) => { c.bonus += v; } },
-    hit: { r: (c, l, v) => { this.hurt(this.pickFoe(c, this.tg(this.foes(c, l))), v, c); } },
+    hit: { r: (c, l, v) => { this.hurt(this.pickFoe(this.tg(this.foes(c, l))), v, c); } },
     team: { r: (c, l, v) => { this.friends(c, l).forEach((x) => (x.bonus += v)); } },
     draw: { r: (c, _l, v) => { for (let i = 0; i < v; i++) this.draw(c.side); } },
   };
@@ -684,12 +683,6 @@ export class Match {
     w.bonus += 2 * Math.abs(d);
     if ((lo.stats?.POL ?? 0) < DUEL_SAFE_POL && !lo.st.unstop) lo.st.silU = this.t;
     this.say({ k: "duel", c: this.N(w), t: this.N(lo), v: 2 * Math.abs(d) });
-  }
-  /** Palavras-chave que agem ao revelar (Ágil vale desde o início; Certeiro e Constante agem nos efeitos). */
-  private keywordsOnReveal(c: GCard, l: Loc) {
-    if (c.kw.includes("MAC") && this.total(l, c.side) - this.pow(c, l) < this.total(l, opp(c.side))) c.bonus += 2;
-    if (c.kw.includes("SUP")) { const w = this.weakest(this.friends(c, l)); if (w) w.bonus += 1; }
-    if (c.kw.includes("POL")) this.draw(c.side);
   }
 
   /* ---------- itens da loja ---------- */
@@ -973,7 +966,6 @@ export class Match {
     if (c.p.role === "Suporte") l.s[s].forEach((x) => { if (x !== c && (x.st.stun ?? 0) >= this.t) { x.st.stun = 0; this.say({ k: "liftEnd", c: this.N(x) }); } });
     this.mentor(c);
     this.duel(c, l);
-    this.keywordsOnReveal(c, l);
     const impl = this.IMPL[this.abilityOf(c)];
     if (impl?.r) for (let i = 0, n = this.ty(l, "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) impl.r(c, at, c.v); }
   }
@@ -992,7 +984,7 @@ export class Match {
     // queimaduras: permanentes e temporárias (Constante é imune)
     this.order().flatMap((s) => this.mine(s)).forEach((c) => {
       const b = (c.st.burn ?? 0) + (c.st.tburn ?? []).filter((x) => x.u >= this.t).reduce((a, x) => a + x.v, 0);
-      if (b && !c.kw.includes("CON")) this.hurt(c, b, null);
+      if (b) this.hurt(c, b, null);
       if (c.st.tburn) c.st.tburn = c.st.tburn.filter((x) => x.u > this.t);
     });
     this.loc.forEach((l) => {
