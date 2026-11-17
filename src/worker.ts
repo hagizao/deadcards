@@ -5,6 +5,7 @@ import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
 import { sanitizeGameConfig, sanitizeHeroPool, trimItemIcons } from "./lib/game/config";
+import type { ArtCredit } from "./lib/types";
 
 export interface Env {
   DB: D1Database;
@@ -35,6 +36,19 @@ const CACHE_TTL_SECONDS = 60 * 60 * 6;
 const ALLOWED_PATHS = ["/v1/assets/heroes", "/v1/analytics/hero-stats", "/v1/patches"];
 const UPSERT_CACHE =
   "INSERT INTO api_cache (cache_key, body, fetched_at) VALUES (?, ?, ?) ON CONFLICT(cache_key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at";
+
+function artCredit(v: unknown): ArtCredit | null | undefined {
+  if (v === undefined || v === null) return undefined;
+  const c = v as { name?: unknown; url?: unknown };
+  const name = typeof c.name === "string" ? c.name.trim() : "";
+  if (!name || name.length > 60) return null;
+  if (c.url === undefined || c.url === "") return { name };
+  if (typeof c.url !== "string" || c.url.length > 300) return null;
+  try {
+    const u = new URL(c.url);
+    return u.protocol === "https:" || u.protocol === "http:" ? { name, url: u.href } : null;
+  } catch { return null; }
+}
 
 const imgUrl = (key: string | null) => (key ? `/img/${key}` : undefined);
 const parse = <T>(s: string | null, fallback: T): T => {
@@ -139,6 +153,11 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
       if (!b.name || !b.teamId || !b.stats) return bad("jogador incompleto");
       const heroPool = sanitizeHeroPool(b.heroPool, typeof b.hero === "string" ? b.hero : "Abrams");
       b.heroPool = heroPool.length ? heroPool : undefined;
+      if (b.art && typeof b.art === "object") {
+        const credit = artCredit((b.art as { credit?: unknown }).credit);
+        if (credit === null) return bad("crédito da arte inválido: nome até 60 caracteres e link http(s)");
+        b.art = { ...b.art, credit };
+      }
       const extra = Object.fromEntries(PLAYER_EXTRA.filter((k) => b[k] !== undefined && b[k] !== null).map((k) => [k, b[k]]));
       await db.prepare(
         "INSERT INTO players (id, team_id, name, position, hero, stats_json, ovr, c1, c2, history_json, extra_json) VALUES (?,?,?,?,?,?,?,?,?,?,?) " +

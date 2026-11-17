@@ -46,8 +46,10 @@ export type Player = {
   inactive?: boolean;
   /** Heróis de afinidade: outras versões que o jogador pode usar no deck do jogo. */
   heroPool?: string[];
-  art?: { url: string; zoom?: number; x?: number; y?: number };
+  art?: { url: string; zoom?: number; x?: number; y?: number; credit?: ArtCredit };
 };
+
+export type ArtCredit = { name: string; url?: string };
 
 export type HeroArt = { name: string; url: string; zoom: number; x: number; y: number };
 

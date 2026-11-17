@@ -275,6 +275,18 @@ function PlayerForm({ editId, onEditId }: { editId: string | null; onEditId: (id
               <Range label="Y" value={d.art.y ?? 50} min={0} max={100} onChange={(v) => set({ art: { ...d.art!, y: v } })} />
             </div>
           )}
+          {d.art && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Artista (crédito)">
+                <input className={input} maxLength={60} placeholder="@artista" value={d.art.credit?.name ?? ""}
+                  onChange={(e) => set({ art: { ...d.art!, credit: e.target.value ? { ...d.art!.credit, name: e.target.value } : undefined } })} />
+              </Field>
+              <Field label="Link do artista (Twitter, Instagram…)">
+                <input className={input} type="url" maxLength={300} placeholder="https://x.com/artista" disabled={!d.art.credit?.name} value={d.art.credit?.url ?? ""}
+                  onChange={(e) => set({ art: { ...d.art!, credit: { name: d.art!.credit!.name, url: e.target.value || undefined } } })} />
+              </Field>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3 rounded-2xl border border-amber-200/15 p-4">
