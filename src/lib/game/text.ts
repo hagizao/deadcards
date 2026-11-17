@@ -30,6 +30,11 @@ export type GameText = {
     title: string; hint: string; count: (n: number, max: number) => string; avg: (n: number) => string; curve: string; search: string;
     random: string; clear: string; play: string; change: string; full: (max: number) => string; versions: string; alt: (n: number) => string; altPro: string;
     add: (name: string) => string; version: (name: string, hero: string) => string; empty: string; aiNote: string;
+    defaultName: (n: number) => string; decks: string; newDeck: string; maxDecks: (n: number) => string; rename: string; duplicate: string; remove: string;
+    cover: string; isCover: string; left: (n: number) => string; aiLeft: (n: number) => string; list: string; showList: (n: number) => string;
+    open: (name: string) => string; take: (name: string) => string; addBtn: string; takeBtn: string; close: string; heroes: string; why: string;
+    parts: { hero: (hero: string) => string; ovr: (ovr: number, half: boolean) => string; alt: string; floor: string; admin: string };
+    costFrom: (hero: string) => string; vBonus: (at: number) => string; mastery: (stat: string, v: number, level: string) => string; emptyDeck: string; cards: (n: number) => string;
   };
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
@@ -250,6 +255,14 @@ export const GAME_TEXT = strings<GameText>({
       versions: "Versões", alt: (n) => `Versão de afinidade: −${n} de poder`, altPro: "Versão de afinidade: POL alto, sem perda",
       add: (name) => `Colocar ${name} no deck`, version: (name, hero) => `${name} com ${hero}`, empty: "Nenhum jogador encontrado.",
       aiNote: "A IA monta um deck com o mesmo OVR médio e curva parecida.",
+      defaultName: (n) => `Baralho ${n}`, decks: "Seus baralhos", newDeck: "Novo baralho", maxDecks: (n) => `Limite de ${n} baralhos.`, rename: "Nome do baralho",
+      duplicate: "Duplicar", remove: "Segure para excluir", cover: "Usar como capa", isCover: "Capa do baralho",
+      left: (n) => `${pl(n, "Falta", "Faltam")} ${n} ${pl(n, "carta", "cartas")} no seu baralho`, aiLeft: (n) => `Baralho da IA: ${n} ${pl(n, "carta", "cartas")}`,
+      list: "Cartas do baralho", showList: (n) => `Ver baralho (${n})`, open: (name) => `Ver detalhes de ${name}`, take: (name) => `Tirar ${name} do baralho`,
+      addBtn: "Colocar no baralho", takeBtn: "Tirar do baralho", close: "Fechar", heroes: "Heróis deste jogador", why: "De onde vem o poder",
+      parts: { hero: (hero) => `Base de ${hero}`, ovr: (ovr, half) => `OVR ${ovr}${half ? " (metade: perfil habilidade)" : ""}`, alt: "Fora do herói principal", floor: "Mínimo de 1", admin: "Ajuste do admin" },
+      costFrom: (hero) => `Custo de ${hero}`, vBonus: (at) => `Habilidade +1 com OVR ${at}+`, mastery: (stat, v, level) => `${stat} ${v}: chega a ${level}`,
+      emptyDeck: "Baralho vazio", cards: (n) => `${n} ${pl(n, "carta", "cartas")}`,
     },
     ui: {
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
@@ -478,6 +491,14 @@ export const GAME_TEXT = strings<GameText>({
       versions: "Versions", alt: (n) => `Affinity version: −${n} power`, altPro: "Affinity version: high POL, no loss",
       add: (name) => `Add ${name} to the deck`, version: (name, hero) => `${name} as ${hero}`, empty: "No players found.",
       aiNote: "The AI builds a deck with the same average OVR and a similar curve.",
+      defaultName: (n) => `Deck ${n}`, decks: "Your decks", newDeck: "New deck", maxDecks: (n) => `Up to ${n} decks.`, rename: "Deck name",
+      duplicate: "Duplicate", remove: "Hold to delete", cover: "Use as cover", isCover: "Deck cover",
+      left: (n) => `${n} ${pl(n, "card", "cards")} left in your deck`, aiLeft: (n) => `AI deck: ${n} ${pl(n, "card", "cards")}`,
+      list: "Deck cards", showList: (n) => `Show deck (${n})`, open: (name) => `See ${name} details`, take: (name) => `Remove ${name} from the deck`,
+      addBtn: "Add to deck", takeBtn: "Remove from deck", close: "Close", heroes: "This player's heroes", why: "Where the power comes from",
+      parts: { hero: (hero) => `${hero} base`, ovr: (ovr, half) => `OVR ${ovr}${half ? " (half: ability profile)" : ""}`, alt: "Off their main hero", floor: "Minimum of 1", admin: "Admin tweak" },
+      costFrom: (hero) => `${hero} cost`, vBonus: (at) => `Ability +1 at OVR ${at}+`, mastery: (stat, v, level) => `${stat} ${v}: reaches ${level}`,
+      emptyDeck: "Empty deck", cards: (n) => `${n} ${pl(n, "card", "cards")}`,
     },
     ui: {
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
@@ -706,6 +727,14 @@ export const GAME_TEXT = strings<GameText>({
       versions: "Versiones", alt: (n) => `Versión de afinidad: −${n} de poder`, altPro: "Versión de afinidad: POL alto, sin pérdida",
       add: (name) => `Añadir a ${name} al mazo`, version: (name, hero) => `${name} con ${hero}`, empty: "No se encontró ningún jugador.",
       aiNote: "La IA arma un mazo con el mismo OVR medio y una curva parecida.",
+      defaultName: (n) => `Mazo ${n}`, decks: "Tus mazos", newDeck: "Nuevo mazo", maxDecks: (n) => `Hasta ${n} mazos.`, rename: "Nombre del mazo",
+      duplicate: "Duplicar", remove: "Mantén para borrar", cover: "Usar de portada", isCover: "Portada del mazo",
+      left: (n) => `${pl(n, "Queda", "Quedan")} ${n} ${pl(n, "carta", "cartas")} en tu mazo`, aiLeft: (n) => `Mazo de la IA: ${n} ${pl(n, "carta", "cartas")}`,
+      list: "Cartas del mazo", showList: (n) => `Ver mazo (${n})`, open: (name) => `Ver detalles de ${name}`, take: (name) => `Quitar a ${name} del mazo`,
+      addBtn: "Añadir al mazo", takeBtn: "Quitar del mazo", close: "Cerrar", heroes: "Héroes de este jugador", why: "De dónde viene el poder",
+      parts: { hero: (hero) => `Base de ${hero}`, ovr: (ovr, half) => `OVR ${ovr}${half ? " (mitad: perfil habilidad)" : ""}`, alt: "Fuera de su héroe principal", floor: "Mínimo de 1", admin: "Ajuste del admin" },
+      costFrom: (hero) => `Coste de ${hero}`, vBonus: (at) => `Habilidad +1 con OVR ${at}+`, mastery: (stat, v, level) => `${stat} ${v}: llega a ${level}`,
+      emptyDeck: "Mazo vacío", cards: (n) => `${n} ${pl(n, "carta", "cartas")}`,
     },
     ui: {
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",

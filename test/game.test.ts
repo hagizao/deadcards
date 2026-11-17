@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, SHOPS, ALT_MALUS, ALT_POL, cardStats, defaultCard, itemCost, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
+  ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, SHOPS, ALT_MALUS, ALT_POL, cardStats, powerParts, defaultCard, itemCost, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
   type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type PoolCard,
 } from "../src/lib/game/config";
 import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Side } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
-import { fillDeck, resolveDeck, versionPlayer } from "../src/lib/game/deck";
+import { MAX_DECKS, fillDeck, resolveDeck, sanitizeBook, versionPlayer } from "../src/lib/game/deck";
 
 function player(id: string, ovr: number, extra: Partial<Player> = {}): Player {
   return {
@@ -712,5 +712,49 @@ describe("calibração de 8 rounds", () => {
     expect(m.pow(b)).toBe(2);
     expect(m.pow(s)).toBe(5);
     expect(mk.st.burrow).toBe(true);
+  });
+});
+
+describe("baralhos salvos e poder explicado", () => {
+  const name = (n: number) => `Baralho ${n}`;
+
+  it("coleção de baralhos: limpa nomes, ids e cartas, respeita o limite e sempre tem um escolhido", () => {
+    const b = sanitizeBook({
+      current: "x",
+      decks: [
+        { id: "a", name: "  Aggro  ", cards: ["p1", "p1", 3, "p2"], cover: "p2" },
+        { id: "a", name: "", cards: "nada", cover: "p9" },
+        ...Array.from({ length: 20 }, (_, i) => ({ id: `d${i}`, name: `D${i}`, cards: [] })),
+      ],
+    }, name);
+    expect(b.decks).toHaveLength(MAX_DECKS);
+    expect(b.decks[0]).toEqual({ id: "a", name: "Aggro", cards: ["p1", "p2"], cover: "p2" });
+    expect(b.decks[1].id).not.toBe("a");
+    expect(b.decks[1]).toMatchObject({ name: "Baralho 2", cards: [] });
+    expect(b.decks[1]).not.toHaveProperty("cover");
+    expect(b.current).toBe("a");
+    const empty = sanitizeBook(null, name);
+    expect(empty.decks).toHaveLength(1);
+    expect(empty.current).toBe(empty.decks[0].id);
+  });
+
+  it("as partes do poder somam o poder final da carta", () => {
+    const cfg = gameConfig(undefined);
+    for (const [i, hero] of HEROES.entries()) {
+      for (const ovr of [50, 72, 88, 97]) {
+        for (const alt of [false, true]) {
+          const p: PoolCard = { id: `x${i}`, key: `x${i}`, name: "X", position: POSITIONS[i % 5], hero, c1: "#000", c2: "#fff", ovr, stats: flat(ovr), alt };
+          const w = powerParts(p, cfg);
+          expect(w.parts.reduce((a, x) => a + x.n, 0)).toBe(w.power);
+          expect(w.power).toBe(cardStats(p, cfg.cards, cfg.heroes).power);
+          expect(w.parts.some((x) => x.k === "alt")).toBe(alt);
+        }
+      }
+    }
+    const tuned = { ...gameConfig(undefined), cards: { y: { power: 20 } } };
+    const y: PoolCard = { id: "y", key: "y", name: "Y", position: "Flex", hero: "Haze", c1: "#000", c2: "#fff", ovr: 80, stats: flat(80) };
+    const w = powerParts(y, tuned);
+    expect(w.power).toBe(20);
+    expect(w.parts.find((x) => x.k === "admin")?.n).toBe(20 - defaultCard(y).power);
   });
 });

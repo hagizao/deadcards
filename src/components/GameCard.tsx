@@ -109,12 +109,13 @@ function PowerGem({ power, base }: { power: number; base: number }) {
 }
 
 /** Verso da carta (cartas viradas da IA e a mão dela). */
-export function CardBack({ className = "" }: { className?: string }) {
+/** Verso da carta; `tone` pinta o losango com a cor do lado (IA por padrão). */
+export function CardBack({ className = "", tone = "ai" }: { className?: string; tone?: "me" | "ai" }) {
   return (
     <div className={`@container aspect-295/430 ${className}`}>
       <div className="deadlock-card-shell size-full">
         <div className="deadlock-card-inner flex items-center justify-center game-card-back">
-          <span className="font-display text-[40cqw] text-game-ai/50" aria-hidden="true">◆</span>
+          <span className={`font-display text-[40cqw] ${tone === "me" ? "text-game-me/50" : "text-game-ai/50"}`} aria-hidden="true">◆</span>
         </div>
       </div>
     </div>
