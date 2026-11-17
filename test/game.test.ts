@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, cardStats, defaultCard, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
+  ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, SHOPS, cardStats, defaultCard, itemCost, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
   type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type PoolCard,
 } from "../src/lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Side } from "../src/lib/game/engine";
@@ -176,9 +176,6 @@ describe("prioridade", () => {
 const plainLocs: GameLoc[] = [0, 1, 2].map((i) => ({ id: `n${i}`, name: `Local ${i}`, type: "none", v: 0, n: 1, desc: "" }));
 const only = (keep: ItemKey[]): GameConfig["items"] => Object.fromEntries(ITEM_KEYS.filter((k) => !keep.includes(k)).map((k) => [k, { off: true }]));
 const cfgWith = (keep: ItemKey[], locs = plainLocs): GameConfig => ({ locs, cards: {}, items: only(keep), heroes: {} });
-function playUntil(m: Match, turn: number) {
-  while (m.t < turn && !m.result) m.runEndTurn();
-}
 
 describe("itens: configuração", () => {
   it("guarda só itens conhecidos, liga/desliga e valor limitado", () => {
@@ -207,99 +204,129 @@ describe("itens: configuração", () => {
   });
 });
 
-describe("itens: draft e revelação", () => {
-  const four: ItemKey[] = ["Extra Health", "Swift Striker", "Sharpshooter", "Ricochet"];
+describe("itens: lojas e alvo", () => {
+  const all = ITEM_KEYS;
+  /** Joga as cartas mais baratas primeiro até o round dado. */
+  const playTo = (m: Match, turn: number) => {
+    while (m.t < turn && !m.result) {
+      for (const c of [...m.hand].sort((a, b) => a.cost - b.cost)) { const l = m.loc.find((x) => !m.canPlay(c, x)); if (l) m.play(c, l); }
+      m.runEndTurn();
+    }
+  };
 
-  it("no turno 5 os dois lados recebem 3 itens com os mesmos tiers, e a IA já escolhe", () => {
-    for (let seed = 1; seed <= 30; seed++) {
-      const m = new Match(cfgWith(four), pool, seeded(seed));
-      playUntil(m, 5);
-      const tiers = (s: "p" | "a") => m.offer![s].map((k) => ITEMS[k].tier);
-      expect(m.offer!.p).toHaveLength(3);
-      expect(tiers("p")).toEqual(tiers("a"));
-      expect(new Set(tiers("p")).size).toBe(3);
-      expect(m.offer!.a).toContain(m.picked.a);
+  it("lojas abrem nos rounds 2, 4 e 7, com 3 itens dos tiers da fase e os mesmos tiers para os dois lados", () => {
+    expect(SHOPS).toEqual({ 2: [1], 4: [2, 3], 7: [3, 4] });
+    expect([1, 2, 3, 4].map((t) => itemCost(t as 1 | 2 | 3 | 4))).toEqual([1, 2, 4, 6]);
+    for (let seed = 1; seed <= 20; seed++) {
+      const m = new Match(cfgWith(all), pool, seeded(seed));
+      for (const r of [1, 2, 3, 4, 5, 6, 7, 8]) {
+        playTo(m, r);
+        if (!SHOPS[r]) { expect(m.offer).toBeNull(); continue; }
+        const tiers = (x: "p" | "a") => m.offer![x].map((k) => ITEMS[k].tier);
+        expect(m.offer!.p).toHaveLength(3);
+        expect(tiers("p")).toEqual(tiers("a"));
+        expect(tiers("p").every((t) => SHOPS[r].includes(t))).toBe(true);
+        expect(new Set(tiers("p")).size).toBe(SHOPS[r].length);
+      }
     }
   });
 
-  it("não fecha o turno 5 sem escolher; o item é pago no turno 5 e fica escondido até o turno 6", () => {
-    const m = new Match(cfgWith(four), pool, seeded(7));
-    playUntil(m, 5);
-    expect(m.needsPick).toBe(true);
-    expect(m.endTurn()).toEqual([]);
-    expect(m.busy).toBe(false);
+  it("comprar mira uma carta sua, cobra na hora e age só nela no fim do turno; desfazer devolve", () => {
+    const m = new Match(cfgWith(["Extra Health"]), pool, seeded(7));
+    playTo(m, 2);
+    const mine = m.loc.flatMap((l) => l.s.p);
+    expect(mine.length).toBeGreaterThan(0);
+    const [target] = mine;
+    const other = mine[1];
     const e = m.E;
-    const [cheap, , k] = m.offer!.p;
-    m.pick(cheap);
-    expect(m.E).toBe(e - ITEMS[cheap].tier);
-    m.pick(k);
-    expect(m.picked.p).toBe(k);
-    expect(m.E).toBe(e - ITEMS[k].tier);
-    expect(m.paid.p).toBe(ITEMS[k].tier);
-    expect(m.itemsOn).toBe(false);
+    expect(m.buy("Extra Health", target)).toBe(true);
+    expect(m.E).toBe(e - 1);
+    m.unbuy();
+    expect(m.E).toBe(e);
+    m.buy("Extra Health", target);
+    const before = target.bonus, otherBefore = other?.bonus;
     m.runEndTurn();
-    expect(m.t).toBe(6);
-    expect(m.itemsOn).toBe(true);
-    expect(m.E).toBe(6);
+    expect(target.bonus - before).toBeGreaterThanOrEqual(ITEMS["Extra Health"].v);
+    if (other) expect(other.bonus).toBe(otherBefore);
+    expect(m.owned.p.map((b) => b.k)).toEqual(["Extra Health"]);
+    expect(m.offer).toBeNull();
   });
 
-  it("sem almas para o item, a escolha é recusada; sem almas para nenhum, o turno fecha sem item", () => {
-    const m = new Match(cfgWith(four), pool, seeded(8));
-    playUntil(m, 5);
-    const [cheap, , dear] = m.offer!.p;
-    m.E = ITEMS[cheap].tier;
-    expect(m.canBuy(dear)).toBe(false);
-    m.pick(dear);
-    expect(m.picked.p).toBeNull();
-    expect(m.needsPick).toBe(true);
+  it("item de ataque mira uma inimiga; sem alvo ou sem almas, não compra", () => {
+    const m = new Match(cfgWith(["Slowing Hex", "Toxic Bullets", "Ricochet"]), pool, seeded(9));
+    playTo(m, 4);
+    const k = m.offer!.p.find((x) => ITEMS[x].tier === 2)!;
+    expect(k).toBe("Slowing Hex");
+    expect(m.itemTargets("p", k).every((c) => c.side === "a")).toBe(true);
+    const mineCard = m.loc.flatMap((l) => l.s.p)[0];
+    if (mineCard) expect(m.buy(k, mineCard)).toBe(false);
     m.E = 0;
-    expect(m.needsPick).toBe(false);
+    expect(m.canBuy(k)).toBe(false);
+  });
+
+  it("a loja é opcional: o turno fecha sem comprar", () => {
+    const m = new Match(cfgWith(all), pool, seeded(4));
+    playTo(m, 2);
+    expect(m.offer).not.toBeNull();
     m.runEndTurn();
-    expect(m.t).toBe(6);
-    expect(m.picked.p).toBeNull();
+    expect(m.t).toBe(3);
+    expect(m.owned.p).toEqual([]);
   });
 
   it("desconto da loja reduz o preço, sem ficar negativo", () => {
-    const m = new Match(cfgWith(four), pool, seeded(3));
+    const m = new Match(cfgWith(all), pool, seeded(3));
     m.discount.p = 1;
-    expect(m.itemPrice("p", "Ricochet")).toBe(3);
+    expect(m.itemPrice("p", "Ricochet")).toBe(5);
     m.discount.p = 9;
     expect(m.itemPrice("p", "Ricochet")).toBe(0);
   });
 
   it("sem itens ligados não há loja", () => {
     const m = new Match(cfgWith([]), pool, seeded(4));
-    playUntil(m, 5);
+    playTo(m, 2);
     expect(m.offer).toBeNull();
-    expect(m.needsPick).toBe(false);
   });
 
-  it("Swift Striker dá poder contínuo às cartas de custo 3 ou menos", () => {
-    const m = new Match(cfgWith(["Swift Striker"]), pool, seeded(5));
-    playUntil(m, 6);
-    const c = m.loc.flatMap((l) => l.s.p).find((x) => x.rev && x.cost <= 3);
-    if (!c) return;
-    const before = m.pow(c);
-    m.itemsOn = false;
-    expect(before - m.pow(c)).toBe(2);
-  });
-
-  it.each(ITEM_KEYS)("%s: partidas com o item terminam sem erro", (k) => {
+  it.each(ITEM_KEYS)("%s: partidas com o item terminam sem erro e a IA também compra", (k) => {
+    let aiBought = 0;
     for (let seed = 1; seed <= 25; seed++) {
       const m = new Match(cfgWith([k], DEFAULT_LOCS), pool, seeded(seed));
       let result = null;
       while (!result) {
-        if (m.needsPick) m.pick(k);
-        for (const c of [...m.hand].sort((a, b) => a.cost - b.cost)) {
-          const l = m.loc.find((x) => !m.canPlay(c, x));
-          if (l) m.play(c, l);
-        }
+        for (const c of [...m.hand].sort((a, b) => a.cost - b.cost)) { const l = m.loc.find((x) => !m.canPlay(c, x)); if (l) m.play(c, l); }
+        if (m.offer && m.canBuy(k)) m.buy(k, m.itemTargets("p", k)[0]);
         result = m.runEndTurn();
       }
-      expect(m.picked.p).toBe(k);
-      expect(m.picked.a).toBe(k);
+      aiBought += m.owned.a.length;
       for (const l of m.loc) for (const s of ["p", "a"] as const) for (const c of l.s[s]) expect(m.pow(c, l)).toBeGreaterThanOrEqual(0);
     }
+    expect(aiBought).toBeGreaterThan(0);
+  });
+});
+
+describe("comeback e recompensa", () => {
+  it("quem perde em mais locais ganha +1 alma no próximo round", () => {
+    const { m, put } = arena();
+    const c = put(pc("a", "Herói Novo", flat(70)), "a", 0);
+    c.ab = "none"; c.base = 5;
+    m.endOfTurn();
+    m.nextTurn();
+    expect(m.E).toBe(m.t + 1);
+    expect(m.AE).toBe(m.t);
+  });
+
+  it("virar um local que o outro segurava há 2 rounds dá +1 alma", () => {
+    const { m, put } = arena();
+    const a = put(pc("a", "Herói Novo", flat(70)), "a", 0);
+    a.ab = "none"; a.base = 5;
+    m.endOfTurn(); m.t++;
+    m.endOfTurn(); m.t++;
+    const p = put(pc("p", "Herói Novo", flat(70)), "p", 0);
+    p.ab = "none"; p.base = 9;
+    m.extra = { p: 0, a: 0 };
+    m.endOfTurn();
+    expect(m.log.some((e) => e.k === "bounty" && e.side === "p")).toBe(true);
+    expect(m.extra.p).toBe(1);
   });
 });
 

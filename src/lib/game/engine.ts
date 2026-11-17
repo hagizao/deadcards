@@ -3,7 +3,7 @@
 import { getPlayerOvr } from "../cards";
 import type { Player } from "../types";
 import {
-  ABILITIES, ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, MASTERY_BONUS, phaseOf, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
+  ABILITIES, ITEMS, ITEM_KEYS, SHOPS, MASTERY_BONUS, phaseOf, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
   type AbilityKey, type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type ItemTier, type LocType, type Mastery, type PoolCard, type StatKey,
 } from "./config";
 
@@ -29,7 +29,7 @@ type Status = {
   tmp: { v: number; u: number }[];
   burrow?: boolean; stun?: number; immune?: boolean; immU?: number; rip?: number; ripV?: number; chained?: boolean; silenced?: boolean; silU?: number;
   burn?: number; tburn?: { v: number; u: number }[]; vuln?: number; sleep?: number; root?: number; petri?: boolean; unstop?: boolean;
-  chan?: { u: number }; drainU?: number; grown?: number; wolf?: boolean; wolfAt?: number; exec?: { u: number; target?: number }; duel?: boolean; mvT?: number; grow?: number;
+  chan?: { u: number }; drainU?: number; grown?: number; cd?: boolean; wolf?: boolean; wolfAt?: number; exec?: { u: number; target?: number }; duel?: boolean; mvT?: number; grow?: number;
 };
 
 /** Movimento disponível: quantas vezes, até que turno, bônus ao chegar, ilusão deixada para trás e destino só com inimigas. */
@@ -51,7 +51,14 @@ export type Loc = {
   L: GameLoc; rev: boolean; s: Record<Side, GCard[]>; lock: Record<Side, number>; trap: Record<Side, number>;
   /** Kelvin: até que turno cada lado não sofre dano aqui. Vyper: petrificação armada contra cada lado. */
   shield: Record<Side, number>; petri: Record<Side, { m: boolean } | null>;
+  /** Quem vence o local e há quantos rounds seguidos (recompensa por virar um local segurado). */
+  hold: { side: Side | null; n: number };
 };
+
+/** Item comprado: o que é, em quem (id da carta) e no round em que foi aplicado. */
+export type Bought = { k: ItemKey; target: number; t: number; name?: Name };
+/** Rounds seguidos segurando um local para que virá-lo dê a recompensa. */
+export const BOUNTY_AT = 2;
 
 /** Passo da revelação: revelar uma carta, ou executar a marca do Shiv. */
 export type Act = { c: GCard; l: Loc; exec?: boolean };
@@ -64,7 +71,7 @@ export type LogKey =
   | "haze" | "dance" | "holliday" | "infernus" | "ivy" | "kelvin" | "geist" | "lash" | "turret" | "move" | "burrow" | "harrow" | "paige"
   | "paradox" | "pocket" | "rats" | "rem" | "storm" | "shiv" | "mark" | "wolf" | "illusion" | "portal" | "trap" | "vindicta" | "fall"
   | "cube" | "petrify" | "wraith" | "liftEnd" | "yamato" | "chanEnd" | "extraSouls" | "hookPull" | "trapHit" | "urn" | "boss" | "zipline"
-  | "item" | "shop" | "prio" | "phase" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves";
+  | "item" | "itemLost" | "shop" | "prio" | "phase" | "comeback" | "bounty" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves";
 
 export type Result = { outcome: "win" | "loss" | "draw"; won: number; lost: number; myPower: number; aiPower: number; patron: boolean };
 export type PlayError = "souls" | "frozen" | "full";
@@ -93,17 +100,17 @@ const onReveal = (c: GCard) => ABILITIES[c.ab].kind === "r";
 /** Com o que cada item combina: cartas (função, habilidade, custo) e tipo de local. Usado pela IA e pela tela do draft. */
 const ITEM_FIT: Partial<Record<ItemKey, { card?: (c: GCard) => boolean; loc?: LocType }>> = {
   "High-Velocity Rounds": { card: isGun },
-  "Extra Spirit": { card: (c) => ABILITIES[c.ab].hero },
+  "Extra Spirit": { card: (c) => ABILITIES[c.ab].hero && ABILITIES[c.ab].usesV },
   "Golden Goose Egg": { loc: "urn" },
-  "Swift Striker": { card: (c) => c.cost <= 3, loc: "costLow" },
+  "Swift Striker": { card: (c) => c.cost <= 3 },
   "Battle Vest": { card: isFront },
   "Healing Booster": { card: (c) => SUPPORT.has(c.ab) },
   "Arcane Surge": { card: onReveal, loc: "ritual" },
-  "Toxic Bullets": { card: isGun },
-  "Superior Cooldown": { card: (c) => ABILITIES[c.ab].kind === "f", loc: "endturn" },
+  "Surge of Power": { card: onReveal },
+  "Superior Cooldown": { card: (c) => ABILITIES[c.ab].kind === "f" },
   "Glass Cannon": { card: isGun },
   "Colossus": { card: isFront },
-  "Echo Shard": { card: onReveal, loc: "ritual" },
+  "Echo Shard": { card: onReveal },
   "Refresher": { card: onReveal },
 };
 
@@ -131,13 +138,13 @@ export class Match {
   hand: GCard[] = [];
   ahand: GCard[] = [];
   result: Result | null = null;
-  /** Draft do turno 5: as 3 opções de cada lado (mesmos tiers, itens sorteados à parte) e a escolha. */
+  /** Loja aberta neste round: as 3 opções de cada lado (mesmos tiers, itens sorteados à parte). */
   offer: Record<Side, ItemKey[]> | null = null;
-  picked: Record<Side, ItemKey | null> = { p: null, a: null };
-  /** Itens revelados (turno 6 em diante) e quanto cada lado pagou. */
-  itemsOn = false;
-  paid: Record<Side, number> = { p: 0, a: 0 };
-  /** Desconto no item para quem venceu a Loja Secreta no fim do turno 4. */
+  /** Compra deste round, ainda não aplicada (a da IA fica escondida até o fim do turno). */
+  buying: Record<Side, Bought | null> = { p: null, a: null };
+  /** Itens já aplicados, em ordem. */
+  owned: Record<Side, Bought[]> = { p: [], a: [] };
+  /** Desconto na próxima loja para quem venceu a Loja Secreta no round anterior. */
   discount: Record<Side, number> = { p: 0, a: 0 };
   /** Quem age primeiro no turno: o Rei Oculto (você) no turno 1; depois, quem estiver ganhando a partida. */
   prio: Side = "p";
@@ -145,7 +152,7 @@ export class Match {
 
   constructor(private cfg: GameConfig, pool: PoolCard[], private rnd: () => number = Math.random) {
     this.loc = this.sh(cfg.locs).slice(0, LOC_COUNT).map((L) => ({
-      L, rev: false, s: { p: [], a: [] }, lock: { p: 0, a: 0 }, trap: { p: 0, a: 0 }, shield: { p: 0, a: 0 }, petri: { p: null, a: null },
+      L, rev: false, s: { p: [], a: [] }, lock: { p: 0, a: 0 }, trap: { p: 0, a: 0 }, shield: { p: 0, a: 0 }, petri: { p: null, a: null }, hold: { side: null, n: 0 },
     }));
     this.deck = this.sh(pool).slice(0, DECK_SIZE).map((p) => this.mk(p, cfg, "p"));
     this.adeck = this.sh(pool).slice(0, DECK_SIZE).map((p) => this.mk(p, cfg, "a"));
@@ -250,7 +257,6 @@ export class Match {
     if (a === "Mo & Krill" && this.final) x += c.v;
     if (this.ty(l, "costLow") && c.cost <= l.L.n) x += l.L.v;
     if (this.ty(l, "costHigh") && c.cost >= l.L.n) x += l.L.v;
-    if (this.active(c.side, "Swift Striker") && c.cost <= 3) x += this.itemV("Swift Striker");
     return Math.max(0, x);
   }
   total = (l: Loc, s: Side) => l.s[s].filter((c) => c.rev).reduce((a, c) => a + this.pow(c, l), 0);
@@ -690,80 +696,58 @@ export class Match {
 
   /* ---------- itens da loja ---------- */
   itemV = (k: ItemKey) => itemStats(k, this.cfg.items).v;
-  /** O item está revelado e em efeito para este lado. */
-  active = (s: Side, k: ItemKey) => this.itemsOn && this.picked[s] === k;
   private mine = (s: Side) => this.everywhere(s).map((x) => x[0]);
   private addSouls(s: Side, n: number) { if (s === "p") this.E += n; else this.AE += n; }
   private leading = (s: Side, l: Loc) => this.total(l, s) > this.total(l, opp(s));
+  /** Repete o Ao revelar da carta (n vezes; 2× no Círculo do Ritual por vez). */
+  private reReveal(c: GCard, n = 1) {
+    for (let k = 0; k < n; k++) {
+      const impl = this.IMPL[this.abilityOf(c)];
+      for (let i = 0, m = this.ty(this.locOf(c), "ritual") ? 2 : 1; i < m; i++) { const at = this.locOf(c); if (at && impl?.r) impl.r(c, at, c.v); }
+    }
+  }
+  private cleanse(c: GCard) {
+    const st = c.st;
+    const bad = !!st.burn || !!st.tburn?.length || !!st.petri || !!st.silenced || (st.stun ?? 0) >= this.t || (st.vuln ?? 0) >= this.t || st.tmp.some((m) => m.v < 0 && this.t <= m.u);
+    st.burn = 0; st.tburn = []; st.petri = false; st.silenced = false; st.stun = 0; st.vuln = 0; st.sleep = 0; st.tmp = st.tmp.filter((m) => m.v >= 0);
+    return bad;
+  }
 
-  /** Efeito de cada item na revelação (início do turno 6). Itens contínuos agem em pow/reveal/endOfTurn. */
-  private ITEM_FX: Partial<Record<ItemKey, (s: Side, v: number) => void>> = {
-    "High-Velocity Rounds": (s, v) => this.mine(s).filter(isGun).forEach((c) => (c.bonus += v)),
-    "Close Quarters": (s, v) => this.loc.forEach((l) => {
-      if (l.s[opp(s)].filter((c) => c.rev).length >= l.s[s].filter((c) => c.rev).length) l.s[s].forEach((c) => { if (c.rev) c.bonus += v; });
-    }),
-    "Extra Health": (s, v) => this.mine(s).forEach((c) => (c.bonus += v)),
-    "Healing Rite": (s, v) => {
-      this.mine(s).forEach((c) => {
-        const st = c.st;
-        const bad = !!st.burn || !!st.tburn?.length || !!st.petri || (st.stun ?? 0) >= this.t || (st.vuln ?? 0) >= this.t || st.tmp.some((m) => m.v < 0 && this.t <= m.u);
-        if (!bad) return;
-        st.burn = 0; st.tburn = []; st.petri = false; st.stun = 0; st.vuln = 0; st.sleep = 0; st.tmp = st.tmp.filter((m) => m.v >= 0);
-        c.bonus += v;
-      });
-      const w = this.weakest(this.mine(s));
-      if (w) w.bonus += v;
-    },
-    "Extra Spirit": (s, v) => this.mine(s).filter((c) => ABILITIES[this.abilityOf(c)].hero).forEach((c) => (c.bonus += v)),
-    "Golden Goose Egg": (s, v) => this.addSouls(s, v + (this.loc.some((l) => this.ty(l, "urn") && this.leading(s, l)) ? 2 : 0)),
-    "Long Range": (s, v) => this.loc.forEach((l) => { if (this.leading(opp(s), l)) l.s[s].forEach((c) => { if (c.rev) c.bonus += v; }); }),
-    "Battle Vest": (s, v) => this.mine(s).forEach((c) => (c.bonus += isFront(c) ? v + 2 : 2)),
-    "Healing Booster": (s, v) => this.mine(s).forEach((c) => (c.bonus += 2 + (SUPPORT.has(this.abilityOf(c)) ? v : 0))),
-    "Arcane Surge": (s, v) => {
-      const c = this.strongest(this.mine(s).filter((x) => this.IMPL[this.abilityOf(x)]?.r));
-      if (!c) return;
+  /** Efeito de cada item na carta alvo, aplicado no fim do turno da compra (antes dos efeitos de fim do turno). */
+  private ITEM_FX: Record<ItemKey, (c: GCard, s: Side, v: number) => void> = {
+    "High-Velocity Rounds": (c, _s, v) => { c.bonus += isGun(c) ? v : v - 1; },
+    "Close Quarters": (c, s, v) => { const l = this.locOf(c); c.bonus += l && l.s[opp(s)].filter((x) => x.rev).length >= l.s[s].filter((x) => x.rev).length ? v : 1; },
+    "Extra Health": (c, _s, v) => { c.bonus += v; },
+    "Healing Rite": (c, _s, v) => { this.cleanse(c); c.bonus += v; },
+    "Extra Spirit": (c, _s, v) => { if (ABILITIES[c.ab].usesV) c.v += v; c.bonus += 1; },
+    "Golden Goose Egg": (c, s, v) => { c.bonus += 1; this.extra[s] += v + (this.loc.some((l) => this.ty(l, "urn") && this.leading(s, l)) ? 1 : 0); },
+    "Swift Striker": (c, _s, v) => { c.bonus += c.cost <= 3 ? v : 2; },
+    "Long Range": (c, s, v) => { const l = this.locOf(c); c.bonus += l && this.leading(opp(s), l) ? v : 2; },
+    "Battle Vest": (c, _s, v) => { c.bonus += isFront(c) ? v : 2; },
+    "Healing Booster": (c, _s, v) => { c.bonus += v + (SUPPORT.has(this.abilityOf(c)) ? 2 : 0); },
+    "Arcane Surge": (c, _s, v) => { c.bonus += v; this.reReveal(c); },
+    "Slowing Hex": (c, _s, v) => { this.hurt(c, v, null); this.silence(c); },
+    "Toxic Bullets": (c, _s, v) => { if (!this.ty(this.locOf(c), "shrine")) c.st.burn = (c.st.burn ?? 0) + v; },
+    "Sharpshooter": (c, s, v) => { c.bonus += this.strongest(this.mine(s)) === c ? v : 4; },
+    "Metal Skin": (c, _s, v) => { c.st.immune = true; c.bonus += v; },
+    "Rescue Beam": (c, s, v) => {
       c.bonus += v;
-      for (let i = 0, n = this.ty(this.locOf(c), "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) this.IMPL[this.abilityOf(c)]?.r?.(c, at, c.v); }
-    },
-    "Slowing Hex": (s, v) => {
-      const t = this.strongest(this.tg(this.mine(opp(s))));
-      if (!t) return;
-      this.hurt(t, v, null);
-      this.silence(t);
-    },
-    "Toxic Bullets": (s, v) => this.loc.forEach((l) => {
-      if (this.ty(l, "shrine")) return;
-      const n = l.s[s].some((c) => c.rev && isGun(c)) ? v + 3 : v;
-      this.tg(l.s[opp(s)].filter((c) => c.rev)).forEach((c) => (c.st.burn = (c.st.burn ?? 0) + n));
-    }),
-    "Sharpshooter": (s, v) => { const top = this.strongest(this.mine(s)); this.mine(s).forEach((c) => (c.bonus += c === top ? v : 2)); },
-    "Metal Skin": (s, v) => this.mine(s).forEach((c) => { c.st.immune = true; c.bonus += v; }),
-    "Rescue Beam": (s, v) => {
-      const c = this.weakest(this.mine(s));
-      if (!c) return;
-      this.mine(s).forEach((x) => (x.bonus += x === c ? v : 2));
       const from = this.locOf(c);
       const to = this.best(this.loc.filter((l) => l !== from && this.room(l, s) && this.leading(opp(s), l)), (l) => this.total(l, s) - this.total(l, opp(s)));
       this.move(c, from, to ?? undefined);
     },
-    "Glass Cannon": (s, v) => this.mine(s).forEach((c) => (c.bonus += isGun(c) ? v : 4)),
-    "Ricochet": (s, v) => this.loc.forEach((l) => this.hurt(this.strongest(this.tg(l.s[opp(s)].filter((c) => c.rev && !c.st.burrow))), v, null)),
-    "Colossus": (s, v) => {
-      const l = this.best(this.sh(this.loc), (L) => L.s[s].filter((c) => c.rev).length);
-      this.mine(s).forEach((c) => (c.bonus += this.locOf(c) === l ? v + (isFront(c) ? v : 0) : 3));
+    "Surge of Power": (c, _s, v) => { c.bonus += ABILITIES[c.ab].kind === "r" ? v : 4; },
+    "Superior Cooldown": (c, _s, v) => { c.st.cd = true; c.bonus += v; },
+    "Glass Cannon": (c, _s, v) => { c.bonus += isGun(c) ? v : 7; },
+    "Ricochet": (c, _s, v) => {
+      const l = this.locOf(c);
+      this.hurt(c, v, null);
+      if (l) this.tg(l.s[c.side].filter((x) => x !== c && x.rev && !x.st.burrow)).forEach((x) => this.hurt(x, 2, null));
     },
-    "Surge of Power": (s, v) => this.mine(s).filter((c) => ABILITIES[this.abilityOf(c)].kind === "r").forEach((c) => (c.bonus += v)),
-    "Unstoppable": (s, v) => this.mine(s).forEach((c) => { c.st.chained = false; c.st.silenced = false; c.st.petri = false; c.st.stun = 0; c.st.root = 0; c.bonus += v; }),
-    "Echo Shard": (s, v) => {
-      const top = this.strongest(this.mine(s));
-      const echoes = this.sh(this.mine(s).filter((c) => c !== top)).slice(0, 2);
-      [top, ...echoes].forEach((c) => { if (c) c.bonus += v; });
-    },
-    "Refresher": (s, v) => this.mine(s).forEach((c) => {
-      const at = this.locOf(c);
-      if (at && c.rev) this.IMPL[this.abilityOf(c)]?.r?.(c, at, c.v);
-      if (this.locOf(c)) c.bonus += v;
-    }),
+    "Colossus": (c, _s, v) => { c.st.immune = true; c.bonus += v + (isFront(c) ? 2 : 0); },
+    "Unstoppable": (c, _s, v) => { this.cleanse(c); c.st.chained = false; c.st.root = 0; c.st.unstop = true; c.bonus += v; },
+    "Echo Shard": (c, _s, v) => { c.bonus += v; this.reReveal(c, 2); },
+    "Refresher": (c, _s, v) => { this.cleanse(c); c.bonus += v; this.reReveal(c); },
   };
 
   /** Quantas cartas suas (mão e mesa) e qual local em jogo combinam com o item. */
@@ -774,15 +758,19 @@ export class Match {
     return { cards, loc };
   }
 
+  /** Cartas que o item pode mirar: suas na mesa (inclusive as jogadas neste turno) ou, se for de ataque, inimigas reveladas. */
+  itemTargets(s: Side, k: ItemKey): GCard[] {
+    if ((ITEMS[k] as { foe?: boolean }).foe) return this.tg(this.everywhere(opp(s)).map((x) => x[0]));
+    return this.loc.flatMap((l) => l.s[s].filter((c) => !c.st.burrow));
+  }
+
   private itemsOfTier = (t: ItemTier) => ITEM_KEYS.filter((k) => ITEMS[k].tier === t && itemStats(k, this.cfg.items).on);
 
-  private openShop() {
-    const avail = ITEM_TIERS.filter((t) => this.itemsOfTier(t).length);
+  private openShop(tiers0: ItemTier[]) {
+    const avail = tiers0.filter((t) => this.itemsOfTier(t).length);
     if (!avail.length) return;
-    // mesma combinação de tiers para os dois lados; tiers diferentes entre si quando dá
-    const tiers = this.sh(avail).slice(0, 3);
-    while (tiers.length < 3) tiers.push(this.sh(avail)[0]);
-    tiers.sort((a, b) => a - b);
+    // 3 opções nos tiers da loja; com 2 tiers, ao menos uma de cada
+    const tiers = avail.length === 1 ? [avail[0], avail[0], avail[0]] : [...avail, this.sh(avail)[0]].sort((a, b) => a - b);
     const draft = () => {
       const out: ItemKey[] = [];
       for (const t of tiers) {
@@ -792,44 +780,58 @@ export class Match {
       return out;
     };
     this.offer = { p: draft(), a: draft() };
-    this.picked.a = this.best(this.sh(this.offer.a), (k) => {
-      const fit = this.itemFit("a", k);
-      return ITEMS[k].tier + 0.6 * fit.cards + (fit.loc ? 1.5 : 0) + this.rnd() * 1.5;
-    });
-    this.pay("a", this.picked.a);
   }
 
-  /** Cobra o item na hora da escolha (turno 5), devolvendo o que tinha sido pago por outro. */
-  private pay(s: Side, k: ItemKey | null) {
-    const back = this.paid[s];
-    this.paid[s] = k ? this.itemPrice(s, k) : 0;
-    if (s === "p") this.E += back - this.paid.p;
-    else this.AE += back - this.paid.a;
-  }
-
-  /** Almas disponíveis para este item, contando a devolução do item já escolhido. */
-  canBuy = (k: ItemKey) => this.itemPrice("p", k) <= this.E + this.paid.p;
-
-  /** O jogador ainda precisa escolher o item antes de fechar o turno. */
-  get needsPick() { return this.t === ITEM_OFFER_TURN && !!this.offer && !this.picked.p && this.offer.p.some(this.canBuy); }
-
-  pick(k: ItemKey) {
-    if (this.busy || this.t !== ITEM_OFFER_TURN || !this.offer?.p.includes(k) || !this.canBuy(k)) return;
-    this.picked.p = k;
-    this.pay("p", k);
-  }
-
-  /** Custo final do item: tier em almas, menos o desconto da Loja Secreta. */
+  /** Custo final do item: almas do tier, menos o desconto da Loja Secreta. */
   itemPrice = (s: Side, k: ItemKey) => Math.max(0, itemCost(ITEMS[k].tier) - this.discount[s]);
 
-  private revealItems() {
-    this.itemsOn = true;
+  /** Dá para comprar este item agora (com a devolução da compra já feita neste round)? */
+  canBuy = (k: ItemKey) => !!this.offer?.p.includes(k) && this.itemPrice("p", k) <= this.E + (this.buying.p ? this.itemPrice("p", this.buying.p.k) : 0) && this.itemTargets("p", k).length > 0;
+
+  /** Compra o item e mira uma carta. Uma compra por loja; comprar outro troca a compra. */
+  buy(k: ItemKey, target: GCard) {
+    if (this.busy || !this.canBuy(k) || !this.itemTargets("p", k).includes(target)) return false;
+    this.unbuy();
+    this.E -= this.itemPrice("p", k);
+    this.buying.p = { k, target: target.id, t: this.t };
+    return true;
+  }
+  unbuy() {
+    const b = this.buying.p;
+    if (this.busy || !b) return;
+    this.E += this.itemPrice("p", b.k);
+    this.buying.p = null;
+  }
+
+  /** IA: escolhe o item que mais combina com a mesa e mira a carta que mais aproveita. */
+  private aiShop() {
+    if (!this.offer) return;
+    const opts = this.offer.a.filter((k) => this.itemPrice("a", k) <= this.AE && this.itemTargets("a", k).length);
+    const k = this.best(this.sh(opts), (x) => { const f = this.itemFit("a", x); return ITEMS[x].tier + 0.6 * f.cards + (f.loc ? 1.5 : 0) + this.rnd() * 1.5; });
+    if (!k) return;
+    const fit = ITEM_FIT[k]?.card;
+    const margin = (c: GCard) => { const l = this.locOf(c); return l ? Math.abs(this.total(l, "a") - this.total(l, "p")) : 99; };
+    const ts = this.itemTargets("a", k);
+    const t = (ITEMS[k] as { foe?: boolean }).foe ? this.strongest(ts) : this.best(this.sh(ts), (c) => (fit?.(c) ? 10 : 0) - margin(c));
+    if (!t) return;
+    this.AE -= this.itemPrice("a", k);
+    this.buying.a = { k, target: t.id, t: this.t };
+  }
+
+  /** Aplica as compras do round (quem tem prioridade primeiro). Se o alvo saiu da mesa, o item se perde. */
+  private applyItems() {
     for (const s of this.order()) {
-      const k = this.picked[s];
-      if (!k) continue;
-      this.say({ k: "item", side: s, item: k });
-      this.ITEM_FX[k]?.(s, this.itemV(k));
+      const b = this.buying[s];
+      if (!b) continue;
+      this.buying[s] = null;
+      const c = this.byId(b.target);
+      const ok = !!c && !!this.locOf(c) && !!(ITEMS[b.k] as { foe?: boolean }).foe === (c.side !== s);
+      this.owned[s].push({ ...b, name: c ? this.N(c) : undefined });
+      if (!c || !ok) { this.say({ k: "itemLost", side: s, item: b.k }); continue; }
+      this.say({ k: "item", side: s, item: b.k, t: this.N(c) });
+      this.ITEM_FX[b.k](c, s, this.itemV(b.k));
     }
+    if (this.offer) { this.offer = null; this.discount = { p: 0, a: 0 }; }
   }
 
   /* ---------- turnos ---------- */
@@ -850,8 +852,8 @@ export class Match {
     this.draw("p");
     this.draw("a");
     if (this.t <= LOC_COUNT) this.loc[this.t - 1].rev = true;
-    if (this.t === ITEM_OFFER_TURN) this.openShop();
-    if (this.t === ITEM_REVEAL_TURN) this.revealItems();
+    const shop = SHOPS[this.t];
+    if (shop) this.openShop(shop);
     this.busy = false;
   }
 
@@ -925,8 +927,9 @@ export class Match {
 
   /** Fecha o turno: a IA joga e devolve a ordem de revelação (alternando lados; quem tem prioridade começa; execuções marcadas antes das cartas). */
   endTurn(): Act[] {
-    if (this.busy || this.needsPick) return [];
+    if (this.busy) return [];
     this.busy = true;
+    this.aiShop();
     this.aiPlay();
     this.aiMoves();
     const side = (s: Side): Act[] => [
@@ -970,7 +973,6 @@ export class Match {
     if (this.ty(l, "enter")) c.bonus += l.L.v;
     if (this.ty(l, "chaos")) { c.base = 1 + Math.floor(this.rnd() * Math.max(1, l.L.n)); c.bonus = 0; }
     if (this.ty(l, "loot")) for (let i = 0; i < l.L.v; i++) this.draw(s);
-    if (this.active(s, "Metal Skin")) c.st.immune = true;
     // um Suporte revelado solta os aliados erguidos pela Wraith
     if (c.p.role === "Suporte") l.s[s].forEach((x) => { if (x !== c && (x.st.stun ?? 0) >= this.t) { x.st.stun = 0; this.say({ k: "liftEnd", c: this.N(x) }); } });
     this.mentor(c);
@@ -980,13 +982,13 @@ export class Match {
   }
 
   endOfTurn() {
+    this.applyItems();
     this.loc.forEach((l) => this.order().flatMap((s) => l.s[s]).forEach((c) => {
-      for (let i = 0, n = this.active(c.side, "Superior Cooldown") ? 2 : 1; i < n; i++) {
+      for (let i = 0, n = c.st.cd ? 2 : 1; i < n; i++) {
         const L = this.locOf(c);
         if (c.rev && L === l) this.IMPL[this.abilityOf(c)]?.f?.(c, L, c.v);
       }
     }));
-    this.order().forEach((s) => { if (this.active(s, "Superior Cooldown")) this.mine(s).forEach((c) => (c.bonus += this.itemV("Superior Cooldown"))); });
     const due = this.pend.filter((p) => p.t === this.t);
     this.pend = this.pend.filter((p) => p.t !== this.t);
     due.forEach((p) => p.f());
@@ -1001,8 +1003,11 @@ export class Match {
       const p = this.total(l, "p"), a = this.total(l, "a"), lead: Side | null = p > a ? "p" : a > p ? "a" : null;
       if (this.ty(l, "endturn")) [...l.s.p, ...l.s.a].forEach((c) => { if (c.rev) c.bonus += l.L.v; });
       if (this.ty(l, "urn") && lead) { this.extra[lead] += l.L.v; this.say({ k: "urn", side: lead }); }
-      if (this.ty(l, "shop") && this.t === ITEM_OFFER_TURN - 1 && lead) { this.discount[lead] += l.L.v; this.say({ k: "shop", side: lead, v: l.L.v }); }
+      if (this.ty(l, "shop") && SHOPS[this.t + 1] && lead) { this.discount[lead] += l.L.v; this.say({ k: "shop", side: lead, v: l.L.v }); }
       if (this.ty(l, "midboss") && this.t === l.L.n && lead) { this.everywhere(lead).forEach(([x]) => (x.bonus += l.L.v)); this.say({ k: "boss", side: lead }); }
+      // recompensa: quem vira um local que o outro segurava há BOUNTY_AT rounds ganha +1 alma
+      if (lead && l.hold.side && lead !== l.hold.side && l.hold.n >= BOUNTY_AT) { this.extra[lead] += 1; this.say({ k: "bounty", side: lead, loc: l.L.name }); }
+      if (lead) l.hold = lead === l.hold.side ? { side: lead, n: l.hold.n + 1 } : { side: lead, n: 1 };
       if (this.ty(l, "zipline")) this.order().forEach((s) => {
         const w = this.weakest(l.s[s].filter((x) => x.rev && !x.st.chained));
         const d = w && this.pickLoc(l, s);
@@ -1018,6 +1023,8 @@ export class Match {
     const sc = this.score();
     const lead: Side | null = sc.p > sc.a ? "p" : sc.a > sc.p ? "a" : null;
     if (lead && lead !== this.prio) { this.prio = lead; this.say({ k: "prio", side: lead }); }
+    // comeback: quem está perdendo em mais locais ganha +1 alma no próximo round
+    if (lead && !this.over) { this.extra[opp(lead)] += 1; this.say({ k: "comeback", side: opp(lead) }); }
   }
 
   get over() { return this.t >= TURNS; }
@@ -1056,7 +1063,6 @@ export class Match {
 
   /** Fecha o turno de uma vez, sem a pausa entre revelações (testes e simulação). Sem escolha feita, fica com o primeiro item. */
   runEndTurn(): Result | null {
-    if (this.needsPick) this.pick(this.offer!.p.find(this.canBuy)!);
     for (const a of this.endTurn()) this.act(a);
     this.endOfTurn();
     if (this.over) return this.finish();

@@ -7,8 +7,8 @@ import { AudioMenu, EndTurnButton, SoulOrb } from "../components/GameHud";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, ITEMS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, gameConfig, phaseOf, type ItemKey, type ItemSlot } from "../lib/game/config";
-import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
+import { ABILITIES, ITEMS, gameConfig, phaseOf, type ItemKey, type ItemSlot } from "../lib/game/config";
+import { MIN_POOL, Match, TURNS, cardPool, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
 import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
@@ -86,6 +86,8 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   useEffect(() => { duckMusic(showEnd); }, [showEnd]);
   // escolha de alvo ao jogar, movimento ou marca do Shiv em andamento
   const [mode, setMode] = useState<Mode | null>(null);
+  /** Item da loja escolhido, esperando a carta alvo (mirado com a seta). */
+  const [aim, setAim] = useState<ItemKey | null>(null);
   // carta sendo arrastada da mão e o local sob o cursor
   const [drag, setDrag] = useState<{ c: GCard; over: number | null } | null>(null);
   // carta da mesa ampliada no hover
@@ -109,7 +111,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const name = (c: GCard) => (c.p.token ? t.tokens[c.p.token] : c.p.name);
   const logName = (n: LogEntry["c"]) => (n === undefined ? "" : typeof n === "string" ? n : t.tokens[n.token]);
   const logLine = m.log[0] ? t.log[m.log[0].k](m.log[0], logName, (k) => t.abilities[k].name) : "";
-  const shopOpen = m.t === ITEM_OFFER_TURN && !!m.offer && !result;
+  const shopOpen = !!m.offer && !result && !m.busy;
   const errText: Record<PlayError, string> = { souls: t.ui.toast.souls, frozen: t.ui.toast.frozen, full: t.ui.toast.full };
 
   /** Carta desenhada a partir da carta da coleção; `text` mostra a habilidade (mão e zoom), `fx` liga partículas e brilho. */
@@ -143,12 +145,13 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     setShowEnd(false);
     setMode(null);
     setShopHidden(false);
+    setAim(null);
     say(t.ui.toast.turn(1));
   };
 
   const endTurn = () => {
     if (m.busy || result) return;
-    if (m.needsPick) return say(t.shop.pickFirst);
+    setAim(null);
     const queue = m.endTurn();
     sfx("endTurn");
     setSel(null);
@@ -204,6 +207,12 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     setLook(null);
   };
   const pickBoard = (c: GCard) => {
+    if (aim) {
+      if (targets.includes(c) && m.buy(aim, c)) { sfx("target"); setShopHidden(false); }
+      setAim(null);
+      bump();
+      return;
+    }
     if (mode && targets.includes(c)) return hitCard(c);
     if (mode) setMode(null);
     if (c.staged && c.side === "p" && !m.busy) {
@@ -215,7 +224,14 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     }
     setLook((x) => (x === c ? null : c));
   };
-  const pickItem = (k: ItemKey) => { m.pick(k); bump(); };
+  /** Item da loja: escolher abre a mira; escolher o já comprado desfaz a compra. */
+  const pickItem = (k: ItemKey) => {
+    if (m.buying.p?.k === k) { m.unbuy(); bump(); return; }
+    if (!m.canBuy(k)) return;
+    setMode(null);
+    setAim(k);
+    setShopHidden(true);
+  };
   const playCard = (c: GCard, l: Loc) => {
     if (m.busy || result) return;
     const err = m.play(c, l);
@@ -231,7 +247,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   };
   const playAt = (l: Loc) => { if (sel) playCard(sel, l); };
 
-  const targets = !mode ? [] : mode.k === "card" ? m.choiceCards(mode.c) : mode.k === "mark" ? m.markOptions(mode.c) : [];
+  const targets = aim ? m.itemTargets("p", aim) : !mode ? [] : mode.k === "card" ? m.choiceCards(mode.c) : mode.k === "mark" ? m.markOptions(mode.c) : [];
   const dests = !mode ? [] : mode.k === "loc" ? m.choiceLocs(mode.c) : mode.k === "move" ? m.moveOptions(mode.c) : [];
   const hitCard = (x: GCard) => {
     if (!mode) return;
@@ -263,7 +279,12 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     if (c.staged && c.ch?.loc !== undefined) out.push({ from, to: `[data-drop="${c.ch.loc}"]` });
     if (c.st.exec?.u === m.t && c.st.exec.target !== undefined) out.push({ from, to: `[data-card="${c.st.exec.target}"]` });
     return out;
-  });
+  }).concat(m.buying.p ? [{ from: '[data-item-slot="p"]', to: `[data-card="${m.buying.p.target}"]` }] : []);
+  /** Nome do alvo de um item comprado (para a caixa do item). */
+  const boughtOn = (b: Bought) => {
+    const c = m.loc.flatMap((l) => [...l.s.p, ...l.s.a]).find((x) => x.id === b.target);
+    return c ? name(c) : logName(b.name);
+  };
   const handReady = !m.busy && !result && !m.hand.some((c) => m.loc.some((l) => !m.canPlay(c, l)));
   /** Mover e marcar: botões sobre a carta da mesa escolhida. */
   const actsOf = (c: GCard) => {
@@ -287,7 +308,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
           </abbr>
         </div>
         <div className="order-last col-span-2 flex items-start justify-center gap-2 sm:order-0 sm:col-span-1">
-          <ItemSlot s="a" m={m} t={t} icons={icons} />
+          <ItemSlot s="a" m={m} t={t} icons={icons} on={boughtOn} />
           <AiHand n={m.ahand.length} t={t} />
         </div>
         <div className="flex flex-wrap items-center justify-end gap-x-2 text-xs text-zinc-300">
@@ -330,7 +351,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
               <p className="text-xs text-zinc-400">{t.shop.hint}</p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 {m.offer.p.map((k) => (
-                  <ItemOption key={k} k={k} m={m} t={t} icon={icons[k]} picked={m.picked.p === k} disabled={m.busy || !m.canBuy(k)} onPick={() => pickItem(k)} />
+                  <ItemOption key={k} k={k} m={m} t={t} icon={icons[k]} picked={m.buying.p?.k === k} disabled={m.busy || (m.buying.p?.k !== k && !m.canBuy(k))} onPick={() => pickItem(k)} />
                 ))}
               </div>
             </motion.section>
@@ -339,7 +360,12 @@ function Board({ newMatch }: { newMatch: () => Match }) {
       </div>
 
       <div className="flex min-h-6 w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-xs" role="status" aria-live="polite">
-        {mode ? (
+        {aim ? (
+          <>
+            <span className="font-bold text-game-me">{t.shop.aim(aim)}</span>
+            <button type="button" className={pill(false)} onClick={() => { setAim(null); setShopHidden(false); }}>{t.ui.act.cancel}</button>
+          </>
+        ) : mode ? (
           <>
             <span className="font-bold text-game-me">{modeHint}</span>
             <span className="hidden text-zinc-400 sm:inline">{t.ui.aim}</span>
@@ -349,14 +375,12 @@ function Board({ newMatch }: { newMatch: () => Match }) {
           </>
         ) : shopOpen && shopHidden ? (
           <button type="button" className={pill(false)} onClick={() => setShopHidden(false)}>{t.shop.title}</button>
-        ) : m.needsPick ? (
-          <span id="game-pick-first" className="text-game-brass">{t.shop.pickFirst}</span>
         ) : <span className="line-clamp-1 text-zinc-300">{logLine || t.ui.hint}</span>}
       </div>
 
       <div className="flex w-full flex-wrap items-end justify-between gap-x-2 sm:flex-nowrap">
         <div className="flex shrink-0 flex-col items-center gap-1 pb-1">
-          <ItemSlot s="p" m={m} t={t} icons={icons} />
+          <ItemSlot s="p" m={m} t={t} icons={icons} on={boughtOn} />
           <SoulOrb n={m.E} label={t.ui.souls(m.E)} />
         </div>
         <section aria-label={t.ui.hand} className="relative z-10 order-last w-full min-w-0 sm:order-0 sm:w-auto sm:flex-1">
@@ -368,8 +392,8 @@ function Board({ newMatch }: { newMatch: () => Match }) {
         <div className="flex shrink-0 flex-col items-center gap-1 pb-1">
           {result && !showEnd
             ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
-            : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady && !m.needsPick}
-                disabled={m.busy || !!result || m.needsPick} describedBy={m.needsPick ? "game-pick-first" : undefined} onClick={endTurn} />}
+            : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady}
+                disabled={m.busy || !!result} onClick={endTurn} />}
         </div>
       </div>
 
@@ -377,7 +401,8 @@ function Board({ newMatch }: { newMatch: () => Match }) {
         {peek && !drag && <Peek key={peek.c.id} r={peek.r} card={face(peek.c, true, true)} tips={tipsOf(peek.c)} />}
       </AnimatePresence>
 
-      <TargetArrow from={mode ? `[data-card="${mode.c.id}"]` : null} lines={result ? [] : aimLines} onCancel={() => setMode(null)} />
+      <TargetArrow from={aim ? '[data-item-slot="p"]' : mode ? `[data-card="${mode.c.id}"]` : null} lines={result ? [] : aimLines}
+        onCancel={() => { setMode(null); if (aim) { setAim(null); setShopHidden(false); } }} />
 
       <AnimatePresence>
         {toast && (
@@ -608,43 +633,44 @@ function ItemOption({ k, m, t, icon, picked, disabled, onPick }: { k: ItemKey; m
           <span className={`text-[11px] font-bold tracking-wider uppercase ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
         </span>
         <span className="text-xs text-zinc-200">{t.items[k](m.itemV(k))}</span>
-        <span className="text-[11px] text-game-brass">{t.shop.price(m.itemPrice("p", k))}{!picked && !m.canBuy(k) && ` · ${t.shop.noSouls}`}</span>
+        <span className="text-[11px] text-game-brass">{t.shop.price(m.itemPrice("p", k))}{!picked && !m.canBuy(k) && ` · ${m.itemTargets("p", k).length ? t.shop.noSouls : t.shop.noTarget}`}</span>
         {(fit.cards > 0 || fit.loc) && (
           <span className="flex flex-wrap gap-1">
             {fit.cards > 0 && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me">{t.shop.fitCards(fit.cards)}</span>}
             {fit.loc && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me">{t.shop.fitLoc(fit.loc)}</span>}
           </span>
         )}
-        {picked && <span className="text-[11px] font-bold tracking-wider text-game-brass uppercase">{t.shop.picked}</span>}
+        {picked && <span className="text-[11px] font-bold tracking-wider text-game-brass uppercase">{t.shop.picked} · {t.shop.undo}</span>}
       </span>
     </button>
   );
 }
 
-/** Item comprado (seu ou da IA): ícone pequeno, com o texto numa caixa no hover/foco/toque. */
-function ItemSlot({ s, m, t, icons }: { s: Side; m: Match; t: T; icons: Record<string, string> }) {
+/** Itens comprados (seus ou da IA): ícones pequenos, com o texto e o alvo numa caixa no hover/foco/toque. A compra da IA só aparece no fim do turno. */
+function ItemSlot({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string }) {
   const [open, setOpen] = useState(false);
-  const k = m.picked[s];
+  const list = [...m.owned[s], ...(s === "p" && m.buying.p ? [m.buying.p] : [])];
   const who = s === "p" ? t.shop.mine : t.shop.ai;
-  if (!m.offer) return <span className="w-9 shrink-0" aria-hidden="true" />;
-  if (!k || (s === "a" && !m.itemsOn)) {
+  if (!list.length) {
     return (
-      <span title={`${who}: ${s === "a" && m.t < ITEM_REVEAL_TURN ? t.shop.hidden : "—"}`}
+      <span data-item-slot={s} title={`${who}: ${t.shop.hidden}`}
         className="flex size-9 shrink-0 items-center justify-center rounded-md bg-zinc-950/70 font-display text-sm text-zinc-500">?</span>
     );
   }
-  const it = ITEMS[k];
+  const size = list.length > 1 ? "size-7" : "size-9";
   return (
-    <span className="relative shrink-0">
+    <span className="relative shrink-0" data-item-slot={s}>
       <button type="button" onClick={() => setOpen((x) => !x)} onPointerEnter={(e) => { if (e.pointerType === "mouse") setOpen(true); }}
         onPointerLeave={(e) => { if (e.pointerType === "mouse") setOpen(false); }} onBlur={() => setOpen(false)}
-        aria-expanded={open} aria-label={`${who}: ${t.shop.label(k, it.tier)}`}
-        className={`block cursor-pointer rounded-md transition hover:brightness-125 active:scale-95 ${focus}`}>
-        <ItemIconBox k={k} icon={icons[k]} size="size-9" />
+        aria-expanded={open} aria-label={`${who}: ${list.map((b) => b.k).join(", ")}`}
+        className={`flex cursor-pointer gap-0.5 rounded-md transition hover:brightness-125 active:scale-95 ${focus}`}>
+        {list.map((b, i) => (
+          <span key={`${b.k}-${b.t}-${i}`} className={b === m.buying.p ? "animate-pulse" : ""}><ItemIconBox k={b.k} icon={icons[b.k]} size={size} /></span>
+        ))}
       </button>
       {open && (
         <TipBoxes className={`absolute z-70 ${s === "a" ? "top-full left-0 pt-1" : "bottom-full left-0 pb-1"}`}
-          tips={[{ title: `${who}: ${k} · ${t.slots[it.slot]} ${t.shop.tier(it.tier)}`, text: `${t.items[k](m.itemV(k))}${m.itemsOn ? ` (${t.shop.paid(m.paid[s])})` : ""}` }]} />
+          tips={list.map((b) => ({ title: `${b.k} · ${t.slots[ITEMS[b.k].slot]} ${t.shop.tier(ITEMS[b.k].tier)}`, text: `${t.items[b.k](m.itemV(b.k))} (${t.shop.on(on(b))})` }))} />
       )}
     </span>
   );

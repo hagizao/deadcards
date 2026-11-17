@@ -9,7 +9,7 @@ export const LOC_FIELDS: Record<LocType, ("v" | "n")[]> = {
   none: [], enter: ["v"], costLow: ["v", "n"], costHigh: ["v", "n"], slots: ["n"], endturn: ["v"], midboss: ["v", "n"],
   urn: ["v"], loot: ["v"], zipline: [], shrine: [], patron: [], ritual: [], chaos: ["n"], shop: ["v"],
 };
-export const LOC_N_RANGE: Partial<Record<LocType, [number, number]>> = { slots: [1, 4], costLow: [0, 8], costHigh: [0, 8], midboss: [1, 6], chaos: [1, 15] };
+export const LOC_N_RANGE: Partial<Record<LocType, [number, number]>> = { slots: [1, 4], costLow: [0, 8], costHigh: [0, 8], midboss: [1, 8], chaos: [1, 15] };
 export const LOC_V_RANGE: [number, number] = [-10, 10];
 export const nRange = (t: LocType): [number, number] => LOC_N_RANGE[t] ?? [1, 6];
 
@@ -18,7 +18,7 @@ export type GameLoc = { id: string; name: string; type: LocType; v: number; n: n
 export const DEFAULT_LOCS: GameLoc[] = [
   { id: "l1", name: "Guardião", type: "costLow", v: 2, n: 2 },
   { id: "l2", name: "Walker", type: "costHigh", v: 3, n: 5 },
-  { id: "l3", name: "Chefe do Meio", type: "midboss", v: 1, n: 4 },
+  { id: "l3", name: "Chefe do Meio", type: "midboss", v: 1, n: 6 },
   { id: "l4", name: "Urna de Almas", type: "urn", v: 1, n: 1 },
   { id: "l5", name: "Sacrifício do Pecador", type: "loot", v: 1, n: 1 },
   { id: "l6", name: "Tirolesa", type: "zipline", v: 0, n: 1 },
@@ -164,31 +164,33 @@ export const MASTERY_BONUS = 1;
 
 /* ---------- itens da loja ---------- */
 
-/** Turno em que cada lado escolhe 1 de 3 itens, e turno em que os itens são revelados e pagos. */
-export const ITEM_OFFER_TURN = 5;
-export const ITEM_REVEAL_TURN = 6;
+/** Lojas: em que round abrem e de quais tiers são os 3 itens oferecidos (early, mid e late). */
+export const SHOPS: Record<number, ItemTier[]> = { 2: [1], 4: [2, 3], 7: [3, 4] };
+export const SHOP_ROUNDS = Object.keys(SHOPS).map(Number);
 export const ITEM_TIERS = [1, 2, 3, 4] as const;
 export type ItemTier = (typeof ITEM_TIERS)[number];
 export type ItemSlot = "weapon" | "vitality" | "spirit";
-/** Custo em almas no turno da revelação: tier 1..4 = 1..4 almas (800/1600/3200/6400 no jogo). */
-export const itemCost = (tier: ItemTier) => tier;
-type ItemDef = { tier: ItemTier; slot: ItemSlot; v: number; usesV: boolean };
-const I = (tier: ItemTier, slot: ItemSlot, v: number, usesV = true): ItemDef => ({ tier, slot, v, usesV });
+/** Custo em almas de cada tier (800/1600/3200/6400 no jogo). */
+const TIER_COST = { 1: 1, 2: 2, 3: 4, 4: 6 } as const;
+export const itemCost = (tier: ItemTier) => TIER_COST[tier];
+/** foe = o item mira uma carta inimiga; senão, uma carta sua. */
+type ItemDef = { tier: ItemTier; slot: ItemSlot; v: number; usesV: boolean; foe?: boolean };
+const I = (tier: ItemTier, slot: ItemSlot, v: number, foe = false): ItemDef => ({ tier, slot, v, usesV: true, ...(foe && { foe }) });
 
 /** Chave = nome do item no Deadlock (inglês, igual à API), com o tier real do jogo. 2 de cada categoria por tier. */
 export const ITEMS = {
   "High-Velocity Rounds": I(1, "weapon", 3), "Close Quarters": I(1, "weapon", 3),
-  "Extra Health": I(1, "vitality", 1), "Healing Rite": I(1, "vitality", 2),
+  "Extra Health": I(1, "vitality", 2), "Healing Rite": I(1, "vitality", 2),
   "Extra Spirit": I(1, "spirit", 1), "Golden Goose Egg": I(1, "spirit", 1),
-  "Swift Striker": I(2, "weapon", 3), "Long Range": I(2, "weapon", 7),
-  "Battle Vest": I(2, "vitality", 5), "Healing Booster": I(2, "vitality", 4),
-  "Arcane Surge": I(2, "spirit", 10), "Slowing Hex": I(2, "spirit", 10),
-  "Toxic Bullets": I(3, "weapon", 2), "Sharpshooter": I(3, "weapon", 10),
-  "Metal Skin": I(3, "vitality", 3), "Rescue Beam": I(3, "vitality", 8),
-  "Surge of Power": I(3, "spirit", 5), "Superior Cooldown": I(3, "spirit", 3),
-  "Glass Cannon": I(4, "weapon", 10), "Ricochet": I(4, "weapon", 10),
-  "Colossus": I(4, "vitality", 10), "Unstoppable": I(4, "vitality", 8),
-  "Echo Shard": I(4, "spirit", 10), "Refresher": I(4, "spirit", 5),
+  "Swift Striker": I(2, "weapon", 4), "Long Range": I(2, "weapon", 4),
+  "Battle Vest": I(2, "vitality", 4), "Healing Booster": I(2, "vitality", 3),
+  "Arcane Surge": I(2, "spirit", 1), "Slowing Hex": I(2, "spirit", 2, true),
+  "Toxic Bullets": I(3, "weapon", 2, true), "Sharpshooter": I(3, "weapon", 7),
+  "Metal Skin": I(3, "vitality", 4), "Rescue Beam": I(3, "vitality", 5),
+  "Surge of Power": I(3, "spirit", 6), "Superior Cooldown": I(3, "spirit", 2),
+  "Glass Cannon": I(4, "weapon", 10), "Ricochet": I(4, "weapon", 5, true),
+  "Colossus": I(4, "vitality", 7), "Unstoppable": I(4, "vitality", 6),
+  "Echo Shard": I(4, "spirit", 3), "Refresher": I(4, "spirit", 4),
 } satisfies Record<string, ItemDef>;
 export type ItemKey = keyof typeof ITEMS;
 export const ITEM_KEYS = Object.keys(ITEMS) as ItemKey[];

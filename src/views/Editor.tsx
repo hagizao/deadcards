@@ -10,7 +10,7 @@ import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
 import {
   ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, LOC_V_RANGE, MIN_LOCS, NAME_MAX, POWER_RANGE,
-  ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, HERO_CARD, BASE_RANGE, HABILITY_AT, heroCard, MASTERY_AT, STAT_KEYS as GAME_STATS,
+  ITEMS, ITEM_KEYS, SHOP_ROUNDS, SHOPS, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, HERO_CARD, BASE_RANGE, HABILITY_AT, heroCard, MASTERY_AT, STAT_KEYS as GAME_STATS,
   cardStats, gameConfig, itemCost, itemStats, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey, type HeroOverride, type Profile,
 } from "../lib/game/config";
 import { cardPool } from "../lib/game/engine";
@@ -868,7 +868,7 @@ function GameForm() {
       <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
         <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Itens da loja</h2>
         <p className="text-xs text-zinc-400">
-          No turno {ITEM_OFFER_TURN} cada lado escolhe 1 entre 3 itens (mesma combinação de tiers para você e a IA). O item é revelado e pago no turno {ITEM_REVEAL_TURN}: tier 1 a 4 custa 1 a 4 almas. Item desligado não aparece no sorteio.
+          Lojas nos rounds {SHOP_ROUNDS.map((r) => `${r} (tier ${SHOPS[r].join("/")})`).join(", ")}: cada lado pode comprar 1 entre 3 itens e mira uma carta com a seta (itens de ataque miram uma inimiga). O item age no fim do turno da compra. Item desligado não aparece no sorteio.
         </p>
         {ITEM_TIERS.map((tier) => (
           <div key={tier} className="flex flex-col gap-2">
