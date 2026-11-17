@@ -517,3 +517,91 @@ describe("escolhas, movimento e execução", () => {
     }
   });
 });
+
+describe("balanceamento das habilidades", () => {
+  /** Carta sem habilidade com o poder dado. */
+  const dummy = (put: ReturnType<typeof arena>["put"], side: Side, li: number, power: number, id = `d${power}${side}${li}`) => {
+    const c = put(pc(id, "Herói Novo", flat(70)), side, li);
+    c.ab = "none"; c.base = power; c.bonus = 0;
+    return c;
+  };
+
+  it("teto de remoção: a Wraith só ergue inimigas com até 2 × o custo dela", () => {
+    const { m, put } = arena();
+    const big = dummy(put, "a", 0, 20);
+    const mid = dummy(put, "a", 0, 9);
+    const w = put(pc("w", "Wraith", flat(70)), "p", 0);
+    expect(w.cost).toBe(7);
+    expect(m.pow(big)).toBe(20);
+    expect(m.pow(mid)).toBe(0);
+  });
+
+  it("Lady Geist troca no máximo o valor da habilidade", () => {
+    const { m, put } = arena();
+    const t = dummy(put, "a", 0, 12);
+    const lg = put(pc("g", "Lady Geist", flat(70)), "p", 0);
+    const before = lg.base;
+    expect(m.pow(t)).toBe(12 - lg.v);
+    expect(m.pow(lg)).toBe(before + lg.v);
+  });
+
+  it("Mina drena só no turno em que revela e nos 2 seguintes", () => {
+    const { m, put } = arena();
+    const t = dummy(put, "a", 0, 10);
+    const mina = put(pc("m", "Mina", flat(70)), "p", 0);
+    for (let i = 0; i < 5; i++) { m.endOfTurn(); m.t++; }
+    expect(m.pow(t)).toBe(10 - 3 * mina.v);
+  });
+
+  it("Violet ganha no máximo +4 no total", () => {
+    const { m, put } = arena();
+    const v = put(pc("v", "Violet", flat(70)), "p", 0);
+    put(pc("x", "Herói Novo", flat(70)), "p", 1);
+    put(pc("y", "Herói Novo", flat(70)), "p", 2);
+    const b = v.base + v.bonus;
+    for (let i = 0; i < 6; i++) { m.endOfTurn(); m.t++; }
+    expect(v.base + v.bonus - b).toBe(4);
+  });
+
+  it("Paige é constante: os aliados daqui têm +valor enquanto ela estiver lá", () => {
+    const { m, put } = arena();
+    const ally = dummy(put, "p", 0, 5);
+    const other = dummy(put, "p", 1, 5);
+    const paige = put(pc("p", "Paige", flat(70)), "p", 0);
+    expect(m.pow(ally)).toBe(5 + paige.v);
+    expect(m.pow(other)).toBe(5);
+    paige.st.silenced = true;
+    expect(m.pow(ally)).toBe(5);
+  });
+
+  it("Nurse Harrow é constante: tira da inimiga mais forte e dá ao aliado mais fraco daqui", () => {
+    const { m, put } = arena();
+    const strong = dummy(put, "a", 0, 9);
+    const weakFoe = dummy(put, "a", 0, 2);
+    const ally = dummy(put, "p", 0, 1);
+    const nh = put(pc("n", "Nurse Harrow", flat(70)), "p", 0);
+    nh.base = 6;
+    expect(m.pow(strong)).toBe(9 - nh.v);
+    expect(m.pow(weakFoe)).toBe(2);
+    expect(m.pow(ally)).toBe(1 + nh.v);
+  });
+
+  it("portal do Doorman leva no máximo 2 cartas", () => {
+    const { m, put, stage } = arena();
+    const cards = [0, 1, 2].map((i) => dummy(put, "p", 0, 3, `c${i}`));
+    const door = stage(pc("d", "The Doorman", flat(70)), 0);
+    m.choose(door, { loc: m.loc[1] });
+    m.reveal(door, m.loc[0]);
+    m.t++;
+    expect(m.moveCard(cards[0], m.loc[1])).toBe(true);
+    expect(m.moveCard(cards[1], m.loc[1])).toBe(true);
+    expect(m.moveOptions(cards[2])).toEqual([]);
+  });
+
+  it("Shiv executa inimigas com até 3 de poder", () => {
+    const { m, put } = arena();
+    const t = dummy(put, "a", 0, 3);
+    put(pc("s", "Shiv", flat(70)), "p", 0);
+    expect(m.locOf(t)).toBeUndefined();
+  });
+});

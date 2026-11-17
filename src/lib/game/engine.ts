@@ -3,7 +3,7 @@
 import { getPlayerOvr } from "../cards";
 import type { Player } from "../types";
 import {
-  ABILITIES, ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, MASTERY_BONUS, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, keywords, mastery,
+  ABILITIES, ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, MASTERY_BONUS, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, keywords, mastery,
   type AbilityKey, type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type ItemTier, type LocType, type Mastery, type PoolCard, type StatKey,
 } from "./config";
 
@@ -29,7 +29,7 @@ type Status = {
   tmp: { v: number; u: number }[];
   burrow?: boolean; stun?: number; immune?: boolean; immU?: number; rip?: number; ripV?: number; chained?: boolean; silenced?: boolean; silU?: number;
   burn?: number; tburn?: { v: number; u: number }[]; vuln?: number; sleep?: number; root?: number; petri?: boolean; unstop?: boolean;
-  chan?: { u: number }; wolf?: boolean; wolfAt?: number; exec?: { u: number; target?: number }; duel?: boolean; mvT?: number; grow?: number;
+  chan?: { u: number }; drainU?: number; grown?: number; wolf?: boolean; wolfAt?: number; exec?: { u: number; target?: number }; duel?: boolean; mvT?: number; grow?: number;
 };
 
 /** Movimento disponível: quantas vezes, até que turno, bônus ao chegar, ilusão deixada para trás e destino só com inimigas. */
@@ -119,7 +119,7 @@ export class Match {
   hook: Record<Side, { i: number; m: boolean } | null> = { p: null, a: null };
   pend: { t: number; f: () => void }[] = [];
   /** Portais do Doorman: no turno t, as cartas do lado podem viajar entre os locais a e b. */
-  portals: { side: Side; a: number; b: number; t: number; bonus: number }[] = [];
+  portals: { side: Side; a: number; b: number; t: number; bonus: number; n: number }[] = [];
   log: LogEntry[] = [];
   final = false;
   busy = false;
@@ -209,6 +209,16 @@ export class Match {
   private pickFoe = (src: GCard, a: GCard[]) => (src.kw.includes("MIR") ? this.strongest(a) : this.sh(a)[0] ?? null);
   private pickLoc = (from: Loc, s: Side) => this.sh(this.loc.filter((L) => L !== from && this.room(L, s)))[0];
   private losing = (s: Side, l: Loc) => this.total(l, s) < this.total(l, opp(s));
+  /** Alvos dentro do teto de remoção da carta (poder até CAP_PER_COST × custo). */
+  private capped = (src: GCard, a: GCard[]) => a.filter((x) => this.pow(x) <= CAP_PER_COST * Math.max(1, src.cost));
+  private raw = (c: GCard) => c.base + c.bonus;
+  /** Alvos da Nurse Harrow (constante): a inimiga mais forte e o aliado mais fraco daqui, pelo poder sem auras (evita recursão). */
+  private harrow(o: GCard, l: Loc) {
+    const pick = (a: GCard[], f: (x: GCard) => number) => a.reduce<GCard | null>((x, y) => (!x || f(y) > f(x) || (f(y) === f(x) && y.id < x.id) ? y : x), null);
+    const foes = l.s[opp(o.side)].filter((x) => x.rev && !x.st.burrow && !this.immune(x) && !x.st.unstop);
+    const mine = l.s[o.side].filter((x) => x.rev && !x.st.burrow);
+    return { foe: pick(foes, this.raw), ally: pick(mine, (x) => -this.raw(x)) };
+  }
 
   /** Poder atual da carta no local (com bônus, auras, efeitos do local e status). */
   pow(c: GCard, l?: Loc): number {
@@ -218,7 +228,18 @@ export class Match {
     if ((c.st.stun ?? 0) >= this.t) return 0;
     let x = c.base + c.bonus;
     c.st.tmp.forEach((m) => { if (this.t <= m.u) x += m.v; });
-    l.s[c.side].forEach((o) => { if (o !== c && o.rev && this.abilityOf(o) === "aura") x += o.v; });
+    l.s[c.side].forEach((o) => {
+      if (o === c || !o.rev) return;
+      const a = this.abilityOf(o);
+      if (a === "aura" || a === "Paige") x += o.v;
+    });
+    // Nurse Harrow: drena constante da inimiga mais forte daqui para o aliado mais fraco daqui
+    [...l.s.p, ...l.s.a].forEach((o) => {
+      if (!o.rev || o.st.burrow || this.abilityOf(o) !== "Nurse Harrow") return;
+      const h = this.harrow(o, l);
+      if (h.foe === c) x -= o.v;
+      if (h.ally === c) x += o.v;
+    });
     // Victor: aura contínua em todas as cartas daqui; o Mestre poupa o próprio lado
     [...l.s.p, ...l.s.a].forEach((o) => { if (o !== c && o.rev && this.abilityOf(o) === "Victor" && (o.side !== c.side || !this.master(o))) x -= o.v; });
     const a = this.abilityOf(c);
@@ -294,7 +315,7 @@ export class Match {
       if (!l || c.st.wolf) return;
       c.st.wolf = true;
       c.bonus += c.v;
-      const t = this.master(c) ? this.weakest(this.tg(this.foes(c, l))) : null;
+      const t = this.master(c) ? this.weakest(this.capped(c, this.tg(this.foes(c, l)))) : null;
       this.say({ k: "wolf", c: this.N(c), t: t && this.destroy(t) ? this.N(t) : undefined });
     }, c.st.wolfAt);
   }
@@ -341,7 +362,7 @@ export class Match {
   private charge = (c: GCard, to: Loc) => c.mv.find((m) => m.n > 0 && m.u >= this.t && (!m.foes || to.s[opp(c.side)].some((x) => x.rev)));
   private portal(c: GCard, from: Loc, to: Loc) {
     const i = this.idx(from), j = this.idx(to);
-    return this.portals.find((p) => p.side === c.side && p.t === this.t && ((p.a === i && p.b === j) || (p.a === j && p.b === i)));
+    return this.portals.find((p) => p.side === c.side && p.t === this.t && p.n > 0 && ((p.a === i && p.b === j) || (p.a === j && p.b === i)));
   }
   /** Para onde a carta pode se mover agora (cargas de movimento ou portal do Doorman). Uma vez por turno. */
   moveOptions(c: GCard): Loc[] {
@@ -358,7 +379,7 @@ export class Match {
     if (!this.move(c, from, to, true)) return false;
     c.st.mvT = this.t;
     this.say({ k: "move", c: this.N(c), loc: to.L.name });
-    if (portal) { c.bonus += portal.bonus; return true; }
+    if (portal) { portal.n--; c.bonus += portal.bonus; return true; }
     if (!charge) return true;
     charge.n--;
     c.bonus += charge.bonus;
@@ -407,10 +428,10 @@ export class Match {
     } },
     "Apollo": { r: (c, _l, v) => { c.st.rip = this.master(c) ? 2 : 1; c.st.ripV = v; } },
     "Baba": { r: (c, l, v) => {
-      const t = this.best(this.sh(this.tg(this.foes(c, l))), (x) => x.cost);
+      const t = this.best(this.sh(this.capped(c, this.tg(this.foes(c, l)))), (x) => x.cost);
       if (!t) return;
       this.say({ k: "pigeon", t: this.N(t) });
-      if (this.master(c) && t.cost >= 5) this.extra[c.side] += 1;
+      if (this.master(c) && t.cost >= 6) c.bonus += 3;
       t.p = { ...t.p, name: "", hero: null, c1: "#71717a", c2: "#27272a", token: "pigeon" };
       t.base = v; t.bonus = 0; t.ab = "none"; t.desc = ""; t.st = nst(); t.tok = true;
     } },
@@ -509,13 +530,13 @@ export class Match {
       if (this.master(c)) this.foes(c, l).filter((t) => t.main === "MIR").forEach((t) => this.hurt(t, 2, c));
       this.say({ k: "kelvin", loc: l.L.name });
     } },
-    "Lady Geist": { r: (c, l) => {
-      const t = this.strongest(this.tg(this.foes(c, l)));
+    "Lady Geist": { r: (c, l, v) => {
+      const t = this.strongest(this.capped(c, this.tg(this.foes(c, l))));
       if (!t) return;
-      const a = this.pow(c, l), b = this.pow(t, l);
-      if (b <= a || !this.hurt(t, b - a, c)) return;
-      c.bonus += b - a;
-      if (this.master(c)) this.hurt(t, this.pow(t, l) - 1, c);
+      const d = Math.min(v, this.pow(t, l) - this.pow(c, l));
+      if (d <= 0 || !this.hurt(t, d, c)) return;
+      c.bonus += d;
+      if (this.master(c)) this.hurt(t, 2, c);
       this.say({ k: "geist", c: this.N(c), t: this.N(t) });
     } },
     "Lash": { r: (c, l, v) => {
@@ -537,18 +558,16 @@ export class Match {
     },
     },
     "Mina": {
-      r: (c) => { if (this.master(c)) c.mv.push({ n: 1, u: this.t + 1, bonus: 0 }); },
-      f: (c, l, v) => { const t = this.pickFoe(c, this.tg(this.foes(c, l))); if (t && this.hurt(t, v, c)) c.bonus += v; },
+      r: (c) => { c.st.drainU = this.t + MINA_TURNS - 1; if (this.master(c)) c.mv.push({ n: 1, u: this.t + 1, bonus: 0 }); },
+      f: (c, l, v) => {
+        if ((c.st.drainU ?? 0) < this.t) return;
+        const t = this.pickFoe(c, this.tg(this.foes(c, l)));
+        if (t && this.hurt(t, v, c)) c.bonus += v;
+      },
     },
     "Mirage": { r: (c, _l, v) => { c.mv.push({ n: this.master(c) ? 2 : 1, u: Infinity, bonus: v }); } },
     "Mo & Krill": { r: (c) => { c.st.burrow = true; this.say({ k: "burrow", c: this.N(c) }); } },
-    "Nurse Harrow": { r: (c, l, v) => {
-      const t = this.strongest(this.tg(this.foes(c, l)));
-      const a = this.weakest([c, ...this.friends(c, l)])!;
-      if (t && this.hurt(t, v, c)) { a.bonus += v; this.say({ k: "harrow", c: this.N(c), t: this.N(t), a: this.N(a) }); }
-      if (this.master(c)) l.lock[opp(c.side)] = this.t + 1;
-    } },
-    "Paige": { r: (c, l, v) => { this.friends(c, l).forEach((x) => (x.bonus += v)); this.say({ k: "paige", c: this.N(c) }); } },
+    "Nurse Harrow": { r: (c, l) => { if (this.master(c)) l.lock[opp(c.side)] = this.t + 1; } },
     "Paradox": { r: (c, l) => {
       if (c.st.chained || c.st.petri || c.st.unstop || (c.st.root ?? 0) >= this.t || !this.room(l, opp(c.side))) return;
       const opts = this.loc.filter((L) => L !== l && this.room(L, c.side))
@@ -592,7 +611,7 @@ export class Match {
     "The Doorman": { r: (c, l) => {
       const to = this.chosenLoc(c, l) ?? this.best(this.sh(this.loc.filter((L) => L !== l)), (L) => this.total(L, opp(c.side)) - this.total(L, c.side));
       if (!to) return;
-      this.portals.push({ side: c.side, a: this.idx(l), b: this.idx(to), t: this.t + 1, bonus: this.master(c) ? 2 : 0 });
+      this.portals.push({ side: c.side, a: this.idx(l), b: this.idx(to), t: this.t + 1, bonus: this.master(c) ? 1 : 0, n: DOOR_MAX });
       this.say({ k: "portal", c: this.N(c), loc: to.L.name });
     } },
     "Venator": { r: (c, l, v) => {
@@ -609,7 +628,8 @@ export class Match {
     } },
     "Violet": { f: (c, _l, v) => {
       const n = this.loc.filter((L) => L.rev && (this.total(L, c.side) > this.total(L, opp(c.side)) || (this.master(c) && this.total(L, c.side) === this.total(L, opp(c.side))))).length;
-      c.bonus += v * n;
+      const g = Math.min(v * n, VIOLET_MAX - (c.st.grown ?? 0));
+      if (g > 0) { c.bonus += g; c.st.grown = (c.st.grown ?? 0) + g; }
     } },
     "Viscous": { r: (c, l, v) => {
       const pool = [c, ...this.friends(c, l)].sort((x, y) => this.pow(x) - this.pow(y)).slice(0, this.master(c) ? 2 : 1);
@@ -618,7 +638,7 @@ export class Match {
     } },
     "Vyper": { r: (c, l) => { l.petri[opp(c.side)] = { m: this.master(c) }; this.say({ k: "trap", c: this.N(c), loc: l.L.name }); } },
     "Wraith": { r: (c, l) => {
-      const t = this.strongest(this.tg(this.foes(c, l)));
+      const t = this.strongest(this.capped(c, this.tg(this.foes(c, l))));
       if (t) { t.st.stun = this.t + 1; this.interrupt(t); this.say({ k: "wraith", c: this.N(c), t: this.N(t) }); }
       if (!this.master(c)) return;
       this.later(() => {
