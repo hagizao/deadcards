@@ -17,6 +17,8 @@ import { GAME_TEXT } from "../lib/game/text";
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text";
 const COSTS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 const FLY_S = 0.3;
+/** Heróis diferentes entre as versões do jogador (duas cartas do mesmo herói contam uma vez). */
+const heroCount = (l: PoolCard[]) => new Set(l.map((c) => c.hero)).size;
 
 type Flight = { id: number; from: DOMRect; to: DOMRect; card: ReactNode };
 let flightSeq = 0;
@@ -138,15 +140,16 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
             return (
               <li key={d.id} className="w-28 shrink-0 snap-start sm:w-36">
                 <button type="button" onClick={() => setBook((b) => ({ ...b, current: d.id }))} aria-pressed={on} aria-label={`${d.name} · ${t.deck.cards(cards.length)}`}
-                  className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-xl p-1.5 text-left transition active:scale-95 ${focus} ${on ? "bg-white/12" : "opacity-75 hover:bg-white/6 hover:opacity-100"}`}>
+                  className={`group flex w-full cursor-pointer flex-col gap-1.5 rounded-xl p-1.5 text-left transition active:scale-95 ${focus} ${on ? "bg-white/12 ring-2 ring-game-me/60" : "opacity-75 hover:bg-white/6 hover:opacity-100"}`}>
                   {/* o brilho da moldura (pseudo-elementos da carta) vaza para baixo e criava rolagem vertical na prateleira: corta só na miniatura */}
-                  {/* baralho em leque: dois versos do estilo dele atrás da capa */}
-                  <span className="relative block">
-                    <CardBack look={d.look ?? "noir"} className="absolute inset-x-0 top-0 origin-bottom rotate-6 opacity-80" />
-                    <CardBack look={d.look ?? "noir"} className="absolute inset-x-0 top-0 origin-bottom -rotate-4" />
-                    <span className={`relative block overflow-clip rounded-lg ${on ? "ring-2 ring-game-me" : ""}`}>
-                      {cv ? face(cv) : <CardBack look={d.look ?? "noir"} />}
-                    </span>
+                  {/* baralho de pé: o verso inteiro na frente e a capa saindo por trás, como uma carta puxada do topo */}
+                  <span className="relative block pt-14 sm:pt-16">
+                    {cv && (
+                      // o brilho da moldura (pseudo-elementos da carta) vaza e criava rolagem na prateleira: corta só na capa
+                      <span className="absolute inset-x-3 top-0 block origin-bottom -rotate-6 overflow-clip rounded-lg transition-transform duration-200 group-hover:-translate-y-1 motion-reduce:transition-none">{face(cv)}</span>
+                    )}
+                    <CardBack look={d.look ?? "noir"} className="absolute inset-x-0 bottom-0 origin-bottom rotate-3 brightness-75" />
+                    <CardBack look={d.look ?? "noir"} className="relative drop-shadow-[0_0.4rem_0.6rem_rgb(0_0_0/0.6)]" />
                   </span>
                   <span className="truncate text-xs font-bold">{d.name}</span>
                   <span className={`text-[10px] ${cards.length === DECK_SIZE ? "text-game-me" : "text-zinc-400"}`}>{cards.length}/{DECK_SIZE}</span>
@@ -154,9 +157,9 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
               </li>
             );
           })}
-          <li className="w-28 shrink-0 snap-start sm:w-36">
+          <li className="flex w-28 shrink-0 snap-start sm:w-36">
             <button type="button" onClick={() => addDeck()} disabled={book.decks.length >= MAX_DECKS} title={book.decks.length >= MAX_DECKS ? t.deck.maxDecks(MAX_DECKS) : undefined}
-              className={`flex aspect-295/430 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-black/30 text-zinc-300 transition hover:bg-white/8 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${focus}`}>
+              className={`flex w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-black/30 text-zinc-300 transition hover:bg-white/8 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${focus}`}>
               <span className="font-display text-3xl leading-none" aria-hidden="true">+</span>
               <span className="text-center text-xs font-bold">{t.deck.newDeck}</span>
             </button>
@@ -262,7 +265,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
                           <span aria-hidden="true" className="card-stack-edge absolute inset-1 origin-bottom -rotate-3 bg-zinc-300/40" />
                         </>
                       )}
-                      <motion.button type="button" onClick={() => openFocus(c.key)} aria-label={`${t.deck.open(t.deck.version(c.name, c.hero))}${l.length > 1 ? ` · ${t.deck.moreHeroes(l.length - 1)}` : ""}`} whileTap={{ scale: 0.96 }}
+                      <motion.button type="button" onClick={() => openFocus(c.key)} aria-label={`${t.deck.open(t.deck.version(c.name, c.hero))}${heroCount(l) > 1 ? ` · ${t.deck.moreHeroes(heroCount(l) - 1)}` : ""}`} whileTap={{ scale: 0.96 }}
                         className={`relative block w-full cursor-pointer rounded-xl transition-[filter,opacity] duration-150 hover:brightness-110 ${focus} ${on ? "" : "opacity-80"}`}>
                         <span className={`block rounded-xl ${on ? "ring-3 ring-game-me" : ""}`}>{face(c)}</span>
                       </motion.button>
@@ -274,9 +277,9 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
                     </div>
                     {taken && <span className="text-center text-[10px] leading-tight text-rose-300">{t.deck.dupHero(c.hero)}</span>}
                     {c.alt && <span className="text-center text-[10px] leading-tight text-zinc-400">{(c.stats?.POL ?? 0) >= ALT_POL ? t.deck.altPro : t.deck.alt(ALT_MALUS)}</span>}
-                    {l.length > 1 && (
+                    {heroCount(l) > 1 && (
                       <span aria-hidden="true" className="flex items-center justify-center gap-1 text-[11px] font-bold text-zinc-400">
-                        <span className="text-zinc-500">⇄</span>{t.deck.moreHeroes(l.length - 1)}
+                        <span className="text-zinc-500">⇄</span>{t.deck.moreHeroes(heroCount(l) - 1)}
                       </span>
                     )}
                   </li>
