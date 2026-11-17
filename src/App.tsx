@@ -307,7 +307,7 @@ function Shell() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.15, ease: easeOut }}
           >
-            {tab === "home" && <Home onOpenTeam={openTeam} />}
+            {tab === "home" && <Home onOpenTeam={openTeam} onOpenCard={setSpotlight} onNavigate={(id) => { setFocusTeam(undefined); setTab(id); }} />}
             {tab === "teams" && <Teams focusTeamId={focusTeam} onOpenCard={setSpotlight} />}
             {tab === "tierlist" && <TierList onOpenCard={setSpotlight} onOpenTeam={openTeam} />}
             {tab === "collection" && <Collection onOpenCard={setSpotlight} />}

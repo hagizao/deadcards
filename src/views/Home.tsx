@@ -1,94 +1,163 @@
-import { AnimatePresence, motion } from "motion/react";
-import { useMemo, useState } from "react";
-import type { Team } from "../lib/types";
+import { motion } from "motion/react";
+import type { CSSProperties } from "react";
+import type { Player, Team } from "../lib/types";
 import { useData } from "../lib/data";
-import { regionClass, teamOvr, teamTrend, tierKeyForOvr, useLabel } from "../lib/cards";
+import { getPlayerOvr, isMainCard, regionClass, teamOvr, teamTrend, tierKeyForOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
+import { Card } from "../components/Card";
 import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
 import { Icon } from "../components/Icon";
-import { easeOut } from "../lib/ui";
+import { easeOut, pageTitle, pill } from "../lib/ui";
+
+export type Area = "teams" | "tierlist" | "collection" | "compare" | "redeem";
 
 const S = strings({
-  pt: { featured: "Herói em destaque", prev: "Herói anterior", next: "Próximo herói", none: "Nenhum time cadastrado ainda.", players: (n: number) => `${n} ${n === 1 ? "jogador" : "jogadores"}` },
-  en: { featured: "Featured hero", prev: "Previous hero", next: "Next hero", none: "No teams registered yet.", players: (n: number) => `${n} ${n === 1 ? "player" : "players"}` },
-  es: { featured: "Héroe destacado", prev: "Héroe anterior", next: "Siguiente héroe", none: "Aún no hay equipos registrados.", players: (n: number) => `${n} ${n === 1 ? "jugador" : "jugadores"}` },
+  pt: {
+    featured: "Cartas em destaque", picked: "Escolhidas pela equipe", top: "As maiores OVR",
+    explore: "Explore", ranking: "Ranking dos times", allTeams: (n: number) => `Ver os ${n} times`,
+    none: "Nenhum time cadastrado ainda.", players: (n: number) => `${n} ${n === 1 ? "jogador" : "jogadores"}`,
+    areas: {
+      teams: ["Times", "Elencos, regiões e o OVR de cada time"],
+      tierlist: ["Tier List", "Quem está no topo, do SS ao D"],
+      collection: ["Coleção", "Todas as cartas, com busca e ordenação"],
+      compare: ["Comparar", "Duas cartas lado a lado, atributo por atributo"],
+      redeem: ["Resgatar", "Tem um código? Resgate sua carta"],
+    },
+    meta: { teams: (n: number) => `${n} times`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cartas`, compare: () => "1 contra 1", redeem: () => "Precisa entrar" },
+  },
+  en: {
+    featured: "Featured cards", picked: "Picked by the team", top: "Highest OVR",
+    explore: "Explore", ranking: "Team ranking", allTeams: (n: number) => `See all ${n} teams`,
+    none: "No teams registered yet.", players: (n: number) => `${n} ${n === 1 ? "player" : "players"}`,
+    areas: {
+      teams: ["Teams", "Rosters, regions and each team's OVR"],
+      tierlist: ["Tier List", "Who's on top, from SS to D"],
+      collection: ["Collection", "Every card, with search and sorting"],
+      compare: ["Compare", "Two cards side by side, stat by stat"],
+      redeem: ["Redeem", "Got a code? Redeem your card"],
+    },
+    meta: { teams: (n: number) => `${n} teams`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cards`, compare: () => "1 vs 1", redeem: () => "Sign-in needed" },
+  },
+  es: {
+    featured: "Cartas destacadas", picked: "Elegidas por el equipo", top: "Los OVR más altos",
+    explore: "Explora", ranking: "Ranking de equipos", allTeams: (n: number) => `Ver los ${n} equipos`,
+    none: "Aún no hay equipos registrados.", players: (n: number) => `${n} ${n === 1 ? "jugador" : "jugadores"}`,
+    areas: {
+      teams: ["Equipos", "Plantillas, regiones y el OVR de cada equipo"],
+      tierlist: ["Tier List", "Quién está arriba, de SS a D"],
+      collection: ["Colección", "Todas las cartas, con búsqueda y orden"],
+      compare: ["Comparar", "Dos cartas lado a lado, atributo por atributo"],
+      redeem: ["Canjear", "¿Tienes un código? Canjea tu carta"],
+    },
+    meta: { teams: (n: number) => `${n} equipos`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cartas`, compare: () => "1 contra 1", redeem: () => "Hay que iniciar sesión" },
+  },
 });
 
-export function Home({ onOpenTeam }: { onOpenTeam: (teamId: string) => void }) {
-  const { teams, players, settings, heroNames, heroArt } = useData();
+const AREAS: Area[] = ["teams", "tierlist", "collection", "compare", "redeem"];
+const FEATURED = 5;
+const RANKING = 4;
+
+// no leque (xl) a primeira escolhida fica no centro e as seguintes alternam esquerda/direita: 0 → 0, 1 → -1, 2 → 1, 3 → -2, 4 → 2
+const fanOffset = (i: number) => (i % 2 ? -(i + 1) / 2 : i / 2);
+
+export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (teamId: string) => void; onOpenCard: (id: string) => void; onNavigate: (area: Area) => void }) {
+  const { teams, players, settings, me } = useData();
   const t = useT(S);
   const label = useLabel();
-  const slides = useMemo(() => {
-    const list = heroNames.flatMap((n) => {
-      const url = heroArt(n)?.url;
-      return url ? [{ name: n, url }] : [];
-    });
-    return settings.homeHero ? [{ name: "", url: settings.homeHero }, ...list] : list;
-  }, [heroNames, heroArt, settings.homeHero]);
-  const [[heroIdx, dir], setHero] = useState([0, 1]);
-  const slide = slides[heroIdx % Math.max(1, slides.length)];
-  const hero = slide?.name;
-  const homeImg = slide?.url;
-  const step = (d: number) => setHero(([i]) => [(i + d + slides.length) % slides.length, d]);
+
+  const picked = (settings.homeFeatured ?? []).flatMap((id) => players.find((p) => p.id === id) ?? []);
+  const featured = picked.length
+    ? picked
+    : players.filter(isMainCard).sort((a, b) => getPlayerOvr(b) - getPlayerOvr(a)).slice(0, FEATURED);
 
   const ranked = teams
     .map((team) => ({ team, ...teamOvr(players, team.id), delta: teamTrend(players, team.id) }))
     .sort((a, b) => b.exact - a.exact || a.team.name.localeCompare(b.team.name));
 
-  return (
-    <section className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
-      <div className="home-col home-hero-box noir-glass relative overflow-hidden rounded-2xl">
-        <AnimatePresence initial={false} custom={dir}>
-          {homeImg && (
-            <motion.img
-              key={homeImg}
-              src={homeImg}
-              alt={hero || t.featured}
-              draggable={false}
-              custom={dir}
-              variants={{
-                enter: (d: number) => ({ opacity: 0, x: d * 40 }),
-                center: { opacity: 1, x: 0 },
-                exit: (d: number) => ({ opacity: 0, x: d * -40 }),
-              }}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.25, ease: easeOut }}
-              className="absolute inset-0 size-full object-cover object-center select-none"
-            />
-          )}
-        </AnimatePresence>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3" style={{ background: "linear-gradient(to top, rgba(9,9,11,0.55), transparent)" }} />
-        {slides.length > 1 && (
-          <>
-            <button type="button" className="home-hero-arrow home-hero-arrow--l" onClick={() => step(-1)} aria-label={t.prev}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
-            </button>
-            <button type="button" className="home-hero-arrow home-hero-arrow--r" onClick={() => step(1)} aria-label={t.next}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
-            </button>
-          </>
-        )}
-        {hero && <div className="home-hero-tag">{hero}</div>}
-      </div>
+  const meta: Record<Area, string | null> = {
+    teams: t.meta.teams(teams.length),
+    tierlist: t.meta.tierlist(settings.tierConfig?.length ?? 0),
+    collection: t.meta.collection(players.length),
+    compare: t.meta.compare(),
+    redeem: me ? null : t.meta.redeem(),
+  };
 
-      <div className="home-col home-teams-scroll flex flex-col gap-4" style={{ "--ft": "0px", "--fb": "120px" } as React.CSSProperties}>
+  return (
+    <div className="flex flex-col gap-10">
+      {featured.length > 0 && (
+        <section className="noir-glass relative flex flex-col gap-6 overflow-hidden rounded-3xl py-5 sm:py-8" aria-labelledby="home-featured">
+          {settings.homeHero && <img src={settings.homeHero} alt="" className="pointer-events-none absolute inset-0 size-full object-cover opacity-20" />}
+          <div className="relative flex flex-col gap-1 px-5 sm:px-8">
+            <span className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">{picked.length ? t.picked : t.top}</span>
+            <h1 id="home-featured" className={pageTitle}>{t.featured}</h1>
+          </div>
+          <Fan cards={featured} onOpenCard={onOpenCard} />
+        </section>
+      )}
+
+      <section className="flex flex-col gap-4" aria-labelledby="home-explore">
+        <h2 id="home-explore" className={sectionTitle}>{t.explore}</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {AREAS.map((a) => <AreaTile key={a} title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />)}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-4" aria-labelledby="home-ranking">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="home-ranking" className={sectionTitle}>{t.ranking}</h2>
+          {ranked.length > RANKING && <button type="button" className={pill(false)} onClick={() => onNavigate("teams")}>{t.allTeams(ranked.length)}</button>}
+        </div>
         {ranked.length === 0 && <div className="noir-glass rounded-2xl p-6 text-sm text-zinc-300">{t.none}</div>}
-        {ranked.map((r, idx) => (
-          <TeamRow
-            key={r.team.id}
-            r={r}
-            idx={idx}
-            tier={r.count ? settings.tierConfig!.find((t) => t.key === tierKeyForOvr(r.rounded, settings.tierConfig!)) : undefined}
-            meta={`${r.team.tag} · ${label(r.team.region)} · ${t.players(r.count)}`}
-            onOpen={() => onOpenTeam(r.team.id)}
-          />
-        ))}
-      </div>
-    </section>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {ranked.slice(0, RANKING).map((r, idx) => (
+            <TeamRow
+              key={r.team.id}
+              r={r}
+              idx={idx}
+              tier={r.count ? settings.tierConfig!.find((x) => x.key === tierKeyForOvr(r.rounded, settings.tierConfig!)) : undefined}
+              meta={`${r.team.tag} · ${label(r.team.region)} · ${t.players(r.count)}`}
+              onOpen={() => onOpenTeam(r.team.id)}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+const sectionTitle = "font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase sm:text-2xl";
+
+function Fan({ cards, onOpenCard }: { cards: Player[]; onOpenCard: (id: string) => void }) {
+  return (
+    <div className="relative flex snap-x snap-mandatory items-center justify-center-safe gap-2 overflow-x-auto overflow-y-hidden px-5 py-8 sm:px-8 xl:items-end xl:gap-0 xl:overflow-visible xl:px-4">
+      {cards.map((p, i) => {
+        const k = fanOffset(i);
+        return (
+          <div key={p.id} className="shrink-0 snap-center xl:order-(--fo) xl:translate-y-(--fy) xl:rotate-(--fr)" style={{ "--fo": k, "--fr": `${k * 3}deg`, "--fy": `${Math.abs(k) * 12}px` } as CSSProperties}>
+            <Card player={p} variant={k === 0 ? "team" : "medium"} onOpen={() => onOpenCard(p.id)} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AreaTile({ title, text, meta, onClick }: { title: string; text: string; meta: string | null; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="noir-glass flex min-h-11 cursor-pointer items-center gap-4 rounded-2xl p-5 text-left transition-colors hover:border-zinc-200/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+    >
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="font-display text-lg tracking-[0.11em] text-dl-text uppercase">{title}</span>
+        <span className="text-sm text-zinc-300">{text}</span>
+        {meta && <span className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">{meta}</span>}
+      </span>
+      <Icon name="chevron-right" className="size-5 text-zinc-400" />
+    </button>
   );
 }
 

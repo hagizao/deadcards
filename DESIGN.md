@@ -36,9 +36,13 @@ Fonte do design system: `src/index.css` (tokens `@theme`, `noir-glass`, `noir-gl
 - 2026-11-17 — FIFA pesa mais que Marvel Snap como referência — a carta estilo FUT é a identidade do site.
 - 2026-11-17 — Design system já existe no código (`src/index.css`, `src/styles/cards.css`); estender, não renomear.
 - 2026-11-17 — Importado para o guia HTML em `public/design/` (`/design/`, fora da navegação): tokens, Card (6 raridades), pill, primaryBtn, field e noir-glass. Os demais componentes ficam só no código — eles são desenhados quando uma tela precisar deles.
+- 2026-11-17 — Home = opção A, "vitrine em leque": cartas em destaque no topo, depois uma entrada por área (Times, Tier List, Coleção, Comparar, Resgatar) e o top 4 do ranking com "Ver os N times" — quem chega da stream vê as cartas primeiro e acha cada área sem caçar abas. Escolhida entre 3 direções (B: duas colunas; C: carta do dia).
+- 2026-11-17 — As cartas em destaque são escolhidas pelo admin (até 5, Editor › Aparência); sem escolha, a Home mostra as 5 maiores OVR — a vitrine nunca fica vazia.
+- 2026-11-17 — O leque só existe a partir de `xl`; abaixo disso a vitrine rola na horizontal começando pela carta principal, sem rotação — 5 cartas não cabem lado a lado em telas menores.
+- 2026-11-17 — O carrossel de heróis saiu da Home; a imagem da capa (`homeHero`) virou o fundo da vitrine.
 
 ## Perguntas abertas
-- A tarefa principal é achar e mostrar a sua carta ou a do streamer? (assumido)
+- A tarefa principal é achar e mostrar a sua carta ou a do streamer? (assumido) A Home ainda não personaliza nada para quem está logado ("sua carta").
 - A maioria acessa pelo celular (vindo do chat da Twitch) ou pelo desktop (com a stream aberta)?
 - Do FIFA, evitar os menus do FUT? (assumido)
 - Tema claro algum dia, ou só escuro? (assumido: só escuro)
