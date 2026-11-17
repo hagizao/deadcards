@@ -26,6 +26,11 @@ export type GameText = {
     aim: (k: string) => string; undo: string; noTarget: string; on: (name: string) => string;
   };
   log: Record<LogKey, Log>;
+  deck: {
+    title: string; hint: string; count: (n: number, max: number) => string; avg: (n: number) => string; curve: string; search: string;
+    random: string; clear: string; play: string; change: string; full: (max: number) => string; versions: string; alt: (n: number) => string; altPro: string;
+    add: (name: string) => string; version: (name: string, hero: string) => string; empty: string; aiNote: string;
+  };
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
     turn: (t: number, total: number) => string; phase: (p: number) => string; phaseHint: string; prio: (me: boolean) => string; prioHint: string; record: (w: number, l: number) => string; souls: (n: number) => string;
@@ -237,6 +242,14 @@ export const GAME_TEXT = strings<GameText>({
       lastStand: (e, n) => `Última Resistência de ${n(e.c)}: drenou ${e.n}.`,
       emerge: (e, n) => `${n(e.c)} emergiu e atingiu as inimigas.`,
       graves: (e) => `Carniçais nasceram em ${e.loc}.`,
+    },
+    deck: {
+      title: "Monte seu deck", hint: "Escolha 12 jogadores. Quem tem heróis de afinidade pode entrar com outra versão.",
+      count: (n, max) => `${n}/${max} cartas`, avg: (n) => `OVR médio ${n}`, curve: "Curva de custo", search: "Buscar jogador",
+      random: "Completar aleatório", clear: "Limpar", play: "Jogar", change: "Trocar deck", full: (max) => `O deck já tem ${max} cartas.`,
+      versions: "Versões", alt: (n) => `Versão de afinidade: −${n} de poder`, altPro: "Versão de afinidade: POL alto, sem perda",
+      add: (name) => `Colocar ${name} no deck`, version: (name, hero) => `${name} com ${hero}`, empty: "Nenhum jogador encontrado.",
+      aiNote: "A IA monta um deck com o mesmo OVR médio e curva parecida.",
     },
     ui: {
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
@@ -458,6 +471,14 @@ export const GAME_TEXT = strings<GameText>({
       emerge: (e, n) => `${n(e.c)} emerged and hit the enemies.`,
       graves: (e) => `Ghouls rose at ${e.loc}.`,
     },
+    deck: {
+      title: "Build your deck", hint: "Pick 12 players. Players with affinity heroes can join as another version.",
+      count: (n, max) => `${n}/${max} cards`, avg: (n) => `Avg OVR ${n}`, curve: "Cost curve", search: "Search player",
+      random: "Fill randomly", clear: "Clear", play: "Play", change: "Change deck", full: (max) => `The deck already has ${max} cards.`,
+      versions: "Versions", alt: (n) => `Affinity version: −${n} power`, altPro: "Affinity version: high POL, no loss",
+      add: (name) => `Add ${name} to the deck`, version: (name, hero) => `${name} as ${hero}`, empty: "No players found.",
+      aiNote: "The AI builds a deck with the same average OVR and a similar curve.",
+    },
     ui: {
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
       needCards: (n) => `Add at least ${n} cards to play.`, you: "You: Hidden King", ai: "AI: Archmother",
@@ -677,6 +698,14 @@ export const GAME_TEXT = strings<GameText>({
       lastStand: (e, n) => `La Última Resistencia de ${n(e.c)} drenó ${e.n}.`,
       emerge: (e, n) => `${n(e.c)} emergió y golpeó a las enemigas.`,
       graves: (e) => `Nacieron Necrófagos en ${e.loc}.`,
+    },
+    deck: {
+      title: "Arma tu mazo", hint: "Elige 12 jugadores. Quien tiene héroes de afinidad puede entrar con otra versión.",
+      count: (n, max) => `${n}/${max} cartas`, avg: (n) => `OVR medio ${n}`, curve: "Curva de coste", search: "Buscar jugador",
+      random: "Completar al azar", clear: "Vaciar", play: "Jugar", change: "Cambiar mazo", full: (max) => `El mazo ya tiene ${max} cartas.`,
+      versions: "Versiones", alt: (n) => `Versión de afinidad: −${n} de poder`, altPro: "Versión de afinidad: POL alto, sin pérdida",
+      add: (name) => `Añadir a ${name} al mazo`, version: (name, hero) => `${name} con ${hero}`, empty: "No se encontró ningún jugador.",
+      aiNote: "La IA arma un mazo con el mismo OVR medio y una curva parecida.",
     },
     ui: {
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",

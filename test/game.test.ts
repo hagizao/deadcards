@@ -3,8 +3,9 @@ import {
   ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, SHOPS, ALT_MALUS, ALT_POL, cardStats, defaultCard, itemCost, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
   type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type PoolCard,
 } from "../src/lib/game/config";
-import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type GCard, type Side } from "../src/lib/game/engine";
+import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Side } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
+import { fillDeck, resolveDeck, versionPlayer } from "../src/lib/game/deck";
 
 function player(id: string, ovr: number, extra: Partial<Player> = {}): Player {
   return {
@@ -641,5 +642,45 @@ describe("versões e heróis de afinidade", () => {
     expect(defaultCard(alt).power).toBe(defaultCard(sig).power - ALT_MALUS);
     const pro = { ...alt, stats: flat(80, { POL: ALT_POL }) };
     expect(defaultCard(pro).power).toBe(defaultCard({ ...sig, stats: pro.stats }).power);
+  });
+});
+
+describe("deck montado e deck da IA", () => {
+  const cfg = gameConfig(undefined);
+  const avg = (d: PoolCard[]) => d.reduce((a, c) => a + c.ovr, 0) / d.length;
+  const costOf = (c: PoolCard) => cardStats(c, cfg.cards, cfg.heroes).cost;
+
+  it("a IA monta 12 cartas com OVR médio a no máximo 1 do seu e curva parecida", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const rnd = seeded(seed);
+      const mine = [...pool].sort(() => rnd() - 0.5).slice(0, 12);
+      const ai = aiDeck(pool, mine, cfg, rnd);
+      expect(ai).toHaveLength(12);
+      expect(new Set(ai.map((c) => c.key)).size).toBe(12);
+      expect(Math.abs(avg(ai) - avg(mine))).toBeLessThanOrEqual(AI_OVR_GAP);
+      const curve = (d: PoolCard[]) => d.reduce((a, c) => a + costOf(c), 0);
+      expect(Math.abs(curve(ai) - curve(mine))).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it("a partida usa o deck escolhido", () => {
+    const mine = pool.slice(0, 12);
+    const m = new Match(cfgWith([]), pool, seeded(5), { p: mine });
+    const ids = [...m.hand, ...m.deck].map((c) => c.p.id).sort();
+    expect(ids).toEqual(mine.map((c) => c.id).sort());
+  });
+
+  it("deck salvo: ignora ids sumidos e jogador repetido; completar enche até 12 sem repetir", () => {
+    const list = [player("a", 80, { hero: "Haze", heroPool: ["Wraith"] }), ...HEROES.slice(0, 14).map((hero, i) => player(`q${i}`, 75, { hero }))];
+    const v = cardVersions(list);
+    const d = resolveDeck(["a~Wraith", "a", "sumiu", 3, "q1"], v);
+    expect(d.map((c) => c.id)).toEqual(["a~Wraith", "q1"]);
+    expect(resolveDeck("x", v)).toEqual([]);
+    const f = fillDeck(d, v, seeded(2));
+    expect(f).toHaveLength(12);
+    expect(new Set(f.map((c) => c.key)).size).toBe(12);
+    expect(f.slice(0, 2)).toEqual(d);
+    const byId = new Map(list.map((p) => [p.id, p]));
+    expect(versionPlayer(byId, { id: "a~Wraith", hero: "Wraith" })).toMatchObject({ id: "a", hero: "Wraith" });
   });
 });

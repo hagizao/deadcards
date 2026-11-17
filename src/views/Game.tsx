@@ -7,8 +7,10 @@ import { AudioMenu, EndTurnButton, SoulOrb } from "../components/GameHud";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, ITEMS, gameConfig, phaseOf, type ItemKey, type ItemSlot } from "../lib/game/config";
-import { MIN_POOL, Match, TURNS, cardPool, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
+import { ABILITIES, ITEMS, gameConfig, phaseOf, type ItemKey, type ItemSlot, type PoolCard } from "../lib/game/config";
+import { DeckBuilder } from "../components/DeckBuilder";
+import { versionPlayer } from "../lib/game/deck";
+import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
 import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
@@ -37,12 +39,16 @@ export function Game() {
   const { players, settings } = useData();
   const t = useT(GAME_TEXT);
   const cfg = useMemo(() => gameConfig(settings.game), [settings.game]);
+  const versions = useMemo(() => cardVersions(players), [players]);
   const pool = useMemo(() => cardPool(players), [players]);
+  // deck escolhido na tela de deck; null = mostrar a tela
+  const [deck, setDeck] = useState<PoolCard[] | null>(null);
   if (pool.length < MIN_POOL) return <p className="text-sm text-zinc-300">{t.ui.needCards(MIN_POOL)}</p>;
-  return <Board key={JSON.stringify(cfg)} newMatch={() => new Match(cfg, pool)} />;
+  if (!deck) return <DeckBuilder versions={versions} cfg={cfg} onPlay={setDeck} />;
+  return <Board key={JSON.stringify(cfg)} newMatch={() => new Match(cfg, pool, Math.random, { p: deck })} onDeck={() => setDeck(null)} />;
 }
 
-function Board({ newMatch }: { newMatch: () => Match }) {
+function Board({ newMatch, onDeck }: { newMatch: () => Match; onDeck: () => void }) {
   const t = useT(GAME_TEXT);
   const { players } = useData();
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
@@ -122,7 +128,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
     const ms = t.abilities[c.ab].master();
     const icons = c.rev ? statusIcons(c, m, t) : [];
     return (
-      <GameCard player={c.p.token || !c.p.id ? null : byId.get(c.p.id) ?? null} name={name(c)} cost={c.cost} power={c.rev ? m.pow(c) : c.base} base={c.base}
+      <GameCard player={c.p.token ? null : versionPlayer(byId, c.p)} name={name(c)} cost={c.cost} power={c.rev ? m.pow(c) : c.base} base={c.base}
         glyph={c.p.token ? TOKEN_GLYPH[c.p.token] : undefined} master={c.lvl === 2 ? t.levels[2] : undefined} fx={fx}
         status={icons.map((x) => x[0]).join("") || undefined}
         text={text ? { name: a.name, kind: t.kinds[ABILITIES[key].kind], body, master: c.lvl === 2 && key === c.ab && ms ? ms : undefined, masterLabel: t.ui.masterLine } : null} />
@@ -424,6 +430,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
                 {/* eslint-disable-next-line jsx-a11y/no-autofocus -- foco vai para a ação principal do diálogo que acabou de abrir */}
                 <button type="button" autoFocus className={primaryBtn} onClick={restart}>{t.ui.again}</button>
                 <button type="button" className={pill(false)} onClick={() => setShowEnd(false)}>{t.ui.viewBoard}</button>
+                <button type="button" className={pill(false)} onClick={onDeck}>{t.deck.change}</button>
               </div>
             </div>
           </motion.div>

@@ -12,7 +12,7 @@ export const opp = (s: Side): Side => (s === "p" ? "a" : "p");
 
 export const TURNS = 8;
 export const HAND_MAX = 7;
-const DECK_SIZE = 12;
+export const DECK_SIZE = 12;
 const START_HAND = 3;
 const LOC_COUNT = 3;
 export const MIN_POOL = DECK_SIZE;
@@ -109,6 +109,46 @@ export function cardPool(players: Player[]): PoolCard[] {
   return [...cardVersions(players).values()].map((l) => l[0]);
 }
 
+const avgOvr = (d: PoolCard[]) => d.reduce((a, c) => a + c.ovr, 0) / Math.max(1, d.length);
+/** Diferença de OVR médio que o deck da IA aceita em relação ao seu. */
+export const AI_OVR_GAP = 1;
+
+/**
+ * Deck da IA espelhando o seu: para cada carta sua, uma do pool com o mesmo custo e OVR parecido (a IA pode repetir jogadores seus).
+ * Depois troca cartas de mesmo custo até o OVR médio ficar a no máximo AI_OVR_GAP do seu.
+ */
+export function aiDeck(pool: PoolCard[], mine: PoolCard[], cfg: GameConfig, rnd: () => number = Math.random): PoolCard[] {
+  const cost = new Map(pool.map((p) => [p.id, cardStats(p, cfg.cards, cfg.heroes).cost]));
+  const costOf = (p: PoolCard) => cost.get(p.id) ?? cardStats(p, cfg.cards, cfg.heroes).cost;
+  const free = [...pool];
+  const out: PoolCard[] = [];
+  for (const m of mine) {
+    if (!free.length) break;
+    const c = costOf(m);
+    const score = (p: PoolCard) => Math.abs(costOf(p) - c) * 20 + Math.abs(p.ovr - m.ovr) + rnd() * 4;
+    let best = 0;
+    for (let i = 1; i < free.length; i++) if (score(free[i]) < score(free[best])) best = i;
+    out.push(free.splice(best, 1)[0]);
+  }
+  const goal = avgOvr(mine);
+  for (let n = 0; n < 40 && Math.abs(avgOvr(out) - goal) > AI_OVR_GAP; n++) {
+    const high = avgOvr(out) > goal;
+    let swap: [number, number, number] | null = null;
+    for (let i = 0; i < out.length; i++) {
+      for (let j = 0; j < free.length; j++) {
+        const d = free[j].ovr - out[i].ovr;
+        if ((high ? d >= 0 : d <= 0) || costOf(free[j]) !== costOf(out[i])) continue;
+        const gap = Math.abs(avgOvr(out) + d / out.length - goal);
+        if (!swap || gap < swap[2]) swap = [i, j, gap];
+      }
+    }
+    if (!swap) break;
+    const [i, j] = swap;
+    [out[i], free[j]] = [free[j], out[i]];
+  }
+  return out;
+}
+
 const nst = (): Status => ({ tmp: [] });
 
 const isGun = (c: GCard) => c.p.role === "Carry" || c.p.role === "OffCarry";
@@ -169,12 +209,15 @@ export class Match {
   prio: Side = "p";
   private uid = 0;
 
-  constructor(private cfg: GameConfig, pool: PoolCard[], private rnd: () => number = Math.random) {
+  /** `decks.p` é o deck montado pelo jogador; sem ele, os dois decks saem aleatórios do pool. O da IA espelha o seu (ver aiDeck). */
+  constructor(private cfg: GameConfig, pool: PoolCard[], private rnd: () => number = Math.random, decks: { p?: PoolCard[]; a?: PoolCard[] } = {}) {
     this.loc = this.sh(cfg.locs).slice(0, LOC_COUNT).map((L) => ({
       L, rev: false, s: { p: [], a: [] }, lock: { p: 0, a: 0 }, trap: { p: 0, a: 0 }, shield: { p: 0, a: 0 }, petri: { p: null, a: null }, hold: { side: null, n: 0 },
     }));
-    this.deck = this.sh(pool).slice(0, DECK_SIZE).map((p) => this.mk(p, cfg, "p"));
-    this.adeck = this.sh(pool).slice(0, DECK_SIZE).map((p) => this.mk(p, cfg, "a"));
+    const mine = decks.p?.length ? decks.p.slice(0, DECK_SIZE) : this.sh(pool).slice(0, DECK_SIZE);
+    const theirs = decks.a ?? (decks.p?.length ? aiDeck(pool, mine, cfg, rnd) : this.sh(pool).slice(0, DECK_SIZE));
+    this.deck = this.sh(mine).map((p) => this.mk(p, cfg, "p"));
+    this.adeck = this.sh(theirs).map((p) => this.mk(p, cfg, "a"));
     for (let i = 0; i < START_HAND; i++) { this.draw("p"); this.draw("a"); }
     this.nextTurn();
   }
