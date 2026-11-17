@@ -50,6 +50,26 @@ function Board({ newMatch }: { newMatch: () => Match }) {
   const [sel, setSel] = useState<GCard | null>(null);
   const [look, setLook] = useState<GCard | null>(null);
   const [shopHidden, setShopHidden] = useState(false);
+  // tela cheia: a partida cobre o site (e pede tela cheia ao navegador quando dá); os locais viram 2x2
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    if (!full) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    // saiu da tela cheia do navegador (Esc): sai do modo também
+    const off = () => { if (!document.fullscreenElement) setFull(false); };
+    document.addEventListener("fullscreenchange", off);
+    return () => { document.body.style.overflow = prev; document.removeEventListener("fullscreenchange", off); };
+  }, [full]);
+  const toggleFull = () => {
+    if (full) {
+      setFull(false);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      return;
+    }
+    setFull(true);
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  };
   const muted = useMuted();
   const [toast, setToast] = useState<{ id: number; text: string } | null>(() => ({ id: 0, text: t.ui.toast.turn(1) }));
   const [result, setResult] = useState<Result | null>(null);
@@ -247,30 +267,37 @@ function Board({ newMatch }: { newMatch: () => Match }) {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="mx-auto flex h-[calc(100dvh-7rem)] min-h-120 max-w-5xl flex-col gap-1.5 text-dl-text sm:h-[calc(100dvh-10rem)]">
-      <div className="flex w-full items-center justify-between gap-2">
-        <h1 className="font-display text-sm font-extrabold tracking-[0.11em] whitespace-nowrap uppercase sm:text-xl">{t.ui.title}</h1>
+    <div className={full ? "game-full fixed inset-0 z-50 overflow-hidden bg-dl-black/90 px-3 pt-1 backdrop-blur-xl sm:px-6" : "contents"}>
+    <div className={`mx-auto flex flex-col gap-1.5 text-dl-text ${full ? "h-full max-w-7xl" : "h-[calc(100dvh-5.5rem)] min-h-120 max-w-7xl sm:h-[calc(100dvh-7.5rem)]"}`}>
+      <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
+        <h1 className="pt-1 font-display text-sm font-extrabold tracking-[0.11em] uppercase sm:text-xl">{t.ui.title}</h1>
+        <div className="order-last col-span-2 flex items-start justify-center gap-2 sm:order-0 sm:col-span-1">
+          <ItemSlot s="a" m={m} t={t} icons={icons} />
+          <AiHand n={m.ahand.length} t={t} />
+        </div>
         <div className="flex flex-wrap items-center justify-end gap-x-2 text-xs text-zinc-300">
           <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr>
           <span aria-hidden="true">·</span>
           <span>{t.ui.record(record.w, record.l)}</span>
-          <button type="button" onClick={() => setMuted(!muted)} aria-label={t.ui.sound(!muted)} aria-pressed={muted}
-            className={`grid size-11 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
-            <span aria-hidden="true">{muted ? "🔇" : "🔊"}</span>
-          </button>
+          <span className="flex">
+            <button type="button" onClick={() => setMuted(!muted)} aria-label={t.ui.sound(!muted)} aria-pressed={muted}
+              className={`grid size-11 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
+              <span aria-hidden="true">{muted ? "🔇" : "🔊"}</span>
+            </button>
+            <button type="button" onClick={toggleFull} aria-label={t.ui.fullscreen(full)} aria-pressed={full} title={t.ui.fullscreen(full)}
+              className={`grid size-11 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
+              <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden="true">
+                <path d={full ? "M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </span>
         </div>
-      </div>
-
-      <div className="flex w-full items-start gap-2">
-        <ItemSlot s="a" m={m} t={t} icons={icons} />
-        <AiHand n={m.ahand.length} t={t} />
-        <span className="w-9 shrink-0" aria-hidden="true" />
       </div>
 
       <div ref={arena} className="relative flex min-h-0 w-full flex-1 flex-col justify-center">
         <section aria-label={t.ui.arena} className="flex w-full gap-1.5 sm:gap-2">
           {m.loc.map((l, i) => (
-            <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
+            <Location key={l.L.id + i} m={m} l={l} i={i} t={t} grid={full} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
               drop={!drag || m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok"}
               card={(c) => (
                 <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} acts={actsOf(c)}
@@ -366,6 +393,7 @@ function Board({ newMatch }: { newMatch: () => Match }) {
         )}
       </AnimatePresence>
     </div>
+    </div>
     </MotionConfig>
   );
 }
@@ -373,8 +401,8 @@ function Board({ newMatch }: { newMatch: () => Match }) {
 type T = (typeof GAME_TEXT)["pt"];
 type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
-function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
-  m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: "off" | "ok" | "over"; card: (c: GCard) => React.ReactNode;
+function Location({ m, l, i, t, grid, canPlay, onPlay, dest, onDest, drop, card }: {
+  grid: boolean; m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: "off" | "ok" | "over"; card: (c: GCard) => React.ReactNode;
 }) {
   const a = m.total(l, "a"), p = m.total(l, "p");
   const nm = l.rev ? l.L.name : t.ui.hiddenLoc;
@@ -393,7 +421,10 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
   ] as [boolean, string, string][]).filter((x) => x[0]);
   const desc = l.rev ? l.L.desc || t.locs[l.L.type].text(l.L) : t.ui.revealsOn(i + 1);
   // uma fileira por lado: até 2 cartas lado a lado; com mais, elas se sobrepõem como um leque (cada vaga encolhe, a última fica inteira)
-  const side = "flex h-[calc(var(--spacing-gc)*1.46)] w-full justify-center gap-1";
+  const side = grid
+    // tela cheia (sm para cima): 2x2 sem sobrepor; no celular continua a fileira
+    ? "flex h-[calc(var(--spacing-gc)*1.46)] w-full justify-center gap-1 sm:grid sm:h-[calc(var(--spacing-gc)*2.92+0.25rem)] sm:grid-cols-[repeat(2,var(--spacing-gc))] sm:content-center"
+    : "flex h-[calc(var(--spacing-gc)*1.46)] w-full justify-center gap-1";
   const ring = drop === "over" ? "bg-game-me/15 outline-2 outline-game-me" : drop === "ok" ? "outline-2 outline-game-me/50 outline-dashed" : "";
   return (
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
@@ -528,12 +559,14 @@ function Peek({ r, card, tips }: { r: DOMRect; card: React.ReactNode; tips: { ti
 }
 
 /** Mão da IA: versos de carta em leque no topo. */
+/** Mão da IA: versos em leque afundados na borda de cima (menores que a sua mão, mas à vista). */
 function AiHand({ n, t }: { n: number; t: T }) {
   const mid = (n - 1) / 2;
   return (
-    <div role="img" aria-label={t.ui.aiHand(n)} className="relative h-9 min-w-0 flex-1">
+    <div role="img" aria-label={t.ui.aiHand(n)} className="relative h-12 w-32 [clip-path:inset(0_-100vw_-100vh_-100vw)] sm:h-16 sm:w-56">
       {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="absolute top-0 w-6 origin-top" style={{ left: `calc(50% - 0.75rem + ${(i - mid) * 14}px)`, transform: `rotate(${(mid - i) * 5}deg) translateY(${Math.abs(i - mid) * 2}px)` }}>
+        <div key={i} className="absolute top-0 left-1/2 w-9 origin-bottom sm:w-13"
+          style={{ transform: `translate(-50%, -38%) translateX(${(i - mid) * 62}%) rotate(${(mid - i) * 6}deg) translateY(${-Math.abs(i - mid) * 4}%)` }}>
           <CardBack />
         </div>
       ))}
