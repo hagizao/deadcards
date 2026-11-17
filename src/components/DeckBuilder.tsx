@@ -47,7 +47,8 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
         <p className="text-sm text-zinc-300">{t.deck.hint} {t.deck.aiNote}</p>
       </header>
 
-      <div className="noir-glass sticky top-2 z-20 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl p-3">
+      <div className="noir-glass sticky top-2 z-20 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl p-3">
+        <div className="flex items-center gap-4">
         <div className="flex flex-col">
           <span className="font-display text-lg font-extrabold" aria-live="polite">{t.deck.count(deck.length, DECK_SIZE)}</span>
           <span className="text-xs text-zinc-400">{deck.length ? t.deck.avg(avg) : " "}</span>
@@ -55,23 +56,25 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
         <figure className="flex flex-col gap-1" aria-label={`${t.deck.curve}: ${COSTS.map((n, i) => `${n}: ${curve[i]}`).join(", ")}`}>
           <div className="flex h-8 items-end gap-1" aria-hidden="true">
             {curve.map((n, i) => (
-              <span key={COSTS[i]} className="w-3 rounded-sm bg-game-me/70 transition-[height] duration-200" style={{ height: `${Math.max(8, (n / peak) * 100)}%`, opacity: n ? 1 : 0.25 }} />
+              <span key={COSTS[i]} className="h-full w-3 origin-bottom rounded-sm bg-game-me/70 transition-transform duration-200 motion-reduce:transition-none" style={{ transform: `scaleY(${Math.max(0.08, n / peak)})`, opacity: n ? 1 : 0.25 }} />
             ))}
           </div>
           <figcaption className="flex gap-1 text-[10px] text-zinc-500" aria-hidden="true">
-            {COSTS.map((n) => <span key={n} className="w-3 text-center">{n === 8 ? "8+" : n}</span>)}
+            {COSTS.map((n) => <span key={n} className="w-3 text-center">{n}</span>)}
           </figcaption>
         </figure>
-        <label className="flex min-w-40 flex-1 flex-col gap-1 text-xs text-zinc-400">
-          <span className="sr-only">{t.deck.search}</span>
-          <input type="search" className={field} placeholder={t.deck.search} value={query} onChange={(e) => setQuery(e.target.value)} />
-        </label>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={`${pill(false)} disabled:cursor-not-allowed disabled:opacity-50`} disabled={full} onClick={() => setDeck((d) => fillDeck(d, versions))}>{t.deck.random}</button>
           <button type="button" className={`${pill(false)} disabled:cursor-not-allowed disabled:opacity-50`} disabled={!deck.length} onClick={() => setDeck([])}>{t.deck.clear}</button>
           <button type="button" className={primaryBtn} disabled={!full} onClick={() => onPlay(deck)}>{t.deck.play}</button>
         </div>
       </div>
+
+      <label className="flex max-w-sm flex-col">
+        <span className="sr-only">{t.deck.search}</span>
+        <input type="search" className={field} placeholder={t.deck.search} value={query} onChange={(e) => setQuery(e.target.value)} />
+      </label>
 
       {list.length ? (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]">

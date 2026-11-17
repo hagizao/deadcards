@@ -246,7 +246,7 @@ export const GAME_TEXT = strings<GameText>({
     deck: {
       title: "Monte seu deck", hint: "Escolha 12 jogadores. Quem tem heróis de afinidade pode entrar com outra versão.",
       count: (n, max) => `${n}/${max} cartas`, avg: (n) => `OVR médio ${n}`, curve: "Curva de custo", search: "Buscar jogador",
-      random: "Completar aleatório", clear: "Limpar", play: "Jogar", change: "Trocar deck", full: (max) => `O deck já tem ${max} cartas.`,
+      random: "Aleatório", clear: "Limpar", play: "Jogar", change: "Trocar deck", full: (max) => `O deck já tem ${max} cartas.`,
       versions: "Versões", alt: (n) => `Versão de afinidade: −${n} de poder`, altPro: "Versão de afinidade: POL alto, sem perda",
       add: (name) => `Colocar ${name} no deck`, version: (name, hero) => `${name} com ${hero}`, empty: "Nenhum jogador encontrado.",
       aiNote: "A IA monta um deck com o mesmo OVR médio e curva parecida.",
@@ -474,7 +474,7 @@ export const GAME_TEXT = strings<GameText>({
     deck: {
       title: "Build your deck", hint: "Pick 12 players. Players with affinity heroes can join as another version.",
       count: (n, max) => `${n}/${max} cards`, avg: (n) => `Avg OVR ${n}`, curve: "Cost curve", search: "Search player",
-      random: "Fill randomly", clear: "Clear", play: "Play", change: "Change deck", full: (max) => `The deck already has ${max} cards.`,
+      random: "Random", clear: "Clear", play: "Play", change: "Change deck", full: (max) => `The deck already has ${max} cards.`,
       versions: "Versions", alt: (n) => `Affinity version: −${n} power`, altPro: "Affinity version: high POL, no loss",
       add: (name) => `Add ${name} to the deck`, version: (name, hero) => `${name} as ${hero}`, empty: "No players found.",
       aiNote: "The AI builds a deck with the same average OVR and a similar curve.",
@@ -702,7 +702,7 @@ export const GAME_TEXT = strings<GameText>({
     deck: {
       title: "Arma tu mazo", hint: "Elige 12 jugadores. Quien tiene héroes de afinidad puede entrar con otra versión.",
       count: (n, max) => `${n}/${max} cartas`, avg: (n) => `OVR medio ${n}`, curve: "Curva de coste", search: "Buscar jugador",
-      random: "Completar al azar", clear: "Vaciar", play: "Jugar", change: "Cambiar mazo", full: (max) => `El mazo ya tiene ${max} cartas.`,
+      random: "Al azar", clear: "Vaciar", play: "Jugar", change: "Cambiar mazo", full: (max) => `El mazo ya tiene ${max} cartas.`,
       versions: "Versiones", alt: (n) => `Versión de afinidad: −${n} de poder`, altPro: "Versión de afinidad: POL alto, sin pérdida",
       add: (name) => `Añadir a ${name} al mazo`, version: (name, hero) => `${name} con ${hero}`, empty: "No se encontró ningún jugador.",
       aiNote: "La IA arma un mazo con el mismo OVR medio y una curva parecida.",
