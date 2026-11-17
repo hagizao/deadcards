@@ -10,8 +10,8 @@ import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
 import {
   ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, LOC_V_RANGE, MIN_LOCS, NAME_MAX, POWER_RANGE,
-  ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, ITEM_V_RANGE,
-  cardStats, gameConfig, itemCost, itemStats, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard,
+  ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, KEYWORD_AT, MASTERY_AT, STAT_KEYS as GAME_STATS,
+  cardStats, gameConfig, itemCost, itemStats, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey,
 } from "../lib/game/config";
 import { cardPool } from "../lib/game/engine";
 import { GAME_TEXT } from "../lib/game/text";
@@ -700,6 +700,12 @@ function GameForm() {
     if (!Object.keys(o).length) delete items[k];
     return { ...c, items };
   });
+  const setHero = (k: AbilityKey, stat: StatKey) => setCfg((c) => {
+    const heroes = { ...c.heroes };
+    if (stat === HERO_STAT[k]) delete heroes[k];
+    else heroes[k] = { stat };
+    return { ...c, heroes };
+  });
   const resetCard = () => {
     if (!card) return;
     setCfg((c) => { const cards = { ...c.cards }; delete cards[card.id]; return { ...c, cards }; });
@@ -819,6 +825,23 @@ function GameForm() {
       </section>
 
       <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Heróis</h2>
+        <p className="text-xs text-zinc-400">
+          O atributo principal define a Maestria da carta: abaixo de {MASTERY_AT[0]} é {GT.levels[0]}, de {MASTERY_AT[0]} a {MASTERY_AT[1] - 1} é {GT.levels[1]} e a partir de {MASTERY_AT[1]} é {GT.levels[2]} (libera a frase de Mestre). Atributos a partir de {KEYWORD_AT} viram palavras-chave.
+        </p>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2">
+          {HERO_KEYS.map((k) => (
+            <label key={k} className="flex flex-col gap-1 rounded-2xl bg-zinc-950/60 p-3 text-sm font-bold text-zinc-100">
+              <span className="flex items-baseline gap-1.5">{k}{cfg.heroes[k] && <span className="text-[10px] tracking-[0.12em] text-game-brass uppercase">editado</span>}</span>
+              <select className={input} value={cfg.heroes[k]?.stat ?? HERO_STAT[k] ?? "MIR"} onChange={(e) => setHero(k, e.target.value as StatKey)}>
+                {GAME_STATS.map((st) => <option key={st} value={st}>{GT.stats[st]}{st === HERO_STAT[k] ? " (padrão)" : ""}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
         <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Itens da loja</h2>
         <p className="text-xs text-zinc-400">
           No turno {ITEM_OFFER_TURN} cada lado escolhe 1 entre 3 itens (mesma combinação de tiers para você e a IA). O item é revelado e pago no turno {ITEM_REVEAL_TURN}: tier 1 a 4 custa 1 a 4 almas. Item desligado não aparece no sorteio.
@@ -849,7 +872,7 @@ function GameForm() {
 
       <div className="noir-glass sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3">
         <button type="button" className={primary} disabled={busy} onClick={save}>{busy ? "Salvando…" : "Salvar"}</button>
-        <button type="button" className={ghost} onClick={() => { setCfg({ locs: structuredClone(DEFAULT_LOCS), cards: {}, items: {} }); setLi(0); }}>Restaurar tudo ao padrão</button>
+        <button type="button" className={ghost} onClick={() => { setCfg({ locs: structuredClone(DEFAULT_LOCS), cards: {}, items: {}, heroes: {} }); setLi(0); }}>Restaurar tudo ao padrão</button>
         <Toast msg={msg} />
       </div>
     </div>
