@@ -309,7 +309,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className={full ? "game-full fixed inset-0 z-50 overflow-hidden bg-dl-black/90 px-3 pt-1 backdrop-blur-xl sm:px-6" : "contents"}>
+    <div className={full ? "fixed inset-0 z-50 overflow-hidden bg-dl-black/90 px-3 pt-1 backdrop-blur-xl sm:px-6" : "contents"}>
     <div className={`mx-auto flex flex-col gap-1.5 text-dl-text ${full ? "h-full max-w-7xl" : "h-[calc(100dvh-5.5rem)] min-h-120 max-w-7xl sm:h-[calc(100dvh-7.5rem)]"}`}>
       <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
         <div className="flex flex-col items-start gap-1 pt-1">
@@ -343,7 +343,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       </div>
 
       <div ref={arena} className="relative flex min-h-0 w-full flex-1 flex-col">
-        <section aria-label={t.ui.arena} className="flex min-h-0 w-full flex-1 gap-0.5 sm:gap-1">
+        <section aria-label={t.ui.arena} className="lane-board flex min-h-0 w-full flex-1 gap-0.5 sm:gap-1">
           {m.loc.map((l, i) => (
             <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
               drop={!drag || m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok"}
@@ -463,35 +463,74 @@ const LANE = [
   { stroke: "stroke-lane-green", tint: "from-lane-green/30" },
 ] as const;
 
-/** Borda pincelada de um lado da faixa, em unidades 0 a 1: ondas largas com um pouco de tremido, de cima a baixo. Determinística por faixa. */
-function brushEdge(seed: number, x0: number, amp: number): [number, number][] {
+/** Gerador determinístico, para cada faixa ter sempre a mesma borda. */
+function rng(seed: number) {
   let s = seed * 9301 + 49297;
-  const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  return () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+}
+/** Borda de um lado da faixa, em unidades 0 a 1: ondas largas com um pouco de tremido, de cima a baixo. */
+function brushEdge(seed: number, x0: number, amp: number): [number, number][] {
+  const r = rng(seed);
   return Array.from({ length: 31 }, (_, k) => [x0 + Math.sin(k * 0.45 + seed * 1.7) * amp * 0.35 + (r() - 0.5) * amp, k / 30]);
 }
-const P = ([x, y]: [number, number]) => `${x.toFixed(4)} ${y.toFixed(4)}`;
+const P = ([x, y]: [number, number]) => `${x.toFixed(2)} ${y.toFixed(2)}`;
 /** Curva suave pelos pontos (quadráticas entre os pontos médios). */
 const smooth = (p: [number, number][]) => {
   const mid = (i: number): [number, number] => [(p[i][0] + p[i + 1][0]) / 2, (p[i][1] + p[i + 1][1]) / 2];
   return `${P(p[0])} L ${P(mid(0))} ${p.slice(1, -1).map((q, i) => `Q ${P(q)} ${P(mid(i + 1))}`).join(" ")} L ${P(p[p.length - 1])}`;
 };
-/** Recorte (fundo da faixa) e traços das bordas de cada faixa. */
-const BRUSH = [0, 1, 2].map((i) => {
-  const left = brushEdge(i * 2 + 1, 0.03, 0.035), right = brushEdge(i * 2 + 2, 0.97, 0.035);
-  return { clip: `M ${smooth(left)} L ${smooth([...right].reverse())} Z`, left: `M ${smooth(left)}`, right: `M ${smooth(right)}` };
-});
+/** Falhas do pincel: traço e buraco alternados, em frações da altura (o pincel some por um trecho e volta). */
+function gaps(seed: number) {
+  const r = rng(seed + 50), out: number[] = [];
+  for (let y = 0; y < 1.2;) { const on = 0.05 + r() * 0.2, off = 0.015 + r() * 0.06; out.push(on, off); y += on + off; }
+  return out;
+}
+/** Bordas de cada faixa: pontos (0 a 1) dos dois lados e o padrão de falhas. */
+const BRUSH = [0, 1, 2].map((i) => ({
+  left: brushEdge(i * 2 + 1, 0.035, 0.035), right: brushEdge(i * 2 + 2, 0.965, 0.035), dash: gaps(i * 2 + 1), dash2: gaps(i * 2 + 2),
+}));
+const clipOf = (b: (typeof BRUSH)[number]) => `M ${smooth(b.left.map(([x, y]) => [+x.toFixed(4), +y.toFixed(4)]))} L ${smooth([...b.right].reverse())} Z`;
+const CLIPS = BRUSH.map(clipOf);
 
-/** Fundo da faixa: arte do local (ou névoa enquanto oculto), escurecida nas pontas e tingida com a cor da lane; bordas pinceladas. */
+/** Tamanho do elemento em px (as bordas são desenhadas em px para o pincel ter espessura e textura certas). */
+function useSize() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, size] as const;
+}
+
+/** Traço de pincel seco: grosso, com a borda rasgada (deslocamento por ruído), fiapos (erosão por ruído) e falhas (tracejado irregular). */
+function BrushStroke({ id, pts, w, h, sw, dash, dash2, inward }: { id: string; pts: [number, number][]; w: number; h: number; sw: number; dash: number[]; dash2: number[]; inward: number }) {
+  const px = pts.map(([x, y]): [number, number] => [x * w, y * h]);
+  const d = `M ${smooth(px)}`;
+  // pincelada de apoio, mais fina e por dentro, que aparece só em trechos
+  const d2 = `M ${smooth(px.map(([x, y]) => [x + inward * sw * 0.9, y]))}`;
+  return (
+    <g filter={`url(#${id})`}>
+      <path d={d} strokeWidth={sw} strokeDasharray={dash.map((x) => (x * h).toFixed(1)).join(" ")} strokeLinecap="butt" />
+      <path d={d2} strokeWidth={sw * 0.45} strokeDasharray={dash2.map((x, k) => (x * h * (k % 2 ? 3 : 0.6)).toFixed(1)).join(" ")} strokeDashoffset={h * 0.1} strokeLinecap="butt" />
+    </g>
+  );
+}
+
+/** Fundo da faixa: arte do local (ou névoa enquanto oculto), escurecida nas pontas e tingida com a cor da lane; bordas a pincel. */
 function LaneBackdrop({ l, i, drop }: { l: Loc; i: number; drop: "off" | "ok" | "over" }) {
   const b = BRUSH[i % 3], lane = LANE[i % 3];
-  const id = `lane-clip-${i}`;
+  const [ref, { w, h }] = useSize();
+  const id = `lane-${i}`;
   const art = l.rev && l.L.art;
+  // espessura proporcional à faixa, como no mapa: fina no celular, grossa no desktop
+  const sw = Math.max(4, Math.min(13, w * 0.03));
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-      <svg className="absolute size-0">
-        <defs><clipPath id={id} clipPathUnits="objectBoundingBox"><path d={b.clip} /></clipPath></defs>
-      </svg>
-      <div className="absolute inset-0 bg-zinc-950" style={{ clipPath: `url(#${id})` }}>
+    <div ref={ref} aria-hidden="true" className="pointer-events-none absolute inset-0">
+      <div className="absolute inset-0 bg-zinc-950" style={{ clipPath: `url(#${id}-clip)` }}>
         {art ? (
           <motion.img key={art} src={locArtUrl(art)} alt="" draggable={false} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}
             className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />
@@ -500,13 +539,23 @@ function LaneBackdrop({ l, i, drop }: { l: Loc; i: number; drop: "off" | "ok" | 
         <div className={`absolute inset-0 bg-linear-to-t to-transparent to-60% ${lane.tint}`} />
         <div className={`absolute inset-0 transition-colors duration-150 ${drop === "over" ? "bg-game-me/20" : drop === "ok" ? "bg-game-me/8" : ""}`} />
       </div>
-      <svg viewBox="0 0 1 1" preserveAspectRatio="none" className={`absolute inset-0 size-full fill-none ${lane.stroke}`}>
-        {[b.left, b.right].map((d) => (
-          <g key={d}>
-            <path d={d} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" className="stroke-[3px] opacity-25 sm:stroke-[7px]" />
-            <path d={d} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" className="stroke-1 opacity-70 sm:stroke-2 sm:opacity-90" />
-          </g>
-        ))}
+      <svg className={`absolute inset-0 size-full overflow-visible fill-none ${lane.stroke}`}>
+        <defs>
+          <clipPath id={`${id}-clip`} clipPathUnits="objectBoundingBox"><path d={CLIPS[i % 3]} /></clipPath>
+          <filter id={id} filterUnits="userSpaceOnUse" x={-40} y={-40} width={w + 80} height={h + 80}>
+            <feTurbulence type="fractalNoise" baseFrequency="0.035 0.008" numOctaves={2} seed={i * 7 + 1} result="wave" />
+            <feDisplacementMap in="SourceGraphic" in2="wave" scale={sw * 1.4} xChannelSelector="R" yChannelSelector="G" result="torn" />
+            <feTurbulence type="fractalNoise" baseFrequency="0.22 0.03" numOctaves={3} seed={i * 7 + 3} result="grain" />
+            <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 7 -2.6" result="dry" />
+            <feComposite in="torn" in2="dry" operator="in" />
+          </filter>
+        </defs>
+        {w > 0 && (
+          <>
+            <BrushStroke id={id} pts={b.left} w={w} h={h} sw={sw} dash={b.dash} dash2={b.dash2} inward={1} />
+            <BrushStroke id={id} pts={b.right} w={w} h={h} sw={sw} dash={b.dash2} dash2={b.dash} inward={-1} />
+          </>
+        )}
       </svg>
     </div>
   );
@@ -531,16 +580,15 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
     [m.portals.some((x) => x.t >= m.t && (x.a === i || x.b === i)), "🚪", t.ui.chips.portal],
   ] as [boolean, string, string][]).filter((x) => x[0]);
   const desc = l.rev ? l.L.desc || t.locs[l.L.type].text(l.L) : t.ui.revealsOn(i + 1);
-  // uma fileira por lado: até 2 cartas lado a lado; com mais, elas se sobrepõem como um leque (cada vaga encolhe, a última fica inteira)
-  // cada lado numa área translúcida da faixa: até 2 cartas lado a lado; com mais, elas se sobrepõem como um leque
-  const side = "flex h-[calc(var(--spacing-gc)*1.46)] w-full justify-center gap-1 rounded-lg bg-black/25 p-0.5";
+  // cada lado numa área translúcida da faixa: grade 2x2 (no máximo 4 cartas por lado), nunca sobrepostas
+  const side = "grid h-[calc(var(--spacing-gc)*2.92+0.5rem)] w-full grid-cols-[repeat(2,var(--spacing-gc))] grid-rows-[repeat(2,calc(var(--spacing-gc)*1.46))] justify-center gap-1 rounded-lg bg-black/25 p-0.5";
   return (
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
       className="relative flex min-w-0 flex-1 flex-col items-center justify-between gap-1 px-2 py-1.5 sm:gap-2 sm:px-4 sm:py-3">
       <LaneBackdrop l={l} i={i} drop={drop} />
-      <div className={`relative ${side}`} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
+      <div className={`relative content-end ${side}`} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
       <div className="relative w-full"><LocTile nm={nm} desc={desc} chips={chips} a={a} p={p} /></div>
-      <div className={`relative ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
+      <div className={`relative content-start ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
         {l.s.p.map(card)}
         {canPlay && (
           <button type="button" onClick={onPlay} aria-label={t.ui.playHere(nm)}
@@ -570,7 +618,7 @@ function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
 }
 
 /** Vaga da carta na fileira do local: encolhe quando não cabe (a carta transborda e fica por baixo da seguinte). */
-const slot = "min-w-0 max-w-gc flex-1 last:w-gc last:flex-none hover:z-10 focus-within:z-10";
+const slot = "w-gc hover:z-10 focus-within:z-10";
 
 function BoardCard({ c, m, t, name, face, looking, target, acts, onClick, onPeek }: {
   c: GCard; m: Match; t: T; name: string; face: React.ReactNode; looking: boolean; target: boolean; acts: { label: string; run: () => void }[];

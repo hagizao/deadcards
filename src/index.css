@@ -39,20 +39,16 @@
   --color-item-vitality: #7cbb4d;
   --color-item-spirit: #b77ce6;
   /* faixas dos locais: as três lanes do mapa do Deadlock */
-  --color-lane-yellow: #e9c046;
-  --color-lane-blue: #5b8fe8;
-  --color-lane-green: #5cc26e;
+  --color-lane-yellow: #f0c443;
+  --color-lane-blue: #52c4dd;
+  --color-lane-green: #8edc78;
 }
 
-/* do sm para cima o orbe e o fim do turno dividem a linha com a mão, então sobra mais altura para a mesa */
-@media (width >= 40rem) {
-  :root {
-    --spacing-gc: clamp(2.5rem, min((min(100vw, 80rem) - 3rem) / 6 - 0.75rem, 32dvh - 8.5rem), 12rem);
-  }
-  /* tela cheia: sem o cabeçalho do site, sobra mais altura para as faixas */
-  .game-full {
-    --spacing-gc: clamp(2.5rem, min((min(100vw, 80rem) - 3rem) / 6 - 0.75rem, 32dvh - 6.5rem), 12rem);
-  }
+/* mesa em faixas: cada lado de um local é uma grade 2x2, então a carta mede 1/6 da largura da mesa
+   e cabe 4 vezes na altura (mais a placa do local); a mesa é o container das medidas */
+.lane-board {
+  container-type: size;
+  --spacing-gc: clamp(1.5rem, min((100cqw - 0.5rem) / 6 - 1.25rem, (100cqh - 8.5rem) / 5.84), 11rem);
 }
 
 /* faixa de local ainda oculto: névoa sobre o escuro */
