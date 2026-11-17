@@ -7,7 +7,7 @@ import { AudioMenu, EndTurnButton, SoulOrb } from "../components/GameHud";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, ITEMS, gameConfig, phaseOf, type ItemKey, type ItemSlot, type PoolCard } from "../lib/game/config";
+import { ABILITIES, ITEMS, gameConfig, locArtUrl, phaseOf, type ItemKey, type ItemSlot, type PoolCard } from "../lib/game/config";
 import { DeckBuilder } from "../components/DeckBuilder";
 import { DeckPile } from "../components/DeckPile";
 import { versionPlayer, type DeckLook } from "../lib/game/deck";
@@ -59,7 +59,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   const [sel, setSel] = useState<GCard | null>(null);
   const [look, setLook] = useState<GCard | null>(null);
   const [shopHidden, setShopHidden] = useState(false);
-  // tela cheia: a partida cobre o site (e pede tela cheia ao navegador quando dá); os locais viram 2x2
+  // tela cheia: a partida cobre o site (e pede tela cheia ao navegador quando dá)
   const [full, setFull] = useState(false);
   useEffect(() => {
     if (!full) return;
@@ -100,6 +100,8 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   // carta da mesa ampliada no hover
   const [peek, setPeek] = useState<{ c: GCard; r: DOMRect } | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // artes dos locais da partida já no cache, para a faixa não piscar ao revelar
+  useEffect(() => { m.loc.forEach((l) => { if (l.L.art) new Image().src = locArtUrl(l.L.art); }); }, [m]);
   const [arena, shake] = useAnimate<HTMLDivElement>();
   const still = useReducedMotion();
 
@@ -301,7 +303,9 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       m.markOptions(c).length > 0 && { label: t.ui.act.mark, run: () => startMode("mark", c) },
     ].filter(Boolean) as { label: string; run: () => void }[];
   };
-  const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && sel.cost <= m.E && m.room(l, "p") && l.lock.p < m.t;
+  const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && !m.canPlay(sel, l);
+  /** The New York Oracle: próxima carta de cada baralho. */
+  const next = { p: m.peek("p"), a: m.peek("a") };
 
   return (
     <MotionConfig reducedMotion="user">
@@ -333,14 +337,15 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
             </button>
           </span>
         </div>
+        {next.a && <NextCard name={name(next.a)} t={t} />}
         <DeckPile n={m.adeck.length} tone="ai" label={t.deck.aiLeft(m.adeck.length)} tipSide="left" out={{ x: -80, y: -10 }} className="w-8 sm:w-11" />
         </div>
       </div>
 
-      <div ref={arena} className="relative flex min-h-0 w-full flex-1 flex-col justify-center">
-        <section aria-label={t.ui.arena} className="flex w-full gap-1.5 sm:gap-2">
+      <div ref={arena} className="relative flex min-h-0 w-full flex-1 flex-col">
+        <section aria-label={t.ui.arena} className="flex min-h-0 w-full flex-1 gap-0.5 sm:gap-1">
           {m.loc.map((l, i) => (
-            <Location key={l.L.id + i} m={m} l={l} i={i} t={t} grid={full} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
+            <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
               drop={!drag || m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok"}
               card={(c) => (
                 <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} acts={actsOf(c)}
@@ -400,6 +405,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
             onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => { if (c && !drag) sfx("grab", 0.7); setDrag(c ? { c, over } : null); }} />
         </section>
         <div className="flex shrink-0 items-end gap-2 pb-1">
+          {next.p && <NextCard name={name(next.p)} t={t} />}
           <DeckPile n={m.deck.length} look={deckLook} label={t.deck.left(m.deck.length)} tipSide="top" out={{ x: -120, y: 0 }} className="w-10 sm:w-14" />
           {result && !showEnd
             ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
@@ -450,8 +456,64 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
 type T = (typeof GAME_TEXT)["pt"];
 type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
-function Location({ m, l, i, t, grid, canPlay, onPlay, dest, onDest, drop, card }: {
-  grid: boolean; m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: "off" | "ok" | "over"; card: (c: GCard) => React.ReactNode;
+/** Cores das três faixas (amarela, azul e verde, como as lanes do mapa), em classes inteiras. */
+const LANE = [
+  { stroke: "stroke-lane-yellow", tint: "from-lane-yellow/30" },
+  { stroke: "stroke-lane-blue", tint: "from-lane-blue/30" },
+  { stroke: "stroke-lane-green", tint: "from-lane-green/30" },
+] as const;
+
+/** Borda pincelada de um lado da faixa, em unidades 0 a 1: ondas largas com um pouco de tremido, de cima a baixo. Determinística por faixa. */
+function brushEdge(seed: number, x0: number, amp: number): [number, number][] {
+  let s = seed * 9301 + 49297;
+  const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  return Array.from({ length: 31 }, (_, k) => [x0 + Math.sin(k * 0.45 + seed * 1.7) * amp * 0.35 + (r() - 0.5) * amp, k / 30]);
+}
+const P = ([x, y]: [number, number]) => `${x.toFixed(4)} ${y.toFixed(4)}`;
+/** Curva suave pelos pontos (quadráticas entre os pontos médios). */
+const smooth = (p: [number, number][]) => {
+  const mid = (i: number): [number, number] => [(p[i][0] + p[i + 1][0]) / 2, (p[i][1] + p[i + 1][1]) / 2];
+  return `${P(p[0])} L ${P(mid(0))} ${p.slice(1, -1).map((q, i) => `Q ${P(q)} ${P(mid(i + 1))}`).join(" ")} L ${P(p[p.length - 1])}`;
+};
+/** Recorte (fundo da faixa) e traços das bordas de cada faixa. */
+const BRUSH = [0, 1, 2].map((i) => {
+  const left = brushEdge(i * 2 + 1, 0.03, 0.035), right = brushEdge(i * 2 + 2, 0.97, 0.035);
+  return { clip: `M ${smooth(left)} L ${smooth([...right].reverse())} Z`, left: `M ${smooth(left)}`, right: `M ${smooth(right)}` };
+});
+
+/** Fundo da faixa: arte do local (ou névoa enquanto oculto), escurecida nas pontas e tingida com a cor da lane; bordas pinceladas. */
+function LaneBackdrop({ l, i, drop }: { l: Loc; i: number; drop: "off" | "ok" | "over" }) {
+  const b = BRUSH[i % 3], lane = LANE[i % 3];
+  const id = `lane-clip-${i}`;
+  const art = l.rev && l.L.art;
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      <svg className="absolute size-0">
+        <defs><clipPath id={id} clipPathUnits="objectBoundingBox"><path d={b.clip} /></clipPath></defs>
+      </svg>
+      <div className="absolute inset-0 bg-zinc-950" style={{ clipPath: `url(#${id})` }}>
+        {art ? (
+          <motion.img key={art} src={locArtUrl(art)} alt="" draggable={false} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}
+            className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />
+        ) : <div className="absolute inset-0 lane-fog" />}
+        <div className="absolute inset-0 bg-linear-to-b from-black/80 via-black/10 to-black/85" />
+        <div className={`absolute inset-0 bg-linear-to-t to-transparent to-60% ${lane.tint}`} />
+        <div className={`absolute inset-0 transition-colors duration-150 ${drop === "over" ? "bg-game-me/20" : drop === "ok" ? "bg-game-me/8" : ""}`} />
+      </div>
+      <svg viewBox="0 0 1 1" preserveAspectRatio="none" className={`absolute inset-0 size-full fill-none ${lane.stroke}`}>
+        {[b.left, b.right].map((d) => (
+          <g key={d}>
+            <path d={d} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" className="stroke-[3px] opacity-25 sm:stroke-[7px]" />
+            <path d={d} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" className="stroke-1 opacity-70 sm:stroke-2 sm:opacity-90" />
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
+  m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: "off" | "ok" | "over"; card: (c: GCard) => React.ReactNode;
 }) {
   const a = m.total(l, "a"), p = m.total(l, "p");
   const nm = l.rev ? l.L.name : t.ui.hiddenLoc;
@@ -470,16 +532,14 @@ function Location({ m, l, i, t, grid, canPlay, onPlay, dest, onDest, drop, card 
   ] as [boolean, string, string][]).filter((x) => x[0]);
   const desc = l.rev ? l.L.desc || t.locs[l.L.type].text(l.L) : t.ui.revealsOn(i + 1);
   // uma fileira por lado: até 2 cartas lado a lado; com mais, elas se sobrepõem como um leque (cada vaga encolhe, a última fica inteira)
-  const side = grid
-    // tela cheia (sm para cima): 2x2 sem sobrepor; no celular continua a fileira
-    ? "flex h-[calc(var(--spacing-gc)*1.46)] w-full justify-center gap-1 sm:grid sm:h-[calc(var(--spacing-gc)*2.92+0.25rem)] sm:grid-cols-[repeat(2,var(--spacing-gc))] sm:content-center"
-    : "flex h-[calc(var(--spacing-gc)*1.46)] w-full justify-center gap-1";
-  const ring = drop === "over" ? "bg-game-me/15 outline-2 outline-game-me" : drop === "ok" ? "outline-2 outline-game-me/50 outline-dashed" : "";
+  // cada lado numa área translúcida da faixa: até 2 cartas lado a lado; com mais, elas se sobrepõem como um leque
+  const side = "flex h-[calc(var(--spacing-gc)*1.46)] w-full justify-center gap-1 rounded-lg bg-black/25 p-0.5";
   return (
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
-      className={`noir-glass relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl p-1 transition-colors duration-150 sm:p-1.5 ${ring}`}>
-      <div className={side} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
-      <LocTile nm={nm} desc={desc} chips={chips} a={a} p={p} />
+      className="relative flex min-w-0 flex-1 flex-col items-center justify-between gap-1 px-2 py-1.5 sm:gap-2 sm:px-4 sm:py-3">
+      <LaneBackdrop l={l} i={i} drop={drop} />
+      <div className={`relative ${side}`} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
+      <div className="relative w-full"><LocTile nm={nm} desc={desc} chips={chips} a={a} p={p} /></div>
       <div className={`relative ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
         {l.s.p.map(card)}
         {canPlay && (
@@ -531,7 +591,7 @@ function BoardCard({ c, m, t, name, face, looking, target, acts, onClick, onPeek
       initial={c.rev ? { ...FALL[w], opacity: 0, rotateY: c.side === "a" ? 100 : 0 } : { y: 24, scale: 1.08, opacity: 0 }}
       animate={{ scale: 1, y: 0, rotate: 0, rotateY: 0, opacity: 1 }}
       transition={c.rev ? { duration: FALL_MS[w] / 1000, ease: "easeIn", opacity: { duration: 0.1 } } : { type: "spring", stiffness: 420, damping: 26 }}
-      className={`relative block w-gc cursor-pointer rounded-lg ${c.staged ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
+      className={`relative block w-gc cursor-pointer rounded-lg ${c.staged || c.st.wait ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
       {face}
     </motion.button>
     {c.rev && <Impact w={w} />}
@@ -708,6 +768,15 @@ function LocTile({ nm, desc, chips, a, p }: { nm: string; desc: string; chips: [
         </div>
       )}
     </div>
+  );
+}
+
+/** The New York Oracle: a próxima carta do baralho ao lado dele. */
+function NextCard({ name, t }: { name: string; t: T }) {
+  return (
+    <span role="note" title={t.ui.next(name)} className="max-w-24 self-center truncate rounded-md bg-zinc-950/80 px-1.5 py-0.5 text-[10px] text-game-brass sm:max-w-32 sm:text-xs">
+      <span aria-hidden="true">🔮 </span>{t.ui.next(name)}
+    </span>
   );
 }
 

@@ -28,6 +28,8 @@ export const nRange = (t: LocType): [number, number] => LOC_N_RANGE[t] ?? [1, 6]
 
 /** Local da partida. art = chave da imagem no R2 (locs/<id>.webp); fx = foco horizontal da arte na faixa (0 a 100). */
 export type GameLoc = { id: string; name: string; type: LocType; v: number; n: number; desc: string; art?: string; fx?: number };
+/** URL da arte do local, servida do R2. */
+export const locArtUrl = (art: string) => `/img/${art}`;
 
 /** Os 45 locais do Cardslock Game: lugares do Cursed Apple, cada um com um efeito tirado da lore (deadlock.wiki). */
 export const DEFAULT_LOCS: GameLoc[] = ([

@@ -9,9 +9,9 @@ import { TeamLogo } from "../components/TeamLogo";
 import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
 import {
-  ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, LOC_V_RANGE, MIN_LOCS, NAME_MAX, POWER_RANGE,
+  ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, MIN_LOCS, NAME_MAX, POWER_RANGE,
   ITEMS, ITEM_KEYS, SHOP_ROUNDS, SHOPS, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, HERO_CARD, HERO_POOL_MAX, ALT_POL, ALT_MALUS, BASE_RANGE, HABILITY_AT, heroCard, MASTERY_AT, STAT_KEYS as GAME_STATS,
-  cardStats, gameConfig, itemCost, itemStats, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey, type HeroOverride, type Profile,
+  cardStats, gameConfig, itemCost, itemStats, locArtUrl, nRange, vRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey, type HeroOverride, type Profile,
 } from "../lib/game/config";
 import { cardPool } from "../lib/game/engine";
 import { GAME_TEXT } from "../lib/game/text";
@@ -690,7 +690,12 @@ function CodesForm() {
 /* ---------- Cardslock Game ---------- */
 
 const GT = GAME_TEXT.pt;
-const LOC_N_LABEL: Partial<Record<LocType, string>> = { slots: "Espaços", costLow: "Custo", costHigh: "Custo", midboss: "Turno", chaos: "Poder máximo" };
+const LOC_N_LABEL: Partial<Record<LocType, string>> = {
+  slots: "Espaços", costLow: "Custo", costHigh: "Custo", midboss: "Turno", chaos: "Poder máximo", stock: "Almas máximas", bell: "Turno", hotel: "Turno",
+  late: "Revela no turno", museum: "Chance (%)", hoop: "Chance (%)", sacrifice: "Poder perdido", bull: "Turno", costMin: "Custo mínimo", ambush: "A partir do turno",
+};
+/** Artes já enviadas ao R2 (uma por local padrão). */
+const LOC_ARTS = DEFAULT_LOCS.flatMap((l) => (l.art ? [{ art: l.art, name: l.name }] : []));
 const clampTo = (x: number, [a, b]: [number, number]) => Math.max(a, Math.min(b, Math.round(x)));
 
 function NumField({ label, value, range, onChange }: { label: string; value: number; range: [number, number]; onChange: (v: number) => void }) {
@@ -796,7 +801,7 @@ function GameForm() {
               </div>
               {LOC_FIELDS[loc.type].length > 0 && (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {LOC_FIELDS[loc.type].includes("v") && <NumField label="Valor" value={loc.v} range={LOC_V_RANGE} onChange={(v) => setLoc({ v })} />}
+                  {LOC_FIELDS[loc.type].includes("v") && <NumField label="Valor" value={loc.v} range={vRange(loc.type)} onChange={(v) => setLoc({ v })} />}
                   {LOC_FIELDS[loc.type].includes("n") && <NumField label={LOC_N_LABEL[loc.type] ?? "Número"} value={loc.n} range={nRange(loc.type)} onChange={(n) => setLoc({ n })} />}
                 </div>
               )}
@@ -804,10 +809,24 @@ function GameForm() {
                 <textarea className={`${input} min-h-16 resize-y`} rows={3} maxLength={DESC_MAX} placeholder={GT.locs[loc.type].text(loc)} value={loc.desc} onChange={(e) => setLoc({ desc: e.target.value })} />
               </Field>
               <p className="text-xs text-zinc-400">Em branco, o jogo mostra o texto automático do efeito (o texto cinza no campo).</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Arte">
+                  <select className={input} value={loc.art ?? ""} onChange={(e) => setLoc({ art: e.target.value || undefined })}>
+                    <option value="">Sem arte (névoa)</option>
+                    {LOC_ARTS.map((a) => <option key={a.art} value={a.art}>{a.name}</option>)}
+                  </select>
+                </Field>
+                <Field label={`Foco da arte: ${loc.fx ?? 50}%`}>
+                  <input type="range" min={0} max={100} step={1} value={loc.fx ?? 50} disabled={!loc.art} onChange={(e) => setLoc({ fx: +e.target.value })}
+                    className="h-11 w-full cursor-pointer accent-game-brass focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text disabled:cursor-not-allowed disabled:opacity-40" />
+                </Field>
+              </div>
             </div>
-            <div className="flex flex-col gap-1 rounded-2xl bg-zinc-950/60 p-4 text-center">
-              <b className="font-display tracking-wide text-dl-text">{loc.name || "Sem nome"}</b>
-              <span className="text-sm text-zinc-300">{loc.desc.trim() || GT.locs[loc.type].text(loc)}</span>
+            <div className="relative flex aspect-9/14 flex-col justify-end gap-1 overflow-hidden rounded-2xl bg-zinc-950/60 p-4 text-center">
+              {loc.art && <img src={locArtUrl(loc.art)} alt="" className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${loc.fx ?? 50}% 50%` }} />}
+              <div className="absolute inset-0 bg-linear-to-b from-black/60 via-transparent to-black/90" />
+              <b className="relative font-display tracking-wide text-dl-text">{loc.name || "Sem nome"}</b>
+              <span className="relative text-sm text-zinc-300">{loc.desc.trim() || GT.locs[loc.type].text(loc)}</span>
             </div>
           </div>
         )}
