@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, SHOPS, ALT_MALUS, ALT_POL, cardStats, powerParts, defaultCard, itemCost, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
-  type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type PoolCard,
+  type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type LocType, type PoolCard,
 } from "../src/lib/game/config";
 import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Side } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
@@ -844,5 +844,265 @@ describe("versões guardadas e duas cartas do mesmo herói", () => {
     const byId = new Map(list.map((p) => [p.id, p]));
     expect(versionPlayer(byId, { id: "s2~Holliday", hero: "Holliday" })).toMatchObject({ id: "s2", hero: "Holliday" });
     expect(v.get("s")!.find((c) => c.id === "s2~Holliday")!.ovr).toBe(83);
+  });
+});
+
+/* ---------- locais novos ---------- */
+
+type Inner = { rnd: () => number; move(c: GCard, from: unknown, to: unknown): boolean };
+
+describe("locais novos", () => {
+  /** Partida com o local testado num dos 3 espaços e os outros dois sem efeito. */
+  function at(type: LocType, v = 0, n = 1, t = 1) {
+    const locs: GameLoc[] = [{ id: "x", name: "X", type, v, n, desc: "" }, ...plainLocs.slice(1)];
+    const a = arena({ ...heroCfg(), locs }, t);
+    const m = a.m;
+    const L = m.loc.find((l) => l.L.type === type)!;
+    const other = m.loc.find((l) => l !== L)!;
+    let i = 0;
+    /** Carta sem habilidade; revelada no local, a menos que reveal = false. */
+    const card = (side: Side, base = 3, o: { cost?: number; role?: string; at?: typeof L; reveal?: boolean; ab?: GCard["ab"] } = {}) => {
+      const c = a.mk(pc(`c${i++}`, "Herói Novo", flat(70)), side);
+      Object.assign(c, { ab: o.ab ?? "none", base, cost: o.cost ?? 1 });
+      if (o.role) c.p.role = o.role;
+      const l = o.at ?? L;
+      l.s[side].push(c);
+      if (o.reveal !== false) m.reveal(c, l);
+      return c;
+    };
+    const inner = m as unknown as Inner;
+    return { m, L, other, card, inner };
+  }
+
+  it("Buff de Arma dá poder só a Carry e OffCarry", () => {
+    const { m, L, card } = at("gun", 2);
+    expect(m.pow(card("p", 3, { role: "Carry" }), L)).toBe(5);
+    expect(m.pow(card("p", 3, { role: "Suporte" }), L)).toBe(3);
+  });
+
+  it("Grande Navio dá +v por aliado revelado aqui", () => {
+    const { m, L, card } = at("crew", 1);
+    const a = card("p"); card("p"); card("p");
+    expect(m.pow(a, L)).toBe(5);
+  });
+
+  it("Fenda Instável dá +100 a quem tem mais cartas; empate não dá nada", () => {
+    const { m, L, card } = at("rift", 100);
+    card("p", 1); card("p", 1); card("a", 5);
+    expect(m.total(L, "p")).toBe(102);
+    expect(m.total(L, "a")).toBe(5);
+    card("a", 1);
+    expect(m.total(L, "p")).toBe(2);
+  });
+
+  it("Casa Abandonada não aceita cartas; Universidade só aceita custo mínimo", () => {
+    const closed = at("noplay");
+    const c = closed.m.hand[0];
+    closed.m.E = 10;
+    expect(closed.m.canPlay(c, closed.L)).toBe("closed");
+    const uni = at("costMin", 0, 7);
+    uni.m.E = 10;
+    const h = uni.m.hand[0];
+    h.cost = 3;
+    expect(uni.m.canPlay(h, uni.L)).toBe("minCost");
+    h.cost = 7;
+    expect(uni.m.canPlay(h, uni.L)).toBeNull();
+  });
+
+  it("Buff de Movimento barateia, Troll cobra pedágio e desfazer devolve o que foi pago", () => {
+    const cheap = at("cheap", 1);
+    const c = cheap.m.hand[0];
+    c.cost = 3; cheap.m.E = 5;
+    expect(cheap.m.play(c, cheap.L)).toBeNull();
+    expect(cheap.m.E).toBe(3);
+    cheap.m.unstage(c);
+    expect(cheap.m.E).toBe(5);
+    const toll = at("toll", 1);
+    const d = toll.m.hand[0];
+    d.cost = 3;
+    expect(toll.m.playCost(d, toll.L)).toBe(4);
+  });
+
+  it("Estátua da Coruja não recebe cartas movidas; Táxi dá +v a quem chega", () => {
+    const owl = at("nomove");
+    const c = owl.card("p", 3, { at: owl.other });
+    expect(owl.inner.move(c, owl.other, owl.L)).toBe(false);
+    const taxi = at("arrive", 2);
+    const d = taxi.card("p", 3, { at: taxi.other });
+    expect(taxi.inner.move(d, taxi.other, taxi.L)).toBe(true);
+    expect(taxi.m.pow(d, taxi.L)).toBe(5);
+  });
+
+  it("Véu de Fumaça: se os dois jogam aqui no mesmo turno, as duas voltam para a mão", () => {
+    const { m, L, card } = at("smoke");
+    m.ahand = []; m.AE = 0;
+    const p = card("p", 3, { reveal: false }); p.staged = true;
+    const a = card("a", 3, { reveal: false }); a.staged = true;
+    m.endTurn();
+    expect(L.s.p).toHaveLength(0);
+    expect(L.s.a).toHaveLength(0);
+    expect(m.hand).toContain(p);
+    expect(m.ahand).toContain(a);
+  });
+
+  it("Véu de Fumaça: só um lado jogando, a carta fica", () => {
+    const { m, L, card } = at("smoke");
+    m.ahand = []; m.AE = 0;
+    const p = card("p", 3, { reveal: false }); p.staged = true;
+    const q = m.endTurn();
+    expect(L.s.p).toContain(p);
+    expect(q.some((x) => x.c === p)).toBe(true);
+  });
+
+  it("Jardim: as cartas daqui só revelam no turno 7", () => {
+    const early = at("late", 0, 7, 3);
+    early.m.ahand = [];
+    const p = early.card("p", 3, { reveal: false }); p.staged = true;
+    const q = early.m.endTurn();
+    expect(q.some((x) => x.c === p)).toBe(false);
+    expect(p).toMatchObject({ staged: false, rev: false });
+    expect(p.st.wait).toBe(true);
+    const late = at("late", 0, 7, 7);
+    late.m.ahand = [];
+    const w = late.card("p", 3, { reveal: false }); w.st.wait = true;
+    expect(late.m.endTurn().some((x) => x.c === w)).toBe(true);
+  });
+
+  it("Museu: a carta pode voltar para a mão ao revelar", () => {
+    const yes = at("museum", 0, 100);
+    const c = yes.card("p");
+    expect(yes.L.s.p).not.toContain(c);
+    expect(yes.m.hand).toContain(c);
+    const no = at("museum", 0, 0);
+    const d = no.card("p");
+    expect(d.rev).toBe(true);
+    expect(no.L.s.p).toContain(d);
+  });
+
+  it("Quadra de Basquete: chance de +v por carta", () => {
+    const hit = at("hoop", 3, 50);
+    hit.inner.rnd = () => 0;
+    expect(hit.m.pow(hit.card("p"), hit.L)).toBe(6);
+    const miss = at("hoop", 3, 50);
+    miss.inner.rnd = () => 0.99;
+    expect(miss.m.pow(miss.card("p"), miss.L)).toBe(3);
+  });
+
+  it("Sinner's Sacrifice tira poder e dá alma; Viela embosca a partir do turno n", () => {
+    const sac = at("sacrifice", 1, 2);
+    sac.m.extra = { p: 0, a: 0 };
+    expect(sac.m.pow(sac.card("p", 5), sac.L)).toBe(3);
+    expect(sac.m.extra.p).toBe(1);
+    const early = at("ambush", 3, 7, 6);
+    expect(early.m.pow(early.card("p"), early.L)).toBe(3);
+    const late = at("ambush", 3, 7, 7);
+    expect(late.m.pow(late.card("p"), late.L)).toBe(6);
+  });
+
+  it("Buff de Espírito: +v na habilidade de quem usa valor, senão +1 de poder", () => {
+    const { m, L, card } = at("spirit", 2);
+    const sp = card("p");
+    expect(m.pow(sp, L)).toBe(4);
+    const h = card("p", 3, { ab: "hit" });
+    expect(h.v).toBe(sp.v + 2);
+  });
+
+  it("Teletransportador dá um movimento; Teatro cria uma cópia com o mesmo poder", () => {
+    const tp = at("teleport");
+    expect(tp.card("p").mv).toHaveLength(1);
+    const th = at("copy");
+    th.card("p", 4);
+    expect(th.L.s.p).toHaveLength(2);
+    expect(th.L.s.p[1]).toMatchObject({ tok: true, rev: true });
+    expect(th.m.total(th.L, "p")).toBe(8);
+  });
+
+  it("Piscinão desliga as habilidades daqui", () => {
+    const { m, card } = at("nofx");
+    expect(m.abilityOf(card("p", 3, { ab: "aura" }))).toBe("none");
+  });
+
+  it("Bar: quem vence ganha almas e quem perde paga", () => {
+    const { m, card } = at("bet", 1);
+    card("p", 5);
+    m.extra = { p: 0, a: 0 };
+    m.endOfTurn();
+    // o perdedor paga 1 e ganha 1 do comeback
+    expect(m.extra).toEqual({ p: 1, a: 0 });
+  });
+
+  it("Chinatown: o sino dá almas a quem vence no turno n", () => {
+    const { m, card } = at("bell", 3, 4, 4);
+    card("p", 5);
+    m.extra = { p: 0, a: 0 };
+    m.endOfTurn();
+    expect(m.extra.p).toBe(3);
+  });
+
+  it("Bolsa de Valores: almas que sobram viram poder na carta mais fraca, até n", () => {
+    const { m, L, card } = at("stock", 0, 3);
+    const weak = card("p", 1); const strong = card("p", 5);
+    m.E = 5; m.AE = 0;
+    m.endOfTurn();
+    expect(m.pow(weak, L)).toBe(4);
+    expect(m.pow(strong, L)).toBe(5);
+  });
+
+  it("Buff de Vida limpa o dano; Cemitério devolve quem ficou com 0", () => {
+    const heal = at("heal");
+    const c = heal.card("p", 5);
+    c.bonus = -3; c.st.tmp.push({ v: -2, u: 99 });
+    heal.m.endOfTurn();
+    expect(heal.m.pow(c, heal.L)).toBe(5);
+    const grave = at("grave");
+    const d = grave.card("p", 0);
+    grave.m.endOfTurn();
+    expect(grave.L.s.p).not.toContain(d);
+    expect(grave.m.hand).toContain(d);
+  });
+
+  it("Hotel Baronesa: no turno n a mais fraca de cada lado volta para a mão", () => {
+    const { m, L, card } = at("hotel", 0, 4, 4);
+    const pw = card("p", 1); card("p", 5);
+    const aw = card("a", 2); card("a", 6);
+    m.endOfTurn();
+    expect(L.s.p).not.toContain(pw);
+    expect(L.s.a).not.toContain(aw);
+    expect(L.s.p).toHaveLength(1);
+  });
+
+  it("Metrô: um rato aparece do lado com menos cartas", () => {
+    const { m, L, card } = at("rats", 1);
+    card("p"); card("a"); card("a");
+    m.endOfTurn();
+    expect(L.s.p).toHaveLength(2);
+    expect(L.s.p[1].tok).toBe(true);
+  });
+
+  it("Touro: no turno n as cartas de quem perde aqui são destruídas", () => {
+    const { m, L, card } = at("bull", 0, 5, 5);
+    card("p", 9); card("a", 2); card("a", 3);
+    m.endOfTurn();
+    expect(L.s.a).toHaveLength(0);
+    expect(L.s.p).toHaveLength(1);
+  });
+
+  it("The New York Oracle mostra a próxima carta do baralho", () => {
+    const { m } = at("oracle");
+    expect(m.peek("p")).toBe(m.deck[m.deck.length - 1]);
+    expect(arena().m.peek("p")).toBeNull();
+  });
+
+  it("os 45 locais padrão têm id único e arte no R2", () => {
+    expect(DEFAULT_LOCS).toHaveLength(45);
+    expect(new Set(DEFAULT_LOCS.map((l) => l.id)).size).toBe(45);
+    DEFAULT_LOCS.forEach((l) => expect(l.art).toBe(`locs/${l.id}.webp`));
+  });
+
+  it("sanitize aceita a Fenda com +100, recusa arte fora de locs/ e limita o foco", () => {
+    const base = plainLocs.slice(1);
+    const g = sanitizeGameConfig({ locs: [{ name: "F", type: "rift", v: 100, n: 1, art: "locs/f.webp", fx: 150 }, { name: "B", type: "none", art: "../x.png" }, ...base] })!;
+    expect(g.locs[0]).toMatchObject({ v: 100, art: "locs/f.webp", fx: 100 });
+    expect(g.locs[1].art).toBeUndefined();
   });
 });

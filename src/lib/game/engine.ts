@@ -30,6 +30,10 @@ type Status = {
   burrow?: boolean; stun?: number; immune?: boolean; immU?: number; rip?: number; ripV?: number; chained?: boolean; silenced?: boolean; silU?: number;
   burn?: number; tburn?: { v: number; u: number }[]; vuln?: number; sleep?: number; root?: number; petri?: boolean; unstop?: boolean;
   chan?: { u: number }; drainU?: number; grown?: number; cd?: boolean; wolf?: boolean; wolfAt?: number; exec?: { u: number; target?: number }; duel?: boolean; mvT?: number; grow?: number;
+  /** Almas pagas ao jogar (devolvidas se a carta voltar para a mão neste turno). */
+  paid?: number;
+  /** Jardim: carta virada esperando o turno de revelar. */
+  wait?: boolean;
 };
 
 /** Movimento disponível: quantas vezes, até que turno, bônus ao chegar, ilusão deixada para trás e destino só com inimigas. */
@@ -71,10 +75,11 @@ export type LogKey =
   | "haze" | "dance" | "holliday" | "infernus" | "ivy" | "kelvin" | "geist" | "lash" | "turret" | "move" | "burrow" | "harrow" | "paige"
   | "paradox" | "pocket" | "rats" | "rem" | "storm" | "shiv" | "mark" | "wolf" | "illusion" | "portal" | "trap" | "vindicta" | "fall"
   | "cube" | "petrify" | "wraith" | "liftEnd" | "yamato" | "chanEnd" | "extraSouls" | "hookPull" | "trapHit" | "urn" | "boss" | "zipline"
-  | "item" | "itemLost" | "shop" | "prio" | "phase" | "comeback" | "bounty" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves";
+  | "item" | "itemLost" | "shop" | "prio" | "phase" | "comeback" | "bounty" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves"
+  | "back" | "gone" | "hoop" | "copy" | "ratLoc" | "bell" | "bet" | "smoke" | "stock";
 
 export type Result = { outcome: "win" | "loss" | "draw"; won: number; lost: number; myPower: number; aiPower: number; patron: boolean };
-export type PlayError = "souls" | "frozen" | "full";
+export type PlayError = "souls" | "frozen" | "full" | "closed" | "minCost";
 
 /** Carta de uma linha do cadastro no formato do jogo, agrupada pela chave do jogador. */
 const toPool = (p: Player, key: string): PoolCard => ({
@@ -273,7 +278,7 @@ export class Match {
   private friends = (c: GCard, l: Loc) => l.s[c.side].filter((x) => x !== c && x.rev && !x.st.burrow);
   private everywhere = (s: Side) => this.loc.flatMap((l) => l.s[s].filter((x) => x.rev && !x.st.burrow).map((x) => [x, l] as const));
   private foeCards = (c: GCard) => this.everywhere(opp(c.side)).map((x) => x[0]);
-  abilityOf = (c: GCard): AbilityKey => (c.st.silenced || c.st.petri || (c.st.silU ?? 0) >= this.t ? "none" : c.ab);
+  abilityOf = (c: GCard): AbilityKey => (c.st.silenced || c.st.petri || (c.st.silU ?? 0) >= this.t || this.ty(this.locOf(c), "nofx") ? "none" : c.ab);
   /** A carta é Mestre e está com a habilidade ativa. */
   master = (c: GCard) => c.lvl === 2 && this.abilityOf(c) === c.ab;
   private best<T>(a: T[], f: (x: T) => number): T | null {
@@ -324,9 +329,15 @@ export class Match {
     if (a === "Mo & Krill" && this.final) x += c.v;
     if (this.ty(l, "costLow") && c.cost <= l.L.n) x += l.L.v;
     if (this.ty(l, "costHigh") && c.cost >= l.L.n) x += l.L.v;
+    if (this.ty(l, "gun") && isGun(c)) x += l.L.v;
+    if (this.ty(l, "crew")) x += l.L.v * l.s[c.side].filter((o) => o !== c && o.rev).length;
     return Math.max(0, x);
   }
-  total = (l: Loc, s: Side) => l.s[s].filter((c) => c.rev).reduce((a, c) => a + this.pow(c, l), 0);
+  total = (l: Loc, s: Side) => {
+    const mine = l.s[s].filter((c) => c.rev);
+    const rift = this.ty(l, "rift") && mine.length > l.s[opp(s)].filter((c) => c.rev).length ? l.L.v : 0;
+    return mine.reduce((a, c) => a + this.pow(c, l), rift);
+  };
 
   /** Dano: perder poder por efeito. Respeita imunidade, Santuário, escudo do Kelvin, Riposta e vulnerabilidade. */
   private hurt(t: GCard | null | undefined, amt: number, src: GCard | null, until?: number): boolean {
@@ -359,7 +370,7 @@ export class Match {
   }
   /** Pode ser movida de `from` para `to`? `self` = a própria carta escolhendo sair (a Paige Mestre impede). */
   private movable(c: GCard, from: Loc, to: Loc, self: boolean) {
-    if (from === to || !this.room(to, c.side)) return false;
+    if (from === to || !this.room(to, c.side) || this.ty(to, "nomove")) return false;
     if (c.st.chained || c.st.petri || c.st.unstop || (c.st.root ?? 0) >= this.t) return false;
     if (self && from.s[opp(c.side)].some((o) => o.rev && this.abilityOf(o) === "Paige" && this.master(o))) return false;
     return true;
@@ -369,6 +380,7 @@ export class Match {
     from.s[c.side].splice(from.s[c.side].indexOf(c), 1);
     to.s[c.side].push(c);
     this.interrupt(c);
+    if (this.ty(to, "arrive")) c.bonus += to.L.v;
     return true;
   }
   private destroy(c: GCard): boolean {
@@ -376,6 +388,23 @@ export class Match {
     if (!l || this.immune(c) || c.st.unstop) return false;
     l.s[c.side].splice(l.s[c.side].indexOf(c), 1);
     return true;
+  }
+  /** Tira a carta da mesa e devolve à mão do dono, limpa. Fichas somem; com a mão cheia, a carta se perde. */
+  private toHand(c: GCard, why: Loc) {
+    const l = this.locOf(c);
+    if (!l) return;
+    l.s[c.side].splice(l.s[c.side].indexOf(c), 1);
+    this.say({ k: "back", c: this.N(c), loc: why.L.name });
+    if (c.tok) return;
+    Object.assign(c, { bonus: 0, rev: false, staged: false, st: nst(), mv: [], ch: undefined });
+    const h = this.handOf(c.side);
+    if (h.length < HAND_MAX) h.push(c);
+  }
+  /** Próxima carta do baralho de cada lado, se The New York Oracle estiver revelado. */
+  peek(s: Side): GCard | null {
+    if (!this.loc.some((l) => this.ty(l, "oracle"))) return null;
+    const d = s === "p" ? this.deck : this.adeck;
+    return d[d.length - 1] ?? null;
   }
   private draw(s: Side) {
     const d = s === "p" ? this.deck : this.adeck, h = this.handOf(s);
@@ -911,8 +940,9 @@ export class Match {
       [...this.deck, ...this.adeck, ...this.hand, ...this.ahand, ...this.all()].forEach((c) => { if (!c.tok) this.levelTo(c, Math.min(c.top, ph) as Mastery); });
       this.say({ k: "phase", n: ph });
     }
-    this.E = this.t + this.extra.p;
-    this.AE = this.t + this.extra.a;
+    // a Aposta do Bar pode tirar almas, mas nunca abaixo de zero
+    this.E = Math.max(0, this.t + this.extra.p);
+    this.AE = Math.max(0, this.t + this.extra.a);
     if (this.extra.p) this.say({ k: "extraSouls", n: this.extra.p });
     this.extra = { p: 0, a: 0 };
     // Ratos do Rat King crescem na mão
@@ -925,11 +955,18 @@ export class Match {
     this.busy = false;
   }
 
-  canPlay(c: GCard, l: Loc): PlayError | null {
-    if (c.cost > this.E) return "souls";
-    if (l.lock.p >= this.t) return "frozen";
-    if (!this.room(l, "p")) return "full";
+  /** Almas para jogar a carta no local (Buff de Movimento barateia, Troll cobra pedágio). */
+  playCost = (c: GCard, l: Loc) => Math.max(0, c.cost - (this.ty(l, "cheap") ? l.L.v : 0) + (this.ty(l, "toll") ? l.L.v : 0));
+  private playError(s: Side, c: GCard, l: Loc, souls: number): PlayError | null {
+    if (this.ty(l, "noplay")) return "closed";
+    if (this.ty(l, "costMin") && c.cost < l.L.n) return "minCost";
+    if (this.playCost(c, l) > souls) return "souls";
+    if (l.lock[s] >= this.t) return "frozen";
+    if (!this.room(l, s)) return "full";
     return null;
+  }
+  canPlay(c: GCard, l: Loc): PlayError | null {
+    return this.playError("p", c, l, this.E);
   }
 
   /** Coloca a carta (virada) num local; ela só revela no fim do turno. */
@@ -940,8 +977,9 @@ export class Match {
     this.hand.splice(this.hand.indexOf(c), 1);
     c.staged = true;
     c.ch = undefined;
+    c.st.paid = this.playCost(c, l);
     l.s.p.push(c);
-    this.E -= c.cost;
+    this.E -= c.st.paid;
     return null;
   }
 
@@ -952,21 +990,24 @@ export class Match {
     l.s.p.splice(l.s.p.indexOf(c), 1);
     c.staged = false;
     c.ch = undefined;
-    this.E += c.cost;
+    this.E += c.st.paid ?? c.cost;
+    c.st.paid = undefined;
     this.hand.push(c);
   }
 
   private aiPlay() {
     let e = this.AE;
     for (const c of this.sh(this.ahand).sort((a, b) => b.cost - a.cost)) {
-      if (c.cost > e) continue;
-      const ls = this.sh(this.loc).filter((l) => this.room(l, "a") && l.lock.a < this.t);
-      if (!ls.length) break;
+      const ls = this.sh(this.loc).filter((l) => !this.playError("a", c, l, e));
+      if (!ls.length) continue;
       ls[0].s.a.push(c);
       c.staged = true;
+      c.st.paid = this.playCost(c, ls[0]);
       this.ahand.splice(this.ahand.indexOf(c), 1);
-      e -= c.cost;
+      e -= c.st.paid;
     }
+    // o que sobra conta para a Bolsa de Valores
+    this.AE = e;
     // Shiv com a janela aberta marca a inimiga mais fraca daqui
     this.mine("a").forEach((c) => { const t = this.weakest(this.markOptions(c)); if (t) this.mark(c, t); });
   }
@@ -1000,10 +1041,21 @@ export class Match {
     this.aiShop();
     this.aiPlay();
     this.aiMoves();
+    this.loc.forEach((l) => {
+      if (!this.ty(l, "smoke")) return;
+      const now = (x: Side) => l.s[x].filter((c) => c.staged && !c.rev);
+      const p = now("p"), a = now("a");
+      if (!p.length || !a.length) return;
+      [...p, ...a].forEach((c) => this.toHand(c, l));
+      this.say({ k: "smoke", loc: l.L.name });
+    });
+    const waits = (c: GCard, l: Loc) => this.ty(l, "late") && this.t < l.L.n;
     const side = (s: Side): Act[] => [
       ...this.loc.flatMap((l) => l.s[s].filter((c) => c.st.exec?.target !== undefined && c.st.exec.u === this.t).map((c) => ({ c, l, exec: true }))),
-      ...this.loc.flatMap((l) => l.s[s].filter((c) => !c.rev).map((c) => ({ c, l }))),
+      ...this.loc.flatMap((l) => l.s[s].filter((c) => !c.rev && !waits(c, l)).map((c) => ({ c, l }))),
     ];
+    // as que esperam o Jardim deixam de ser "jogadas neste turno" (não voltam para a mão)
+    this.loc.forEach((l) => (["p", "a"] as Side[]).forEach((x) => l.s[x].forEach((c) => { if (!c.rev && waits(c, l)) { c.staged = false; c.st.wait = true; } })));
     const [f, s] = this.order().map(side);
     const q: Act[] = [];
     while (f.length || s.length) { const x = f.shift(); if (x) q.push(x); const y = s.shift(); if (y) q.push(y); }
@@ -1030,8 +1082,11 @@ export class Match {
         if (h.m) { c.rev = true; this.hurt(c, 2, null); c.st.chained = true; }
       }
     }
+    // Museu: a carta pode ser roubada de volta para a mão antes de agir
+    if (this.ty(l, "museum") && this.rnd() * 100 < l.L.n) { this.toHand(c, l); return; }
     c.rev = true;
     c.staged = false;
+    c.st.wait = undefined;
     if (l.trap[s]) { const v = l.trap[s]; l.trap[s] = 0; if (this.hurt(c, v, null)) this.say({ k: "trapHit", c: this.N(c), v }); }
     const pt = l.petri[s];
     if (pt) {
@@ -1041,18 +1096,31 @@ export class Match {
     if (this.ty(l, "enter")) c.bonus += l.L.v;
     if (this.ty(l, "chaos")) { c.base = 1 + Math.floor(this.rnd() * Math.max(1, l.L.n)); c.bonus = 0; }
     if (this.ty(l, "loot")) for (let i = 0; i < l.L.v; i++) this.draw(s);
+    if (this.ty(l, "spirit")) { if (ABILITIES[c.ab].usesV) c.v += l.L.v; else c.bonus += 1; }
+    if (this.ty(l, "hoop") && this.rnd() * 100 < l.L.n) { c.bonus += l.L.v; this.say({ k: "hoop", c: this.N(c) }); }
+    if (this.ty(l, "sacrifice")) { c.bonus -= l.L.n; this.extra[s] += l.L.v; }
+    if (this.ty(l, "ambush") && this.t >= l.L.n) c.bonus += l.L.v;
+    if (this.ty(l, "teleport")) c.mv.push({ n: 1, u: TURNS, bonus: 0 });
     // um Suporte revelado solta os aliados erguidos pela Wraith
     if (c.p.role === "Suporte") l.s[s].forEach((x) => { if (x !== c && (x.st.stun ?? 0) >= this.t) { x.st.stun = 0; this.say({ k: "liftEnd", c: this.N(x) }); } });
     this.mentor(c);
     this.duel(c, l);
     const impl = this.IMPL[this.abilityOf(c)];
     if (impl?.r) for (let i = 0, n = this.ty(l, "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) impl.r(c, at, c.v); }
+    // Teatro: uma cópia com o mesmo poder, sem habilidade
+    const at = this.locOf(c);
+    if (at && this.ty(at, "copy") && !c.tok && this.room(at, s)) {
+      const k = this.token(s, "illusion", this.raw(c));
+      Object.assign(k, { p: { ...c.p }, cost: c.cost, rev: true });
+      at.s[s].push(k);
+      this.say({ k: "copy", c: this.N(c), loc: at.L.name });
+    }
   }
 
   endOfTurn() {
     this.applyItems();
     this.loc.forEach((l) => this.order().flatMap((s) => l.s[s]).forEach((c) => {
-      for (let i = 0, n = c.st.cd ? 2 : 1; i < n; i++) {
+      for (let i = 0, n = (c.st.cd ? 2 : 1) * (this.ty(l, "clock") ? 2 : 1); i < n; i++) {
         const L = this.locOf(c);
         if (c.rev && L === l) this.IMPL[this.abilityOf(c)]?.f?.(c, L, c.v);
       }
@@ -1070,9 +1138,10 @@ export class Match {
       if (!l.rev) return;
       const p = this.total(l, "p"), a = this.total(l, "a"), lead: Side | null = p > a ? "p" : a > p ? "a" : null;
       if (this.ty(l, "endturn")) [...l.s.p, ...l.s.a].forEach((c) => { if (c.rev) c.bonus += l.L.v; });
-      if (this.ty(l, "urn") && lead) { this.extra[lead] += l.L.v; this.say({ k: "urn", side: lead }); }
+      if (this.ty(l, "urn") && lead) { this.extra[lead] += l.L.v; this.say({ k: "urn", side: lead, loc: l.L.name }); }
       if (this.ty(l, "shop") && SHOPS[this.t + 1] && lead) { this.discount[lead] += l.L.v; this.say({ k: "shop", side: lead, v: l.L.v }); }
       if (this.ty(l, "midboss") && this.t === l.L.n && lead) { this.everywhere(lead).forEach(([x]) => (x.bonus += l.L.v)); this.say({ k: "boss", side: lead }); }
+      this.locEnd(l, lead);
       // recompensa: quem vira um local que o outro segurava há BOUNTY_AT rounds ganha +1 alma
       if (lead && l.hold.side && lead !== l.hold.side && l.hold.n >= BOUNTY_AT) { this.extra[lead] += 1; this.say({ k: "bounty", side: lead, loc: l.L.name }); }
       if (lead) l.hold = lead === l.hold.side ? { side: lead, n: l.hold.n + 1 } : { side: lead, n: 1 };
@@ -1093,6 +1162,28 @@ export class Match {
     if (lead && lead !== this.prio) { this.prio = lead; this.say({ k: "prio", side: lead }); }
     // comeback: quem está perdendo em mais locais ganha +1 alma no próximo round
     if (lead && !this.over) { this.extra[opp(lead)] += 1; this.say({ k: "comeback", side: opp(lead) }); }
+  }
+
+  /** Efeitos de fim de turno dos locais novos (depois das cartas, com o vencedor do local já calculado). */
+  private locEnd(l: Loc, lead: Side | null) {
+    const sides: Side[] = this.order();
+    const rev = (x: Side) => l.s[x].filter((c) => c.rev);
+    if (this.ty(l, "bet") && lead) { this.extra[lead] += l.L.v; this.extra[opp(lead)] -= l.L.v; this.say({ k: "bet", side: lead, loc: l.L.name }); }
+    if (this.ty(l, "bell") && this.t === l.L.n && lead) { this.extra[lead] += l.L.v; this.say({ k: "bell", side: lead, v: l.L.v }); }
+    if (this.ty(l, "stock")) sides.forEach((x) => {
+      const left = Math.min(l.L.n, x === "p" ? this.E : this.AE);
+      const w = this.weakest(rev(x));
+      if (w && left > 0) { w.bonus += left; this.say({ k: "stock", c: this.N(w), v: left, loc: l.L.name }); }
+    });
+    if (this.ty(l, "heal")) [...rev("p"), ...rev("a")].forEach((c) => { c.bonus = Math.max(0, c.bonus); c.st.tmp = c.st.tmp.filter((m) => m.v > 0); });
+    if (this.ty(l, "grave")) [...rev("p"), ...rev("a")].forEach((c) => { if (this.pow(c, l) === 0) this.toHand(c, l); });
+    if (this.ty(l, "hotel") && this.t === l.L.n) sides.forEach((x) => { const w = this.weakest(rev(x)); if (w) this.toHand(w, l); });
+    if (this.ty(l, "rats")) {
+      const p = rev("p").length, a = rev("a").length;
+      const few: Side | null = p < a ? "p" : a < p ? "a" : null;
+      if (few && this.room(l, few)) { const k = this.token(few, "rat", l.L.v); k.rev = true; l.s[few].push(k); this.say({ k: "ratLoc", loc: l.L.name }); }
+    }
+    if (this.ty(l, "bull") && this.t === l.L.n && lead) rev(opp(lead)).forEach((c) => { if (this.destroy(c)) this.say({ k: "gone", c: this.N(c), loc: l.L.name }); });
   }
 
   get over() { return this.t >= TURNS; }

@@ -1,35 +1,82 @@
 // Regras e configuração do Cardslock Game: catálogo de habilidades e locais, carta padrão de cada jogador
 // e validação da configuração que o admin salva no editor. Sem dependências do front: o worker importa este arquivo.
 
-export const LOC_TYPES = ["none", "enter", "costLow", "costHigh", "slots", "endturn", "midboss", "urn", "loot", "zipline", "shrine", "patron", "ritual", "chaos", "shop"] as const;
+export const LOC_TYPES = [
+  "none", "enter", "costLow", "costHigh", "slots", "endturn", "midboss", "urn", "loot", "zipline", "shrine", "patron", "ritual", "chaos", "shop",
+  "bet", "stock", "gun", "spirit", "cheap", "heal", "noplay", "grave", "bell", "nomove", "rift", "crew", "clock", "hotel", "late", "rats", "museum",
+  "nofx", "hoop", "sacrifice", "arrive", "copy", "teleport", "oracle", "bull", "toll", "costMin", "ambush", "smoke",
+] as const;
 export type LocType = (typeof LOC_TYPES)[number];
 
 /** Campos que cada efeito de local usa: v = valor, n = número (custo, turno, espaços…). */
 export const LOC_FIELDS: Record<LocType, ("v" | "n")[]> = {
   none: [], enter: ["v"], costLow: ["v", "n"], costHigh: ["v", "n"], slots: ["n"], endturn: ["v"], midboss: ["v", "n"],
   urn: ["v"], loot: ["v"], zipline: [], shrine: [], patron: [], ritual: [], chaos: ["n"], shop: ["v"],
+  bet: ["v"], stock: ["n"], gun: ["v"], spirit: ["v"], cheap: ["v"], heal: [], noplay: [], grave: [], bell: ["v", "n"], nomove: [],
+  rift: ["v"], crew: ["v"], clock: [], hotel: ["n"], late: ["n"], rats: ["v"], museum: ["n"], nofx: [], hoop: ["v", "n"], sacrifice: ["v", "n"],
+  arrive: ["v"], copy: [], teleport: [], oracle: [], bull: ["n"], toll: ["v"], costMin: ["n"], ambush: ["v", "n"], smoke: [],
 };
-export const LOC_N_RANGE: Partial<Record<LocType, [number, number]>> = { slots: [1, 4], costLow: [0, 8], costHigh: [0, 8], midboss: [1, 8], chaos: [1, 15] };
+export const LOC_N_RANGE: Partial<Record<LocType, [number, number]>> = {
+  slots: [1, 4], costLow: [0, 8], costHigh: [0, 8], midboss: [1, 8], chaos: [1, 15], stock: [1, 10], bell: [1, 8], hotel: [1, 8], late: [1, 8],
+  museum: [0, 100], hoop: [0, 100], sacrifice: [0, 10], bull: [1, 8], costMin: [0, 8], ambush: [1, 8],
+};
 export const LOC_V_RANGE: [number, number] = [-10, 10];
+/** Valores fora da faixa comum: a Fenda Instável dá +100 a quem tem mais cartas lá. */
+const LOC_V_RANGE_BY: Partial<Record<LocType, [number, number]>> = { rift: [0, 200] };
+export const vRange = (t: LocType): [number, number] => LOC_V_RANGE_BY[t] ?? LOC_V_RANGE;
 export const nRange = (t: LocType): [number, number] => LOC_N_RANGE[t] ?? [1, 6];
 
-export type GameLoc = { id: string; name: string; type: LocType; v: number; n: number; desc: string };
+/** Local da partida. art = chave da imagem no R2 (locs/<id>.webp); fx = foco horizontal da arte na faixa (0 a 100). */
+export type GameLoc = { id: string; name: string; type: LocType; v: number; n: number; desc: string; art?: string; fx?: number };
 
-export const DEFAULT_LOCS: GameLoc[] = [
-  { id: "l1", name: "Guardião", type: "costLow", v: 2, n: 2 },
-  { id: "l2", name: "Walker", type: "costHigh", v: 3, n: 5 },
-  { id: "l3", name: "Chefe do Meio", type: "midboss", v: 1, n: 6 },
-  { id: "l4", name: "Urna de Almas", type: "urn", v: 1, n: 1 },
-  { id: "l5", name: "Sacrifício do Pecador", type: "loot", v: 1, n: 1 },
-  { id: "l6", name: "Tirolesa", type: "zipline", v: 0, n: 1 },
-  { id: "l7", name: "Santuário", type: "shrine", v: 0, n: 1 },
-  { id: "l8", name: "Patrono", type: "patron", v: 0, n: 1 },
-  { id: "l9", name: "Círculo do Ritual", type: "ritual", v: 0, n: 1 },
-  { id: "l10", name: "Maelstrom", type: "chaos", v: 0, n: 8 },
-  { id: "l11", name: "Estação de Metrô", type: "slots", v: 0, n: 3 },
-  { id: "l12", name: "Loja de Curiosidades", type: "enter", v: 1, n: 1 },
-  { id: "l13", name: "Loja Secreta", type: "shop", v: 1, n: 1 },
-].map((l) => ({ ...l, type: l.type as LocType, desc: "" }));
+/** Os 45 locais do Cardslock Game: lugares do Cursed Apple, cada um com um efeito tirado da lore (deadlock.wiki). */
+export const DEFAULT_LOCS: GameLoc[] = ([
+  ["bar", "Bar", "bet", 1, 1],
+  ["bilheteria", "Bilheteria", "enter", 1, 1],
+  ["bolsa-de-valores", "Bolsa de Valores", "stock", 0, 3],
+  ["buff-arma", "Buff de Arma", "gun", 2, 1],
+  ["buff-espirito", "Buff de Espírito", "spirit", 2, 1],
+  ["buff-movimento", "Buff de Movimento", "cheap", 1, 1],
+  ["buff-vida", "Buff de Vida", "heal", 0, 1],
+  ["casa-abandonada", "Casa Abandonada", "noplay", 0, 1],
+  ["cemiterio", "Cemitério", "grave", 0, 1],
+  ["chinatown", "Chinatown", "bell", 3, 4],
+  ["estacao-de-trem", "Estação de Trem", "zipline", 0, 1],
+  ["estatua-da-coruja", "Estátua da Coruja", "nomove", 0, 1],
+  ["fenda-instavel", "Fenda Instável", "rift", 100, 1],
+  ["fabrica", "Fábricas Fairfax", "endturn", -1, 1],
+  ["grande-estatua", "Grande Estátua", "none", 0, 1],
+  ["grande-navio", "Grande Navio", "crew", 1, 1],
+  ["grande-portao", "Grande Portão", "slots", 0, 2],
+  ["grande-relogio", "Grande Relógio", "clock", 0, 1],
+  ["grande-torre", "Grande Torre", "costHigh", 2, 5],
+  ["grande-arvore", "Grande Árvore", "endturn", 1, 1],
+  ["guardian", "Guardian", "costLow", 2, 2],
+  ["hotel-baronesa", "Hotel Baronesa", "hotel", 0, 4],
+  ["igreja", "Igreja", "ritual", 0, 1],
+  ["jardim", "Jardim", "late", 0, 7],
+  ["lanchonete", "Lanchonete", "loot", 1, 1],
+  ["loja-de-curiosidades", "Loja de Curiosidades", "shop", 1, 1],
+  ["maelstrom", "Maelstrom", "chaos", 0, 8],
+  ["metro", "Metrô", "rats", 1, 1],
+  ["midboss", "Midboss", "midboss", 2, 6],
+  ["minas-fairfax", "Minas Fairfax", "urn", 1, 1],
+  ["museu", "Museu", "museum", 0, 50],
+  ["piscinao", "Piscinão", "nofx", 0, 1],
+  ["quadra-de-basquete", "Quadra de Basquete", "hoop", 3, 50],
+  ["sinners-sacrifice", "Sinner's Sacrifice", "sacrifice", 1, 2],
+  ["taxi", "Táxi", "arrive", 2, 1],
+  ["teatro", "Teatro", "copy", 0, 1],
+  ["teletransportador", "Teletransportador", "teleport", 0, 1],
+  ["the-new-york-oracle", "The New York Oracle", "oracle", 0, 1],
+  ["touro", "Touro", "bull", 0, 5],
+  ["troll", "Troll", "toll", 1, 1],
+  ["universidade-de-umbria", "Universidade de Umbria", "costMin", 0, 7],
+  ["viela", "Viela", "ambush", 3, 7],
+  ["veu-de-fumaca", "Véu de Fumaça", "smoke", 0, 1],
+  ["walker", "Walker", "patron", 0, 1],
+  ["zona-de-treino", "Zona de Treino", "shrine", 0, 1],
+] as const).map(([id, name, type, v, n]) => ({ id, name, type: type as LocType, v, n, desc: "", art: `locs/${id}.webp`, fx: 50 }));
 
 /**
  * Momento da habilidade, mostrado como selo na carta: r = ao revelar, c = constante (enquanto estiver no local),
@@ -224,7 +271,7 @@ export const ABILITY_V_RANGE: [number, number] = [0, 10];
 export const NAME_MAX = 24;
 export const DESC_MAX = 160;
 export const MIN_LOCS = 3;
-const MAX_LOCS = 40;
+const MAX_LOCS = 60;
 const MAX_CARDS = 2000;
 
 /** Carta do pool. `key` identifica o jogador (todas as versões dele têm a mesma); `alt` marca a versão de um herói de afinidade. */
@@ -292,6 +339,8 @@ const clampInt = (x: unknown, [a, b]: [number, number], fallback: number) => {
 };
 const text = (x: unknown, max: number) => (typeof x === "string" ? x.trim().slice(0, max) : "");
 const ID_RE = /^[\w-]{1,64}$/;
+/** Arte de local: só imagens da pasta locs/ do R2. */
+const LOC_ART_RE = /^locs\/[\w-]{1,64}\.webp$/;
 
 export function sanitizeLoc(raw: unknown, i = 0): GameLoc {
   const l = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -304,9 +353,11 @@ export function sanitizeLoc(raw: unknown, i = 0): GameLoc {
     id: typeof l.id === "string" && ID_RE.test(l.id) ? l.id : `l${i + 1}`,
     name: text(l.name, NAME_MAX) || "Local",
     type: t,
-    v: clampInt(v, LOC_V_RANGE, 0),
+    v: clampInt(v, vRange(t), 0),
     n: clampInt(l.n, nRange(t), nRange(t)[0] || 1),
     desc: text(l.desc, DESC_MAX),
+    ...(typeof l.art === "string" && LOC_ART_RE.test(l.art) ? { art: l.art } : {}),
+    ...(l.fx !== undefined ? { fx: clampInt(l.fx, [0, 100], 50) } : {}),
   };
 }
 

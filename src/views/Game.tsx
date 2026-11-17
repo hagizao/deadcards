@@ -119,7 +119,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   const logName = (n: LogEntry["c"]) => (n === undefined ? "" : typeof n === "string" ? n : t.tokens[n.token]);
   const logLine = m.log[0] ? t.log[m.log[0].k](m.log[0], logName, (k) => t.abilities[k].name) : "";
   const shopOpen = !!m.offer && !result && !m.busy;
-  const errText: Record<PlayError, string> = { souls: t.ui.toast.souls, frozen: t.ui.toast.frozen, full: t.ui.toast.full };
+  const errText: Record<PlayError, string> = { souls: t.ui.toast.souls, frozen: t.ui.toast.frozen, full: t.ui.toast.full, closed: t.ui.toast.closed, minCost: t.ui.toast.minCost };
 
   /** Carta desenhada a partir da carta da coleção; `text` mostra a habilidade (mão e zoom), `fx` liga partículas e brilho. */
   const face = (c: GCard, text: boolean, fx = false) => {
