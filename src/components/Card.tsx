@@ -1,9 +1,9 @@
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { CSSProperties, PointerEvent } from "react";
 import type { Player } from "../lib/types";
-import { getPlayerOvr, getPlayerTrend, hexToRgba, teamOf, useLabel } from "../lib/cards";
+import { getPlayerOvr, getPlayerTrend, hexToRgba, playerArt, teamOf, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
-import { getCardTier, ornamentSVG, particleSpecs, rarityStyleVars, ringSVG } from "../lib/rarity";
+import { getCardTier, ornamentSVG, particleSpecs, rarityStyleVars, ringSVG, type Tier } from "../lib/rarity";
 import { useData } from "../lib/data";
 import { TeamLogo3D } from "./TeamLogo3D";
 import { TrendBadge } from "./TrendBadge";
@@ -27,7 +27,7 @@ export function Card({ player, variant = "team", onOpen }: { player: Player; var
   const rk = getCardTier(player, settings.tierConfig!);
   const medium = variant === "medium";
   const editor = variant === "editor";
-  const art = player.art?.url ? { url: player.art.url, zoom: player.art.zoom ?? 100, x: player.art.x ?? 50, y: player.art.y ?? 50 } : heroArt(player.hero);
+  const art = playerArt(player, heroArt);
 
   const rx = useMotionValue(0);
   const ry = useMotionValue(0);
@@ -55,35 +55,7 @@ export function Card({ player, variant = "team", onOpen }: { player: Player; var
     >
       <div className={`deadlock-card-shell ${sizeClass} group select-none`}>
         <div className="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5" style={topPad ? { paddingTop: topPad } : undefined}>
-          {art ? (
-            <div className="hero-bg-wrap pointer-events-none absolute inset-0 overflow-hidden">
-              <img
-                src={art.url}
-                alt={player.hero}
-                draggable={false}
-                style={{
-                  position: "absolute", inset: 0, width: "100%", height: "100%", maxWidth: "none", objectFit: "cover",
-                  objectPosition: `${art.x}% ${art.y}%`, transform: `scale(${art.zoom / 100})`, transformOrigin: `${art.x}% ${art.y}%`,
-                  filter: "contrast(1.08) saturate(1.12)", userSelect: "none",
-                }}
-              />
-            </div>
-          ) : (
-            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)" }} />
-          )}
-
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{ background: `linear-gradient(180deg, ${hexToRgba(player.c2, 0)} 52%, ${hexToRgba(player.c2, 0.5)} 80%, rgba(9, 9, 11, 0.78) 100%)` }}
-          />
-          {rk.custom ? (
-            <svg className="fr-orn" aria-hidden="true" viewBox="0 0 295 430" preserveAspectRatio="none" dangerouslySetInnerHTML={{ __html: ornamentSVG(rk) }} />
-          ) : (
-            <svg className={`rk-ring${rk.lvl >= 3 ? " rk-ring-pulse" : ""}`} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ringSVG(rk) }} />
-          )}
-          {(rk.custom ? rk.glint : rk.lvl >= 3) && <div className="rk-glint" />}
-          <Particles tierKey={rk} />
-          {player.special && !rk.noSweep && <div className="sp-card-fx" />}
+          <CardArt player={player} rk={rk} art={art} />
 
           <div className="relative z-10 flex items-start justify-between gap-2">
             <div className="flex flex-col items-start">
@@ -136,6 +108,44 @@ export function Card({ player, variant = "team", onOpen }: { player: Player; var
         </div>
       </div>
     </motion.div>
+  );
+}
+
+type Art = { url: string; zoom: number; x: number; y: number } | null;
+
+/** Arte do jogador e a moldura da raridade (anel/ornamento, brilho, partículas). Usada pela carta da coleção e pela carta do jogo. */
+export function CardArt({ player, rk, art, fx = true }: { player: Player; rk: Tier; art: Art; fx?: boolean }) {
+  return (
+    <>
+      {art ? (
+        <div className="hero-bg-wrap pointer-events-none absolute inset-0 overflow-hidden">
+          <img
+            src={art.url}
+            alt={player.hero}
+            draggable={false}
+            style={{
+              position: "absolute", inset: 0, width: "100%", height: "100%", maxWidth: "none", objectFit: "cover",
+              objectPosition: `${art.x}% ${art.y}%`, transform: `scale(${art.zoom / 100})`, transformOrigin: `${art.x}% ${art.y}%`,
+              filter: "contrast(1.08) saturate(1.12)", userSelect: "none",
+            }}
+          />
+        </div>
+      ) : (
+        <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)" }} />
+      )}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: `linear-gradient(180deg, ${hexToRgba(player.c2, 0)} 52%, ${hexToRgba(player.c2, 0.5)} 80%, rgba(9, 9, 11, 0.78) 100%)` }}
+      />
+      {rk.custom ? (
+        <svg className="fr-orn" aria-hidden="true" viewBox="0 0 295 430" preserveAspectRatio="none" dangerouslySetInnerHTML={{ __html: ornamentSVG(rk) }} />
+      ) : (
+        <svg className={`rk-ring${rk.lvl >= 3 && fx ? " rk-ring-pulse" : ""}`} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ringSVG(rk) }} />
+      )}
+      {fx && (rk.custom ? rk.glint : rk.lvl >= 3) && <div className="rk-glint" />}
+      {fx && <Particles tierKey={rk} />}
+      {fx && player.special && !rk.noSweep && <div className="sp-card-fx" />}
+    </>
   );
 }
 
