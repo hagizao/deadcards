@@ -10,8 +10,8 @@ import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
 import {
   ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, LOC_V_RANGE, MIN_LOCS, NAME_MAX, POWER_RANGE,
-  ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, KEYWORD_AT, MASTERY_AT, STAT_KEYS as GAME_STATS,
-  cardStats, gameConfig, itemCost, itemStats, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey,
+  ITEMS, ITEM_KEYS, ITEM_OFFER_TURN, ITEM_REVEAL_TURN, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, HERO_CARD, BASE_RANGE, HABILITY_AT, heroCard, KEYWORD_AT, MASTERY_AT, STAT_KEYS as GAME_STATS,
+  cardStats, gameConfig, itemCost, itemStats, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey, type HeroOverride, type Profile,
 } from "../lib/game/config";
 import { cardPool } from "../lib/game/engine";
 import { GAME_TEXT } from "../lib/game/text";
@@ -679,9 +679,9 @@ function GameForm() {
   const removeLoc = () => { setCfg((c) => ({ ...c, locs: c.locs.filter((_, i) => i !== li) })); setLi(Math.max(0, li - 1)); };
 
   const q = query.trim().toLowerCase();
-  const shown = pool.filter((p) => !q || `${p.name} ${p.hero} ${p.position} ${GT.abilities[cardStats(p, cfg.cards).ab].name}`.toLowerCase().includes(q));
+  const shown = pool.filter((p) => !q || `${p.name} ${p.hero} ${p.position} ${GT.abilities[cardStats(p, cfg.cards, cfg.heroes).ab].name}`.toLowerCase().includes(q));
   const card = shown.find((p) => p.id === cardId) ?? shown[0];
-  const stats = card && cardStats(card, cfg.cards);
+  const stats = card && cardStats(card, cfg.cards, cfg.heroes);
   const override = card ? cfg.cards[card.id] : undefined;
   const setCard = (patch: CardOverride) => {
     if (!card) return;
@@ -700,10 +700,15 @@ function GameForm() {
     if (!Object.keys(o).length) delete items[k];
     return { ...c, items };
   });
-  const setHero = (k: AbilityKey, stat: StatKey) => setCfg((c) => {
-    const heroes = { ...c.heroes };
-    if (stat === HERO_STAT[k]) delete heroes[k];
-    else heroes[k] = { stat };
+  const setHero = (k: AbilityKey, patch: HeroOverride) => setCfg((c) => {
+    const o: HeroOverride = { ...c.heroes[k], ...patch };
+    const d = HERO_CARD[k];
+    if (o.stat === HERO_STAT[k]) delete o.stat;
+    if (o.cost === d?.cost) delete o.cost;
+    if (o.prof === d?.prof) delete o.prof;
+    if (o.base === d?.base) delete o.base;
+    const heroes = { ...c.heroes, [k]: o };
+    if (!Object.keys(o).length) delete heroes[k];
     return { ...c, heroes };
   });
   const resetCard = () => {
@@ -829,15 +834,34 @@ function GameForm() {
         <p className="text-xs text-zinc-400">
           O atributo principal define a Maestria da carta: abaixo de {MASTERY_AT[0]} é {GT.levels[0]}, de {MASTERY_AT[0]} a {MASTERY_AT[1] - 1} é {GT.levels[1]} e a partir de {MASTERY_AT[1]} é {GT.levels[2]} (libera a frase de Mestre). Atributos a partir de {KEYWORD_AT} viram palavras-chave.
         </p>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2">
-          {HERO_KEYS.map((k) => (
-            <label key={k} className="flex flex-col gap-1 rounded-2xl bg-zinc-950/60 p-3 text-sm font-bold text-zinc-100">
-              <span className="flex items-baseline gap-1.5">{k}{cfg.heroes[k] && <span className="text-[10px] tracking-[0.12em] text-game-brass uppercase">editado</span>}</span>
-              <select className={input} value={cfg.heroes[k]?.stat ?? HERO_STAT[k] ?? "MIR"} onChange={(e) => setHero(k, e.target.value as StatKey)}>
-                {GAME_STATS.map((st) => <option key={st} value={st}>{GT.stats[st]}{st === HERO_STAT[k] ? " (padrão)" : ""}</option>)}
-              </select>
-            </label>
-          ))}
+        <p className="text-xs text-zinc-400">
+          O custo da carta vem do herói. Perfil <b>poder</b>: poder = base + faixa de OVR (1 a cada 10 pontos: 65–74 = 1, 75–84 = 2, 85–94 = 3, 95+ = 4).
+          Perfil <b>habilidade</b>: poder = base + metade da faixa, e a habilidade ganha +1 no valor com OVR {HABILITY_AT}+.
+        </p>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-2">
+          {HERO_KEYS.map((k) => {
+            const h = heroCard(k, cfg.heroes);
+            return (
+              <div key={k} className="flex flex-col gap-2 rounded-2xl bg-zinc-950/60 p-3 text-sm font-bold text-zinc-100">
+                <span className="flex items-baseline gap-1.5">{k}{cfg.heroes[k] && <span className="text-[10px] tracking-[0.12em] text-game-brass uppercase">editado</span>}</span>
+                <Field label="Atributo principal">
+                  <select className={input} value={cfg.heroes[k]?.stat ?? HERO_STAT[k] ?? "MIR"} onChange={(e) => setHero(k, { stat: e.target.value as StatKey })}>
+                    {GAME_STATS.map((st) => <option key={st} value={st}>{GT.stats[st]}{st === HERO_STAT[k] ? " (padrão)" : ""}</option>)}
+                  </select>
+                </Field>
+                <div className="grid grid-cols-3 gap-2">
+                  <NumField label="Custo" value={h.cost} range={[1, COST_RANGE[1]]} onChange={(cost) => setHero(k, { cost })} />
+                  <Field label="Perfil">
+                    <select className={input} value={h.prof} onChange={(e) => setHero(k, { prof: e.target.value as Profile })}>
+                      <option value="P">Poder</option>
+                      <option value="H">Habilidade</option>
+                    </select>
+                  </Field>
+                  <NumField label="Base" value={h.base} range={BASE_RANGE} onChange={(base) => setHero(k, { base })} />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 

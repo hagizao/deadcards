@@ -70,7 +70,7 @@ export type PlayError = "souls" | "frozen" | "full";
 /** Cartas que entram no baralho: jogadores ativos, uma por jogador (variantes ficam de fora). */
 export function cardPool(players: Player[]): PoolCard[] {
   const seen = new Set<string>();
-  const pool = players
+  return players
     .filter((p) => !p.inactive)
     .filter((p) => {
       const k = p.variantOf || p.id;
@@ -79,9 +79,6 @@ export function cardPool(players: Player[]): PoolCard[] {
       return true;
     })
     .map((p) => ({ id: p.id, name: p.name, position: ROLE_ABILITY[p.position] ? p.position : "Flex", hero: p.hero, c1: p.c1 || "#334155", c2: p.c2 || "#0f172a", ovr: getPlayerOvr(p) || 0, stats: p.stats }));
-  // custo pelo ranking de OVR: o baralho sempre tem a mesma curva de custos, por mais que os OVRs se aglomerem
-  const sorted = pool.map((p) => p.ovr).sort((a, b) => a - b);
-  return pool.map((p) => ({ ...p, rank: sorted.findIndex((o) => o >= p.ovr) / pool.length }));
 }
 
 const nst = (): Status => ({ tmp: [] });
@@ -159,7 +156,7 @@ export class Match {
     return a.map((x) => [this.rnd(), x] as const).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
   }
   private mk(p: PoolCard, cfg: GameConfig, side: Side): GCard {
-    const c = cardStats(p, cfg.cards);
+    const c = cardStats(p, cfg.cards, cfg.heroes);
     const main = p.hero ? heroStat(p.hero, cfg.heroes, p.stats) : null;
     const kw = keywords(p.stats);
     const card: GCard = {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_LOCS, HERO_STAT, ITEMS, ITEM_KEYS, cardStats, costByRank, defaultCard, gameConfig, heroStat, keywords, mastery, sanitizeGameConfig, trimItemIcons,
+  ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, cardStats, defaultCard, ovrBand, gameConfig, heroStat, keywords, mastery, sanitizeGameConfig, trimItemIcons,
   type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type PoolCard,
 } from "../src/lib/game/config";
 import { MIN_POOL, Match, TURNS, cardPool, type GCard, type Side } from "../src/lib/game/engine";
@@ -47,22 +47,34 @@ describe("carta padrão", () => {
     expect(defaultCard({ ...base, hero: "Herói Novo" }).ab).toBe("self");
   });
 
-  it("custo fica entre 1 e 6 e cresce com o OVR", () => {
-    expect(defaultCard({ ...base, ovr: 40 }).cost).toBe(1);
-    expect(defaultCard({ ...base, ovr: 99 }).cost).toBe(6);
+  it("custo vem do herói; o OVR muda só o poder, 1 por faixa de 10 pontos", () => {
+    const w = (ovr: number) => defaultCard({ ...base, hero: "Wraith", ovr });
+    expect(w(65)).toMatchObject({ cost: 7, power: 6 });
+    expect(w(95)).toMatchObject({ cost: 7, power: 9 });
+    expect(w(40).power).toBe(5);
+    expect([0, 64, 65, 74, 75, 85, 95, 120].map(ovrBand)).toEqual([0, 0, 1, 1, 2, 3, 4, 4]);
   });
 
-  it("no baralho, o custo segue o ranking de OVR e cartas de custo 1 e 2 são as mais comuns", () => {
-    // OVRs aglomerados em cima, como nos dados reais
-    const list = cardPool(Array.from({ length: 50 }, (_, i) => player(`q${i}`, 80 + (i % 16))));
-    const costs = list.map((p) => defaultCard(p).cost);
-    const count = (c: number) => costs.filter((x) => x === c).length;
-    expect(count(1) + count(2)).toBeGreaterThanOrEqual(list.length * 0.35);
-    expect(count(6)).toBeGreaterThan(0);
-    const byOvr = [...list].sort((a, b) => a.ovr - b.ovr).map((p) => defaultCard(p).cost);
-    expect(byOvr).toEqual([...byOvr].sort((a, b) => a - b));
-    expect(costByRank(0)).toBe(1);
-    expect(costByRank(0.99)).toBe(6);
+  it("perfil habilidade: metade da faixa vira poder e o valor ganha +1 com OVR 85+", () => {
+    const p = (ovr: number) => defaultCard({ ...base, hero: "Paige", ovr });
+    expect(p(67)).toMatchObject({ cost: 2, power: 1, v: ABILITIES.Paige.v });
+    expect(p(90)).toMatchObject({ cost: 2, power: 2, v: ABILITIES.Paige.v + 1 });
+  });
+
+  it("todo herói do catálogo tem custo de 1 a 8 e poder de pelo menos 1", () => {
+    for (const k of HERO_KEYS) {
+      const c = defaultCard({ ...base, hero: k, ovr: 40 });
+      expect(c.cost).toBeGreaterThanOrEqual(1);
+      expect(c.cost).toBeLessThanOrEqual(8);
+      expect(c.power).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("o admin muda custo, perfil e base do herói", () => {
+    const heroes = { Wraith: { cost: 5, prof: "H" as const, base: 2 } };
+    expect(defaultCard({ ...base, hero: "Wraith", ovr: 95 }, heroes)).toMatchObject({ cost: 5, power: 4 });
+    expect(sanitizeGameConfig({ locs: DEFAULT_LOCS, heroes: { Wraith: { cost: 99, base: -99, prof: "Z" }, Nada: { cost: 2 } } })?.heroes)
+      .toEqual({ Wraith: { cost: 8, base: -5 } });
   });
 
   it("ajustes do admin sobrescrevem o padrão", () => {
@@ -87,7 +99,7 @@ describe("sanitizeGameConfig", () => {
     expect(g.locs[0]).toMatchObject({ name: "x".repeat(24), type: "slots", v: 10, n: 4 });
     expect(g.locs[1].type).toBe("none");
     expect(g.locs[2]).toMatchObject({ type: "costHigh", v: -3 });
-    expect(g.cards).toEqual({ p1: { cost: 6, power: 0 } });
+    expect(g.cards).toEqual({ p1: { cost: 8, power: 0 } });
   });
 
   it("sem configuração salva, usa os locais padrão", () => {

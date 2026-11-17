@@ -9,7 +9,7 @@ export const LOC_FIELDS: Record<LocType, ("v" | "n")[]> = {
   none: [], enter: ["v"], costLow: ["v", "n"], costHigh: ["v", "n"], slots: ["n"], endturn: ["v"], midboss: ["v", "n"],
   urn: ["v"], loot: ["v"], zipline: [], shrine: [], patron: [], ritual: [], chaos: ["n"], shop: ["v"],
 };
-export const LOC_N_RANGE: Partial<Record<LocType, [number, number]>> = { slots: [1, 4], costLow: [0, 6], costHigh: [0, 6], midboss: [1, 6], chaos: [1, 15] };
+export const LOC_N_RANGE: Partial<Record<LocType, [number, number]>> = { slots: [1, 4], costLow: [0, 8], costHigh: [0, 8], midboss: [1, 6], chaos: [1, 15] };
 export const LOC_V_RANGE: [number, number] = [-10, 10];
 export const nRange = (t: LocType): [number, number] => LOC_N_RANGE[t] ?? [1, 6];
 
@@ -66,8 +66,8 @@ export const ROLE_ABILITY: Record<string, AbilityKey> = { Carry: "self", OffCarr
 
 export type CardOverride = { ab?: AbilityKey; cost?: number; power?: number; v?: number; desc?: string };
 export type ItemOverride = { off?: boolean; v?: number };
-/** Ajuste por herói: o atributo principal que define a Maestria. */
-export type HeroOverride = { stat?: StatKey };
+/** Ajuste por herói: o atributo principal que define a Maestria, e o custo, o perfil e o poder base da carta. */
+export type HeroOverride = { stat?: StatKey; cost?: number; prof?: Profile; base?: number };
 export type GameConfig = { locs: GameLoc[]; cards: Record<string, CardOverride>; items: Record<string, ItemOverride>; heroes: Record<string, HeroOverride> };
 
 /* ---------- atributos, Maestria e palavras-chave ---------- */
@@ -88,6 +88,45 @@ export const HERO_STAT: Partial<Record<AbilityKey, StatKey>> = {
   "Solomon": "MAC", "The Doorman": "MAC", "Venator": "MAC", "Victor": "CON", "Vindicta": "MIR", "Violet": "MAC",
   "Viscous": "SUP", "Vyper": "MIR", "Warden": "CON", "Wraith": "MOV", "Yamato": "CON",
 };
+
+/**
+ * Perfil da carta: P = poder (carry: o OVR vira poder, 1 por faixa) ou H = habilidade (consistente/suporte: metade da faixa
+ * vira poder e, com OVR a partir de HABILITY_AT, a habilidade ganha +1 no valor).
+ */
+export type Profile = "P" | "H";
+export type HeroCard = { cost: number; prof: Profile; base: number };
+const hc = (cost: number, prof: Profile, base: number): HeroCard => ({ cost, prof, base });
+
+/**
+ * Custo de cada herói (1 a 8) e o poder base. O custo vem só do herói; o jogador muda o poder pela faixa de OVR.
+ * Números da proposta em docs/proposta-balanceamento.md (simulação no próprio motor).
+ */
+export const HERO_CARD: Partial<Record<AbilityKey, HeroCard>> = {
+  "Calico": hc(1, "P", -1), "Holliday": hc(1, "P", -1), "Vyper": hc(1, "P", -2), "Venator": hc(1, "P", -1), "Violet": hc(1, "P", -2), "Graves": hc(1, "P", -2),
+  "Abrams": hc(2, "P", 0), "Mina": hc(2, "P", -2), "Paige": hc(2, "H", 1), "Lash": hc(2, "P", 1), "Bebop": hc(2, "P", 1), "Rat King": hc(2, "P", 0),
+  "Viscous": hc(3, "H", 2), "Kelvin": hc(3, "P", 1), "Nurse Harrow": hc(3, "H", 2), "Mirage": hc(3, "P", 1), "Seven": hc(3, "P", 0), "Dynamo": hc(3, "H", 3),
+  "Billy": hc(4, "P", 3), "Celeste": hc(4, "P", 3), "Mo & Krill": hc(4, "P", 1), "Infernus": hc(4, "P", 3), "McGinnis": hc(4, "H", 4), "Warden": hc(4, "P", 3),
+  "Pocket": hc(5, "P", 3), "Grey Talon": hc(5, "P", 5), "Rem": hc(5, "H", 4), "Apollo": hc(5, "P", 5), "Sinclair": hc(5, "P", 6), "The Doorman": hc(5, "P", 6),
+  "Vindicta": hc(6, "P", 6), "Shiv": hc(6, "H", 7), "Ivy": hc(6, "H", 5), "Drifter": hc(6, "P", 6), "Silver": hc(6, "P", 4), "Deadman Danny": hc(6, "H", 6),
+  "Wraith": hc(7, "P", 5), "Yamato": hc(7, "P", 6), "Lady Geist": hc(7, "H", 1), "Haze": hc(7, "P", 7),
+  "Baba": hc(8, "P", 0), "Paradox": hc(8, "P", 7), "Victor": hc(8, "P", 8), "Solomon": hc(8, "P", 7),
+};
+/** Carta de herói sem habilidade própria (habilidade genérica da função). */
+const GENERIC_CARD = hc(3, "P", 1);
+export const PROFILES: Profile[] = ["P", "H"];
+export const isProfile = (x: unknown): x is Profile => x === "P" || x === "H";
+
+/** Faixa de OVR: sobe 1 a cada 10 pontos (até 64 = 0, 65–74 = 1, 75–84 = 2, 85–94 = 3, 95+ = 4). */
+export const ovrBand = (ovr: number) => Math.max(0, Math.min(4, Math.floor(((ovr || 0) - 55) / 10)));
+/** OVR a partir do qual o perfil habilidade ganha +1 no valor. */
+export const HABILITY_AT = 85;
+
+/** Custo, perfil e base de um herói, com o ajuste do admin. */
+export function heroCard(hero: AbilityKey, heroes: GameConfig["heroes"] = {}): HeroCard {
+  const d = (ABILITIES[hero].hero && HERO_CARD[hero]) || GENERIC_CARD;
+  const o = heroes[hero] ?? {};
+  return { cost: o.cost ?? d.cost, prof: o.prof ?? d.prof, base: o.base ?? d.base };
+}
 
 /** Heróis com habilidade própria (os 44 do catálogo). */
 export const HERO_KEYS = ABILITY_KEYS.filter((k) => ABILITIES[k].hero);
@@ -166,7 +205,8 @@ export function trimItemIcons(raw: unknown): ItemIcon[] {
   });
 }
 
-export const COST_RANGE: [number, number] = [0, 6];
+export const COST_RANGE: [number, number] = [0, 8];
+export const BASE_RANGE: [number, number] = [-5, 20];
 export const POWER_RANGE: [number, number] = [0, 30];
 export const ABILITY_V_RANGE: [number, number] = [0, 10];
 export const NAME_MAX = 24;
@@ -175,35 +215,25 @@ export const MIN_LOCS = 3;
 const MAX_LOCS = 40;
 const MAX_CARDS = 2000;
 
-/** `rank`: fração do baralho com OVR menor que o desta carta (0 a 1); define o custo padrão. */
-export type PoolCard = { id: string; name: string; position: string; hero: string; c1: string; c2: string; ovr: number; rank?: number; stats?: CardStatsBlock };
+export type PoolCard = { id: string; name: string; position: string; hero: string; c1: string; c2: string; ovr: number; stats?: CardStatsBlock };
 
-/** Fatia do baralho em cada custo, do 1 ao 6: mais cartas baratas para os primeiros turnos. */
-export const COST_SHARE = [0.2, 0.22, 0.2, 0.16, 0.13, 0.09] as const;
-
-/** Custo pela posição no ranking de OVR do baralho, seguindo COST_SHARE. */
-export function costByRank(rank: number): number {
-  let acc = 0;
-  for (let i = 0; i < COST_SHARE.length; i++) { acc += COST_SHARE[i]; if (rank < acc - 1e-9) return i + 1; }
-  return COST_SHARE.length;
-}
-
-const nameHash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
-
-/** Custo, poder e habilidade padrão de uma carta, derivados do OVR, da função e do herói. */
-export function defaultCard(p: PoolCard): { cost: number; power: number; ab: AbilityKey; v: number } {
-  const cost = p.rank !== undefined ? costByRank(p.rank) : Math.max(1, Math.min(6, Math.round(((p.ovr || 62) - 62) / 6)));
+/** Custo, poder e habilidade padrão de uma carta: o custo vem do herói, o poder do herói mais a faixa de OVR do jogador. */
+export function defaultCard(p: PoolCard, heroes: GameConfig["heroes"] = {}): { cost: number; power: number; ab: AbilityKey; v: number } {
   const ab: AbilityKey = isAbility(p.hero) ? p.hero : ROLE_ABILITY[p.position] ?? "draw";
-  const power = Math.max(1, cost + 1 + Math.floor(cost * 0.8) + ((Math.abs(nameHash(p.name)) % 3) - 1) + ABILITIES[ab].pm);
-  return { cost, power, ab, v: ABILITIES[ab].v };
+  const h = heroCard(ab, heroes);
+  const band = ovrBand(p.ovr);
+  const power = Math.max(1, h.base + (h.prof === "P" ? band : Math.floor(band / 2)));
+  const a = ABILITIES[ab];
+  const v = a.v + (h.prof === "H" && a.usesV && p.ovr >= HABILITY_AT ? 1 : 0);
+  return { cost: h.cost, power, ab, v };
 }
 
 export type CardStats = { cost: number; power: number; ab: AbilityKey; v: number; desc: string; def: ReturnType<typeof defaultCard> };
 
 /** Carta final: padrão + ajustes do admin. `desc` vazio = usar o texto automático da habilidade. */
-export function cardStats(p: PoolCard, cards: GameConfig["cards"]): CardStats {
+export function cardStats(p: PoolCard, cards: GameConfig["cards"], heroes: GameConfig["heroes"] = {}): CardStats {
   const o = cards[p.id] ?? {};
-  const def = defaultCard(p);
+  const def = defaultCard(p, heroes);
   const ab = o.ab && isAbility(o.ab) ? o.ab : def.ab;
   return { cost: o.cost ?? def.cost, power: o.power ?? def.power, ab, v: o.v ?? (ab === def.ab ? def.v : ABILITIES[ab].v), desc: (o.desc ?? "").trim(), def };
 }
@@ -249,7 +279,15 @@ const isRecord = (x: unknown): x is Record<string, unknown> => !!x && typeof x =
 /** Ajustes dos heróis: só heróis do catálogo e atributos conhecidos. */
 function sanitizeHeroes(raw: unknown): GameConfig["heroes"] {
   if (!isRecord(raw)) return {};
-  return Object.fromEntries(Object.entries(raw).flatMap(([k, o]) => (isAbility(k) && ABILITIES[k].hero && isRecord(o) && isStat(o.stat) ? [[k, { stat: o.stat }]] : [])));
+  return Object.fromEntries(Object.entries(raw).flatMap(([k, o]) => {
+    if (!isAbility(k) || !ABILITIES[k].hero || !isRecord(o)) return [];
+    const r: HeroOverride = {};
+    if (isStat(o.stat)) r.stat = o.stat;
+    if (o.cost !== undefined) r.cost = clampInt(o.cost, [1, COST_RANGE[1]], 1);
+    if (o.base !== undefined) r.base = clampInt(o.base, BASE_RANGE, 0);
+    if (isProfile(o.prof)) r.prof = o.prof;
+    return Object.keys(r).length ? [[k, r]] : [];
+  }));
 }
 
 /** Ajustes dos itens: só chaves conhecidas; itens desconhecidos são ignorados. */
