@@ -708,10 +708,7 @@ export class Match {
       r: (c) => { c.st.chan = { u: this.t + 1 }; if (this.master(c)) c.st.unstop = true; this.say({ k: "storm", c: this.N(c) }); },
       f: (c, l, v) => { if (c.st.chan && c.st.chan.u >= this.t) this.foes(c, l).forEach((t) => this.hurt(t, v, c)); },
     },
-    "Shiv": { r: (c, l, v) => {
-      if (this.shivKill(c, l, v)) { if (this.master(c)) this.shivKill(c, l, v); }
-      else c.st.exec = { u: this.t + 1 };
-    } },
+    "Shiv": { r: (c, l, v) => { if (this.shivKill(c, l, v) && this.master(c)) this.shivKill(c, l, v); } },
     "Sinclair": { r: (c) => { c.mv.push({ n: 1, u: Infinity, bonus: 0, copy: this.master(c) ? "full" : "half" }); } },
     "The Doorman": { r: (c, l) => {
       const to = this.chosenLoc(c, l) ?? this.best(this.sh(this.loc.filter((L) => L !== l)), (L) => this.total(L, opp(c.side)) - this.total(L, c.side));

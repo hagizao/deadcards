@@ -488,18 +488,14 @@ describe("escolhas, movimento e execução", () => {
     expect(m.moveOptions(mi)).toEqual([]);
   });
 
-  it("Shiv sem alvo abre a janela; a inimiga marcada é executada no próximo turno se estiver fraca", () => {
+  it("Shiv sem alvo fraco não faz nada (sem janela para marcar depois)", () => {
     const { m, put } = arena();
     const big = put(pc("a", "Herói Novo", flat(70)), "a", 0);
     big.base = 9; big.bonus = 0;
     const shiv = put(pc("s", "Shiv", flat(70)), "p", 0);
     expect(m.locOf(big)).toBe(m.loc[0]);
     m.t++;
-    expect(m.markOptions(shiv)).toContain(big);
-    m.mark(shiv, big);
-    big.bonus = shiv.v - 9;
-    m.act({ c: shiv, l: m.loc[0], exec: true });
-    expect(m.locOf(big)).toBeUndefined();
+    expect(m.markOptions(shiv)).toEqual([]);
   });
 
   it("partidas com o jogador escolhendo alvos, movendo e marcando terminam sem erro (Mestres e Aprendizes)", () => {
