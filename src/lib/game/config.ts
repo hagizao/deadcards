@@ -51,8 +51,8 @@ export const ABILITIES = {
   "Billy": H("r", 2, 0), "Calico": H("r", 1, 0), "Celeste": H("r", 2, 0), "Deadman Danny": H("r", 1, -1),
   "Drifter": H("r", 3, 0), "Dynamo": H("r", 1, -1), "Graves": H("f", 1, -1), "Grey Talon": H("r", 2, -1),
   "Haze": H("r", 0, 0, false), "Holliday": H("r", 0, -1, false), "Infernus": H("r", 2, -1), "Ivy": H("r", 2, -1),
-  "Kelvin": H("r", 0, -1, false), "Lady Geist": H("r", 5, -3), "Lash": H("r", 1, -1), "McGinnis": H("r", 2, -1),
-  "Mina": H("f", 1, -1), "Mirage": H("x", 2, 0), "Mo & Krill": H("c", 4, 0), "Nurse Harrow": H("c", 1, 0),
+  "Kelvin": H("r", 0, -1, false), "Lady Geist": H("r", 6, -3), "Lash": H("r", 1, -1), "McGinnis": H("r", 2, -1),
+  "Mina": H("f", 1, -1), "Mirage": H("x", 2, 0), "Mo & Krill": H("c", 2, 0), "Nurse Harrow": H("c", 1, 0),
   "Paige": H("c", 1, -2), "Paradox": H("r", 0, 0, false), "Pocket": H("r", 2, -2), "Rat King": H("r", 0, 0, false),
   "Rem": H("r", 2, -1), "Seven": H("f", 1, -1), "Shiv": H("r", 3, 0), "Silver": H("a", 6, -2),
   "Sinclair": H("x", 0, 0, false), "Solomon": H("c", 5, -1), "The Doorman": H("r", 0, 0, false), "Venator": H("r", 3, 0),
@@ -106,14 +106,14 @@ const hc = (cost: number, prof: Profile, base: number): HeroCard => ({ cost, pro
  * Números da proposta em docs/proposta-balanceamento.md (simulação no próprio motor).
  */
 export const HERO_CARD: Partial<Record<AbilityKey, HeroCard>> = {
-  "Calico": hc(1, "P", -1), "Holliday": hc(1, "P", -1), "Vyper": hc(1, "P", -2), "Venator": hc(1, "P", -1), "Violet": hc(1, "P", -2), "Graves": hc(1, "P", -2),
-  "Abrams": hc(2, "P", 0), "Mina": hc(2, "P", -2), "Paige": hc(2, "H", 1), "Lash": hc(2, "P", 1), "Bebop": hc(2, "P", 1), "Rat King": hc(2, "P", 0),
+  "Calico": hc(1, "P", -1), "Holliday": hc(1, "P", 1), "Vyper": hc(1, "P", -2), "Venator": hc(1, "P", -1), "Violet": hc(1, "P", -2), "Graves": hc(1, "P", 1),
+  "Abrams": hc(2, "P", 1), "Mina": hc(2, "P", -2), "Paige": hc(2, "H", 0), "Lash": hc(2, "P", 1), "Bebop": hc(2, "P", 1), "Rat King": hc(2, "P", 0),
   "Viscous": hc(3, "H", 2), "Kelvin": hc(3, "P", 1), "Nurse Harrow": hc(3, "H", 2), "Mirage": hc(3, "P", 1), "Seven": hc(3, "P", 0), "Dynamo": hc(3, "H", 3),
-  "Billy": hc(4, "P", 3), "Celeste": hc(4, "P", 3), "Mo & Krill": hc(4, "P", 1), "Infernus": hc(4, "P", 3), "McGinnis": hc(4, "H", 4), "Warden": hc(4, "P", 3),
-  "Pocket": hc(5, "P", 3), "Grey Talon": hc(5, "P", 5), "Rem": hc(5, "H", 4), "Apollo": hc(5, "P", 5), "Sinclair": hc(5, "P", 6), "The Doorman": hc(5, "P", 6),
-  "Vindicta": hc(6, "P", 6), "Shiv": hc(6, "H", 7), "Ivy": hc(6, "H", 5), "Drifter": hc(6, "P", 6), "Silver": hc(6, "P", 4), "Deadman Danny": hc(6, "H", 6),
-  "Wraith": hc(7, "P", 5), "Yamato": hc(7, "P", 6), "Lady Geist": hc(7, "H", 1), "Haze": hc(7, "P", 7),
-  "Baba": hc(8, "P", 0), "Paradox": hc(8, "P", 7), "Victor": hc(8, "P", 8), "Solomon": hc(8, "P", 7),
+  "Billy": hc(4, "P", 3), "Celeste": hc(4, "P", 3), "Mo & Krill": hc(4, "P", 0), "Infernus": hc(4, "P", 3), "McGinnis": hc(4, "H", 4), "Warden": hc(4, "P", 1),
+  "Pocket": hc(5, "P", 3), "Grey Talon": hc(5, "P", 5), "Rem": hc(5, "H", 5), "Apollo": hc(5, "P", 5), "Sinclair": hc(5, "P", 6), "The Doorman": hc(5, "P", 6), "Lady Geist": hc(5, "H", 2),
+  "Vindicta": hc(6, "P", 6), "Shiv": hc(6, "H", 7), "Ivy": hc(6, "H", 4), "Drifter": hc(6, "P", 6), "Silver": hc(6, "P", 6), "Deadman Danny": hc(6, "H", 6),
+  "Wraith": hc(7, "P", 5), "Yamato": hc(7, "P", 6), "Haze": hc(7, "P", 9),
+  "Baba": hc(8, "P", 5), "Paradox": hc(8, "P", 11), "Victor": hc(8, "P", 8), "Solomon": hc(8, "P", 9),
 };
 /** Carta de herói sem habilidade própria (habilidade genérica da função). */
 const GENERIC_CARD = hc(3, "P", 1);
@@ -161,6 +161,8 @@ export const PHASE_FROM = [1, 4, 7] as const;
 export const phaseOf = (t: number): Phase => (t >= PHASE_FROM[2] ? 2 : t >= PHASE_FROM[1] ? 1 : 0);
 /** Bônus de Profissional e Mestre: +1 no valor da habilidade (ou +1 de poder, se ela não tem valor). */
 export const MASTERY_BONUS = 1;
+/** Habilidades em que +1 no valor dobraria o efeito (valor 1 por carta): o Profissional delas dá +1 de poder. */
+export const PRO_ON_POWER: ReadonlySet<AbilityKey> = new Set<AbilityKey>(["Warden", "Paige"]);
 
 /* ---------- itens da loja ---------- */
 

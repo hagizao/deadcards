@@ -3,7 +3,7 @@
 import { getPlayerOvr } from "../cards";
 import type { Player } from "../types";
 import {
-  ABILITIES, ITEMS, ITEM_KEYS, SHOPS, MASTERY_BONUS, phaseOf, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
+  ABILITIES, ITEMS, ITEM_KEYS, SHOPS, MASTERY_BONUS, PRO_ON_POWER, phaseOf, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
   sanitizeHeroPool, type AbilityKey, type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type ItemTier, type LocType, type Mastery, type PoolCard, type StatKey,
 } from "./config";
 
@@ -241,7 +241,7 @@ export class Match {
   /** Sobe a Maestria: Profissional dá +1 no valor (ou no poder, se a habilidade não usa valor); Mestre libera a frase extra. */
   private levelTo(c: GCard, to: Mastery) {
     while (c.lvl < to) {
-      if (c.lvl === 0) { if (ABILITIES[c.ab].usesV) c.v += MASTERY_BONUS; else c.base += MASTERY_BONUS; }
+      if (c.lvl === 0) { if (ABILITIES[c.ab].usesV && !PRO_ON_POWER.has(c.ab)) c.v += MASTERY_BONUS; else c.base += MASTERY_BONUS; }
       c.lvl = (c.lvl + 1) as Mastery;
     }
   }
@@ -1099,10 +1099,9 @@ export class Match {
       if (a === "Warden") {
         let n = 0;
         this.foes(c, l).forEach((t) => { if (this.hurt(t, 1, c)) n++; });
-        c.bonus += n;
         if (n) this.say({ k: "lastStand", c: this.N(c), n });
       }
-      if (a === "Mo & Krill" && c.st.burrow) { this.foes(c, l).forEach((t) => this.hurt(t, 2, c)); this.say({ k: "emerge", c: this.N(c) }); }
+      if (a === "Mo & Krill" && c.st.burrow) { const t = this.strongest(this.foes(c, l)); if (t) this.hurt(t, 2, c); this.say({ k: "emerge", c: this.N(c) }); }
     }));
     this.final = true;
     let won = 0, lost = 0, myPower = 0, aiPower = 0;

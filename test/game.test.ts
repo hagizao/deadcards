@@ -57,9 +57,9 @@ describe("carta padrão", () => {
   });
 
   it("perfil habilidade: metade da faixa vira poder e o valor ganha +1 com OVR 85+", () => {
-    const p = (ovr: number) => defaultCard({ ...base, hero: "Paige", ovr });
-    expect(p(67)).toMatchObject({ cost: 2, power: 1, v: ABILITIES.Paige.v });
-    expect(p(90)).toMatchObject({ cost: 2, power: 2, v: ABILITIES.Paige.v + 1 });
+    const p = (ovr: number) => defaultCard({ ...base, hero: "Viscous", ovr });
+    expect(p(67)).toMatchObject({ cost: 3, power: 2, v: ABILITIES.Viscous.v });
+    expect(p(90)).toMatchObject({ cost: 3, power: 3, v: ABILITIES.Viscous.v + 1 });
   });
 
   it("todo herói do catálogo tem custo de 1 a 8 e poder de pelo menos 1", () => {
@@ -553,10 +553,10 @@ describe("balanceamento das habilidades", () => {
 
   it("Lady Geist troca no máximo o valor da habilidade", () => {
     const { m, put } = arena();
-    const t = dummy(put, "a", 0, 12);
+    const t = dummy(put, "a", 0, 10);
     const lg = put(pc("g", "Lady Geist", flat(70)), "p", 0);
     const before = lg.base;
-    expect(m.pow(t)).toBe(12 - lg.v);
+    expect(m.pow(t)).toBe(10 - lg.v);
     expect(m.pow(lg)).toBe(before + lg.v);
   });
 
@@ -682,5 +682,35 @@ describe("deck montado e deck da IA", () => {
     expect(f.slice(0, 2)).toEqual(d);
     const byId = new Map(list.map((p) => [p.id, p]));
     expect(versionPlayer(byId, { id: "a~Wraith", hero: "Wraith" })).toMatchObject({ id: "a", hero: "Wraith" });
+  });
+});
+
+describe("calibração de 8 rounds", () => {
+  const dummy = (put: ReturnType<typeof arena>["put"], side: Side, li: number, power: number) => {
+    const c = put(pc(`d${power}${side}${li}`, "Herói Novo", flat(70)), side, li);
+    c.ab = "none"; c.base = power; c.bonus = 0;
+    return c;
+  };
+  it("Warden e Paige: o Profissional dá +1 de poder (não dobra o valor por carta)", () => {
+    const { put } = arena(heroCfg(), 7);
+    const w = put(pc("w", "Warden", flat(92)), "p", 0);
+    expect(w.v).toBe(ABILITIES.Warden.v);
+    expect(w.base).toBe(defaultCard(pc("w", "Warden", flat(92))).power + 1);
+  });
+
+  it("Mestres do fim da partida: Warden só tira, Mo & Krill acerta a mais forte", () => {
+    const { m, put } = arena(heroCfg(), 7);
+    const a = dummy(put, "a", 0, 6);
+    const b = dummy(put, "a", 0, 3);
+    const w = put(pc("w", "Warden", flat(95)), "p", 0);
+    const mk = put(pc("k", "Mo & Krill", flat(95)), "p", 1);
+    const s = dummy(put, "a", 1, 7);
+    const wb = w.bonus;
+    m.finish();
+    expect(w.bonus).toBe(wb);
+    expect(m.pow(a)).toBe(5);
+    expect(m.pow(b)).toBe(2);
+    expect(m.pow(s)).toBe(5);
+    expect(mk.st.burrow).toBe(true);
   });
 });
