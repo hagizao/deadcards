@@ -839,3 +839,7 @@
 .gc .deadlock-card-shell:hover { transform: none; }
 .gc .deadlock-card-shell:hover .hero-bg-wrap { transform: none; }
 .rk-wrap.gc { width: 100%; height: 100%; max-width: none; }
+
+/* Cardslock Game: placa do texto (cantos de cima chanfrados) e faixa do nome com pontas */
+.gc-plaque { clip-path: polygon(5cqw 0, calc(100% - 5cqw) 0, 100% 5cqw, 100% 100%, 0 100%, 0 5cqw); }
+.gc-ribbon { clip-path: polygon(0 50%, 4cqw 0, calc(100% - 4cqw) 0, 100% 50%, calc(100% - 4cqw) 100%, 4cqw 100%); }

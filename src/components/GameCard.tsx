@@ -54,15 +54,25 @@ export function GameCard({ player, name, cost, power, base, glyph, master, text,
               </span>
             )}
 
-            <div className={`absolute inset-x-0 bottom-0 flex flex-col gap-[1.5cqw] px-[6cqw] ${text ? "h-[72cqw] bg-linear-to-b from-black/0 via-black/85 to-black/95 pt-[8cqw] pb-[12cqw]" : "bg-linear-to-b from-black/0 to-black/85 pt-[10cqw] pb-[15cqw]"}`}>
+            {/* placa do texto: moldura no metal da raridade, cantos de cima chanfrados, separando a arte do texto */}
+            {text && (
+              <div className="gc-plaque absolute inset-x-[4cqw] bottom-[5cqw] h-[64cqw] bg-zinc-500 bg-(image:--rk-bg) p-[0.8cqw]">
+                <div className="gc-plaque flex size-full items-center bg-zinc-950/95 px-[4cqw] pt-[7cqw] pb-[2cqw]">
+                  <p className="line-clamp-8 w-full text-center text-[5.2cqw] leading-[1.2] font-semibold text-zinc-100">
+                    <span className="text-game-brass">{text.name}{text.kind ? ` (${text.kind})` : ""}:</span> {text.body}
+                    {text.master && <><br /><span className="text-game-brass">★ {text.masterLabel}:</span> {text.master}</>}
+                  </p>
+                </div>
+              </div>
+            )}
+            {!text && <div className="absolute inset-x-0 bottom-0 h-[45cqw] bg-linear-to-b from-black/0 to-black/80" aria-hidden="true" />}
+
+            {/* faixa do nome na fronteira entre a arte e o texto */}
+            <div className={`absolute inset-x-[2cqw] flex flex-col items-center gap-[1.5cqw] ${text ? "bottom-[62cqw]" : "bottom-[9cqw]"}`}>
               {status && <span className="text-center text-[9cqw] leading-none drop-shadow-sm" aria-hidden="true">{status}</span>}
-              <b className={`card-txt-shadow truncate text-center font-black tracking-[0.08em] uppercase ${text ? "text-[8.5cqw]" : "text-[11cqw]"}`}>{name}</b>
-              {text && (
-                <p className="card-txt-shadow line-clamp-8 text-center text-[5.2cqw] leading-[1.2] font-semibold text-zinc-100">
-                  <span className="text-game-brass">{text.name}{text.kind ? ` (${text.kind})` : ""}:</span> {text.body}
-                  {text.master && <><br /><span className="text-game-brass">★ {text.masterLabel}:</span> {text.master}</>}
-                </p>
-              )}
+              <div className="gc-ribbon w-full bg-zinc-500 bg-(image:--rk-bg) p-[0.8cqw] shadow-lg">
+                <b className={`gc-ribbon card-txt-shadow block truncate bg-zinc-950/90 px-[6cqw] py-[1.2cqw] text-center leading-tight font-black tracking-[0.08em] uppercase ${text ? "text-[7.5cqw]" : "text-[10cqw]"}`}>{name}</b>
+              </div>
             </div>
           </div>
         </div>
