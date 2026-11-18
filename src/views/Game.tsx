@@ -222,8 +222,6 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     setVeil((s) => ({ ...s, [k]: v }));
     later(() => setVeil((s) => { const n = { ...s }; delete n[k]; return n; }), ms);
   };
-  /** Gelo do Kelvin: o lado do local fica azulado até o fim deste turno ou do próximo (chave: local e lado). */
-  const [frost, setFrost] = useState<Record<string, number>>({});
   const say = (text: string) => setToast({ id: ++toastSeq, text });
   const name = (c: GCard) => (c.p.token ? t.tokens[c.p.token] : c.p.name);
   const logName = (n: LogEntry["c"]) => (n === undefined ? "" : typeof n === "string" ? n : t.tokens[n.token]);
@@ -282,7 +280,6 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     setIntro(true);
     setDrew(false);
     setVeil({});
-    setFrost({});
     sfx("shuffle");
     setSel(null);
     setLook(null);
@@ -377,8 +374,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       const foe = opp(h.side);
       if (h.ab === "Vyper") veilFor(`petri${h.at}${h.ev === "petri" ? opp(h.side) : foe}`, h.ev === "petri" ? "keep" : "hide", t + (h.ev === "petri" ? 1060 : 600));
       if (h.ab === "Venator") veilFor(`trap${h.at}${h.ev === "trap" ? opp(h.side) : foe}`, h.ev === "trap" ? "keep" : "hide", t + (h.ev === "trap" ? 130 : 600));
-      if (h.ab === "Paige") veilFor(`paige${h.at}${h.side}`, "hide", t + 900);
-      if (h.ab === "Kelvin") { const k = `${h.at}${h.side}`, until = m.t + 1; later(() => setFrost((f) => ({ ...f, [k]: until })), t + 900); }
+      // a névoa de quem age no local inteiro só aparece quando a cena dela chega na mesa
+      if (h.ab in MIST) veilFor(`${h.ab}${h.at}${h.side}`, "hide", t + 700);
       const alt = h.ab === "The Doorman" ? laneBox(m.portals.at(-1)?.b) : null;
       later(() => rig.start(h.ab, { id: h.id, box: old(h.id) }, dst, { self: h.self, ev: h.ev, lane: laneBox(h.at), alt, shake: quake }), t);
       t += ms;
@@ -506,14 +503,17 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     sfx("place");
     bump();
   };
-  /** O que fica no chão de cada lado do local: a poça da Vyper, a armadilha do Venator, o verde da Paige e o gelo do Kelvin. */
+  /**
+   * O que fica no chão de cada lado do local: a poça da Vyper, a armadilha do Venator e a névoa de quem age no local
+   * inteiro (Paige, Kelvin, Solomon...), enquanto a carta estiver ali.
+   */
   const marksOf = (l: Loc, i: number, s: Side): Marks => {
     const v = (k: string, on: boolean) => (veil[`${k}${i}${s}`] === "hide" ? false : on || veil[`${k}${i}${s}`] === "keep");
+    const here = new Set(l.s[s].filter((c) => c.rev).map((c) => m.abilityOf(c)));
     return {
       petri: v("petri", !!l.petri[s]),
       trap: v("trap", l.trap[s] > 0),
-      paige: v("paige", l.s[s].some((c) => c.rev && m.abilityOf(c) === "Paige")),
-      frost: (frost[`${i}${s}`] ?? 0) >= m.t,
+      mist: (Object.keys(MIST) as AbilityKey[]).filter((k) => v(k, here.has(k))),
     };
   };
   /** Tipos dos itens que melhoram a carta (os que pioram a inimiga não brilham). */
@@ -1068,19 +1068,24 @@ function Location({ m, l, i, t, marks, canPlay, onPlay, dest, onDest, drop, card
 
 type StatusKey = keyof T["ui"]["status"];
 
-type Marks = { petri: boolean; trap: boolean; paige: boolean; frost: boolean };
+/** Cor da névoa de quem age no local inteiro (a mesma das animações). */
+const MIST: Partial<Record<AbilityKey, string>> = {
+  "Paige": "var(--color-emerald-400)", "Kelvin": "var(--color-cyan-300)", "Solomon": "var(--color-amber-300)",
+  "Warden": "var(--color-sky-400)", "Victor": "var(--color-lime-400)", "Nurse Harrow": "var(--color-rose-500)",
+};
+type Marks = { petri: boolean; trap: boolean; mist: AbilityKey[] };
 /** As marcas no chão de um lado do local, por baixo das cartas (os chips da placa dizem o mesmo em texto). */
-function SideMarks({ petri, trap, paige, frost }: Marks) {
-  const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.5 } };
+function SideMarks({ petri, trap, mist }: Marks) {
+  const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.9, ease: "easeInOut" } } as const;
   return (
     <div aria-hidden="true" className="pointer-events-none absolute -inset-1">
       <AnimatePresence>
-        {paige && <motion.div key="paige" {...fade} className="absolute inset-0 rounded-xl bg-radial from-emerald-400/35 via-emerald-500/15 to-transparent shadow-[inset_0_0_18px_var(--color-emerald-400)]" />}
-        {frost && <motion.div key="frost" {...fade} className="absolute inset-0 rounded-xl bg-linear-to-b from-cyan-200/30 to-sky-500/20 shadow-[inset_0_0_20px_var(--color-cyan-200)]" />}
+        {mist.map((k) => <motion.div key={k} {...fade} className="absolute inset-[-8%]"><Mist tone={MIST[k] ?? ""} /></motion.div>)}
         {petri && (
-          <motion.div key="petri" initial={{ opacity: 0, scale: 0.3 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scaleY: 0.2 }} transition={{ duration: 0.45 }}
-            className="absolute inset-x-[2%] top-[38%] h-1/4">
-            <div className="size-full lane-puddle rounded-[50%] bg-radial from-lime-300/70 via-green-600/50 to-transparent to-70%" />
+          <motion.div key="petri" initial={{ opacity: 0, scale: 0.3 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.15 }} transition={{ duration: 0.7, ease: "easeInOut" }}
+            className="absolute inset-x-[2%] top-[34%] h-1/3">
+            <Mist tone="var(--color-lime-400)" />
+            <div className="absolute inset-x-0 top-1/4 h-1/2 lane-puddle rounded-[50%] bg-radial from-lime-300/70 via-green-600/45 to-transparent to-70% blur-[2px]" />
           </motion.div>
         )}
         {/* desenho fixo do jogo (svgOf), nada vindo de fora */}
@@ -1130,7 +1135,7 @@ function BoardCard({ c, m, t, name, face, looking, target, mark = false, aura = 
       onDrag={(e) => { const pt = pointOf(e); shift?.on(dropUnder(pt.x, pt.y)); }}
       onDragEnd={(e) => { const pt = pointOf(e); setHeld(false); shift?.drop(dropUnder(pt.x, pt.y)); }}>
     {/* pode ser movida: balança e brilha como a conta do "Fechar a conta" (parada enquanto arrasta); o atraso varia para as cartas não balançarem juntas */}
-    {c.rev && aura.map((k, j) => <span key={k} aria-hidden="true" className={`pointer-events-none absolute inset-0 item-aura rounded-lg ${AURA[k]}`} style={{ animationDelay: `${-j * 0.9}s` }} />)}
+    {c.rev && aura.map((k) => <Mist key={k} tone={AURA[k]} strong className="inset-x-[-45%] inset-y-[-30%]" />)}
     {shift && !held && <span aria-hidden="true" className="pointer-events-none absolute -inset-2 card-call-glow rounded-2xl bg-radial from-game-me/60 via-game-me/20 to-transparent to-70% blur-md" />}
     <div className={shift && !held ? "card-jiggle" : ""} style={shift ? { animationDelay: `${-(c.id % 7) * 0.31}s` } : undefined}>
     <motion.button type="button" onClick={(e) => { if (moved.current) { moved.current = false; return; } onClick(touch.current ? e.currentTarget.getBoundingClientRect() : null); }} aria-pressed={looking}
@@ -1164,12 +1169,29 @@ function BoardCard({ c, m, t, name, face, looking, target, mark = false, aura = 
   );
 }
 
-/** Cor que a carta com item irradia, pelo tipo do item. */
-const AURA: Record<ItemSlot, string> = {
-  weapon: "shadow-[0_0_16px_5px_var(--color-item-weapon),0_0_36px_10px_var(--color-item-weapon)]",
-  vitality: "shadow-[0_0_16px_5px_var(--color-item-vitality),0_0_36px_10px_var(--color-item-vitality)]",
-  spirit: "shadow-[0_0_16px_5px_var(--color-item-spirit),0_0_36px_10px_var(--color-item-spirit)]",
-};
+/** Cor da névoa que a carta com item solta, pelo tipo do item. */
+const AURA: Record<ItemSlot, string> = { weapon: "var(--color-item-weapon)", vitality: "var(--color-item-vitality)", spirit: "var(--color-item-spirit)" };
+
+/** Manchas da névoa: espalhadas, cada uma respirando no seu ritmo, para não formar nenhuma borda. */
+const MIST_BLOBS = [
+  "left-[-10%] top-[2%] size-[70%] [animation-duration:7s]",
+  "left-[40%] top-[-6%] size-[66%] [animation-delay:-3s] [animation-duration:9s]",
+  "left-[4%] top-[38%] size-[68%] [animation-delay:-5s] [animation-duration:8s]",
+  "left-[36%] top-[34%] size-[72%] [animation-delay:-2s] [animation-duration:10s]",
+];
+const MIST_RISE = ["left-[12%]", "left-[34%] [animation-delay:-1.2s]", "left-[56%] [animation-delay:-2.3s]"];
+/**
+ * Névoa colorida sem bordas, no estilo da tela de vitória: manchas borradas que se mexem devagar. `strong` é a do
+ * item, mais densa e com fiapos subindo.
+ */
+function Mist({ tone, strong = false, className = "inset-0" }: { tone: string; strong?: boolean; className?: string }) {
+  return (
+    <span aria-hidden="true" className={`pointer-events-none absolute ${className}`} style={{ "--mist": tone, "--mist-k": strong ? "100%" : "55%" } as CSSProperties}>
+      {MIST_BLOBS.map((b) => <span key={b} className={`absolute mist-blob rounded-full ${b}`} />)}
+      {strong && MIST_RISE.map((b) => <span key={b} className={`absolute bottom-[18%] size-[34%] mist-rise rounded-full ${b}`} />)}
+    </span>
+  );
+}
 /** Corrente da Billy, a mesma da animação. */
 const CHAIN = "bg-[repeating-linear-gradient(90deg,var(--color-zinc-300)_0_6px,var(--color-zinc-600)_6px_8px)] shadow-[0_0_4px_rgb(0_0_0/0.9)]";
 
