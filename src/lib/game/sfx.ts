@@ -11,12 +11,11 @@ import grab from "../../assets/sfx/grab.ogg";
 import loss from "../../assets/sfx/loss.ogg";
 import shuffle from "../../assets/sfx/shuffle.ogg";
 import soul from "../../assets/sfx/soul.ogg";
-import target from "../../assets/sfx/target.ogg";
 import win from "../../assets/sfx/win.ogg";
 
-const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, target, win };
+const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, win };
 /** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
-const WOOD = { place: 0.6, land: 0.75, slam: 1 } as const;
+const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
 export type Sfx = keyof typeof FILES | keyof typeof WOOD;
 
 /** Volume e mudo de cada canal (0 a 1). */
