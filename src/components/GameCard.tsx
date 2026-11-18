@@ -6,6 +6,7 @@ import { useData } from "../lib/data";
 import { getCardTier, rarityStyleVars } from "../lib/rarity";
 import type { Player } from "../lib/types";
 import type { DeckLook } from "../lib/game/deck";
+import soulsIcon from "../assets/game/souls.png";
 import { CardArt } from "./Card";
 
 export type GameCardText = { name: string; kind: string; body: string; master?: string; masterLabel: string };
@@ -31,7 +32,27 @@ type Props = {
   className?: string;
 };
 
-const gem = "absolute top-[3cqw] flex size-[21cqw] items-center justify-center rounded-full border-[1.2cqw] border-white text-[12cqw] leading-none font-extrabold shadow-[0_0.8cqw_2cqw_rgb(0_0_0/0.7)]";
+/** Posição e tamanho dos selos de custo e poder nos cantos de cima. */
+const gem = "absolute top-[3cqw] grid size-[21cqw] place-items-center rounded-full text-[12cqw] leading-none font-extrabold";
+/** Número sobre os selos: contorno escuro para ler em cima da luz. */
+const ink = "relative [text-shadow:0_0.5cqw_0_rgb(0_0_0/0.9),0_0_1.5cqw_rgb(0_0_0/0.8)]";
+
+/** Custo como uma orbe de almas pequena (as almas que você paga): teal escuro, chama ao fundo e o brilho das almas em volta. */
+function CostOrb({ cost }: { cost: number }) {
+  return (
+    <i className={`${gem} left-[3cqw] overflow-hidden bg-radial-[at_50%_35%] from-teal-400 via-teal-800 to-teal-950 text-white not-italic shadow-[inset_0_-1.5cqw_2.5cqw_rgb(0_0_0/0.7),0_0_0_0.8cqw_var(--color-game-soul),0_0_3cqw_var(--color-game-soul)]`}>
+      <img src={soulsIcon} alt="" draggable={false} className="absolute inset-0 m-auto h-3/4 opacity-50" />
+      <span className={ink}>{cost}</span>
+    </i>
+  );
+}
+
+/** Ficha de cassino do poder: borda listrada e miolo na cor do momento (latão, verde acima do impresso, vermelho abaixo). */
+const CHIP = {
+  up: { edge: "bg-[repeating-conic-gradient(var(--color-emerald-300)_0deg_16deg,var(--color-zinc-950)_16deg_45deg)]", face: "from-emerald-300 to-emerald-600" },
+  down: { edge: "bg-[repeating-conic-gradient(var(--color-red-400)_0deg_16deg,var(--color-zinc-950)_16deg_45deg)]", face: "from-red-400 to-red-700" },
+  even: { edge: "bg-[repeating-conic-gradient(var(--color-amber-200)_0deg_16deg,var(--color-zinc-950)_16deg_45deg)]", face: "from-amber-200 to-game-brass" },
+} as const;
 
 /** Carta com a largura do container (`@container`); todas as medidas internas são em cqw, então ela escala inteira. */
 export function GameCard({ player, name, cost, power, base, glyph, master, text, status, fx = false, className = "" }: Props) {
@@ -47,7 +68,7 @@ export function GameCard({ player, name, cost, power, base, glyph, master, text,
               <div className="absolute inset-0 flex items-start justify-center bg-linear-160 from-stone-700 to-stone-900 pt-[30cqw] text-[42cqw]" aria-hidden="true">{glyph}</div>
             )}
 
-            <i className={`${gem} left-[3cqw] bg-linear-160 from-sky-400 to-blue-700 not-italic`}>{cost}</i>
+            <CostOrb cost={cost} />
             <PowerGem power={power} base={base} />
             {master && (
               <span className="absolute inset-x-[26cqw] top-[5cqw] flex items-center justify-center gap-[1cqw] rounded-full bg-game-brass py-[0.8cqw] text-[6.5cqw] font-extrabold tracking-wider text-dl-black uppercase shadow-[0_0.6cqw_2cqw_rgb(0_0_0/0.6)]">
@@ -91,11 +112,16 @@ function PowerGem({ power, base }: { power: number; base: number }) {
     setPrev(power);
     setPop((p) => ({ id: (p?.id ?? 0) + 1, d: power - prev }));
   }
-  const tone = power > base ? "from-emerald-200 to-emerald-500" : power < base ? "from-red-300 to-red-600" : "from-amber-200 to-game-brass";
+  const chip = CHIP[power > base ? "up" : power < base ? "down" : "even"];
   return (
     <>
       <motion.b key={pop?.id ?? 0} initial={pop ? { scale: 1.45 } : false} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }}
-        className={`${gem} right-[3cqw] bg-linear-160 ${tone} text-dl-black`}>{power}</motion.b>
+        className={`${gem} right-[3cqw] p-[1.6cqw] shadow-[0_0.8cqw_2cqw_rgb(0_0_0/0.7)] ${chip.edge}`}>
+        {/* miolo da ficha, com o anel tracejado de dentro */}
+        <span className={`grid size-full place-items-center rounded-full bg-linear-160 text-white shadow-[inset_0_-1cqw_1.5cqw_rgb(0_0_0/0.45)] outline-[0.5cqw] outline-offset-[-1.6cqw] outline-black/35 outline-dashed ${chip.face}`}>
+          <span className={ink}>{power}</span>
+        </span>
+      </motion.b>
       <AnimatePresence>
         {pop && (
           <motion.span key={pop.id} initial={{ opacity: 1, y: 0 }} animate={{ opacity: 0, y: "-14cqw" }} transition={{ duration: 0.9, ease: "easeOut" }}
