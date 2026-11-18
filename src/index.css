@@ -136,3 +136,19 @@
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.18); opacity: 0.6; }
 }
+
+/* Cardslock Game: luz fraca e quente sobre a mesa do bar, que balança devagar como um lampião */
+@utility table-lamp {
+  background: radial-gradient(ellipse 30% 26% at 50% 50%, rgb(255 184 110 / 0.09), transparent 70%);
+  animation: table-lamp 11s ease-in-out infinite alternate;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes table-lamp {
+  0% { transform: translate(-5%, -2%); opacity: 0.75; }
+  40% { opacity: 1; }
+  48% { opacity: 0.85; }
+  100% { transform: translate(5%, 3%); opacity: 0.95; }
+}

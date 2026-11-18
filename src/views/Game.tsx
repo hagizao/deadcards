@@ -15,6 +15,7 @@ import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard
 import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
+import tableArt from "../assets/game/table.webp";
 
 const REVEAL_MS = 650;
 const END_MS = 750;
@@ -303,14 +304,20 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       m.markOptions(c).length > 0 && { label: t.ui.act.mark, run: () => startMode("mark", c) },
     ].filter(Boolean) as { label: string; run: () => void }[];
   };
+  const dropAt = (l: Loc, i: number) => !drag || m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok";
   const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && !m.canPlay(sel, l);
   /** The New York Oracle: próxima carta de cada baralho. */
   const next = { p: m.peek("p"), a: m.peek("a") };
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className={full ? "fixed inset-0 z-50 overflow-hidden bg-dl-black/90 px-3 pt-1 backdrop-blur-xl sm:px-6" : "contents"}>
-    <div className={`mx-auto flex flex-col gap-1.5 text-dl-text ${full ? "h-full max-w-7xl" : "h-[calc(100dvh-5.5rem)] min-h-120 max-w-7xl sm:h-[calc(100dvh-7.5rem)]"}`}>
+    <div className={full ? "fixed inset-0 z-50 overflow-hidden px-3 sm:px-6" : "contents"}>
+    <BarTable />
+    <div className={`relative mx-auto flex flex-col gap-1.5 text-dl-text ${full ? "h-full max-w-7xl" : "h-[calc(100dvh-5.5rem)] min-h-120 max-w-7xl sm:h-[calc(100dvh-7.5rem)]"}`}>
+      {/* as faixas vão de cima até embaixo da mão, como se a mesa fosse vista de cima */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 flex gap-0.5 sm:gap-1">
+        {m.loc.map((l, i) => <LaneBackdrop key={l.L.id + i} l={l} i={i} drop={dropAt(l, i)} />)}
+      </div>
       <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
         <div className="flex flex-col items-start gap-1 pt-1">
           <h1 className="font-display text-sm font-extrabold tracking-[0.11em] uppercase sm:text-xl">{t.ui.title}</h1>
@@ -346,7 +353,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
         <section aria-label={t.ui.arena} className="lane-board flex min-h-0 w-full flex-1 gap-0.5 sm:gap-1">
           {m.loc.map((l, i) => (
             <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
-              drop={!drag || m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok"}
+              drop={dropAt(l, i)}
               card={(c) => (
                 <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} acts={actsOf(c)}
                   onClick={(r) => { pickBoard(c); setPeek(r && look !== c ? { c, r } : null); }}
@@ -458,9 +465,9 @@ type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
 /** Cores das três faixas (amarela, azul e verde, como as lanes do mapa), em classes inteiras. */
 const LANE = [
-  { stroke: "stroke-lane-yellow", tint: "from-lane-yellow/30" },
-  { stroke: "stroke-lane-blue", tint: "from-lane-blue/30" },
-  { stroke: "stroke-lane-green", tint: "from-lane-green/30" },
+  { stroke: "stroke-lane-yellow", tint: "from-lane-yellow/30", glow: "from-lane-yellow/30" },
+  { stroke: "stroke-lane-blue", tint: "from-lane-blue/30", glow: "from-lane-blue/30" },
+  { stroke: "stroke-lane-green", tint: "from-lane-green/30", glow: "from-lane-green/30" },
 ] as const;
 
 /** Gerador determinístico, para cada faixa ter sempre a mesma borda. */
@@ -520,7 +527,18 @@ function BrushStroke({ id, pts, w, h, sw, dash, dash2, inward }: { id: string; p
   );
 }
 
-/** Fundo da faixa: arte do local (ou névoa enquanto oculto), escurecida nas pontas e tingida com a cor da lane; bordas a pincel. */
+/** Mesa do bar Jezebel's: madeira quase no escuro; a luz vem das faixas e de um lampião fraco que balança. */
+function BarTable() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-dl-black">
+      <img src={tableArt} alt="" draggable={false} className="absolute inset-0 size-full object-cover brightness-40 saturate-75" />
+      <div className="absolute -inset-1/4 table-lamp" />
+      <div className="absolute inset-0 bg-radial from-transparent from-35% to-black/80" />
+    </div>
+  );
+}
+
+/** Fundo da faixa: arte do local (ou névoa enquanto oculto), escurecida nas pontas e tingida com a cor da lane; bordas a pincel. A cor da lane vaza na mesa. */
 function LaneBackdrop({ l, i, drop }: { l: Loc; i: number; drop: "off" | "ok" | "over" }) {
   const b = BRUSH[i % 3], lane = LANE[i % 3];
   const [ref, { w, h }] = useSize();
@@ -529,7 +547,8 @@ function LaneBackdrop({ l, i, drop }: { l: Loc; i: number; drop: "off" | "ok" | 
   // espessura proporcional à faixa, como no mapa: fina no celular, grossa no desktop
   const sw = Math.max(4, Math.min(13, w * 0.03));
   return (
-    <div ref={ref} aria-hidden="true" className="pointer-events-none absolute inset-0">
+    <div ref={ref} className="relative min-w-0 flex-1">
+      <div className={`absolute -inset-x-1/2 inset-y-0 bg-radial to-transparent to-70% mix-blend-screen ${lane.glow}`} />
       <div className="absolute inset-0 bg-zinc-950" style={{ clipPath: `url(#${id}-clip)` }}>
         {art ? (
           <motion.img key={art} src={locArtUrl(art)} alt="" draggable={false} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}
@@ -585,7 +604,6 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
   return (
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
       className="relative flex min-w-0 flex-1 flex-col items-center justify-between gap-1 px-2 py-1.5 sm:gap-2 sm:px-4 sm:py-3">
-      <LaneBackdrop l={l} i={i} drop={drop} />
       <div className={`relative content-end ${side}`} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
       <div className="relative w-full"><LocTile nm={nm} desc={desc} chips={chips} a={a} p={p} /></div>
       <div className={`relative content-start ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
