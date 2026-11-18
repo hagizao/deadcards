@@ -42,7 +42,9 @@ const json = (v) => sql(JSON.stringify(v));
 const num = (v, fallback) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
 
 // upsert em vez de DELETE: user_cards e redeem_codes têm ON DELETE CASCADE em players
-const lines = ["DELETE FROM heroes;", "DELETE FROM settings;"];
+// só as chaves de settings que o save reescreve: o resto (como "game", a configuração do Cardslock Game com os efeitos
+// sonoros enviados) fica intacto
+const lines = ["DELETE FROM heroes;", "DELETE FROM settings WHERE key IN ('tierConfig', 'bg', 'bgImageKey', 'homeHeroKey');"];
 
 for (const t of d.teams ?? []) {
   const logoKey = stash(t.logo, `teams/${slug(t.id)}`);
