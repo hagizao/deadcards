@@ -42,7 +42,7 @@ export type GameText = {
   };
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
-    turn: (t: number, total: number) => string; phase: (p: number) => string; phaseHint: string; prio: (me: boolean) => string; prioHint: string; record: (w: number, l: number) => string; souls: (n: number) => string;
+    turn: (t: number, total: number) => string; phase: (p: number) => string; phaseHint: string; prio: (me: boolean) => string; prioHint: string; record: (w: number, l: number) => string; souls: (n: number) => string; aiSouls: (n: number) => string; players: string; decks: string;
     endTurn: string; newMatch: string; again: string; viewBoard: string; hint: string; hiddenLoc: string; revealsOn: (t: number) => string; next: (name: string) => string;
     cost: string; power: string; silenced: string; noAbility: string; tokenDesc: string; hand: string; arena: string;
     win: string; loss: string; draw: string; summary: (w: number, l: number, me: number, ai: number) => string; patron: string;
@@ -313,7 +313,7 @@ export const GAME_TEXT = strings<GameText>({
     ui: {
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
       needCards: (n) => `Cadastre pelo menos ${n} cartas para jogar.`, you: "Você: Rei Oculto", ai: "IA: Arquimãe",
-      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 a 3 · Mid: 4 a 6 (cartas sobem para Profissional) · Late: 7 e 8 (Mestre e ultimates).", prio: (me) => `Prioridade: ${me ? "você" : "IA"}`, prioHint: "Quem tem prioridade revela primeiro. No turno 1 é o Rei Oculto; depois, quem estiver ganhando a partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`,
+      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 a 3 · Mid: 4 a 6 (cartas sobem para Profissional) · Late: 7 e 8 (Mestre e ultimates).", prio: (me) => `Prioridade: ${me ? "você" : "IA"}`, prioHint: "Quem tem prioridade revela primeiro. No turno 1 é o Rei Oculto; depois, quem estiver ganhando a partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, aiSouls: (n) => `IA: ${n} ${pl(n, "alma", "almas")}`, players: "Almas e itens", decks: "Baralhos e fim do turno",
       endTurn: "Fim do turno", newMatch: "Nova partida", again: "Jogar de novo", viewBoard: "Ver tabuleiro",
       hint: "Arraste uma carta até um local para jogar (ou toque nela e depois no local). Passe o mouse para ler.", hiddenLoc: "Local oculto", revealsOn: (t) => `Revela no turno ${t}`, next: (name) => `Próxima carta: ${name}`,
       cost: "custo", power: "poder", silenced: "habilidade anulada", noAbility: "Sem habilidade.", tokenDesc: "Ficha criada por uma habilidade.",
@@ -591,7 +591,7 @@ export const GAME_TEXT = strings<GameText>({
     ui: {
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
       needCards: (n) => `Add at least ${n} cards to play.`, you: "You: Hidden King", ai: "AI: Archmother",
-      turn: (t, total) => `Turn ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 to 3 · Mid: 4 to 6 (cards rise to Pro) · Late: 7 and 8 (Master and ultimates).", prio: (me) => `Priority: ${me ? "you" : "AI"}`, prioHint: "Whoever has priority reveals first. On turn 1 it's the Hidden King; after that, whoever is winning the match.", record: (w, l) => `${w}W ${l}L`, souls: (n) => `${n} ${pl(n, "soul", "souls")}`,
+      turn: (t, total) => `Turn ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 to 3 · Mid: 4 to 6 (cards rise to Pro) · Late: 7 and 8 (Master and ultimates).", prio: (me) => `Priority: ${me ? "you" : "AI"}`, prioHint: "Whoever has priority reveals first. On turn 1 it's the Hidden King; after that, whoever is winning the match.", record: (w, l) => `${w}W ${l}L`, souls: (n) => `${n} ${pl(n, "soul", "souls")}`, aiSouls: (n) => `AI: ${n} ${pl(n, "soul", "souls")}`, players: "Souls and items", decks: "Decks and end turn",
       endTurn: "End turn", newMatch: "New match", again: "Play again", viewBoard: "View board",
       hint: "Drag a card onto a location to play it (or tap it, then the location). Hover to read.", hiddenLoc: "Hidden location", revealsOn: (t) => `Reveals on turn ${t}`, next: (name) => `Next card: ${name}`,
       cost: "cost", power: "power", silenced: "ability canceled", noAbility: "No ability.", tokenDesc: "Token created by an ability.",
@@ -869,7 +869,7 @@ export const GAME_TEXT = strings<GameText>({
     ui: {
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",
       needCards: (n) => `Registra al menos ${n} cartas para jugar.`, you: "Tú: Rey Oculto", ai: "IA: Archimadre",
-      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rondas 1 a 3 · Mid: 4 a 6 (las cartas suben a Profesional) · Late: 7 y 8 (Maestro y ultimates).", prio: (me) => `Prioridad: ${me ? "tú" : "IA"}`, prioHint: "Quien tiene la prioridad revela primero. En el turno 1 es el Rey Oculto; después, quien vaya ganando la partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`,
+      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rondas 1 a 3 · Mid: 4 a 6 (las cartas suben a Profesional) · Late: 7 y 8 (Maestro y ultimates).", prio: (me) => `Prioridad: ${me ? "tú" : "IA"}`, prioHint: "Quien tiene la prioridad revela primero. En el turno 1 es el Rey Oculto; después, quien vaya ganando la partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, aiSouls: (n) => `IA: ${n} ${pl(n, "alma", "almas")}`, players: "Almas y objetos", decks: "Mazos y fin del turno",
       endTurn: "Fin del turno", newMatch: "Nueva partida", again: "Jugar de nuevo", viewBoard: "Ver tablero",
       hint: "Arrastra una carta a un lugar para jugarla (o tócala y luego el lugar). Pasa el ratón para leer.", hiddenLoc: "Lugar oculto", revealsOn: (t) => `Se revela en el turno ${t}`, next: (name) => `Próxima carta: ${name}`,
       cost: "coste", power: "poder", silenced: "habilidad anulada", noAbility: "Sin habilidad.", tokenDesc: "Ficha creada por una habilidad.",

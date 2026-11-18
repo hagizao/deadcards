@@ -1,5 +1,5 @@
 import { AnimatePresence, MotionConfig, motion, useAnimate, useReducedMotion } from "motion/react";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { CardBack, GameCard, TipBoxes } from "../components/GameCard";
 import { GameHand } from "../components/GameHand";
 import { TargetArrow } from "../components/TargetArrow";
@@ -62,6 +62,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   const [shopHidden, setShopHidden] = useState(false);
   // tela cheia: a partida cobre o site (e pede tela cheia ao navegador quando dá)
   const [full, setFull] = useState(false);
+  const wide = useWide();
   useEffect(() => {
     if (!full) return;
     const prev = document.body.style.overflow;
@@ -309,24 +310,54 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   /** The New York Oracle: próxima carta de cada baralho. */
   const next = { p: m.peek("p"), a: m.peek("a") };
 
+  const height = full ? "h-full" : "h-[calc(100dvh-5.5rem)] min-h-120 sm:h-[calc(100dvh-7.5rem)]";
+  const title = (
+    <div className="flex flex-col items-start gap-1 pt-1">
+      <h1 className="font-display text-sm font-extrabold tracking-[0.11em] uppercase sm:text-xl">{t.ui.title}</h1>
+      <abbr title={t.ui.phaseHint} className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold tracking-widest uppercase no-underline sm:text-xs ${PHASE_TONE[phaseOf(Math.min(m.t, TURNS))]}`}>
+        {t.ui.phase(phaseOf(Math.min(m.t, TURNS)))}
+      </abbr>
+    </div>
+  );
+  const aiItems = <ItemSlot s="a" m={m} t={t} icons={icons} on={boughtOn} big={wide} />;
+  const myItems = <ItemSlot s="p" m={m} t={t} icons={icons} on={boughtOn} big={wide} />;
+  const aiDeck = <DeckPile n={m.adeck.length} tone="ai" label={t.deck.aiLeft(m.adeck.length)} tipSide="left" out={{ x: -80, y: -10 }} className={wide ? "w-full max-w-40" : "w-8 sm:w-11"} />;
+  const myDeck = <DeckPile n={m.deck.length} look={deckLook} label={t.deck.left(m.deck.length)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} />;
+  const endBtn = result && !showEnd
+    ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
+    : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady} big={wide}
+        disabled={m.busy || !!result} onClick={endTurn} />;
+
   return (
     <MotionConfig reducedMotion="user">
     <div className={full ? "fixed inset-0 z-50 overflow-hidden px-3 sm:px-6" : "contents"}>
     <BarTable />
-    <div className={`relative mx-auto flex flex-col gap-1.5 text-dl-text ${full ? "h-full max-w-7xl" : "h-[calc(100dvh-5.5rem)] min-h-120 max-w-7xl sm:h-[calc(100dvh-7.5rem)]"}`}>
+    <div className={wide ? `flex gap-4 ${height}` : "contents"}>
+    {/* tela larga: à esquerda o título e, de cada jogador, as almas e os itens (IA em cima, você embaixo) */}
+    {wide && (
+      <aside aria-label={t.ui.players} className="flex min-w-36 flex-[1_0_9rem] flex-col justify-between gap-4 py-3 text-dl-text">
+        <div className="flex flex-col gap-8">
+          {title}
+          <div className="flex flex-col items-center gap-3">
+            <SoulOrb n={m.AE} label={t.ui.aiSouls(m.AE)} big />
+            {aiItems}
+          </div>
+        </div>
+        <div className="flex flex-col items-center gap-3">
+          {myItems}
+          <SoulOrb n={m.E} label={t.ui.souls(m.E)} big />
+        </div>
+      </aside>
+    )}
+    <div className={`relative mx-auto flex flex-col gap-1.5 text-dl-text ${wide ? "h-full min-w-0 flex-[0_1_80rem]" : `${height} max-w-7xl`}`}>
       {/* as faixas vão de cima até embaixo da mão, como se a mesa fosse vista de cima */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 flex gap-0.5 sm:gap-1">
         {m.loc.map((l, i) => <LaneBackdrop key={l.L.id + i} l={l} i={i} drop={dropAt(l, i)} />)}
       </div>
       <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
-        <div className="flex flex-col items-start gap-1 pt-1">
-          <h1 className="font-display text-sm font-extrabold tracking-[0.11em] uppercase sm:text-xl">{t.ui.title}</h1>
-          <abbr title={t.ui.phaseHint} className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold tracking-widest uppercase no-underline sm:text-xs ${PHASE_TONE[phaseOf(Math.min(m.t, TURNS))]}`}>
-            {t.ui.phase(phaseOf(Math.min(m.t, TURNS)))}
-          </abbr>
-        </div>
+        {wide ? <div /> : title}
         <div className="order-last col-span-2 flex items-start justify-center gap-2 sm:order-0 sm:col-span-1">
-          <ItemSlot s="a" m={m} t={t} icons={icons} on={boughtOn} />
+          {!wide && aiItems}
           <AiHand n={m.ahand.length} t={t} />
         </div>
         <div className="flex items-start justify-end gap-2">
@@ -344,8 +375,8 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
             </button>
           </span>
         </div>
-        {next.a && <NextCard name={name(next.a)} t={t} />}
-        <DeckPile n={m.adeck.length} tone="ai" label={t.deck.aiLeft(m.adeck.length)} tipSide="left" out={{ x: -80, y: -10 }} className="w-8 sm:w-11" />
+        {!wide && next.a && <NextCard name={name(next.a)} t={t} />}
+        {!wide && aiDeck}
         </div>
       </div>
 
@@ -401,24 +432,25 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       </div>
 
       <div className="flex w-full flex-wrap items-end justify-between gap-x-2 sm:flex-nowrap">
-        <div className="flex shrink-0 flex-col items-center gap-1 pb-1">
-          <ItemSlot s="p" m={m} t={t} icons={icons} on={boughtOn} />
-          <SoulOrb n={m.E} label={t.ui.souls(m.E)} />
-        </div>
+        {!wide && (
+          <div className="flex shrink-0 flex-col items-center gap-1 pb-1">
+            {myItems}
+            <SoulOrb n={m.E} label={t.ui.souls(m.E)} />
+          </div>
+        )}
         <section aria-label={t.ui.hand} className="relative z-10 order-last w-full min-w-0 sm:order-0 sm:w-auto sm:flex-1">
           <GameHand cards={m.hand} selected={sel} disabled={m.busy || !!result}
             playable={(c) => !m.busy && !result && m.loc.some((l) => !m.canPlay(c, l))}
             label={(c) => t.ui.cardLabel(name(c), c.cost, c.base)} tips={tipsOf} render={(c, zoomed) => face(c, true, zoomed)}
             onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => { if (c && !drag) sfx("grab", 0.7); setDrag(c ? { c, over } : null); }} />
         </section>
-        <div className="flex shrink-0 items-end gap-2 pb-1">
-          {next.p && <NextCard name={name(next.p)} t={t} />}
-          <DeckPile n={m.deck.length} look={deckLook} label={t.deck.left(m.deck.length)} tipSide="top" out={{ x: -120, y: 0 }} className="w-10 sm:w-14" />
-          {result && !showEnd
-            ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
-            : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady}
-                disabled={m.busy || !!result} onClick={endTurn} />}
-        </div>
+        {!wide && (
+          <div className="flex shrink-0 items-end gap-2 pb-1">
+            {next.p && <NextCard name={name(next.p)} t={t} />}
+            {myDeck}
+            {endBtn}
+          </div>
+        )}
       </div>
 
       <AnimatePresence>
@@ -455,9 +487,34 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
         )}
       </AnimatePresence>
     </div>
+    {/* tela larga: à direita os dois baralhos (IA em cima, o seu embaixo) e o fim do turno entre eles */}
+    {wide && (
+      <aside aria-label={t.ui.decks} className="flex min-w-36 flex-[1_0_9rem] flex-col items-center justify-between gap-3 py-3">
+        <div className="flex w-full flex-col items-center gap-1">
+          {aiDeck}
+          {next.a && <NextCard name={name(next.a)} t={t} />}
+        </div>
+        {endBtn}
+        <div className="flex w-full flex-col items-center gap-1">
+          {next.p && <NextCard name={name(next.p)} t={t} />}
+          {myDeck}
+        </div>
+      </aside>
+    )}
+    </div>
     </div>
     </MotionConfig>
   );
+}
+
+/** Tela larga o bastante para usar as laterais da mesa (baralhos de um lado, almas e itens do outro). */
+const WIDE = "(min-width: 80rem)";
+function useWide() {
+  return useSyncExternalStore((on) => {
+    const q = matchMedia(WIDE);
+    q.addEventListener("change", on);
+    return () => q.removeEventListener("change", on);
+  }, () => matchMedia(WIDE).matches, () => false);
 }
 
 type T = (typeof GAME_TEXT)["pt"];
@@ -738,9 +795,9 @@ function Peek({ r, card, tips }: { r: DOMRect; card: React.ReactNode; tips: { ti
 function AiHand({ n, t }: { n: number; t: T }) {
   const mid = (n - 1) / 2;
   return (
-    <div role="img" aria-label={t.ui.aiHand(n)} className="relative h-12 w-32 [clip-path:inset(0_-100vw_-100vh_-100vw)] sm:h-16 sm:w-56">
+    <div role="img" aria-label={t.ui.aiHand(n)} className="relative h-14 w-36 [clip-path:inset(0_-100vw_-100vh_-100vw)] sm:h-20 sm:w-68">
       {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="absolute top-0 left-1/2 w-9 origin-bottom sm:w-13"
+        <div key={i} className="absolute top-0 left-1/2 w-10 origin-bottom sm:w-16"
           style={{ transform: `translate(-50%, -38%) translateX(${(i - mid) * 62}%) rotate(${(mid - i) * 6}deg) translateY(${-Math.abs(i - mid) * 4}%)` }}>
           <CardBack />
         </div>
@@ -785,17 +842,17 @@ function ItemOption({ k, m, t, icon, picked, disabled, onPick }: { k: ItemKey; m
 }
 
 /** Itens comprados (seus ou da IA): ícones pequenos, com o texto e o alvo numa caixa no hover/foco/toque. A compra da IA só aparece no fim do turno. */
-function ItemSlot({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string }) {
+function ItemSlot({ s, m, t, icons, on, big }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string; big?: boolean }) {
   const [open, setOpen] = useState(false);
   const list = [...m.owned[s], ...(s === "p" && m.buying.p ? [m.buying.p] : [])];
   const who = s === "p" ? t.shop.mine : t.shop.ai;
   if (!list.length) {
     return (
       <span data-item-slot={s} title={`${who}: ${t.shop.hidden}`}
-        className="flex size-9 shrink-0 items-center justify-center rounded-md bg-zinc-950/70 font-display text-sm text-zinc-500">?</span>
+        className={`flex shrink-0 items-center justify-center rounded-md bg-zinc-950/70 font-display text-zinc-500 ${big ? "size-14 text-xl" : "size-9 text-sm"}`}>?</span>
     );
   }
-  const size = list.length > 1 ? "size-7" : "size-9";
+  const size = big ? (list.length > 1 ? "size-12" : "size-14") : list.length > 1 ? "size-7" : "size-9";
   return (
     <span className="relative shrink-0" data-item-slot={s}>
       <button type="button" onClick={() => setOpen((x) => !x)} onPointerEnter={(e) => { if (e.pointerType === "mouse") setOpen(true); }}

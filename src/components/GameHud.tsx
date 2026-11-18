@@ -14,7 +14,7 @@ const rnd = (seed: number) => {
  * Orbe de almas: as almas ganhas no começo do turno voam para dentro do orbe (como no Deadlock, quando você
  * coleta as almas de uma tropa), e as gastas saem dele. Sem almas, o orbe apaga.
  */
-export function SoulOrb({ n, label }: { n: number; label: string }) {
+export function SoulOrb({ n, label, big }: { n: number; label: string; /** Na lateral da tela larga. */ big?: boolean }) {
   const [prev, setPrev] = useState(n);
   const [burst, setBurst] = useState<{ id: number; d: number } | null>(null);
   if (n !== prev) {
@@ -24,7 +24,7 @@ export function SoulOrb({ n, label }: { n: number; label: string }) {
   const empty = n === 0;
   const count = burst ? Math.min(8, Math.abs(burst.d) * 2 + 1) : 0;
   return (
-    <div role="status" aria-label={label} className="relative grid size-16 shrink-0 place-items-center sm:size-20">
+    <div role="status" aria-label={label} className={`relative grid shrink-0 place-items-center ${big ? "size-28" : "size-16 sm:size-20"}`}>
       {/* brilho que respira enquanto há almas */}
       <motion.span aria-hidden="true" className="absolute inset-0 rounded-full bg-game-soul/35 blur-lg"
         animate={empty ? { opacity: 0 } : { opacity: [0.45, 0.9, 0.45] }} transition={empty ? { duration: 0.3 } : { duration: 2.6, repeat: Infinity, ease: "easeInOut" }} />
@@ -34,7 +34,7 @@ export function SoulOrb({ n, label }: { n: number; label: string }) {
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.b key={n} aria-hidden="true" initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }}
           transition={{ type: "spring", stiffness: 500, damping: 20 }}
-          className={`relative font-display text-3xl leading-none font-extrabold drop-shadow-[0_0_6px_var(--color-game-soul)] sm:text-4xl ${empty ? "text-zinc-400" : "text-white"}`}>
+          className={`relative font-display leading-none font-extrabold drop-shadow-[0_0_6px_var(--color-game-soul)] ${big ? "text-5xl" : "text-3xl sm:text-4xl"} ${empty ? "text-zinc-400" : "text-white"}`}>
           {n}
         </motion.b>
       </AnimatePresence>
@@ -67,28 +67,30 @@ type EndProps = {
   ready: boolean;
   disabled: boolean;
   describedBy?: string;
+  /** Na lateral da tela larga: ocupa a largura da coluna. */
+  big?: boolean;
   onClick: () => void;
 };
 
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text";
 
 /** Botão de fim do turno com o contador (o número vira como uma placa quando o turno muda). */
-export function EndTurnButton({ label, turn, total, busy, busyLabel, ready, disabled, describedBy, onClick }: EndProps) {
+export function EndTurnButton({ label, turn, total, busy, busyLabel, ready, disabled, describedBy, big, onClick }: EndProps) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} aria-describedby={describedBy} aria-label={`${busy ? busyLabel : label} · ${turn}/${total}`}
-      className={`group relative flex w-20 shrink-0 cursor-pointer flex-col items-center gap-0.5 rounded-2xl bg-linear-to-b from-amber-200 to-game-brass p-2 text-dl-black shadow-[0_0.4rem_1rem_rgb(0_0_0/0.6)] transition duration-150 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:from-zinc-500 disabled:to-zinc-700 disabled:text-zinc-200 sm:w-24 ${focus}`}>
+      className={`group relative flex shrink-0 cursor-pointer flex-col items-center gap-0.5 rounded-2xl bg-linear-to-b from-amber-200 to-game-brass p-2 text-dl-black shadow-[0_0.4rem_1rem_rgb(0_0_0/0.6)] transition duration-150 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:from-zinc-500 disabled:to-zinc-700 disabled:text-zinc-200 ${big ? "w-full max-w-40 py-4" : "w-20 sm:w-24"} ${focus}`}>
       {ready && !disabled && (
         <motion.span aria-hidden="true" className="pointer-events-none absolute -inset-1 rounded-2xl ring-4 ring-game-brass"
           animate={{ opacity: [0.2, 0.9, 0.2], scale: [1, 1.04, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }} />
       )}
-      <span className="text-[10px] leading-tight font-extrabold tracking-widest uppercase sm:text-xs">{busy ? busyLabel : label}</span>
-      <span className="relative flex h-8 items-center overflow-hidden font-display text-2xl leading-none font-extrabold perspective-[20rem] sm:h-9 sm:text-3xl">
+      <span className={`leading-tight font-extrabold tracking-widest uppercase ${big ? "text-sm" : "text-[10px] sm:text-xs"}`}>{busy ? busyLabel : label}</span>
+      <span className={`relative flex items-center overflow-hidden font-display leading-none font-extrabold perspective-[20rem] ${big ? "h-12 text-5xl" : "h-8 text-2xl sm:h-9 sm:text-3xl"}`}>
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span key={turn} initial={{ rotateX: -90, opacity: 0 }} animate={{ rotateX: 0, opacity: 1 }} exit={{ rotateX: 90, opacity: 0 }} transition={{ duration: 0.28 }}>
             {Math.min(turn, total)}
           </motion.span>
         </AnimatePresence>
-        <span className="text-base opacity-70 sm:text-lg">/{total}</span>
+        <span className={`opacity-70 ${big ? "text-2xl" : "text-base sm:text-lg"}`}>/{total}</span>
       </span>
     </button>
   );
