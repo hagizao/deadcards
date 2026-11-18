@@ -69,8 +69,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const t = useT(GAME_TEXT);
   const { players, settings } = useData();
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
-  // efeitos sonoros próprios das cartas (ajuste do Cardslock Game)
-  const tuned = useMemo(() => gameConfig(settings.game).cards, [settings.game]);
+  // efeitos sonoros enviados para os heróis (ajuste do Cardslock Game)
+  const tuned = useMemo(() => gameConfig(settings.game).heroes, [settings.game]);
   const [m, setM] = useState(newMatch);
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const icons = useItemIcons();
@@ -297,18 +297,15 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   };
 
   /**
-   * Toca os sons das habilidades que funcionaram desde a última vez (cada som uma vez, em sequência). A carta com
-   * efeito sonoro próprio (enviado no editor) toca o dela no lugar do som da habilidade.
+   * Toca os sons das habilidades que funcionaram desde a última vez (cada habilidade uma vez, em sequência). A
+   * habilidade de um herói com efeito sonoro enviado no editor toca o arquivo no lugar do som sintetizado.
    */
   const playHeard = (wait: number) => {
-    const sounds = new Map<string, () => void>();
-    for (const h of m.heard.splice(0)) {
-      const id = m.byId(h.id)?.p.id;
-      const own = id ? tuned[id]?.sound : undefined;
-      if (own) sounds.set(own, () => cardSfx(own));
-      else sounds.set(h.ab, () => abilitySfx(h.ab));
-    }
-    [...sounds.values()].slice(0, 4).forEach((play, i) => later(play, wait + i * 260));
+    const abs = [...new Set(m.heard.splice(0).map((h) => h.ab))].slice(0, 4);
+    abs.forEach((ab, i) => {
+      const own = tuned[ab]?.sound;
+      later(() => (own ? cardSfx(own) : abilitySfx(ab)), wait + i * 260);
+    });
   };
   /** Som (e tremor, nas pesadas) quando a carta revelada toca a mesa. */
   const land = (c: GCard) => {

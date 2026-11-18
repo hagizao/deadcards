@@ -73,18 +73,15 @@ const ring = "has-focus-visible:ring-2 has-focus-visible:ring-zinc-100 focus-vis
 const hear = (url: string | undefined, ab: AbilityKey) => (url ? void new Audio(url).play().catch(() => {}) : abilitySfx(ab));
 
 /**
- * Efeito sonoro próprio da carta: enviar (mp3, ogg, wav ou webm de até 1 MB), ouvir o atual (o que está salvo) e o
- * novo (o desta edição, antes de salvar), e voltar ao som da habilidade.
+ * Efeito sonoro do herói: enviar (mp3, ogg, wav ou webm de até 1 MB), ouvir o atual (o que está salvo) e o novo (o
+ * desta edição, antes de salvar), e voltar ao som sintetizado da habilidade.
  */
-function SoundPick({ url, saved, ab, savedAb, onUrl }: {
-  url?: string; saved?: string; ab: AbilityKey; savedAb: AbilityKey; onUrl: (url: string | undefined) => void;
-}) {
+function SoundPick({ url, saved, ab, onUrl }: { url?: string; saved?: string; ab: AbilityKey; onUrl: (url: string | undefined) => void }) {
   const [busy, setBusy] = useState(false);
-  const changed = url !== saved || (!url && ab !== savedAb);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button type="button" className={`${ghost} ${ring}`} onClick={() => hear(saved, savedAb)}>▶ Ouvir atual</button>
-      {changed && <button type="button" className={`${primary} ${ring}`} onClick={() => hear(url, ab)}>▶ Ouvir novo</button>}
+      <button type="button" className={`${ghost} ${ring}`} onClick={() => hear(saved, ab)}>▶ Ouvir atual</button>
+      {url !== saved && <button type="button" className={`${primary} ${ring}`} onClick={() => hear(url, ab)}>▶ Ouvir novo</button>}
       <label className={`${ghost} ${ring} inline-flex items-center gap-2 ${busy ? "cursor-wait opacity-50" : ""}`}>
         {busy ? "Enviando…" : url ? "Trocar som" : "Enviar som"}
         <input
@@ -102,8 +99,22 @@ function SoundPick({ url, saved, ab, savedAb, onUrl }: {
           }}
         />
       </label>
-      {url && <button type="button" className={`${ghost} ${ring}`} onClick={() => onUrl(undefined)}>Usar som da habilidade</button>}
+      {url && <button type="button" className={`${ghost} ${ring}`} onClick={() => onUrl(undefined)}>Usar som padrão</button>}
     </div>
+  );
+}
+
+/** Cabeçalho de uma caixa recolhível (`<details>`): título e a seta que vira ao abrir. */
+function Fold({ title }: { title: string }) {
+  return (
+    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-2 transition hover:bg-zinc-800/40 focus-visible:ring-2 focus-visible:ring-zinc-100 focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+      <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">{title}</h2>
+      <span className="flex items-center gap-2 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+        <span className="group-open/fold:hidden">Abrir</span>
+        <span className="hidden group-open/fold:inline">Recolher</span>
+        <span aria-hidden className="transition-transform group-open/fold:rotate-180 motion-reduce:transition-none">▾</span>
+      </span>
+    </summary>
   );
 }
 
@@ -772,9 +783,8 @@ function GameForm() {
   const card = shown.find((p) => p.id === cardId) ?? shown[0];
   const stats = card && cardStats(card, cfg.cards, cfg.heroes);
   // o que está salvo agora, para ouvir o som atual e comparar com o editado
-  const savedCfg = useMemo(() => gameConfig(settings.game), [settings.game]);
-  const savedCards = savedCfg.cards;
-  const savedStats = card && cardStats(card, savedCfg.cards, savedCfg.heroes);
+  const savedHeroes = useMemo(() => gameConfig(settings.game).heroes, [settings.game]);
+  const [soundHero, setSoundHero] = useState<AbilityKey>(HERO_KEYS[0]);
   const override = card ? cfg.cards[card.id] : undefined;
   const setCard = (patch: CardOverride) => {
     if (!card) return;
@@ -782,7 +792,6 @@ function GameForm() {
       const o: CardOverride = { ...c.cards[card.id], ...patch };
       if (!o.desc?.trim()) delete o.desc;
       if (o.v === undefined) delete o.v;
-      if (!o.sound) delete o.sound;
       return { ...c, cards: { ...c.cards, [card.id]: o } };
     });
   };
@@ -801,19 +810,14 @@ function GameForm() {
     if (o.cost === d?.cost) delete o.cost;
     if (o.prof === d?.prof) delete o.prof;
     if (o.base === d?.base) delete o.base;
+    if (!o.sound) delete o.sound;
     const heroes = { ...c.heroes, [k]: o };
     if (!Object.keys(o).length) delete heroes[k];
     return { ...c, heroes };
   });
-  // volta custo, poder, habilidade e texto ao padrão; o efeito sonoro enviado fica (ele sai só pelo botão dele)
   const resetCard = () => {
     if (!card) return;
-    setCfg((c) => {
-      const cards = { ...c.cards };
-      const sound = cards[card.id]?.sound;
-      if (sound) cards[card.id] = { sound }; else delete cards[card.id];
-      return { ...c, cards };
-    });
+    setCfg((c) => { const cards = { ...c.cards }; delete cards[card.id]; return { ...c, cards }; });
   };
 
   const save = () => {
@@ -925,17 +929,7 @@ function GameForm() {
                 <textarea className={`${input} min-h-16 resize-y`} rows={3} maxLength={DESC_MAX} placeholder={GT.abilities[stats.ab].text(stats.v)} value={override?.desc ?? ""} onChange={(e) => setCard({ desc: e.target.value })} />
               </Field>
               <p className="text-xs text-zinc-400">A descrição é só o texto da carta: quem decide o efeito é a habilidade escolhida. Em branco, usa o texto automático.</p>
-              <div className="flex flex-col gap-2 rounded-2xl bg-zinc-950/40 p-4">
-                <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Efeito sonoro</span>
-                <SoundPick url={override?.sound} saved={savedCards[card.id]?.sound} ab={stats.ab} savedAb={savedStats!.ab} onUrl={(sound) => setCard({ sound })} />
-                <p className="text-xs text-zinc-400">
-                  {override?.sound
-                    ? "Este som toca no lugar do som da habilidade quando a carta age."
-                    : "Sem som próprio: a carta usa o som da habilidade. Envie um mp3, ogg, wav ou webm curto, de até 1 MB."}
-                  {override?.sound !== savedCards[card.id]?.sound && <b className="text-game-brass"> Som alterado: salve o Cardslock Game para valer.</b>}
-                </p>
-              </div>
-              <div><button type="button" className={ghost} onClick={resetCard} disabled={!override || (Object.keys(override).length === 1 && !!override.sound)}>Voltar esta carta ao padrão</button></div>
+              <div><button type="button" className={ghost} onClick={resetCard} disabled={!override}>Voltar esta carta ao padrão</button></div>
             </div>
             <div className="flex flex-col items-center gap-3">
               <div className="relative h-60 w-44 overflow-hidden rounded-xl text-white ring-1 ring-white/40" style={{ background: `linear-gradient(160deg, ${card.c1}, ${card.c2})` }}>
@@ -954,7 +948,41 @@ function GameForm() {
       </section>
 
       <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
-        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Heróis</h2>
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Efeitos sonoros</h2>
+        <p className="text-xs text-zinc-400">
+          Escolha o herói e envie um mp3, ogg, wav ou webm curto, de até 1 MB: ele toca no lugar do som da habilidade sempre que uma carta com a habilidade desse herói age, em todas as versões.
+        </p>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2">
+          {HERO_KEYS.map((k) => {
+            const icon = heroIcon(k) ?? heroArt(k)?.url;
+            const on = k === soundHero;
+            const own = cfg.heroes[k]?.sound;
+            return (
+              <button key={k} type="button" aria-pressed={on} onClick={() => setSoundHero(k)}
+                className={`group relative flex min-h-11 cursor-pointer flex-col items-center gap-1 rounded-xl p-1.5 text-[10px] font-bold text-zinc-300 transition hover:bg-zinc-800/80 hover:text-white focus-visible:ring-2 focus-visible:ring-zinc-100 focus-visible:outline-none active:scale-95 ${on ? "bg-zinc-800 text-white ring-2 ring-game-brass" : "bg-zinc-950/60"}`}>
+                <span className="aspect-square w-full overflow-hidden rounded-lg bg-zinc-900">
+                  {icon && <img src={icon} alt="" className="size-full object-cover" />}
+                </span>
+                <span className="w-full truncate text-center">{k}</span>
+                {own && <span title="Som próprio" className="absolute top-1 right-1 rounded-full bg-game-brass px-1 text-[9px] text-dl-black">♪</span>}
+                {own !== savedHeroes[k]?.sound && <span className="sr-only">(alterado)</span>}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-col gap-2 rounded-2xl bg-zinc-950/40 p-4">
+          <span className="text-sm font-bold text-zinc-100">{soundHero} <span className="text-xs font-normal text-zinc-400">· {GT.abilities[soundHero].name}</span></span>
+          <SoundPick url={cfg.heroes[soundHero]?.sound} saved={savedHeroes[soundHero]?.sound} ab={soundHero} onUrl={(sound) => setHero(soundHero, { sound })} />
+          <p className="text-xs text-zinc-400">
+            {cfg.heroes[soundHero]?.sound ? "Som próprio enviado." : "Sem som próprio: usa o som padrão da habilidade."}
+            {cfg.heroes[soundHero]?.sound !== savedHeroes[soundHero]?.sound && <b className="text-game-brass"> Som alterado: salve o Cardslock Game para valer.</b>}
+          </p>
+        </div>
+      </section>
+
+      <details className="noir-glass group/fold rounded-3xl p-3">
+        <Fold title="Heróis" />
+        <div className="flex flex-col gap-4 px-2 pt-4 pb-2">
         <p className="text-xs text-zinc-400">
           O atributo principal define a Maestria da carta: abaixo de {MASTERY_AT[0]} é {GT.levels[0]}, de {MASTERY_AT[0]} a {MASTERY_AT[1] - 1} é {GT.levels[1]} e a partir de {MASTERY_AT[1]} é {GT.levels[2]} (libera a frase de Mestre).
         </p>
@@ -987,10 +1015,12 @@ function GameForm() {
             );
           })}
         </div>
-      </section>
+        </div>
+      </details>
 
-      <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
-        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Itens da loja</h2>
+      <details className="noir-glass group/fold rounded-3xl p-3">
+        <Fold title="Itens da loja" />
+        <div className="flex flex-col gap-4 px-2 pt-4 pb-2">
         <p className="text-xs text-zinc-400">
           Lojas nos rounds {SHOP_ROUNDS.map((r) => `${r} (tier ${SHOPS[r].join("/")})`).join(", ")}: cada lado pode comprar 1 entre 3 itens e mira uma carta com a seta (itens de ataque miram uma inimiga). O item age no fim do turno da compra. Item desligado não aparece no sorteio.
         </p>
@@ -1016,7 +1046,8 @@ function GameForm() {
             </div>
           </div>
         ))}
-      </section>
+        </div>
+      </details>
 
       <div className="noir-glass sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3">
         <button type="button" className={primary} disabled={busy} onClick={save}>{busy ? "Salvando…" : "Salvar"}</button>

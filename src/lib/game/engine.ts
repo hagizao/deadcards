@@ -342,7 +342,7 @@ export class Match {
   room = (l: Loc, s: Side) => l.s[s].length < this.cap(l);
   private idx = (l: Loc) => this.loc.indexOf(l);
   private all = () => this.loc.flatMap((l) => [...l.s.p, ...l.s.a]);
-  byId = (id: number | undefined) => (id === undefined ? null : this.all().find((x) => x.id === id) ?? null);
+  private byId = (id: number | undefined) => (id === undefined ? null : this.all().find((x) => x.id === id) ?? null);
   private foes = (c: GCard, l: Loc) => l.s[opp(c.side)].filter((x) => x.rev && !x.st.burrow);
   immune = (c: GCard) => !!c.st.immune || (c.st.immU ?? 0) >= this.t;
   /** Cartas que podem sofrer efeitos inimigos (sem imunidade nem imparáveis). */

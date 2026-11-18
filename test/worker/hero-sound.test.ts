@@ -10,13 +10,13 @@ const upload = (cookie: string, type: string, bytes: number) =>
     body: new Uint8Array(bytes),
   });
 
-const saveGame = (cookie: string, cards: unknown) =>
+const saveGame = (cookie: string, heroes: unknown) =>
   SELF.fetch("http://test/api/settings/game", {
     method: "PUT",
     headers: { cookie, origin: "http://test", "content-type": "application/json" },
-    body: JSON.stringify({ game: { locs: DEFAULT_LOCS, cards } }),
+    body: JSON.stringify({ game: { locs: DEFAULT_LOCS, heroes } }),
   });
-const cardsOf = async () => ((await (await SELF.fetch("http://test/api/data")).json()) as { settings: { game: { cards: Record<string, unknown> } } }).settings.game.cards;
+const heroesOf = async () => ((await (await SELF.fetch("http://test/api/data")).json()) as { settings: { game: { heroes: Record<string, unknown> } } }).settings.game.heroes;
 
 describe("Efeito sonoro da carta", () => {
   it("o admin envia um áudio curto e ele vai para o R2 em sounds/", async () => {
@@ -38,12 +38,13 @@ describe("Efeito sonoro da carta", () => {
     expect((await upload(user.cookie, "audio/mpeg", 2048)).status).toBe(403);
   });
 
-  it("o som fica no ajuste da carta do Cardslock Game e só aceita endereço de som enviado", async () => {
+  it("o som fica no ajuste do herói no Cardslock Game e só aceita endereço de som enviado", async () => {
     const { cookie } = await login("admvicli");
-    expect((await saveGame(cookie, { p1: { sound: "/img/sounds/abc-1.ogg" }, p2: { cost: 2, sound: "https://exemplo.com/som.mp3" }, p3: { sound: "/img/players/a.png" } })).status).toBe(200);
-    // o endereço de fora e a imagem caem; o resto do ajuste fica
-    expect(await cardsOf()).toEqual({ p1: { sound: "/img/sounds/abc-1.ogg" }, p2: { cost: 2 } });
+    const heroes = { Vindicta: { sound: "/img/sounds/abc-1.ogg" }, Haze: { cost: 2, sound: "https://exemplo.com/som.mp3" }, Abrams: { sound: "/img/players/a.png" }, Nada: { sound: "/img/sounds/x.mp3" } };
+    expect((await saveGame(cookie, heroes)).status).toBe(200);
+    // endereço de fora, imagem e herói que não existe caem; o resto do ajuste fica
+    expect(await heroesOf()).toEqual({ Vindicta: { sound: "/img/sounds/abc-1.ogg" }, Haze: { cost: 2 } });
     // o editor carrega a configuração salva por gameConfig e salva de volta: o som não pode se perder no caminho
-    expect(gameConfig({ locs: DEFAULT_LOCS, cards: await cardsOf() }).cards.p1).toEqual({ sound: "/img/sounds/abc-1.ogg" });
+    expect(gameConfig({ locs: DEFAULT_LOCS, heroes: await heroesOf() }).heroes.Vindicta).toEqual({ sound: "/img/sounds/abc-1.ogg" });
   });
 });
