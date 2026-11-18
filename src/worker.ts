@@ -27,8 +27,7 @@ const AUDIO_TYPES: Record<string, string> = { "audio/mpeg": "mp3", "audio/ogg": 
 const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_SOUND_BYTES = 1024 * 1024;
-const SOUND_URL = /^\/img\/sounds\/[\w-]+\.(mp3|ogg|wav|webm)$/;
-const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art", "heroPool", "sound"];
+const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art", "heroPool"];
 const ID_RE = /^[\w-]{1,64}$/;
 
 const keyOf = (url: unknown) => (typeof url === "string" && url.startsWith("/img/") ? url.slice(5) : null);
@@ -174,7 +173,6 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
         if (credit === null) return bad("crédito da arte inválido: nome até 60 caracteres e link http(s)");
         b.art = { ...b.art, credit };
       }
-      if (b.sound !== undefined && b.sound !== null && (typeof b.sound !== "string" || !SOUND_URL.test(b.sound))) return bad("efeito sonoro inválido");
       const extra = Object.fromEntries(PLAYER_EXTRA.filter((k) => b[k] !== undefined && b[k] !== null).map((k) => [k, b[k]]));
       await db.prepare(
         "INSERT INTO players (id, team_id, name, position, hero, stats_json, ovr, c1, c2, history_json, extra_json) VALUES (?,?,?,?,?,?,?,?,?,?,?) " +

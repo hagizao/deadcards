@@ -117,7 +117,10 @@ export const ability = (k: AbilityKey): AbilityDef => ABILITIES[k];
 /** Habilidade genérica de cada função quando o herói não tem habilidade própria. */
 export const ROLE_ABILITY: Record<string, AbilityKey> = { Carry: "self", OffCarry: "hit", Frontline: "aura", Suporte: "team", Flex: "draw" };
 
-export type CardOverride = { ab?: AbilityKey; cost?: number; power?: number; v?: number; desc?: string };
+/** `sound`: efeito sonoro próprio da carta (`/img/sounds/...`), tocado no lugar do som da habilidade. */
+export type CardOverride = { ab?: AbilityKey; cost?: number; power?: number; v?: number; desc?: string; sound?: string };
+/** Endereço de um efeito sonoro enviado pelo editor (R2, pasta sounds/). */
+export const SOUND_URL = /^\/img\/sounds\/[\w-]+\.(mp3|ogg|wav|webm)$/;
 export type ItemOverride = { off?: boolean; v?: number };
 /** Ajuste por herói: o atributo principal que define a Maestria, e o custo, o perfil e o poder base da carta. */
 export type HeroOverride = { stat?: StatKey; cost?: number; prof?: Profile; base?: number };
@@ -388,6 +391,7 @@ export function sanitizeOverride(raw: unknown): CardOverride {
   if (o.v !== undefined) r.v = clampInt(o.v, ABILITY_V_RANGE, 0);
   const desc = text(o.desc, DESC_MAX);
   if (desc) r.desc = desc;
+  if (typeof o.sound === "string" && SOUND_URL.test(o.sound)) r.sound = o.sound;
   return r;
 }
 

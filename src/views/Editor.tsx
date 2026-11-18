@@ -15,6 +15,7 @@ import {
 } from "../lib/game/config";
 import { cardPool } from "../lib/game/engine";
 import { GAME_TEXT } from "../lib/game/text";
+import { abilitySfx } from "../lib/game/heroSfx";
 
 const SECTIONS = [
   { id: "card", label: "Carta" },
@@ -68,11 +69,22 @@ function ImagePick({ folder, onUrl, label = "Enviar imagem" }: { folder: Paramet
 const MAX_SOUND_MB = 1;
 const ring = "has-focus-visible:ring-2 has-focus-visible:ring-zinc-100 focus-visible:ring-2 focus-visible:ring-zinc-100 focus-visible:outline-none active:scale-95";
 
-/** Efeito sonoro próprio da carta: enviar (mp3, ogg, wav ou webm de até 1 MB), ouvir e voltar ao som da habilidade. */
-function SoundPick({ url, onUrl }: { url?: string; onUrl: (url: string | undefined) => void }) {
+/** Toca um efeito: o arquivo enviado ou, sem ele, o som sintetizado da habilidade. */
+const hear = (url: string | undefined, ab: AbilityKey) => (url ? void new Audio(url).play().catch(() => {}) : abilitySfx(ab));
+
+/**
+ * Efeito sonoro próprio da carta: enviar (mp3, ogg, wav ou webm de até 1 MB), ouvir o atual (o que está salvo) e o
+ * novo (o desta edição, antes de salvar), e voltar ao som da habilidade.
+ */
+function SoundPick({ url, saved, ab, savedAb, onUrl }: {
+  url?: string; saved?: string; ab: AbilityKey; savedAb: AbilityKey; onUrl: (url: string | undefined) => void;
+}) {
   const [busy, setBusy] = useState(false);
+  const changed = url !== saved || (!url && ab !== savedAb);
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <button type="button" className={`${ghost} ${ring}`} onClick={() => hear(saved, savedAb)}>▶ Ouvir atual</button>
+      {changed && <button type="button" className={`${primary} ${ring}`} onClick={() => hear(url, ab)}>▶ Ouvir novo</button>}
       <label className={`${ghost} ${ring} inline-flex items-center gap-2 ${busy ? "cursor-wait opacity-50" : ""}`}>
         {busy ? "Enviando…" : url ? "Trocar som" : "Enviar som"}
         <input
@@ -90,12 +102,7 @@ function SoundPick({ url, onUrl }: { url?: string; onUrl: (url: string | undefin
           }}
         />
       </label>
-      {url && (
-        <>
-          <button type="button" className={`${ghost} ${ring}`} onClick={() => { new Audio(url).play().catch(() => {}); }}>▶ Ouvir</button>
-          <button type="button" className={`${ghost} ${ring}`} onClick={() => onUrl(undefined)}>Usar som da habilidade</button>
-        </>
-      )}
+      {url && <button type="button" className={`${ghost} ${ring}`} onClick={() => onUrl(undefined)}>Usar som da habilidade</button>}
     </div>
   );
 }
@@ -322,18 +329,6 @@ function PlayerForm({ editId, onEditId }: { editId: string | null; onEditId: (id
               </Field>
             </div>
           )}
-        </div>
-
-        <div className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Efeito sonoro da carta</span>
-            <SoundPick url={d.sound} onUrl={(sound) => set({ sound })} />
-          </div>
-          <p className="text-xs text-zinc-400">
-            {d.sound
-              ? "No Cardslock Game, este som toca no lugar do som da habilidade quando a carta age."
-              : "Sem som próprio: a carta usa o som da habilidade do herói. Envie um mp3, ogg, wav ou webm curto, de até 1 MB."}
-          </p>
         </div>
 
         <div className="space-y-3 rounded-2xl border border-amber-200/15 p-4">
@@ -776,6 +771,10 @@ function GameForm() {
   const shown = pool.filter((p) => !q || `${p.name} ${p.hero} ${p.position} ${GT.abilities[cardStats(p, cfg.cards, cfg.heroes).ab].name}`.toLowerCase().includes(q));
   const card = shown.find((p) => p.id === cardId) ?? shown[0];
   const stats = card && cardStats(card, cfg.cards, cfg.heroes);
+  // o que está salvo agora, para ouvir o som atual e comparar com o editado
+  const savedCfg = useMemo(() => gameConfig(settings.game), [settings.game]);
+  const savedCards = savedCfg.cards;
+  const savedStats = card && cardStats(card, savedCfg.cards, savedCfg.heroes);
   const override = card ? cfg.cards[card.id] : undefined;
   const setCard = (patch: CardOverride) => {
     if (!card) return;
@@ -783,6 +782,7 @@ function GameForm() {
       const o: CardOverride = { ...c.cards[card.id], ...patch };
       if (!o.desc?.trim()) delete o.desc;
       if (o.v === undefined) delete o.v;
+      if (!o.sound) delete o.sound;
       return { ...c, cards: { ...c.cards, [card.id]: o } };
     });
   };
@@ -805,9 +805,15 @@ function GameForm() {
     if (!Object.keys(o).length) delete heroes[k];
     return { ...c, heroes };
   });
+  // volta custo, poder, habilidade e texto ao padrão; o efeito sonoro enviado fica (ele sai só pelo botão dele)
   const resetCard = () => {
     if (!card) return;
-    setCfg((c) => { const cards = { ...c.cards }; delete cards[card.id]; return { ...c, cards }; });
+    setCfg((c) => {
+      const cards = { ...c.cards };
+      const sound = cards[card.id]?.sound;
+      if (sound) cards[card.id] = { sound }; else delete cards[card.id];
+      return { ...c, cards };
+    });
   };
 
   const save = () => {
@@ -919,7 +925,17 @@ function GameForm() {
                 <textarea className={`${input} min-h-16 resize-y`} rows={3} maxLength={DESC_MAX} placeholder={GT.abilities[stats.ab].text(stats.v)} value={override?.desc ?? ""} onChange={(e) => setCard({ desc: e.target.value })} />
               </Field>
               <p className="text-xs text-zinc-400">A descrição é só o texto da carta: quem decide o efeito é a habilidade escolhida. Em branco, usa o texto automático.</p>
-              <div><button type="button" className={ghost} onClick={resetCard} disabled={!override}>Voltar esta carta ao padrão</button></div>
+              <div className="flex flex-col gap-2 rounded-2xl bg-zinc-950/40 p-4">
+                <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Efeito sonoro</span>
+                <SoundPick url={override?.sound} saved={savedCards[card.id]?.sound} ab={stats.ab} savedAb={savedStats!.ab} onUrl={(sound) => setCard({ sound })} />
+                <p className="text-xs text-zinc-400">
+                  {override?.sound
+                    ? "Este som toca no lugar do som da habilidade quando a carta age."
+                    : "Sem som próprio: a carta usa o som da habilidade. Envie um mp3, ogg, wav ou webm curto, de até 1 MB."}
+                  {override?.sound !== savedCards[card.id]?.sound && <b className="text-game-brass"> Som alterado: salve o Cardslock Game para valer.</b>}
+                </p>
+              </div>
+              <div><button type="button" className={ghost} onClick={resetCard} disabled={!override || (Object.keys(override).length === 1 && !!override.sound)}>Voltar esta carta ao padrão</button></div>
             </div>
             <div className="flex flex-col items-center gap-3">
               <div className="relative h-60 w-44 overflow-hidden rounded-xl text-white ring-1 ring-white/40" style={{ background: `linear-gradient(160deg, ${card.c1}, ${card.c2})` }}>

@@ -67,8 +67,10 @@ export function Game() {
 
 function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: () => Match; deckLook?: DeckLook; /** Começa em tela cheia (ao clicar em Jogar). */ startFull?: boolean; onDeck: () => void }) {
   const t = useT(GAME_TEXT);
-  const { players } = useData();
+  const { players, settings } = useData();
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  // efeitos sonoros próprios das cartas (ajuste do Cardslock Game)
+  const tuned = useMemo(() => gameConfig(settings.game).cards, [settings.game]);
   const [m, setM] = useState(newMatch);
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const icons = useItemIcons();
@@ -302,7 +304,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     const sounds = new Map<string, () => void>();
     for (const h of m.heard.splice(0)) {
       const id = m.byId(h.id)?.p.id;
-      const own = id ? byId.get(id)?.sound : undefined;
+      const own = id ? tuned[id]?.sound : undefined;
       if (own) sounds.set(own, () => cardSfx(own));
       else sounds.set(h.ab, () => abilitySfx(h.ab));
     }

@@ -1,6 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { login } from "../helpers/fixtures";
+import { DEFAULT_LOCS, gameConfig } from "../../src/lib/game/config";
 
 const upload = (cookie: string, type: string, bytes: number) =>
   SELF.fetch("http://test/api/upload/sounds", {
@@ -9,14 +10,13 @@ const upload = (cookie: string, type: string, bytes: number) =>
     body: new Uint8Array(bytes),
   });
 
-async function savePlayer(cookie: string, sound: unknown) {
-  await env.DB.prepare("INSERT OR IGNORE INTO teams (id, name, tag) VALUES ('t1', 'Team', 'TM')").run();
-  return SELF.fetch("http://test/api/players/p1", {
+const saveGame = (cookie: string, cards: unknown) =>
+  SELF.fetch("http://test/api/settings/game", {
     method: "PUT",
     headers: { cookie, origin: "http://test", "content-type": "application/json" },
-    body: JSON.stringify({ name: "P", teamId: "t1", stats: {}, sound }),
+    body: JSON.stringify({ game: { locs: DEFAULT_LOCS, cards } }),
   });
-}
+const cardsOf = async () => ((await (await SELF.fetch("http://test/api/data")).json()) as { settings: { game: { cards: Record<string, unknown> } } }).settings.game.cards;
 
 describe("Efeito sonoro da carta", () => {
   it("o admin envia um áudio curto e ele vai para o R2 em sounds/", async () => {
@@ -38,16 +38,12 @@ describe("Efeito sonoro da carta", () => {
     expect((await upload(user.cookie, "audio/mpeg", 2048)).status).toBe(403);
   });
 
-  it("salva o som na carta e aceita só endereço de som enviado", async () => {
+  it("o som fica no ajuste da carta do Cardslock Game e só aceita endereço de som enviado", async () => {
     const { cookie } = await login("admvicli");
-    expect((await savePlayer(cookie, "/img/sounds/abc-1.ogg")).status).toBe(200);
-    const row = await env.DB.prepare("SELECT extra_json FROM players WHERE id = 'p1'").first<{ extra_json: string }>();
-    expect(JSON.parse(row!.extra_json).sound).toBe("/img/sounds/abc-1.ogg");
-    expect((await savePlayer(cookie, "https://exemplo.com/som.mp3")).status).toBe(400);
-    expect((await savePlayer(cookie, "/img/players/a.png")).status).toBe(400);
-    expect((await savePlayer(cookie, 5)).status).toBe(400);
-    expect((await savePlayer(cookie, undefined)).status).toBe(200);
-    const cleared = await env.DB.prepare("SELECT extra_json FROM players WHERE id = 'p1'").first<{ extra_json: string }>();
-    expect(JSON.parse(cleared!.extra_json).sound).toBeUndefined();
+    expect((await saveGame(cookie, { p1: { sound: "/img/sounds/abc-1.ogg" }, p2: { cost: 2, sound: "https://exemplo.com/som.mp3" }, p3: { sound: "/img/players/a.png" } })).status).toBe(200);
+    // o endereço de fora e a imagem caem; o resto do ajuste fica
+    expect(await cardsOf()).toEqual({ p1: { sound: "/img/sounds/abc-1.ogg" }, p2: { cost: 2 } });
+    // o editor carrega a configuração salva por gameConfig e salva de volta: o som não pode se perder no caminho
+    expect(gameConfig({ locs: DEFAULT_LOCS, cards: await cardsOf() }).cards.p1).toEqual({ sound: "/img/sounds/abc-1.ogg" });
   });
 });
