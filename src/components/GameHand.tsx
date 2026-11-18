@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, useVelocity } from "motion/react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { GCard } from "../lib/game/engine";
+import { dropUnder as dropAt, pointOf } from "../lib/game/drop";
 import { sfx, slideSpeed, slideStart, slideStop } from "../lib/game/sfx";
 import { TipBoxes, type Tip } from "./GameCard";
 type Props = {
@@ -27,16 +28,6 @@ const TIP_W = 192;
 /** Parte da carta que fica à mostra; o resto afunda abaixo da borda e sobe no hover. */
 const SHOW = 0.62;
 const TOP = 8;
-
-/** Local (`data-drop`) sob o ponto da tela. */
-function dropAt(x: number, y: number): number | null {
-  for (const el of document.elementsFromPoint(x, y)) {
-    const v = (el as HTMLElement).dataset?.drop;
-    if (v !== undefined) return Number(v);
-  }
-  return null;
-}
-const pointOf = (e: MouseEvent | TouchEvent | PointerEvent) => ("clientX" in e ? { x: e.clientX, y: e.clientY } : { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY });
 
 export function GameHand(p: Props) {
   const [cw, setCw] = useState(0);
@@ -93,7 +84,7 @@ export function GameHand(p: Props) {
             <motion.div key={c.id} className="absolute origin-bottom" style={{ top: TOP, left: cw / 2 - W / 2, width: W, zIndex: c.id === drag ? 60 : i === li ? 50 : i + 1 }}
               initial={p.deal ? { x: pose(i).x, y: boxH + H, rotate: 0, opacity: 0 } : { x: cw / 2, y: -H, rotate: 25, opacity: 0 }}
               animate={{ ...pose(i), opacity: 1 }} exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.18 } }}
-              transition={p.deal ? { type: "spring", stiffness: 140, damping: 20, delay: p.deal.at + i * p.deal.step } : { type: "spring", stiffness: 380, damping: 30 }}>
+              transition={p.deal ? { type: "spring", stiffness: 190, damping: 22, delay: p.deal.at + i * p.deal.step } : { type: "spring", stiffness: 380, damping: 30 }}>
               <HandCard c={c} p={p} zoomed={i === li} dragging={c.id === drag}
                 onHover={(on) => setHover((h) => (on ? c.id : h === c.id ? null : h))}
                 onDragState={(on) => { setDrag(on ? c.id : null); if (on) setHover(null); }} />

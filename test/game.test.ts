@@ -597,14 +597,16 @@ describe("balanceamento das habilidades", () => {
     return c;
   };
 
-  it("teto de remoção: a Wraith só ergue inimigas com até 2 × o custo dela", () => {
+  it("a Wraith ergue a inimiga mais forte daqui, sem teto de remoção", () => {
     const { m, put } = arena();
     const big = dummy(put, "a", 0, 20);
     const mid = dummy(put, "a", 0, 9);
     const w = put(pc("w", "Wraith", flat(70)), "p", 0);
     expect(w.cost).toBe(7);
-    expect(m.pow(big)).toBe(20);
-    expect(m.pow(mid)).toBe(0);
+    expect(m.pow(big)).toBe(0);
+    expect(m.pow(mid)).toBe(9);
+    // erguida conta como 0, mas não é eliminada
+    expect(m.locOf(big)).toBeTruthy();
   });
 
   it("Lady Geist troca no máximo o valor da habilidade", () => {
@@ -1123,7 +1125,7 @@ describe("locais novos", () => {
   it("Vida limpa o dano; Cemitério devolve quem ficou com 0", () => {
     const heal = at("heal");
     const c = heal.card("p", 5);
-    c.bonus = -3; c.st.tmp.push({ v: -2, u: 99 });
+    c.bonus = -2; c.st.tmp.push({ v: -2, u: 99 });
     heal.m.endOfTurn();
     expect(heal.m.pow(c, heal.L)).toBe(5);
     const grave = at("grave");
@@ -1209,5 +1211,44 @@ describe("Kelvin e Metrô", () => {
     expect(rat).toBeTruthy();
     expect(m.loc.slice(1).every((l) => !l.s.p.some((c) => c.tok))).toBe(true);
     expect((m as unknown as Priv2).movable(rat!, metro, m.loc[1], true)).toBe(false);
+  });
+});
+
+describe("poder zerado e origem dos efeitos", () => {
+  const dummy = (put: ReturnType<typeof arena>["put"], side: Side, li: number, power: number, id: string) => {
+    const c = put(pc(id, "Herói Novo", flat(70)), side, li);
+    c.ab = "none"; c.base = power; c.bonus = 0;
+    return c;
+  };
+
+  it("carta reduzida a 0 é eliminada; a Vindicta que zera não cai do céu", () => {
+    const { m, put, mk } = arena();
+    const rat = dummy(put, "a", 1, 1, "rat");
+    const v = mk(pc("v", "Vindicta", flat(70)), "p");
+    m.loc[0].s.p.push(v);
+    const before = v.base + v.bonus;
+    m.act({ c: v, l: m.loc[0] });
+    expect(m.locOf(rat)).toBeUndefined();
+    expect(m.pow(v)).toBe(before);
+    expect(m.log.some((e) => e.k === "zero")).toBe(true);
+  });
+
+  it("entocada, erguida ou com 0 impresso não é eliminada", () => {
+    const { m, put } = arena();
+    const zero = dummy(put, "p", 0, 0, "z");
+    const mk = put(pc("mk", "Mo & Krill", flat(70)), "p", 1);
+    m.endOfTurn();
+    expect(m.locOf(zero)).toBeTruthy();
+    expect(m.locOf(mk)).toBeTruthy();
+  });
+
+  it("a caixa do poder mostra cada efeito com a origem", () => {
+    const { m, put } = arena();
+    const t = dummy(put, "p", 0, 12, "t");
+    const pocket = put(pc("pk", "Pocket", flat(70)), "a", 0);
+    const parts = m.powParts(t);
+    expect(parts).toContainEqual(expect.objectContaining({ k: "from", n: pocket.p.name, v: -pocket.v }));
+    expect(parts.reduce((a, x) => a + x.v, 0)).toBe(m.pow(t));
+    expect(parts.some((x) => x.k === "bonus")).toBe(false);
   });
 });

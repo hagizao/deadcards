@@ -186,23 +186,23 @@
 
 /* Cardslock Game: abertura da mesa. Cada peça entra no seu tempo (--d) e fica escondida até lá (fill both). */
 @utility intro-drop {
-  animation: intro-drop 1s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
+  animation: intro-drop 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
   @media (prefers-reduced-motion: reduce) { animation: none; }
 }
 @utility intro-up {
-  animation: intro-up 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
+  animation: intro-up 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
   @media (prefers-reduced-motion: reduce) { animation: none; }
 }
 @utility intro-left {
-  animation: intro-left 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
+  animation: intro-left 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
   @media (prefers-reduced-motion: reduce) { animation: none; }
 }
 @utility intro-right {
-  animation: intro-right 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
+  animation: intro-right 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
   @media (prefers-reduced-motion: reduce) { animation: none; }
 }
 @utility intro-pop {
-  animation: intro-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) var(--d, 0s) both;
+  animation: intro-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) var(--d, 0s) both;
   @media (prefers-reduced-motion: reduce) { animation: none; }
 }
 @keyframes intro-drop { from { opacity: 0; transform: translateY(-3rem) scale(1.06); } }
@@ -225,4 +225,16 @@
   40% { opacity: 1; }
   48% { opacity: 0.85; }
   100% { transform: translate(5%, 3%); opacity: 0.95; }
+}
+
+/* Cardslock Game: carta da mesa que pode ser movida treme de leve, convidando a arrastar. */
+@utility card-jiggle {
+  animation: card-jiggle 0.55s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) { animation: none; }
+}
+@keyframes card-jiggle {
+  0%, 100% { transform: rotate(-1.4deg); }
+  25% { transform: rotate(1.2deg) translateY(-1px); }
+  50% { transform: rotate(-0.9deg); }
+  75% { transform: rotate(1.4deg) translateY(-1px); }
 }

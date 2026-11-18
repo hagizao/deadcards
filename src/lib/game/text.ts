@@ -46,7 +46,7 @@ export type GameText = {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
     turn: (t: number, total: number) => string; phase: (p: number) => string; phaseHint: string; prio: (me: boolean) => string; prioHint: string; record: (w: number, l: number) => string; souls: (n: number) => string; players: string; decks: string; comanda: { title: string; table: (n: number) => string; item: string; value: string };
     /** Caixa que explica o poder da carta na mesa, parte por parte. */
-    powParts: { title: (v: number) => string; base: string; bonus: string; tmp: string; from: (n: string) => string; ab: (a: string) => string; loc: (l: string) => string; stun: string; burrow: string; floor: string };
+    powParts: { title: (v: number) => string; base: string; bonus: string; tmp: string; from: (n: string) => string; ab: (a: string) => string; loc: (l: string) => string; item: (i: string) => string; burn: string; trap: string; hook: string; duel: string; mentor: string; move: string; brief: (s: string) => string; stun: string; burrow: string; floor: string };
     endTurn: string; closeTab: string; newMatch: string; again: string; viewBoard: string; hint: string; hiddenLoc: string; revealsOn: (t: number) => string; next: (name: string) => string;
     cost: string; power: string; silenced: string; noAbility: string; tokenDesc: string; hand: string; arena: string;
     win: string; loss: string; draw: string; summary: (w: number, l: number, me: number, ai: number) => string; patron: string;
@@ -177,7 +177,7 @@ export const GAME_TEXT = strings<GameText>({
       clock: { label: "Fim do turno em dobro", text: () => "Efeitos “Fim do turno” de cartas aqui acontecem duas vezes." },
       hotel: { label: "Check-in", text: (o) => `No fim do turno ${o.n}, a carta mais fraca de cada lado aqui volta para a mão do dono.` },
       late: { label: "Revela tarde", text: (o) => `Cartas jogadas aqui só se revelam no fim do turno ${o.n}.` },
-      rats: { label: "Ratos", text: (o) => `No fim de cada turno, um Rato de ${o.v} aparece aqui do lado de quem tem menos cartas. Ele não sai do Metrô.` },
+      rats: { label: "Ratos", text: (o) => `No fim de cada turno, um Rato de ${o.v} aparece aqui do lado de quem tem menos cartas.` },
       museum: { label: "Roubo", text: (o) => `Cada carta jogada aqui tem ${o.n}% de chance de voltar para a mão ao revelar.` },
       nofx: { label: "Sem efeitos", text: () => "Habilidades de cartas não funcionam aqui." },
       hoop: { label: "Cesta de 3", text: (o) => `Cada carta revelada aqui tem ${o.n}% de chance de ganhar ${sg(o.v)}.` },
@@ -263,6 +263,7 @@ export const GAME_TEXT = strings<GameText>({
       back: (e, n) => `${n(e.c)} voltou para a mão (${e.loc}).`,
       burnt: (e, n) => `Mão cheia: ${n(e.c)} queimou e saiu da partida.`,
       gone: (e, n) => `${n(e.c)} foi destruída em ${e.loc}.`,
+      zero: (e, n) => `${n(e.c)} chegou a 0 e foi eliminada em ${e.loc}.`,
       hoop: (e, n) => `${n(e.c)} acertou a cesta de 3!`,
       copy: (e, n) => `${n(e.c)} ganhou uma cópia em ${e.loc}.`,
       ratLoc: (e) => `Um Rato apareceu em ${e.loc}.`,
@@ -359,7 +360,7 @@ export const GAME_TEXT = strings<GameText>({
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
       needCards: (n) => `Cadastre pelo menos ${n} cartas para jogar.`, you: "Você: Rei Oculto", ai: "IA: Arquimãe",
       turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 a 3 · Mid: 4 a 6 (cartas sobem para Profissional) · Late: 7 e 8 (Mestre e ultimates).", prio: (me) => `Prioridade: ${me ? "você" : "IA"}`, prioHint: "Quem tem prioridade revela primeiro. No turno 1 é o Rei Oculto; depois, quem estiver ganhando a partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, players: "Almas e itens", decks: "Baralhos e fim do turno", comanda: { title: "Comanda", table: (n) => `Mesa ${n}`, item: "Item", value: "Almas" },
-      powParts: { title: (v) => `Poder ${v}: de onde vem`, base: "Poder base", bonus: "Efeitos e itens recebidos", tmp: "Efeitos deste turno", from: (n) => `Efeito de ${n}`, ab: (a) => `Habilidade: ${a}`, loc: (l) => `Local: ${l}`, stun: "Erguida: 0 de poder neste turno", burrow: "Entocada: 0 de poder até o fim da partida", floor: "O poder nunca fica abaixo de 0." },
+      powParts: { title: (v) => `Poder ${v}: de onde vem`, base: "Poder base", bonus: "Efeitos e itens recebidos", tmp: "Efeitos deste turno", from: (n) => `Efeito de ${n}`, ab: (a) => `Habilidade: ${a}`, loc: (l) => `Local: ${l}`, item: (i) => `Item: ${i}`, burn: "Queimadura", trap: "Armadilha", hook: "Gancho do Bebop", duel: "Duelo de espelho", mentor: "Mentoria", move: "Movimento", brief: (s) => `${s} (até o fim do próximo turno)`, stun: "Erguida pela Wraith: conta como 0", burrow: "Entocada: conta como 0 até o fim da partida", floor: "O poder nunca fica abaixo de 0." },
       endTurn: "Fim do turno", closeTab: "Fechar a conta", newMatch: "Nova partida", again: "Jogar de novo", viewBoard: "Ver tabuleiro",
       hint: "Arraste uma carta até um local para jogar (ou toque nela e depois no local). Passe o mouse para ler.", hiddenLoc: "Local oculto", revealsOn: (t) => `Revela no turno ${t}`, next: (name) => `Próxima carta: ${name}`,
       cost: "custo", power: "poder", silenced: "habilidade anulada", noAbility: "Sem habilidade.", tokenDesc: "Ficha criada por uma habilidade.",
@@ -497,7 +498,7 @@ export const GAME_TEXT = strings<GameText>({
       clock: { label: "Double end of turn", text: () => "“End of turn” effects of cards here happen twice." },
       hotel: { label: "Check-in", text: (o) => `At the end of turn ${o.n}, the weakest card on each side here returns to its owner's hand.` },
       late: { label: "Late reveal", text: (o) => `Cards played here only reveal at the end of turn ${o.n}.` },
-      rats: { label: "Rats", text: (o) => `At the end of each turn, a ${o.v}-power Rat appears here on the side with fewer cards. It never leaves this location.` },
+      rats: { label: "Rats", text: (o) => `At the end of each turn, a ${o.v}-power Rat appears here on the side with fewer cards.` },
       museum: { label: "Heist", text: (o) => `Each card played here has a ${o.n}% chance to return to hand when revealed.` },
       nofx: { label: "No effects", text: () => "Card abilities don't work here." },
       hoop: { label: "Three-pointer", text: (o) => `Each card revealed here has a ${o.n}% chance to get ${sg(o.v)}.` },
@@ -583,6 +584,7 @@ export const GAME_TEXT = strings<GameText>({
       back: (e, n) => `${n(e.c)} returned to hand (${e.loc}).`,
       burnt: (e, n) => `Hand full: ${n(e.c)} burned and left the match.`,
       gone: (e, n) => `${n(e.c)} was destroyed at ${e.loc}.`,
+      zero: (e, n) => `${n(e.c)} hit 0 and was eliminated at ${e.loc}.`,
       hoop: (e, n) => `${n(e.c)} hit a three-pointer!`,
       copy: (e, n) => `${n(e.c)} got a copy at ${e.loc}.`,
       ratLoc: (e) => `A Rat showed up at ${e.loc}.`,
@@ -679,7 +681,7 @@ export const GAME_TEXT = strings<GameText>({
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
       needCards: (n) => `Add at least ${n} cards to play.`, you: "You: Hidden King", ai: "AI: Archmother",
       turn: (t, total) => `Turn ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 to 3 · Mid: 4 to 6 (cards rise to Pro) · Late: 7 and 8 (Master and ultimates).", prio: (me) => `Priority: ${me ? "you" : "AI"}`, prioHint: "Whoever has priority reveals first. On turn 1 it's the Hidden King; after that, whoever is winning the match.", record: (w, l) => `${w}W ${l}L`, souls: (n) => `${n} ${pl(n, "soul", "souls")}`, players: "Souls and items", decks: "Decks and end turn", comanda: { title: "Bar tab", table: (n) => `Table ${n}`, item: "Item", value: "Souls" },
-      powParts: { title: (v) => `Power ${v}: where it comes from`, base: "Base power", bonus: "Effects and items received", tmp: "Effects this turn", from: (n) => `Effect from ${n}`, ab: (a) => `Ability: ${a}`, loc: (l) => `Location: ${l}`, stun: "Lifted: 0 power this turn", burrow: "Burrowed: 0 power until the end of the match", floor: "Power never goes below 0." },
+      powParts: { title: (v) => `Power ${v}: where it comes from`, base: "Base power", bonus: "Effects and items received", tmp: "Effects this turn", from: (n) => `Effect from ${n}`, ab: (a) => `Ability: ${a}`, loc: (l) => `Location: ${l}`, item: (i) => `Item: ${i}`, burn: "Burn", trap: "Trap", hook: "Bebop's hook", duel: "Mirror duel", mentor: "Mentoring", move: "Movement", brief: (s) => `${s} (until the end of next turn)`, stun: "Lifted by Wraith: counts as 0", burrow: "Burrowed: counts as 0 until the end of the match", floor: "Power never goes below 0." },
       endTurn: "End turn", closeTab: "Close the tab", newMatch: "New match", again: "Play again", viewBoard: "View board",
       hint: "Drag a card onto a location to play it (or tap it, then the location). Hover to read.", hiddenLoc: "Hidden location", revealsOn: (t) => `Reveals on turn ${t}`, next: (name) => `Next card: ${name}`,
       cost: "cost", power: "power", silenced: "ability canceled", noAbility: "No ability.", tokenDesc: "Token created by an ability.",
@@ -817,7 +819,7 @@ export const GAME_TEXT = strings<GameText>({
       clock: { label: "Fin de turno doble", text: () => "Los efectos “Fin del turno” de las cartas aquí ocurren dos veces." },
       hotel: { label: "Check-in", text: (o) => `Al final del turno ${o.n}, la carta más débil de cada lado aquí vuelve a la mano de su dueño.` },
       late: { label: "Revela tarde", text: (o) => `Las cartas jugadas aquí solo se revelan al final del turno ${o.n}.` },
-      rats: { label: "Ratas", text: (o) => `Al final de cada turno, aparece aquí una Rata de ${o.v} del lado con menos cartas. Nunca sale de este lugar.` },
+      rats: { label: "Ratas", text: (o) => `Al final de cada turno, aparece aquí una Rata de ${o.v} del lado con menos cartas.` },
       museum: { label: "Robo", text: (o) => `Cada carta jugada aquí tiene ${o.n}% de probabilidad de volver a la mano al revelarse.` },
       nofx: { label: "Sin efectos", text: () => "Las habilidades de las cartas no funcionan aquí." },
       hoop: { label: "Triple", text: (o) => `Cada carta revelada aquí tiene ${o.n}% de probabilidad de ganar ${sg(o.v)}.` },
@@ -903,6 +905,7 @@ export const GAME_TEXT = strings<GameText>({
       back: (e, n) => `${n(e.c)} volvió a la mano (${e.loc}).`,
       burnt: (e, n) => `Mano llena: ${n(e.c)} se quemó y salió de la partida.`,
       gone: (e, n) => `${n(e.c)} fue destruida en ${e.loc}.`,
+      zero: (e, n) => `${n(e.c)} llegó a 0 y fue eliminada en ${e.loc}.`,
       hoop: (e, n) => `¡${n(e.c)} encestó un triple!`,
       copy: (e, n) => `${n(e.c)} recibió una copia en ${e.loc}.`,
       ratLoc: (e) => `Apareció una Rata en ${e.loc}.`,
@@ -999,7 +1002,7 @@ export const GAME_TEXT = strings<GameText>({
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",
       needCards: (n) => `Registra al menos ${n} cartas para jugar.`, you: "Tú: Rey Oculto", ai: "IA: Archimadre",
       turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rondas 1 a 3 · Mid: 4 a 6 (las cartas suben a Profesional) · Late: 7 y 8 (Maestro y ultimates).", prio: (me) => `Prioridad: ${me ? "tú" : "IA"}`, prioHint: "Quien tiene la prioridad revela primero. En el turno 1 es el Rey Oculto; después, quien vaya ganando la partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, players: "Almas y objetos", decks: "Mazos y fin del turno", comanda: { title: "Comanda", table: (n) => `Mesa ${n}`, item: "Objeto", value: "Almas" },
-      powParts: { title: (v) => `Poder ${v}: de dónde viene`, base: "Poder base", bonus: "Efectos y objetos recibidos", tmp: "Efectos de este turno", from: (n) => `Efecto de ${n}`, ab: (a) => `Habilidad: ${a}`, loc: (l) => `Lugar: ${l}`, stun: "Levantada: 0 de poder este turno", burrow: "Enterrada: 0 de poder hasta el final de la partida", floor: "El poder nunca baja de 0." },
+      powParts: { title: (v) => `Poder ${v}: de dónde viene`, base: "Poder base", bonus: "Efectos y objetos recibidos", tmp: "Efectos de este turno", from: (n) => `Efecto de ${n}`, ab: (a) => `Habilidad: ${a}`, loc: (l) => `Lugar: ${l}`, item: (i) => `Objeto: ${i}`, burn: "Quemadura", trap: "Trampa", hook: "Gancho de Bebop", duel: "Duelo de espejo", mentor: "Mentoría", move: "Movimiento", brief: (s) => `${s} (hasta el final del próximo turno)`, stun: "Levantada por Wraith: cuenta como 0", burrow: "Enterrada: cuenta como 0 hasta el final de la partida", floor: "El poder nunca baja de 0." },
       endTurn: "Fin del turno", closeTab: "Pedir la cuenta", newMatch: "Nueva partida", again: "Jugar de nuevo", viewBoard: "Ver tablero",
       hint: "Arrastra una carta a un lugar para jugarla (o tócala y luego el lugar). Pasa el ratón para leer.", hiddenLoc: "Lugar oculto", revealsOn: (t) => `Se revela en el turno ${t}`, next: (name) => `Próxima carta: ${name}`,
       cost: "coste", power: "poder", silenced: "habilidad anulada", noAbility: "Sin habilidad.", tokenDesc: "Ficha creada por una habilidad.",

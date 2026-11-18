@@ -24,9 +24,16 @@ export type Token = "pigeon" | "ghoul" | "turret" | "rat" | "illusion";
 export type CardFace = { id?: string; name: string; hero: string | null; c1: string; c2: string; token?: Token; role?: string };
 /** Nome para o log: texto do jogador ou ficha (traduzida na tela). */
 export type Name = string | { token: Token };
+const nameKey = (n?: Name) => (typeof n === "object" ? `#${n.token}` : n);
+
+/** De onde veio um efeito no poder: carta, item, local ou mecânica da partida. */
+export type Cause = { k: "from" | "item" | "loc" | "burn" | "trap" | "hook" | "duel" | "mentor" | "move"; n?: Name; item?: ItemKey; loc?: string };
 
 type Status = {
-  tmp: { v: number; u: number }[];
+  /** Perdas e ganhos temporários; `src` diz de onde vieram. */
+  tmp: { v: number; u: number; src?: Cause }[];
+  /** Histórico do bônus permanente por origem (soma = bonus), para explicar o número da mesa. */
+  fx?: (Cause & { v: number })[];
   burrow?: boolean; stun?: number; immune?: boolean; immU?: number; rip?: number; ripV?: number; chained?: boolean; silenced?: boolean; silU?: number;
   burn?: number; tburn?: { v: number; u: number }[]; vuln?: number; sleep?: number; root?: number; petri?: boolean; unstop?: boolean;
   /** Rato do Metrô: fica preso no Metrô (não se move nem troca de local). */
@@ -72,7 +79,7 @@ export type Act = { c: GCard; l: Loc; exec?: boolean };
 export type ChoiceSpec = { card?: "here" | "any"; loc?: boolean };
 
 /** Uma parte do poder da carta: de onde veio e quanto soma. */
-export type PowPart = { k: "base" | "bonus" | "tmp" | "from" | "ab" | "loc" | "stun" | "burrow"; v: number; n?: Name; ab?: AbilityKey; loc?: string };
+export type PowPart = { k: "base" | "bonus" | "tmp" | "ab" | "stun" | "burrow" | Cause["k"]; v: number; n?: Name; ab?: AbilityKey; loc?: string; item?: ItemKey; tmp?: boolean };
 export type LogEntry = { k: LogKey; c?: Name; t?: Name; a?: Name; loc?: string; v?: number; n?: number; ab?: AbilityKey; side?: Side; item?: ItemKey };
 export type LogKey =
   | "riposte" | "push" | "wall" | "pigeon" | "hook" | "chain" | "calico" | "celeste" | "danny" | "drifter" | "dynamo" | "owl" | "owlBonus"
@@ -80,7 +87,7 @@ export type LogKey =
   | "paradox" | "pocket" | "rats" | "rem" | "storm" | "shiv" | "mark" | "wolf" | "illusion" | "portal" | "trap" | "vindicta" | "fall"
   | "cube" | "petrify" | "wraith" | "liftEnd" | "yamato" | "chanEnd" | "extraSouls" | "hookPull" | "trapHit" | "urn" | "boss" | "zipline"
   | "item" | "itemLost" | "shop" | "prio" | "phase" | "comeback" | "bounty" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves"
-  | "back" | "burnt" | "gone" | "hoop" | "copy" | "ratLoc" | "bell" | "bet" | "smoke" | "stock";
+  | "back" | "burnt" | "gone" | "hoop" | "copy" | "ratLoc" | "bell" | "bet" | "smoke" | "stock" | "zero";
 
 export type Result = { outcome: "win" | "loss" | "draw"; won: number; lost: number; myPower: number; aiPower: number; patron: boolean };
 export type PlayError = "souls" | "frozen" | "full" | "closed" | "minCost";
@@ -207,7 +214,10 @@ export class Match {
   extra: Record<Side, number> = { p: 0, a: 0 };
   /** Gancho do Bebop armado contra cada lado: local de destino e se é de Mestre. */
   hook: Record<Side, { i: number; m: boolean } | null> = { p: null, a: null };
-  pend: { t: number; f: () => void }[] = [];
+  pend: { t: number; f: () => void; cause?: Cause }[] = [];
+  /** Origens em execução (a de dentro vale) e o bônus de cada carta quando cada uma começou. */
+  private causes: Cause[] = [];
+  private snaps: Map<GCard, { b: number; st: Status }>[] = [];
   /** Portais do Doorman: no turno t, as cartas do lado podem viajar entre os locais a e b. */
   portals: { side: Side; a: number; b: number; t: number; bonus: number; n: number }[] = [];
   log: LogEntry[] = [];
@@ -275,7 +285,26 @@ export class Match {
   private N = (c: GCard): Name => (c.p.token ? { token: c.p.token } : c.p.name);
   private say(e: LogEntry) { this.log.unshift(e); this.log.length = Math.min(this.log.length, 3); }
   private handOf = (s: Side) => (s === "p" ? this.hand : this.ahand);
-  private later(f: () => void, t = this.t + 1) { this.pend.push({ t, f }); }
+  private later(f: () => void, t = this.t + 1) { this.pend.push({ t, f, cause: this.causes.at(-1) }); }
+  private by = (c: GCard): Cause => ({ k: "from", n: this.N(c) });
+  /** Roda `f` atribuindo à origem `cause` o que mudar no bônus das cartas da mesa (para a caixa "de onde vem"). */
+  private as<T>(cause: Cause, f: () => T): T {
+    const snap = new Map(this.all().map((c) => [c, { b: c.bonus, st: c.st }]));
+    this.causes.push(cause);
+    this.snaps.push(snap);
+    try { return f(); } finally {
+      this.causes.pop();
+      this.snaps.pop();
+      snap.forEach((s, c) => {
+        const d = c.bonus - s.b;
+        // carta que virou outra (Pombo) ou voltou para a mão recomeça o histórico
+        if (!d || c.st !== s.st) return;
+        (c.st.fx ??= []).push({ ...cause, v: d });
+        // o que já foi atribuído aqui dentro não conta de novo para as origens de fora
+        this.snaps.forEach((o) => { const x = o.get(c); if (x) x.b += d; });
+      });
+    }
+  }
 
   locOf = (c: GCard) => this.loc.find((l) => l.s[c.side].includes(c));
   live = (l: Loc) => l.rev;
@@ -324,12 +353,19 @@ export class Match {
   powParts(c: GCard, l?: Loc): PowPart[] {
     l = l ?? this.locOf(c);
     const out: PowPart[] = [{ k: "base", v: c.base }];
-    if (c.bonus) out.push({ k: "bonus", v: c.bonus });
-    if (!l) return out;
-    if (c.st.burrow && !this.final) return [{ k: "burrow", v: 0 }];
-    if ((c.st.stun ?? 0) >= this.t) return [{ k: "stun", v: 0 }];
-    const tmp = c.st.tmp.reduce((a, m) => (this.t <= m.u ? a + m.v : a), 0);
-    if (tmp) out.push({ k: "tmp", v: tmp });
+    // bônus permanente, um item por origem (o que sobrar sem origem conhecida vai junto em "bonus")
+    const add = (q: PowPart) => {
+      // efeito da própria carta aparece como a habilidade dela
+      const p: PowPart = q.k === "from" && nameKey(q.n) === nameKey(this.N(c)) ? { k: "ab", ab: c.ab, v: q.v, tmp: q.tmp } : q;
+      const same = out.find((x) => x.k === p.k && x.tmp === p.tmp && x.item === p.item && x.ab === p.ab && x.loc === p.loc && nameKey(x.n) === nameKey(p.n));
+      if (same) same.v += p.v; else out.push({ ...p });
+    };
+    const fx = c.st.fx ?? [];
+    fx.forEach((x) => add(x));
+    const rest = c.bonus - fx.reduce((a, x) => a + x.v, 0);
+    if (rest) add({ k: "bonus", v: rest });
+    if (!l) return out.filter((x) => x.v !== 0 || x.k === "base");
+    c.st.tmp.forEach((m) => { if (this.t <= m.u) add({ ...(m.src ?? { k: "tmp" }), v: m.v, tmp: true }); });
     l.s[c.side].forEach((o) => {
       if (o === c || !o.rev) return;
       const a = this.abilityOf(o);
@@ -355,7 +391,20 @@ export class Match {
     if (this.ty(l, "costHigh") && c.cost >= l.L.n) here(l.L.v);
     if (this.ty(l, "gun") && isGun(c)) here(l.L.v);
     if (this.ty(l, "crew")) here(l.L.v * l.s[c.side].filter((o) => o !== c && o.rev).length);
-    return out.filter((x) => x.v !== 0 || x.k === "base");
+    // entocada ou erguida: tudo acima conta, mas o total vira 0 (a parte mostra quanto foi anulado)
+    const zero = c.st.burrow && !this.final ? "burrow" : (c.st.stun ?? 0) >= this.t ? "stun" : null;
+    if (zero) out.push({ k: zero, v: -Math.max(0, out.reduce((a, x) => a + x.v, 0)) });
+    return out.filter((x) => x.v !== 0 || x.k === "base" || x.k === zero);
+  }
+  /** Zerada por efeitos (com algum poder impresso, sem estar entocada nem erguida): sai da partida. */
+  private zeroed = (c: GCard, l: Loc) => c.rev && c.base > 0 && !c.st.burrow && !((c.st.stun ?? 0) >= this.t) && this.pow(c, l) <= 0;
+  /** Elimina as cartas zeradas. No Cemitério, voltam para a mão em vez disso. */
+  private sweep() {
+    this.loc.forEach((l) => (["p", "a"] as Side[]).forEach((s) => [...l.s[s]].forEach((c) => {
+      if (!this.zeroed(c, l)) return;
+      if (this.ty(l, "grave")) return this.toHand(c, l);
+      if (this.destroy(c)) this.say({ k: "zero", c: this.N(c), loc: l.L.name });
+    })));
   }
   total = (l: Loc, s: Side) => {
     const mine = l.s[s].filter((c) => c.rev);
@@ -371,11 +420,11 @@ export class Match {
     if ((t.st.rip ?? 0) > 0 && src && src.side !== t.side) {
       t.st.rip = (t.st.rip ?? 1) - 1;
       this.say({ k: "riposte", c: this.N(t), t: this.N(src) });
-      if (this.locOf(src)) this.hurt(src, t.st.ripV ?? 2, null);
+      if (this.locOf(src)) this.as(this.by(t), () => this.hurt(src, t.st.ripV ?? 2, null));
       return false;
     }
     if ((t.st.vuln ?? 0) >= this.t) { amt *= 2; t.st.vuln = 0; }
-    if (until) t.st.tmp.push({ v: -amt, u: until });
+    if (until) t.st.tmp.push({ v: -amt, u: until, src: this.causes.at(-1) });
     else t.bonus -= amt;
     this.interrupt(t);
     if (this.abilityOf(t) === "Silver" && !t.st.wolf && t.st.wolfAt === undefined) this.wolfIn(t);
@@ -440,14 +489,14 @@ export class Match {
   }
   private wolfIn(c: GCard) {
     c.st.wolfAt = this.t + 1;
-    this.later(() => {
+    this.later(() => this.as(this.by(c), () => {
       const l = this.locOf(c);
       if (!l || c.st.wolf) return;
       c.st.wolf = true;
       c.bonus += c.v;
       const t = this.master(c) ? this.weakest(this.capped(c, this.tg(this.foes(c, l)))) : null;
       this.say({ k: "wolf", c: this.N(c), t: t && this.destroy(t) ? this.N(t) : undefined });
-    }, c.st.wolfAt);
+    }), c.st.wolfAt);
   }
 
   /* ---------- escolhas ao jogar ---------- */
@@ -509,10 +558,10 @@ export class Match {
     if (!this.move(c, from, to, true)) return false;
     c.st.mvT = this.t;
     this.say({ k: "move", c: this.N(c), loc: to.L.name });
-    if (portal) { portal.n--; c.bonus += portal.bonus; return true; }
+    if (portal) { portal.n--; this.as({ k: "move" }, () => { c.bonus += portal.bonus; }); return true; }
     if (!charge) return true;
     charge.n--;
-    c.bonus += charge.bonus;
+    this.as({ k: "move" }, () => { c.bonus += charge.bonus; });
     if (charge.copy && this.room(from, c.side)) {
       const k = this.token(c.side, "illusion", charge.copy === "full" ? pw : Math.floor(pw / 2));
       k.rev = true;
@@ -734,7 +783,7 @@ export class Match {
     "Rem": { r: (c, l, v) => {
       let n = 0;
       this.foes(c, l).forEach((t) => { if (this.hurt(t, v, c, this.t + 1)) { n++; t.st.sleep = this.t + 1; } });
-      if (n && this.master(c)) l.s[c.side].forEach((x) => { if (x.rev) x.st.tmp.push({ v: 1, u: this.t + 1 }); });
+      if (n && this.master(c)) l.s[c.side].forEach((x) => { if (x.rev) x.st.tmp.push({ v: 1, u: this.t + 1, src: this.by(c) }); });
       if (n) this.say({ k: "rem", c: this.N(c), n });
     } },
     "Seven": {
@@ -773,7 +822,7 @@ export class Match {
     } },
     "Vyper": { r: (c, l) => { l.petri[opp(c.side)] = { m: this.master(c) }; this.say({ k: "trap", c: this.N(c), loc: l.L.name }); } },
     "Wraith": { r: (c, l) => {
-      const t = this.strongest(this.capped(c, this.tg(this.foes(c, l))));
+      const t = this.strongest(this.tg(this.foes(c, l)));
       if (t) { t.st.stun = this.t + 1; this.interrupt(t); this.say({ k: "wraith", c: this.N(c), t: this.N(t) }); }
       if (!this.master(c)) return;
       this.later(() => {
@@ -830,7 +879,7 @@ export class Match {
   private reReveal(c: GCard, n = 1) {
     for (let k = 0; k < n; k++) {
       const impl = this.IMPL[this.abilityOf(c)];
-      for (let i = 0, m = this.ty(this.locOf(c), "ritual") ? 2 : 1; i < m; i++) { const at = this.locOf(c); if (at && impl?.r) impl.r(c, at, c.v); }
+      for (let i = 0, m = this.ty(this.locOf(c), "ritual") ? 2 : 1; i < m; i++) { const at = this.locOf(c); if (at && impl?.r) this.as(this.by(c), () => impl.r?.(c, at, c.v)); }
     }
   }
   private cleanse(c: GCard) {
@@ -1008,7 +1057,7 @@ export class Match {
       this.owned[s].push({ ...b, name: c ? this.N(c) : undefined });
       if (!c || !ok) { this.say({ k: "itemLost", side: s, item: b.k }); continue; }
       this.say({ k: "item", side: s, item: b.k, t: this.N(c) });
-      this.ITEM_FX[b.k](c, s, this.itemV(b.k));
+      this.as({ k: "item", item: b.k }, () => this.ITEM_FX[b.k](c, s, this.itemV(b.k)));
     }
     if (this.offer) { this.offer = null; this.discount = { p: 0, a: 0 }; }
   }
@@ -1145,8 +1194,9 @@ export class Match {
   }
 
   act(a: Act) {
-    if (a.exec) this.execute(a.c);
+    if (a.exec) this.as(this.by(a.c), () => this.execute(a.c));
     else this.reveal(a.c, a.l);
+    this.sweep();
   }
 
   reveal(c: GCard, l: Loc) {
@@ -1161,7 +1211,7 @@ export class Match {
       if (T !== l && this.move(c, l, T)) {
         this.say({ k: "hookPull", c: this.N(c), loc: T.L.name });
         l = T;
-        if (h.m) { c.rev = true; this.hurt(c, 2, null); c.st.chained = true; }
+        if (h.m) { c.rev = true; this.as({ k: "hook" }, () => this.hurt(c, 2, null)); c.st.chained = true; }
       }
     }
     // Museu: a carta pode ser roubada de volta para a mão antes de agir
@@ -1169,26 +1219,30 @@ export class Match {
     c.rev = true;
     c.staged = false;
     c.st.wait = undefined;
-    if (l.trap[s]) { const v = l.trap[s]; l.trap[s] = 0; if (this.hurt(c, v, null)) this.say({ k: "trapHit", c: this.N(c), v }); }
+    if (l.trap[s]) { const v = l.trap[s]; l.trap[s] = 0; if (this.as({ k: "trap" }, () => this.hurt(c, v, null))) this.say({ k: "trapHit", c: this.N(c), v }); }
     const pt = l.petri[s];
     if (pt) {
       l.petri[s] = null;
-      if (!this.immune(c) && !c.st.unstop) { c.st.petri = true; this.say({ k: "petrify", c: this.N(c) }); if (pt.m) this.hurt(c, 2, null); }
+      if (!this.immune(c) && !c.st.unstop) { c.st.petri = true; this.say({ k: "petrify", c: this.N(c) }); if (pt.m) this.as({ k: "trap" }, () => this.hurt(c, 2, null)); }
     }
-    if (this.ty(l, "enter")) c.bonus += l.L.v;
-    if (this.ty(l, "chaos")) { c.base = 1 + Math.floor(this.rnd() * Math.max(1, l.L.n)); c.bonus = 0; }
-    if (this.ty(l, "loot")) for (let i = 0; i < l.L.v; i++) this.draw(s);
-    if (this.ty(l, "spirit")) { if (ABILITIES[c.ab].usesV) c.v += l.L.v; else c.bonus += 1; }
-    if (this.ty(l, "hoop") && this.rnd() * 100 < l.L.n) { c.bonus += l.L.v; this.say({ k: "hoop", c: this.N(c) }); }
-    if (this.ty(l, "sacrifice")) { c.bonus -= l.L.n; this.extra[s] += l.L.v; }
-    if (this.ty(l, "ambush") && this.t >= l.L.n) c.bonus += l.L.v;
-    if (this.ty(l, "teleport")) c.mv.push({ n: 1, u: TURNS, bonus: 0 });
+    const here = l;
+    this.as({ k: "loc", loc: l.L.name }, () => {
+      const l = here;
+      if (this.ty(l, "enter")) c.bonus += l.L.v;
+      if (this.ty(l, "chaos")) { c.base = 1 + Math.floor(this.rnd() * Math.max(1, l.L.n)); c.bonus = 0; }
+      if (this.ty(l, "loot")) for (let i = 0; i < l.L.v; i++) this.draw(s);
+      if (this.ty(l, "spirit")) { if (ABILITIES[c.ab].usesV) c.v += l.L.v; else c.bonus += 1; }
+      if (this.ty(l, "hoop") && this.rnd() * 100 < l.L.n) { c.bonus += l.L.v; this.say({ k: "hoop", c: this.N(c) }); }
+      if (this.ty(l, "sacrifice")) { c.bonus -= l.L.n; this.extra[s] += l.L.v; }
+      if (this.ty(l, "ambush") && this.t >= l.L.n) c.bonus += l.L.v;
+      if (this.ty(l, "teleport")) c.mv.push({ n: 1, u: TURNS, bonus: 0 });
+    });
     // um Suporte revelado solta os aliados erguidos pela Wraith
     if (c.p.role === "Suporte") l.s[s].forEach((x) => { if (x !== c && (x.st.stun ?? 0) >= this.t) { x.st.stun = 0; this.say({ k: "liftEnd", c: this.N(x) }); } });
-    this.mentor(c);
-    this.duel(c, l);
+    this.as({ k: "mentor" }, () => this.mentor(c));
+    this.as({ k: "duel" }, () => this.duel(c, here));
     const impl = this.IMPL[this.abilityOf(c)];
-    if (impl?.r) for (let i = 0, n = this.ty(l, "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) impl.r(c, at, c.v); }
+    if (impl?.r) for (let i = 0, n = this.ty(l, "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) this.as(this.by(c), () => impl.r?.(c, at, c.v)); }
     // Teatro: uma cópia com o mesmo poder, sem habilidade
     const at = this.locOf(c);
     if (at && this.ty(at, "copy") && !c.tok && this.room(at, s)) {
@@ -1201,22 +1255,27 @@ export class Match {
 
   endOfTurn() {
     this.applyItems();
+    this.sweep();
     this.loc.forEach((l) => this.order().flatMap((s) => l.s[s]).forEach((c) => {
       for (let i = 0, n = (c.st.cd ? 2 : 1) * (this.ty(l, "clock") ? 2 : 1); i < n; i++) {
         const L = this.locOf(c);
-        if (c.rev && L === l) this.IMPL[this.abilityOf(c)]?.f?.(c, L, c.v);
+        const f = this.IMPL[this.abilityOf(c)]?.f;
+        if (c.rev && L === l && f) this.as(this.by(c), () => f(c, L, c.v));
       }
     }));
+    this.sweep();
     const due = this.pend.filter((p) => p.t === this.t);
     this.pend = this.pend.filter((p) => p.t !== this.t);
-    due.forEach((p) => p.f());
+    due.forEach((p) => (p.cause ? this.as(p.cause, p.f) : p.f()));
+    this.sweep();
     // queimaduras: permanentes e temporárias (Constante é imune)
     this.order().flatMap((s) => this.mine(s)).forEach((c) => {
       const b = (c.st.burn ?? 0) + (c.st.tburn ?? []).filter((x) => x.u >= this.t).reduce((a, x) => a + x.v, 0);
-      if (b) this.hurt(c, b, null);
+      if (b) this.as({ k: "burn" }, () => this.hurt(c, b, null));
       if (c.st.tburn) c.st.tburn = c.st.tburn.filter((x) => x.u > this.t);
     });
-    this.loc.forEach((l) => {
+    this.sweep();
+    this.loc.forEach((l) => this.as({ k: "loc", loc: l.L.name }, () => {
       if (!l.rev) return;
       const p = this.total(l, "p"), a = this.total(l, "a"), lead: Side | null = p > a ? "p" : a > p ? "a" : null;
       if (this.ty(l, "endturn")) [...l.s.p, ...l.s.a].forEach((c) => { if (c.rev) c.bonus += l.L.v; });
@@ -1232,7 +1291,8 @@ export class Match {
         const d = w && this.pickLoc(l, s);
         if (w && d && this.move(w, l, d)) this.say({ k: "zipline", c: this.N(w), loc: d.L.name });
       });
-    });
+    }));
+    this.sweep();
     // janelas que acabam neste turno
     this.all().forEach((c) => {
       if (c.st.exec && c.st.exec.u <= this.t) c.st.exec = undefined;
@@ -1277,10 +1337,10 @@ export class Match {
       const a = this.abilityOf(c);
       if (a === "Warden") {
         let n = 0;
-        this.foes(c, l).forEach((t) => { if (this.hurt(t, 1, c)) n++; });
+        this.foes(c, l).forEach((t) => { if (this.as(this.by(c), () => this.hurt(t, 1, c))) n++; });
         if (n) this.say({ k: "lastStand", c: this.N(c), n });
       }
-      if (a === "Mo & Krill" && c.st.burrow) { const t = this.strongest(this.foes(c, l)); if (t) this.hurt(t, 2, c); this.say({ k: "emerge", c: this.N(c) }); }
+      if (a === "Mo & Krill" && c.st.burrow) { const t = this.strongest(this.foes(c, l)); if (t) this.as(this.by(c), () => this.hurt(t, 2, c)); this.say({ k: "emerge", c: this.N(c) }); }
     }));
     this.final = true;
     let won = 0, lost = 0, myPower = 0, aiPower = 0;

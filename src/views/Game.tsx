@@ -3,6 +3,7 @@ import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore,
 import { createPortal } from "react-dom";
 import { CardBack, GameCard, TipBoxes, type Tip } from "../components/GameCard";
 import { GameHand } from "../components/GameHand";
+import { dropUnder, pointOf } from "../lib/game/drop";
 import { TargetArrow } from "../components/TargetArrow";
 import { AudioMenu, EndTurnButton, SoulOrb } from "../components/GameHud";
 import { useData } from "../lib/data";
@@ -128,6 +129,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const [drag, setDrag] = useState<{ c: GCard; over: number | null } | null>(null);
   // carta da mesa ampliada no hover
   const [peek, setPeek] = useState<{ c: GCard; r: DOMRect } | null>(null);
+  /** Carta da mesa sendo arrastada para outro local (mover) e o local sob o cursor. */
+  const [shift, setShift] = useState<{ c: GCard; over: number | null } | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   // cartas queimadas (mão cheia) que já terminaram de queimar na tela
   const [ashes, setAshes] = useState<Set<number>>(() => new Set());
@@ -185,7 +188,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const powTip = (c: GCard): Tip => {
     const parts = m.powParts(c);
     const P = t.ui.powParts;
-    const label = (x: PowPart) => x.k === "from" ? P.from(logName(x.n)) : x.k === "ab" ? P.ab(t.abilities[x.ab ?? "none"].name) : x.k === "loc" ? P.loc(x.loc ?? "") : P[x.k];
+    const name = (x: PowPart) => x.k === "from" ? P.from(logName(x.n)) : x.k === "ab" ? P.ab(t.abilities[x.ab ?? "none"].name) : x.k === "loc" ? P.loc(x.loc ?? "") : x.k === "item" ? P.item(x.item ?? "") : P[x.k];
+    const label = (x: PowPart) => (x.tmp && x.k !== "tmp" ? P.brief(name(x)) : name(x));
     const sum = parts.reduce((a, x) => a + x.v, 0);
     return { title: P.title(m.pow(c)), text: sum < 0 ? P.floor : "", rows: parts.map((x) => [label(x), x.v]) };
   };
@@ -349,6 +353,16 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     setMode(null);
     bump();
   };
+  /** Pode arrastar para mover agora: é sua, revelada e tem para onde ir neste turno. */
+  const canShift = (c: GCard) => c.side === "p" && !m.busy && !result && !aim && !mode && m.moveOptions(c).length > 0;
+  const shiftTo = (c: GCard, i: number | null) => {
+    setShift(null);
+    const l = i === null ? null : m.loc[i];
+    if (!l || !m.moveCard(c, l)) return;
+    setLook(null);
+    sfx("place");
+    bump();
+  };
   const undoPlay = () => { if (mode && mode.c.staged) m.unstage(mode.c); setMode(null); bump(); };
   const startMode = (k: "move" | "mark", c: GCard) => setMode({ k, c });
   const modeHint = !mode ? "" : mode.k === "card" ? t.ui.act.pickFoe(name(mode.c)) : mode.k === "loc" ? t.ui.act.pickLoc(name(mode.c))
@@ -378,7 +392,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     ].filter(Boolean) as { label: string; run: () => void }[];
   };
   /** Estado do local enquanto arrasta: o local sob a carta acende (se der para jogar lá) e os outros escurecem. */
-  const dropAt = (l: Loc, i: number): Drop => !drag ? "off" : drag.over !== null && drag.over !== i ? "dim" : m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok";
+  const dropAt = (l: Loc, i: number): Drop => shift ? (!m.moveOptions(shift.c).includes(l) ? "dim" : shift.over === i ? "over" : "ok") : !drag ? "off" : drag.over !== null && drag.over !== i ? "dim" : m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok";
   const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && !m.canPlay(sel, l);
   /** The New York Oracle: próxima carta de cada baralho. */
   const next = { p: m.peek("p"), a: m.peek("a") };
@@ -464,8 +478,9 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
               drop={dropAt(l, i)}
               card={(c) => (
                 <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} acts={actsOf(c)}
+                  shift={canShift(c) ? { on: (over) => { if (!shift) { sfx("grab", 0.7); setPeek(null); } setShift({ c, over }); }, drop: (i) => shiftTo(c, i) } : undefined}
                   onClick={(r) => { pickBoard(c); setPeek(r && look !== c ? { c, r } : null); }}
-                  onPeek={(r) => setPeek(r && !drag ? { c, r } : null)} />
+                  onPeek={(r) => setPeek(r && !drag && !shift ? { c, r } : null)} />
               )} />
           ))}
         </section>
@@ -545,7 +560,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       </div>
 
       <AnimatePresence>
-        {peek && !drag && <Peek key={peek.c.id} r={peek.r} card={face(peek.c, true, true)} tips={peek.c.rev ? [powTip(peek.c), ...tipsOf(peek.c)] : tipsOf(peek.c)} />}
+        {peek && !drag && !shift && <Peek key={peek.c.id} r={peek.r} card={face(peek.c, true, true)} tips={peek.c.rev ? [powTip(peek.c), ...tipsOf(peek.c)] : tipsOf(peek.c)} />}
       </AnimatePresence>
 
       <TargetArrow from={aim ? '[data-item-from="p"]' : mode ? `[data-card="${mode.c.id}"]` : null} lines={result ? [] : aimLines}
@@ -613,7 +628,7 @@ type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
 /** Cores das três faixas (amarela, azul e verde, como as lanes do mapa), em classes inteiras. */
 /** Abertura da mesa (segundos): os locais pousam um a um, entram as comandas e os baralhos, a orbe acende e a mão é dada carta a carta. */
-const INTRO = { lane: (i: number) => 0.3 + i * 0.4, comanda: 1.6, comanda2: 1.95, side: 2.3, orb: 2.7, hand: 3.1, handStep: 0.3, reveal: 4.8, done: 6.6 };
+const INTRO = { lane: (i: number) => 0.2 + i * 0.27, comanda: 1.05, comanda2: 1.27, side: 1.5, orb: 1.75, hand: 2.0, handStep: 0.2, reveal: 3.1, done: 4.3 };
 const INTRO_CLS = { drop: "intro-drop", up: "intro-up", left: "intro-left", right: "intro-right", pop: "intro-pop" } as const;
 
 /** Local durante o arrasto: fora, dá para soltar, sob a carta, ou escurecido (a carta está sobre outro). */
@@ -821,28 +836,39 @@ function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
 /** Vaga da carta na fileira do local: encolhe quando não cabe (a carta transborda e fica por baixo da seguinte). */
 const slot = "w-gc hover:z-10 focus-within:z-10";
 
-function BoardCard({ c, m, t, name, face, looking, target, acts, onClick, onPeek }: {
+function BoardCard({ c, m, t, name, face, looking, target, acts, shift, onClick, onPeek }: {
   c: GCard; m: Match; t: T; name: string; face: React.ReactNode; looking: boolean; target: boolean; acts: { label: string; run: () => void }[];
+  /** Pode ser arrastada para outro local neste turno: treme na mesa e avisa o local sob o cursor e onde foi solta. */
+  shift?: { on: (over: number | null) => void; drop: (i: number | null) => void };
   /** Clique; no toque vem o retângulo da carta para ampliar (no mouse, o hover já amplia). */
   onClick: (r: DOMRect | null) => void; onPeek: (r: DOMRect | null) => void;
 }) {
   const touch = useRef(false);
+  const moved = useRef(false);
+  const [held, setHeld] = useState(false);
   if (c.side === "a" && !c.rev) return <div role="img" aria-label={t.ui.facedown} className={slot}><CardBack className={`w-gc ${REST}`} /></div>;
   const pw = c.rev ? m.pow(c) : c.base;
   const icons = statusIcons(c, m, t);
   const w = weight(c);
   return (
-    <div className={`relative perspective-[40rem] ${slot}`} data-card={c.id} data-target={target ? "" : undefined}>
-    <motion.button type="button" onClick={(e) => onClick(touch.current ? e.currentTarget.getBoundingClientRect() : null)} aria-pressed={looking}
+    <motion.div className={`relative perspective-[40rem] ${slot} ${shift ? "touch-none" : ""} ${held ? "z-50" : ""}`} data-card={c.id} data-target={target ? "" : undefined}
+      drag={!!shift} dragSnapToOrigin dragMomentum={false} dragElastic={1} whileDrag={{ scale: 0.9 }}
+      onDragStart={() => { moved.current = true; setHeld(true); onPeek(null); }}
+      onDrag={(e) => { const pt = pointOf(e); shift?.on(dropUnder(pt.x, pt.y)); }}
+      onDragEnd={(e) => { const pt = pointOf(e); setHeld(false); shift?.drop(dropUnder(pt.x, pt.y)); }}>
+    {/* treme enquanto pode ser movida (parada enquanto arrasta); o atraso varia para as cartas não tremerem juntas */}
+    <div className={shift && !held ? "card-jiggle" : ""} style={shift ? { animationDelay: `${-(c.id % 7) * 0.11}s` } : undefined}>
+    <motion.button type="button" onClick={(e) => { if (moved.current) { moved.current = false; return; } onClick(touch.current ? e.currentTarget.getBoundingClientRect() : null); }} aria-pressed={looking}
       onPointerDown={(e) => { touch.current = e.pointerType !== "mouse"; }}
       aria-label={`${target ? `${t.ui.act.target(name)}: ` : ""}${t.ui.cardLabel(name, c.cost, pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}
       onPointerEnter={(e) => { if (e.pointerType === "mouse") onPeek(e.currentTarget.getBoundingClientRect()); }} onPointerLeave={() => onPeek(null)} onBlur={() => onPeek(null)}
       initial={c.rev ? { ...FALL[w], opacity: 0, rotateY: c.side === "a" ? 100 : 0, filter: LIFTED } : { y: -16, scale: 1.12, opacity: 0, filter: LIFTED }}
       animate={{ scale: 1, y: 0, rotate: 0, rotateY: 0, opacity: 1, filter: RESTING }}
       transition={c.rev ? { duration: FALL_MS[w] / 1000, ease: "easeIn", opacity: { duration: 0.1 } } : { type: "spring", stiffness: 520, damping: 17, opacity: { duration: 0.08 } }}
-      className={`relative block w-gc cursor-pointer rounded-lg ${c.staged || c.st.wait ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
+      className={`relative block w-gc rounded-lg ${shift ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${c.staged || c.st.wait ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
       {face}
     </motion.button>
+    </div>
     {c.rev ? <Impact w={w} /> : c.side === "p" && <Impact w={1} />}
     {acts.length > 0 && (
       <div className="absolute inset-x-0 bottom-1 z-20 flex flex-col items-center gap-1">
@@ -854,7 +880,7 @@ function BoardCard({ c, m, t, name, face, looking, target, acts, onClick, onPeek
         ))}
       </div>
     )}
-    </div>
+    </motion.div>
   );
 }
 
