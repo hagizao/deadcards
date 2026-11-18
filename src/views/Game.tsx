@@ -241,11 +241,10 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const land = (c: GCard) => {
     const w = weight(c);
     later(() => {
-      // 10 ou mais de poder: cai pesada (baque e tremor máximos) e a plateia solta um "uau"
-      if (m.pow(c) >= 10) {
+      // 9 ou mais de poder: cai com um estrondo grave, a tela treme e a mesa do lado solta um "oh!" de susto
+      if (m.pow(c) >= 9) {
         sfx("slam");
-        thump(1.3);
-        sfx("wow");
+        sfx("impact");
         if (!still && arena.current) shake(arena.current, { x: [0, -8, 7, -5, 3, 0], y: [0, 4, -3, 2, 0, 0] }, { duration: 0.4 });
         return;
       }
@@ -264,7 +263,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   };
   const pickBoard = (c: GCard) => {
     if (aim) {
-      if (targets.includes(c) && m.buy(aim, c)) { sfx("target"); setShopHidden(false); }
+      // comprou: a loja volta fechada (o Exibir reabre); errou o alvo: ela reabre
+      if (targets.includes(c) && m.buy(aim, c)) sfx("target"); else setShopHidden(false);
       setAim(null);
       bump();
       return;
@@ -448,11 +448,12 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
                 </filter>
               </svg>
               {/* oculta: título e caixas somem, mas continuam ocupando o espaço, então o Exibir fica onde estava o Ocultar */}
-              <div className={`flex flex-col items-center gap-1 px-2 text-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)] transition-[opacity,visibility] duration-200 ${shopHidden ? "invisible opacity-0" : ""}`}>
+              <motion.div initial={false} animate={shopFade(shopHidden)} transition={{ duration: still ? 0 : 0.25, ease: "easeOut" }}
+                className="flex flex-col items-center gap-1 px-2 text-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)]">
                 <h2 id="game-shop" className="bg-zinc-950 px-3 py-1 text-base font-extrabold tracking-wider uppercase [clip-path:polygon(1%_0,100%_6%,99%_100%,0_94%)] sm:text-xl">{t.shop.title}</h2>
                 <p className="max-w-xl bg-zinc-950/90 px-2 py-0.5 text-[11px] text-zinc-300 sm:text-xs">{t.shop.hint}</p>
-              </div>
-              <div className={`flex w-full items-stretch gap-0.5 transition-[opacity,visibility] duration-200 sm:gap-1 ${shopHidden ? "invisible opacity-0" : ""}`}>
+              </motion.div>
+              <motion.div initial={false} animate={shopFade(shopHidden)} transition={{ duration: still ? 0 : 0.25, ease: "easeOut" }} className="flex w-full items-stretch gap-0.5 sm:gap-1">
                 {m.loc.map((l, i) => {
                   const k = m.offer?.p[i];
                   return (
@@ -461,11 +462,15 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
                     </div>
                   );
                 })}
-              </div>
+              </motion.div>
               <div className="flex min-h-14 w-full items-center justify-end px-2 sm:px-4">
                 <button type="button" onClick={() => setShopHidden(!shopHidden)} aria-expanded={!shopHidden}
                   className={`pointer-events-auto grid min-h-11 cursor-pointer place-items-center font-extrabold tracking-wider text-zinc-950 uppercase transition hover:brightness-110 active:scale-95 ${focus} ${shopHidden ? "text-lg" : "text-sm"}`}>
-                  <TickTag tone="bg-dl-text" className={shopHidden ? "px-7 py-2.5" : "px-4 py-1.5"}>{shopHidden ? t.shop.show : t.shop.hide}</TickTag>
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span key={shopHidden ? "show" : "hide"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: still ? 0 : 0.12 }}>
+                      <TickTag tone="bg-dl-text" className={shopHidden ? "px-7 py-2.5" : "px-4 py-1.5"}>{shopHidden ? t.shop.show : t.shop.hide}</TickTag>
+                    </motion.span>
+                  </AnimatePresence>
                 </button>
               </div>
             </motion.section>
@@ -902,11 +907,13 @@ function ShopBox({ k, i, l, m, t, icon, picked, disabled, onPick }: { k: ItemKey
   const fit = m.itemFit("p", k);
   const box = SLOT_BOX[it.slot];
   const art = l.rev && l.L.art;
+  // já comprou outro: este fica apagado como a carta da mão sem jogada (mas ainda dá para trocar a compra por ele)
+  const dim = !picked && !!m.buying.p;
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }} transition={{ duration: 0.22, delay: i * 0.06 }}
-      className={`pointer-events-auto flex w-full max-w-72 2xl:max-w-108 ${disabled ? "" : box.glow}`}>
+      className={`pointer-events-auto flex w-full max-w-72 2xl:max-w-108 ${disabled || dim ? "" : box.glow}`}>
       <button type="button" onClick={onPick} disabled={disabled} aria-pressed={picked} aria-label={`${t.shop.label(k, it.tier)}: ${t.items[k](m.itemV(k))}`}
-        className={`relative isolate flex w-full cursor-pointer flex-col items-center gap-1.5 p-2.5 text-center transition enabled:hover:-translate-y-0.5 enabled:hover:brightness-125 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:brightness-60 disabled:saturate-50 sm:gap-2 sm:p-3.5 2xl:gap-3 2xl:p-6 ${picked ? "outline-2 -outline-offset-8 outline-game-brass" : ""} ${focusIn}`}>
+        className={`relative isolate flex w-full cursor-pointer flex-col items-center gap-1.5 p-2.5 text-center transition enabled:hover:-translate-y-0.5 enabled:hover:brightness-125 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:brightness-50 disabled:saturate-50 sm:gap-2 sm:p-3.5 2xl:gap-3 2xl:p-6 ${picked ? "outline-2 -outline-offset-8 outline-game-brass" : ""} ${dim ? "brightness-50 saturate-50" : ""} ${focusIn}`}>
         <span aria-hidden="true" className={`absolute inset-0 -z-10 overflow-hidden bg-zinc-950 ring-4 filter-[url(#shop-rough)] ring-inset ${SLOT_RING[it.slot]}`}>
           {art && <img src={locArtUrl(art)} alt="" draggable={false} className="absolute inset-0 size-full object-cover opacity-25" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />}
           <span className={`absolute inset-0 bg-linear-to-b to-zinc-950/75 to-70% ${box.tint}`} />
@@ -1136,46 +1143,69 @@ function Burning({ card, onDone }: { card: ReactNode; onDone: () => void }) {
   );
 }
 
+/** Título e caixas da loja: somem num fade e só então saem do foco e do clique (o espaço continua ocupado). */
+const shopFade = (hidden: boolean) => (hidden ? { opacity: 0, transitionEnd: { visibility: "hidden" as const } } : { opacity: 1, visibility: "visible" as const });
+
 /** Cor da tela de fim: verde na vitória, vermelho na derrota, âmbar no empate. */
 const END_TONE = {
-  win: { fill: "from-emerald-500 via-emerald-700 to-emerald-950", stroke: "stroke-emerald-400", ink: "text-emerald-900" },
-  loss: { fill: "from-red-500 via-red-700 to-red-950", stroke: "stroke-red-500", ink: "text-red-900" },
-  draw: { fill: "from-amber-500 via-amber-700 to-zinc-950", stroke: "stroke-amber-400", ink: "text-amber-900" },
+  win: { stops: ["var(--color-emerald-500)", "var(--color-emerald-700)", "var(--color-emerald-950)"], stroke: "stroke-emerald-400", ink: "text-emerald-900" },
+  loss: { stops: ["var(--color-red-500)", "var(--color-red-700)", "var(--color-red-950)"], stroke: "stroke-red-500", ink: "text-red-900" },
+  draw: { stops: ["var(--color-amber-500)", "var(--color-amber-700)", "var(--color-zinc-950)"], stroke: "stroke-amber-400", ink: "text-amber-900" },
 } as const;
 /** Faixa larga da tela de fim, com as mesmas bordas a pincel das faixas do tabuleiro. */
 const END_BRUSH = { left: brushEdge(21, 0.06, 0.03), right: brushEdge(22, 0.94, 0.03), dash: gaps(21), dash2: gaps(22) };
-const END_CLIP = clipOf(END_BRUSH);
+/** Borda do preenchimento: os mesmos pontos do pincel, esticados para além do topo e do fundo da tela. */
+const stretch = (p: [number, number][]): [number, number][] => [[p[0][0], -0.08], ...p, [p[p.length - 1][0], 1.08]];
 
-/** Fundo da tela de fim no estilo do tabuleiro: a cor numa faixa a 50% (a mesa aparece por trás), bordas tortas a pincel com falhas e névoa. */
+/**
+ * Fundo da tela de fim no estilo do tabuleiro: a cor a 50% numa faixa (a mesa aparece por trás) com bordas tortas a pincel e falhas.
+ * O preenchimento passa pelo mesmo deslocamento de ruído do pincel, então a borda dele acompanha o traço de cima a baixo.
+ */
 function EndBackdrop({ tone }: { tone: (typeof END_TONE)[keyof typeof END_TONE] }) {
   const [ref, { w, h }] = useSize();
   const sw = Math.max(6, Math.min(20, w * 0.014));
+  const px = (p: [number, number][]) => p.map(([x, y]): [number, number] => [x * w, y * h]);
+  const fill = `M ${smooth(px(stretch(END_BRUSH.left)))} L ${smooth(px(stretch(END_BRUSH.right)).reverse())} Z`;
+  const wave = (id: string, dry: boolean) => (
+    <filter id={id} filterUnits="userSpaceOnUse" x={-40} y={-40} width={w + 80} height={h + 80}>
+      <feTurbulence type="fractalNoise" baseFrequency="0.035 0.008" numOctaves={2} seed={21} result="wave" />
+      <feDisplacementMap in="SourceGraphic" in2="wave" scale={sw * 1.4} xChannelSelector="R" yChannelSelector="G" result="torn" />
+      {dry && (
+        <>
+          <feTurbulence type="fractalNoise" baseFrequency="0.22 0.03" numOctaves={3} seed={23} result="grain" />
+          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 7 -2.6" result="dry" />
+          <feComposite in="torn" in2="dry" operator="in" />
+        </>
+      )}
+    </filter>
+  );
   return (
     <div ref={ref} aria-hidden="true" className="absolute inset-0">
       <div className="absolute inset-0 bg-black/40" />
-      <div className="absolute inset-0 opacity-50" style={{ clipPath: "url(#end-clip)" }}>
-        <div className={`absolute inset-0 bg-radial ${tone.fill}`} />
-        <div className="absolute inset-0 opacity-40 mix-blend-overlay lane-fog" />
-        <div className="absolute inset-0 bg-linear-to-b from-black/60 via-transparent to-black/70" />
-      </div>
-      <svg className={`absolute inset-0 size-full overflow-visible fill-none ${tone.stroke}`}>
-        <defs>
-          <clipPath id="end-clip" clipPathUnits="objectBoundingBox"><path d={END_CLIP} /></clipPath>
-          <filter id="end-brush" filterUnits="userSpaceOnUse" x={-40} y={-40} width={w + 80} height={h + 80}>
-            <feTurbulence type="fractalNoise" baseFrequency="0.035 0.008" numOctaves={2} seed={21} result="wave" />
-            <feDisplacementMap in="SourceGraphic" in2="wave" scale={sw * 1.4} xChannelSelector="R" yChannelSelector="G" result="torn" />
-            <feTurbulence type="fractalNoise" baseFrequency="0.22 0.03" numOctaves={3} seed={23} result="grain" />
-            <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 7 -2.6" result="dry" />
-            <feComposite in="torn" in2="dry" operator="in" />
-          </filter>
-        </defs>
-        {w > 0 && (
-          <>
-            <BrushStroke id="end-brush" pts={END_BRUSH.left} w={w} h={h} sw={sw} dash={END_BRUSH.dash} dash2={END_BRUSH.dash2} inward={1} />
-            <BrushStroke id="end-brush" pts={END_BRUSH.right} w={w} h={h} sw={sw} dash={END_BRUSH.dash2} dash2={END_BRUSH.dash} inward={-1} />
-          </>
-        )}
-      </svg>
+      {w > 0 && (
+        <svg className={`absolute inset-0 size-full overflow-visible fill-none ${tone.stroke}`}>
+          <defs>
+            {wave("end-fill", false)}
+            {wave("end-brush", true)}
+            <radialGradient id="end-tone">
+              <stop offset="0" style={{ stopColor: tone.stops[0] }} />
+              <stop offset="0.5" style={{ stopColor: tone.stops[1] }} />
+              <stop offset="1" style={{ stopColor: tone.stops[2] }} />
+            </radialGradient>
+            <linearGradient id="end-shade" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="black" stopOpacity="0.6" />
+              <stop offset="0.5" stopColor="black" stopOpacity="0" />
+              <stop offset="1" stopColor="black" stopOpacity="0.7" />
+            </linearGradient>
+          </defs>
+          <g filter="url(#end-fill)" opacity={0.5} stroke="none">
+            <path d={fill} fill="url(#end-tone)" />
+            <path d={fill} fill="url(#end-shade)" />
+          </g>
+          <BrushStroke id="end-brush" pts={END_BRUSH.left} w={w} h={h} sw={sw} dash={END_BRUSH.dash} dash2={END_BRUSH.dash2} inward={1} />
+          <BrushStroke id="end-brush" pts={END_BRUSH.right} w={w} h={h} sw={sw} dash={END_BRUSH.dash2} dash2={END_BRUSH.dash} inward={-1} />
+        </svg>
+      )}
     </div>
   );
 }

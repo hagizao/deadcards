@@ -16,7 +16,7 @@ import win from "../../assets/sfx/win.ogg";
 const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, win };
 /** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
 const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
-export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn" | "paper" | "wow";
+export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn" | "paper" | "impact";
 
 /** Volume e mudo de cada canal (0 a 1). */
 export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
@@ -67,7 +67,7 @@ export function sfx(name: Sfx, volume = 1) {
   if (name === "hover") return cardFlick(volume);
   if (name === "burn") return cardBurn(volume);
   if (name === "paper") return paperRustle(volume);
-  if (name === "wow") return crowdWow(volume);
+  if (name === "impact") return bigImpact(volume);
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
   const file = name as keyof typeof FILES;
@@ -158,67 +158,98 @@ function cardBurn(strength = 1) {
 }
 
 /**
- * Plateia do bar soltando um "uaaau" (carta com 10 ou mais de poder): ~20 vozes de alturas diferentes, cada uma entrando
- * um pouco depois, com a altura subindo e caindo; os formantes vão de "u" para "a" e voltam, e um murmúrio de ar fica por baixo.
+ * Carta enorme (9 ou mais de poder) caindo: um estrondo grave e longo com o tremor da madeira por baixo e, logo depois,
+ * a mesa ao lado puxando o ar de susto e soltando um "oh!" curto (poucas vozes, perto, cada uma no seu tempo).
  */
-function crowdWow(strength = 1) {
+function bigImpact(strength = 1) {
   const lv = sfxLevel();
   if (!lv || !hasCtx()) return;
   const c = audioCtx();
-  const t = c.currentTime + 0.05;
+  const t = c.currentTime;
   const vol = SFX_BASE * lv * strength;
-  const end = t + 1.9;
-  // as vozes somam aqui e passam pelos formantes da boca
+  // estrondo: seno que cai de 75 para 30 Hz e demora a sumir
+  const boom = c.createOscillator();
+  boom.type = "sine";
+  boom.frequency.setValueAtTime(75, t);
+  boom.frequency.exponentialRampToValueAtTime(30, t + 0.9);
+  const bg = c.createGain();
+  bg.gain.setValueAtTime(0.0001, t);
+  bg.gain.exponentialRampToValueAtTime(1.6 * vol, t + 0.012);
+  bg.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+  boom.connect(bg).connect(c.destination);
+  boom.start(t);
+  boom.stop(t + 1.35);
+  // tremor da mesa: ruído marrom bem grave
+  const rum = c.createBufferSource();
+  rum.buffer = noise(c, 1, true);
+  const rl = c.createBiquadFilter();
+  rl.type = "lowpass"; rl.frequency.value = 160;
+  const rg = c.createGain();
+  rg.gain.setValueAtTime(0.0001, t);
+  rg.gain.exponentialRampToValueAtTime(1.8 * vol, t + 0.02);
+  rg.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  rum.connect(rl).connect(rg).connect(c.destination);
+  rum.start(t);
+  rum.stop(t + 1);
+  // susto: o ar puxado entre os dentes, curto e agudo
+  const g0 = t + 0.1;
+  const inh = c.createBufferSource();
+  inh.buffer = noise(c, 0.4);
+  const ib = c.createBiquadFilter();
+  ib.type = "bandpass"; ib.Q.value = 1.2;
+  ib.frequency.setValueAtTime(1600, g0);
+  ib.frequency.linearRampToValueAtTime(2600, g0 + 0.18);
+  const ig = c.createGain();
+  ig.gain.setValueAtTime(0.0001, g0);
+  ig.gain.exponentialRampToValueAtTime(0.5 * vol, g0 + 0.1);
+  ig.gain.exponentialRampToValueAtTime(0.0001, g0 + 0.24);
+  inh.connect(ib).connect(ig).connect(c.destination);
+  inh.start(g0);
+  inh.stop(g0 + 0.3);
+  // "oh!": vozes graves e agudas misturadas, passando pelos formantes do "o"
   const mix = c.createGain();
-  mix.gain.value = 1;
-  const out = c.createGain();
-  out.gain.setValueAtTime(0.0001, t);
-  out.gain.exponentialRampToValueAtTime(1.1 * vol, t + 0.3);
-  out.gain.setValueAtTime(1.1 * vol, t + 0.75);
-  out.gain.exponentialRampToValueAtTime(0.0001, end);
-  out.connect(c.destination);
-  // vogal: F1 e F2 de "u" (300/800) abrindo para "a" (750/1150) e fechando em "o" (500/900)
-  ([[300, 750, 500, 1.4], [800, 1150, 900, 1], [2600, 2600, 2500, 0.25]] as const).forEach(([a, b, z, g]) => {
+  ([[450, 1.4, 6], [820, 0.9, 7], [2500, 0.18, 4]] as const).forEach(([fq, g, q]) => {
     const bp = c.createBiquadFilter();
-    bp.type = "bandpass"; bp.Q.value = 5;
-    bp.frequency.setValueAtTime(a, t);
-    bp.frequency.linearRampToValueAtTime(b, t + 0.45);
-    bp.frequency.linearRampToValueAtTime(z, t + 1.5);
+    bp.type = "bandpass"; bp.frequency.value = fq; bp.Q.value = q;
     const fg = c.createGain();
-    fg.gain.value = g;
-    mix.connect(bp).connect(fg).connect(out);
+    fg.gain.value = g * vol;
+    mix.connect(bp).connect(fg).connect(c.destination);
   });
-  for (let i = 0; i < 20; i++) {
-    // metade voz grave, metade aguda
-    const f0 = (i % 2 ? 190 : 115) * (0.85 + Math.random() * 0.35);
-    const at = t + Math.random() * 0.14;
+  for (let i = 0; i < 7; i++) {
+    const f0 = (i % 3 ? 120 : 230) * (0.9 + Math.random() * 0.25);
+    const at = g0 + 0.2 + Math.random() * 0.12;
+    const len = 0.45 + Math.random() * 0.3;
     const o = c.createOscillator();
     o.type = "sawtooth";
-    o.frequency.setValueAtTime(f0 * 0.82, at);
-    o.frequency.exponentialRampToValueAtTime(f0 * 1.18, at + 0.38 + Math.random() * 0.1);
-    o.frequency.exponentialRampToValueAtTime(f0 * 0.9, end);
-    // tremido de voz, cada uma no seu ritmo
+    // susto sobe rápido e cai devagar
+    o.frequency.setValueAtTime(f0 * 1.05, at);
+    o.frequency.linearRampToValueAtTime(f0 * 1.25, at + 0.07);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.85, at + len);
     const vib = c.createOscillator();
-    vib.frequency.value = 4.5 + Math.random() * 2.5;
+    vib.frequency.value = 5 + Math.random() * 2;
     const vg = c.createGain();
-    vg.gain.value = f0 * 0.02;
+    vg.gain.value = f0 * 0.015;
     vib.connect(vg).connect(o.frequency);
     const g = c.createGain();
-    g.gain.value = 0.05 + Math.random() * 0.04;
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.09 + Math.random() * 0.06, at + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
     o.connect(g).connect(mix);
     o.start(at); vib.start(at);
-    o.stop(end); vib.stop(end);
+    o.stop(at + len + 0.02); vib.stop(at + len + 0.02);
   }
-  // ar e murmúrio da multidão
-  const air = c.createBufferSource();
-  air.buffer = noise(c, 2);
-  const nb = c.createBiquadFilter();
-  nb.type = "bandpass"; nb.frequency.value = 900; nb.Q.value = 0.6;
-  const ng = c.createGain();
-  ng.gain.value = 0.35;
-  air.connect(nb).connect(ng).connect(out);
-  air.start(t);
-  air.stop(end);
+  // respiração no "oh"
+  const br = c.createBufferSource();
+  br.buffer = noise(c, 0.8);
+  const bb = c.createBiquadFilter();
+  bb.type = "bandpass"; bb.frequency.value = 1100; bb.Q.value = 0.7;
+  const bbg = c.createGain();
+  bbg.gain.setValueAtTime(0.0001, g0 + 0.2);
+  bbg.gain.exponentialRampToValueAtTime(0.12, g0 + 0.26);
+  bbg.gain.exponentialRampToValueAtTime(0.0001, g0 + 0.8);
+  br.connect(bb).connect(bbg).connect(mix);
+  br.start(g0 + 0.2);
+  br.stop(g0 + 0.85);
 }
 
 let lastPaper = 0;
