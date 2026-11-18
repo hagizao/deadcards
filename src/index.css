@@ -140,11 +140,16 @@
 }
 
 /* Cardslock Game: carta queimando (mão cheia). A máscara come a carta de baixo para cima e a frente de fogo sobe junto. */
+/* Cardslock Game: borda de canhoto rasgada (dentes de serrilha) do botão Fechar a conta */
+@utility receipt-edge {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 0.4rem), 95% 100%, 90% calc(100% - 0.4rem), 85% 100%, 80% calc(100% - 0.4rem), 75% 100%, 70% calc(100% - 0.4rem), 65% 100%, 60% calc(100% - 0.4rem), 55% 100%, 50% calc(100% - 0.4rem), 45% 100%, 40% calc(100% - 0.4rem), 35% 100%, 30% calc(100% - 0.4rem), 25% 100%, 20% calc(100% - 0.4rem), 15% 100%, 10% calc(100% - 0.4rem), 5% 100%, 0 calc(100% - 0.4rem));
+}
+
 @utility card-burn {
   mask-image: linear-gradient(to top, transparent 40%, black 60%);
   mask-size: 100% 250%;
   mask-position: 0 0;
-  animation: card-burn 1.5s 0.2s ease-in forwards;
+  animation: card-burn 3s 0.2s ease-in forwards;
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }
@@ -154,7 +159,7 @@
 }
 @utility burn-front {
   bottom: -33%;
-  animation: burn-front 1.5s 0.2s ease-in forwards;
+  animation: burn-front 3s 0.2s ease-in forwards;
   @media (prefers-reduced-motion: reduce) {
     display: none;
   }

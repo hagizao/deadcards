@@ -52,7 +52,7 @@ export function SoulOrb({ n, label, big }: { n: number; label: string; /** Na la
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.b key={n} aria-hidden="true" initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }}
           transition={{ type: "spring", stiffness: 500, damping: 20 }}
-          className={`relative leading-none font-extrabold drop-shadow-[0_0_6px_var(--color-game-soul)] ${big ? "text-5xl" : "text-3xl sm:text-4xl"} ${empty ? "text-zinc-400" : "text-white"}`}>
+          className={`relative leading-none font-extrabold [text-shadow:0_0.15rem_0_rgb(0_0_0/0.9),0_0_0.6rem_rgb(0_0_0/0.85),0_0_1rem_var(--color-game-soul)] ${big ? "text-6xl" : "text-4xl sm:text-5xl"} ${empty ? "text-zinc-400" : "text-white"}`}>
           {n}
         </motion.b>
       </AnimatePresence>
@@ -75,13 +75,16 @@ export function SoulOrb({ n, label, big }: { n: number; label: string; /** Na la
 }
 
 type EndProps = {
+  /** Texto principal (Fechar a conta). */
   label: string;
+  /** Linha de cima (Fim do turno). */
+  sub: string;
   turn: number;
   total: number;
   /** Revelando: mostra o texto de espera e trava o botão. */
   busy: boolean;
   busyLabel: string;
-  /** Nada mais para jogar: o botão pulsa chamando o fim do turno. */
+  /** Nada mais para jogar: a conta balança e brilha chamando o fim do turno. */
   ready: boolean;
   disabled: boolean;
   describedBy?: string;
@@ -92,24 +95,33 @@ type EndProps = {
 
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text";
 
-/** Botão de fim do turno com o contador (o número vira como uma placa quando o turno muda). */
-export function EndTurnButton({ label, turn, total, busy, busyLabel, ready, disabled, describedBy, big, onClick }: EndProps) {
+/**
+ * Fim do turno como a conta do bar: um canhoto de papel com a borda serrilhada, "Fechar a conta" carimbado em vermelho e o
+ * turno anotado embaixo (o número vira como uma placa quando o turno muda). Pronto para fechar, a conta brilha e balança.
+ */
+export function EndTurnButton({ label, sub, turn, total, busy, busyLabel, ready, disabled, describedBy, big, onClick }: EndProps) {
+  const call = ready && !disabled;
   return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-describedby={describedBy} aria-label={`${busy ? busyLabel : label} · ${turn}/${total}`}
-      className={`group relative flex shrink-0 cursor-pointer flex-col items-center gap-0.5 rounded-2xl bg-linear-to-b from-amber-200 to-game-brass p-2 text-dl-black shadow-[0_0.4rem_1rem_rgb(0_0_0/0.6)] transition duration-150 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:from-zinc-500 disabled:to-zinc-700 disabled:text-zinc-200 ${big ? "w-full max-w-40 py-4" : "w-20 sm:w-24"} ${focus}`}>
-      {ready && !disabled && (
-        <motion.span aria-hidden="true" className="pointer-events-none absolute -inset-1 rounded-2xl ring-4 ring-game-brass"
-          animate={{ opacity: [0.2, 0.9, 0.2], scale: [1, 1.04, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }} />
-      )}
-      <span className={`leading-tight font-extrabold tracking-widest uppercase ${big ? "text-sm" : "text-[10px] sm:text-xs"}`}>{busy ? busyLabel : label}</span>
-      <span className={`relative flex items-center overflow-hidden leading-none font-extrabold perspective-[20rem] ${big ? "h-12 text-5xl" : "h-8 text-2xl sm:h-9 sm:text-3xl"}`}>
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span key={turn} initial={{ rotateX: -90, opacity: 0 }} animate={{ rotateX: 0, opacity: 1 }} exit={{ rotateX: 90, opacity: 0 }} transition={{ duration: 0.28 }}>
-            {Math.min(turn, total)}
-          </motion.span>
-        </AnimatePresence>
-        <span className={`opacity-70 ${big ? "text-2xl" : "text-base sm:text-lg"}`}>/{total}</span>
-      </span>
+    <button type="button" onClick={onClick} disabled={disabled} aria-describedby={describedBy} aria-label={`${busy ? busyLabel : `${label} (${sub})`} · ${turn}/${total}`}
+      className={`group relative flex shrink-0 cursor-pointer flex-col items-stretch transition duration-150 enabled:hover:-translate-y-1 enabled:hover:-rotate-2 enabled:active:translate-y-0 enabled:active:scale-95 disabled:cursor-not-allowed ${big ? "w-full max-w-44" : "w-22 sm:w-26"} ${focus}`}>
+      {/* luz vermelha e quente por trás da conta, mais forte quando é hora de fechar */}
+      <motion.span aria-hidden="true" className="pointer-events-none absolute -inset-3 rounded-2xl bg-radial from-rose-500/70 via-game-brass/40 to-transparent to-70% blur-lg"
+        animate={disabled ? { opacity: 0 } : call ? { opacity: [0.55, 1, 0.55], scale: [0.96, 1.08, 0.96] } : { opacity: 0.35, scale: 1 }}
+        transition={call ? { duration: 1.3, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }} />
+      <motion.span className={`relative flex flex-col items-center gap-1 bg-comanda-paper text-comanda-ink shadow-[inset_0_0_1.5rem_rgb(90_60_20/0.3)] transition-[filter] receipt-edge group-disabled:brightness-60 group-disabled:grayscale ${big ? "px-3 pt-3 pb-5" : "px-1.5 pt-1.5 pb-3"}`}
+        animate={call ? { rotate: [0, -3, 3, -2, 0] } : { rotate: 0 }} transition={call ? { duration: 0.6, repeat: Infinity, repeatDelay: 1.6 } : { duration: 0.2 }}>
+        <span className={`w-full bg-comanda-ink text-center font-extrabold tracking-widest text-comanda-paper uppercase ${big ? "py-0.5 text-xs" : "text-[9px] sm:text-[10px]"}`}>{busy ? busyLabel : sub}</span>
+        <span className={`-rotate-3 rounded-sm px-1 text-center leading-none font-extrabold text-rose-700 uppercase ring-2 ring-rose-700/80 ${big ? "py-1 text-2xl" : "py-0.5 text-[11px] sm:text-sm"}`}>{label}</span>
+        <span className="w-full border-t-2 border-dashed border-comanda-ink/40" />
+        <span className={`relative flex items-center overflow-hidden leading-none font-extrabold tabular-nums perspective-[20rem] ${big ? "h-12 text-5xl" : "h-7 text-2xl sm:h-8 sm:text-3xl"}`}>
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span key={turn} initial={{ rotateX: -90, opacity: 0 }} animate={{ rotateX: 0, opacity: 1 }} exit={{ rotateX: 90, opacity: 0 }} transition={{ duration: 0.28 }}>
+              {Math.min(turn, total)}
+            </motion.span>
+          </AnimatePresence>
+          <span className={`opacity-60 ${big ? "text-2xl" : "text-sm sm:text-base"}`}>/{total}</span>
+        </span>
+      </motion.span>
     </button>
   );
 }

@@ -34,6 +34,12 @@ const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 // cor de cada categoria de item, como na loja do Deadlock
 const SLOT_RING: Record<ItemSlot, string> = { weapon: "ring-item-weapon", vitality: "ring-item-vitality", spirit: "ring-item-spirit" };
 const SLOT_TEXT: Record<ItemSlot, string> = { weapon: "text-item-weapon", vitality: "text-item-vitality", spirit: "text-item-spirit" };
+/** Caixa da loja na cor da categoria do item: etiqueta, tinta do fundo, moldura e brilho. */
+const SLOT_BOX: Record<ItemSlot, { tag: string; tint: string; glow: string }> = {
+  weapon: { tag: "bg-item-weapon", tint: "from-item-weapon/35", glow: "drop-shadow-[0_0_0.9rem_var(--color-item-weapon)]" },
+  vitality: { tag: "bg-item-vitality", tint: "from-item-vitality/35", glow: "drop-shadow-[0_0_0.9rem_var(--color-item-vitality)]" },
+  spirit: { tag: "bg-item-spirit", tint: "from-item-spirit/35", glow: "drop-shadow-[0_0_0.9rem_var(--color-item-spirit)]" },
+};
 /** Cor do selo de cada fase da partida (early, mid, late). */
 const PHASE_TONE = ["bg-emerald-500/20 text-emerald-300", "bg-amber-500/20 text-amber-300", "bg-rose-500/20 text-rose-300"] as const;
 
@@ -60,6 +66,8 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   const [sel, setSel] = useState<GCard | null>(null);
   const [look, setLook] = useState<GCard | null>(null);
   const [shopHidden, setShopHidden] = useState(false);
+  // partida atual: as faixas remontam a cada partida nova, para o primeiro local revelar com efeito
+  const [game, setGame] = useState(0);
   // tela cheia: a partida cobre o site (e pede tela cheia ao navegador quando dá)
   const [full, setFull] = useState(false);
   const wide = useWide();
@@ -177,6 +185,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     setAshes(new Set());
     timers.current = [];
     setM(newMatch());
+    setGame((x) => x + 1);
     sfx("shuffle");
     setSel(null);
     setLook(null);
@@ -353,7 +362,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     cover={next.p && face(next.p, false)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} /></div>;
   const endBtn = result && !showEnd
     ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
-    : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady} big={wide}
+    : <EndTurnButton label={t.ui.closeTab} sub={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady} big={wide}
         disabled={m.busy || !!result} onClick={endTurn} />;
   const prio = <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr>;
   const controls = (
@@ -384,7 +393,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     <div className={`relative mx-auto flex flex-col gap-1.5 text-dl-text ${wide ? "h-full min-w-0 flex-[0_1_80rem]" : `${height} max-w-7xl`}`}>
       {/* as faixas vão de cima até embaixo da mão, como se a mesa fosse vista de cima */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 flex gap-0.5 sm:gap-1">
-        {m.loc.map((l, i) => <LaneBackdrop key={l.L.id + i} l={l} i={i} drop={dropAt(l, i)} />)}
+        {m.loc.map((l, i) => <LaneBackdrop key={`${game}-${l.L.id}${i}`} l={l} i={i} drop={dropAt(l, i)} fresh={m.t === 1} />)}
       </div>
       <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
         {wide ? <div /> : title}
@@ -423,6 +432,13 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
           {shopOpen && m.offer && !shopHidden && (
             <motion.section key="shop" aria-labelledby="game-shop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
               className="pointer-events-none absolute inset-0 z-30 flex flex-col justify-center gap-3">
+              {/* borda das caixas a pincel: o fundo e a moldura tremem nas bordas como tinta */}
+              <svg aria-hidden="true" className="absolute size-0">
+                <filter id="shop-rough" x="-8%" y="-8%" width="116%" height="116%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves={2} seed={5} result="wave" />
+                  <feDisplacementMap in="SourceGraphic" in2="wave" scale={11} xChannelSelector="R" yChannelSelector="G" />
+                </filter>
+              </svg>
               <div className="flex flex-col items-center gap-1 px-2 text-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)]">
                 <h2 id="game-shop" className="bg-zinc-950 px-3 py-1 text-base font-extrabold tracking-wider uppercase [clip-path:polygon(1%_0,100%_6%,99%_100%,0_94%)] sm:text-xl">{t.shop.title}</h2>
                 <p className="max-w-xl bg-zinc-950/90 px-2 py-0.5 text-[11px] text-zinc-300 sm:text-xs">{t.shop.hint}</p>
@@ -463,7 +479,10 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
             {(mode.k === "move" || mode.k === "mark") && <button type="button" className={pill(false)} onClick={() => setMode(null)}>{t.ui.act.cancel}</button>}
           </>
         ) : shopOpen && shopHidden ? (
-          <button type="button" className={pill(false)} onClick={() => setShopHidden(false)}>{t.shop.title}</button>
+          <button type="button" onClick={() => setShopHidden(false)}
+            className={`grid min-h-14 cursor-pointer place-items-center text-lg font-extrabold tracking-wider text-zinc-950 uppercase transition hover:brightness-110 active:scale-95 ${focus}`}>
+            <TickTag tone="bg-dl-text" className="px-7 py-2.5">{t.shop.show}</TickTag>
+          </button>
         ) : <span className="line-clamp-1 text-zinc-300">{logLine || t.ui.hint}</span>}
       </div>
 
@@ -639,13 +658,13 @@ function BarTable() {
 }
 
 /** Fundo da faixa: arte do local (ou névoa enquanto oculto), escurecida nas pontas e tingida com a cor da lane; bordas a pincel. A cor da lane vaza na mesa. */
-function LaneBackdrop({ l, i, drop }: { l: Loc; i: number; drop: "off" | "ok" | "over" }) {
+function LaneBackdrop({ l, i, drop, fresh }: { l: Loc; i: number; drop: "off" | "ok" | "over"; /** Começo da partida: o local já revelado também revela com efeito e som. */ fresh: boolean }) {
   const b = BRUSH[i % 3], lane = LANE[i % 3];
   const [ref, { w, h }] = useSize();
   const id = `lane-${i}`;
   const art = l.rev && l.L.art;
   // som quando o local vira (não na montagem: um local já revelado ao abrir a partida fica quieto)
-  const was = useRef(l.rev);
+  const was = useRef(fresh ? false : l.rev);
   useEffect(() => {
     if (l.rev && !was.current) sfx("reveal");
     was.current = l.rev;
@@ -656,8 +675,8 @@ function LaneBackdrop({ l, i, drop }: { l: Loc; i: number; drop: "off" | "ok" | 
     <div ref={ref} className="relative min-w-0 flex-1">
       <div className={`absolute -inset-x-1/2 inset-y-0 bg-radial to-transparent to-70% mix-blend-screen ${lane.glow}`} />
       <div className="absolute inset-0 bg-zinc-950" style={{ clipPath: `url(#${id}-clip)` }}>
-        {/* só anima ao revelar durante a partida; ao abrir a tela com o local já revelado, a arte já está lá */}
-        <AnimatePresence initial={false}>
+        {/* anima ao revelar; ao voltar para a tela no meio da partida, a arte já está lá */}
+        <AnimatePresence initial={fresh}>
           {art && (
           <motion.img key={art} src={locArtUrl(art)} alt="" draggable={false}
             initial={{ opacity: 0, scale: 1.12, filter: "blur(14px) brightness(0.3)" }} animate={{ opacity: 1, scale: 1, filter: "blur(0px) brightness(1)" }}
@@ -883,33 +902,38 @@ function ItemIconBox({ k, icon, size }: { k: ItemKey; icon?: string; size: strin
 /** Foco que aparece dentro de caixas recortadas (o recorte cortaria o contorno de fora). */
 const focusIn = "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-dl-text";
 
-/** Item da loja na região de um local: caixa escura com a arte e a cor do local, nome numa etiqueta que dá o tique. */
+/**
+ * Item da loja na região de um local: caixa escura na cor da categoria do item (arma laranja, vitalidade verde, espírito
+ * roxo), com a arte do local ao fundo, moldura a pincel e o nome numa etiqueta que dá o tique. Na tela larga é 50% maior.
+ */
 function ShopBox({ k, i, l, m, t, icon, picked, disabled, onPick }: { k: ItemKey; i: number; l: Loc; m: Match; t: T; icon?: string; picked: boolean; disabled: boolean; onPick: () => void }) {
   const it = ITEMS[k];
   const fit = m.itemFit("p", k);
-  const lane = LANE[i % 3];
+  const box = SLOT_BOX[it.slot];
   const art = l.rev && l.L.art;
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }} transition={{ duration: 0.22, delay: i * 0.06 }}
-      className="pointer-events-auto flex w-full max-w-72 drop-shadow-[0_0.5rem_0.75rem_rgb(0_0_0/0.75)]">
+      className={`pointer-events-auto flex w-full max-w-72 2xl:max-w-108 ${disabled ? "" : box.glow}`}>
       <button type="button" onClick={onPick} disabled={disabled} aria-pressed={picked} aria-label={`${t.shop.label(k, it.tier)}: ${t.items[k](m.itemV(k))}`}
-        className={`relative isolate flex w-full cursor-pointer flex-col items-center gap-1.5 overflow-hidden bg-zinc-950 p-2 text-center transition [clip-path:polygon(1%_2%,99%_0,100%_98%,0_100%)] enabled:hover:brightness-125 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:brightness-60 disabled:saturate-50 sm:gap-2 sm:p-3 ${picked ? "outline-2 -outline-offset-4 outline-game-brass" : ""} ${focusIn}`}>
-        {art && <img src={locArtUrl(art)} alt="" draggable={false} className="absolute inset-0 -z-10 size-full object-cover opacity-30" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />}
-        <span aria-hidden="true" className={`absolute inset-0 -z-10 bg-linear-to-b to-zinc-950/70 to-70% ${lane.tint}`} />
-        <TickTag tone={lane.tag} className="max-w-full px-2 py-0.5 text-sm font-extrabold tracking-wide text-zinc-950 [font-variant-caps:small-caps] sm:px-3 sm:text-lg">{k}</TickTag>
-        <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-          <ItemIconBox k={k} icon={icon} size="size-9 sm:size-12" />
-          <span className={`text-[10px] font-bold tracking-wider uppercase sm:text-xs ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
+        className={`relative isolate flex w-full cursor-pointer flex-col items-center gap-1.5 p-2.5 text-center transition enabled:hover:-translate-y-0.5 enabled:hover:brightness-125 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:brightness-60 disabled:saturate-50 sm:gap-2 sm:p-3.5 2xl:gap-3 2xl:p-6 ${picked ? "outline-2 -outline-offset-8 outline-game-brass" : ""} ${focusIn}`}>
+        <span aria-hidden="true" className={`absolute inset-0 -z-10 overflow-hidden bg-zinc-950 ring-4 filter-[url(#shop-rough)] ring-inset ${SLOT_RING[it.slot]}`}>
+          {art && <img src={locArtUrl(art)} alt="" draggable={false} className="absolute inset-0 size-full object-cover opacity-25" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />}
+          <span className={`absolute inset-0 bg-linear-to-b to-zinc-950/75 to-70% ${box.tint}`} />
         </span>
-        <span className="text-xs text-zinc-100 sm:text-sm">{t.items[k](m.itemV(k))}</span>
-        <span className="text-[11px] font-bold text-game-brass sm:text-xs">{t.shop.price(m.itemPrice("p", k))}{!picked && !m.canBuy(k) && ` · ${m.itemTargets("p", k).length ? t.shop.noSouls : t.shop.noTarget}`}</span>
+        <TickTag tone={box.tag} className="max-w-full px-2 py-0.5 text-sm font-extrabold tracking-wide text-zinc-950 [font-variant-caps:small-caps] sm:px-3 sm:text-lg 2xl:px-5 2xl:py-1 2xl:text-3xl">{k}</TickTag>
+        <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 2xl:gap-x-3">
+          <ItemIconBox k={k} icon={icon} size="size-9 sm:size-12 2xl:size-18" />
+          <span className={`text-[10px] font-bold tracking-wider uppercase sm:text-xs 2xl:text-lg ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
+        </span>
+        <span className="text-xs text-zinc-100 sm:text-sm 2xl:text-xl">{t.items[k](m.itemV(k))}</span>
+        <span className="text-[11px] font-bold text-game-brass sm:text-xs 2xl:text-lg">{t.shop.price(m.itemPrice("p", k))}{!picked && !m.canBuy(k) && ` · ${m.itemTargets("p", k).length ? t.shop.noSouls : t.shop.noTarget}`}</span>
         {(fit.cards > 0 || fit.loc) && (
           <span className="flex flex-wrap justify-center gap-1">
-            {fit.cards > 0 && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me">{t.shop.fitCards(fit.cards)}</span>}
-            {fit.loc && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me">{t.shop.fitLoc(fit.loc)}</span>}
+            {fit.cards > 0 && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me 2xl:px-2.5 2xl:text-sm">{t.shop.fitCards(fit.cards)}</span>}
+            {fit.loc && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me 2xl:px-2.5 2xl:text-sm">{t.shop.fitLoc(fit.loc)}</span>}
           </span>
         )}
-        {picked && <span className="text-[11px] font-bold tracking-wider text-game-brass uppercase">{t.shop.picked} · {t.shop.undo}</span>}
+        {picked && <span className="text-[11px] font-bold tracking-wider text-game-brass uppercase 2xl:text-base">{t.shop.picked} · {t.shop.undo}</span>}
       </button>
     </motion.div>
   );
@@ -1026,18 +1050,18 @@ function LocTile({ i, nm, desc, chips, a, p }: { i: number; nm: string; desc: st
   const [full, setFull] = useState(false);
   const lane = LANE[i % 3];
   return (
-    <div className="flex w-full flex-col items-center gap-2 text-center leading-tight">
-      <div className="flex w-full flex-wrap items-center justify-between gap-1 sm:flex-nowrap">
+    <div className="@container flex w-full flex-col items-center gap-2 text-center leading-tight">
+      <div className="flex w-full flex-wrap items-center justify-between gap-1 @sm:flex-nowrap">
         <ScoreTag v={p} lead={p > a} side="p" />
         <motion.h3 key={nm} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.9 }}
-          className="order-first flex w-full min-w-0 justify-center text-sm font-extrabold tracking-wide text-zinc-950 [font-variant-caps:small-caps] sm:order-0 sm:w-auto sm:flex-1 sm:text-2xl">
-          <TickTag tone={lane.tag} className="line-clamp-2 px-2 py-1 sm:px-4">{nm}</TickTag>
+          className="order-first flex w-full min-w-0 justify-center text-sm font-extrabold tracking-wide wrap-break-word hyphens-auto text-zinc-950 [font-variant-caps:small-caps] @3xs:text-lg @sm:order-0 @sm:w-auto @sm:flex-1 @sm:text-xl @[26rem]:text-2xl">
+          <TickTag tone={lane.tag} className="line-clamp-2 max-w-full min-w-0 px-2 py-1 sm:px-4">{nm}</TickTag>
         </motion.h3>
         <ScoreTag v={a} lead={a > p} side="a" />
       </div>
       <div className="flex w-full justify-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)]">
         <button type="button" onClick={() => setFull((x) => !x)} aria-expanded={full} title={desc}
-          className={`max-w-full cursor-pointer bg-zinc-950 px-2.5 py-1 text-xs font-bold transition-[filter] [clip-path:polygon(0_0,100%_5%,99%_100%,1%_94%)] hover:brightness-125 active:brightness-90 sm:px-3 sm:py-1.5 sm:text-sm xl:text-base ${lane.ink} ${full ? "" : "line-clamp-3"} ${focusIn}`}>
+          className={`max-w-full cursor-pointer bg-zinc-950 px-2.5 py-1 text-xs font-bold transition-[filter] [clip-path:polygon(0_0,100%_5%,99%_100%,1%_94%)] hover:brightness-125 active:brightness-90 sm:px-3 sm:py-1.5 @3xs:text-sm @sm:text-base ${lane.ink} ${full ? "" : "line-clamp-3"} ${focusIn}`}>
           {desc}
         </button>
       </div>
@@ -1107,7 +1131,7 @@ function Burning({ card, onDone }: { card: ReactNode; onDone: () => void }) {
   return (
     <motion.div aria-hidden="true" className="pointer-events-none absolute bottom-0 left-1/2 z-30 w-full max-w-40 min-w-24 -translate-x-1/2"
       initial={{ opacity: 0, y: 0, scale: 0.9 }} animate={{ opacity: [0, 1, 1, 0], y: -24, scale: 1.05 }} exit={{ opacity: 0 }}
-      transition={{ duration: 1.9, times: [0, 0.1, 0.75, 1], ease: "easeOut" }} onAnimationComplete={onDone}>
+      transition={{ duration: 3.4, times: [0, 0.06, 0.85, 1], ease: "easeOut" }} onAnimationComplete={onDone}>
       <div className="relative card-burn grayscale">
         {card}
         <span className="absolute inset-x-0 burn-front h-1/3 bg-linear-to-t from-transparent via-orange-500 to-amber-200/0 mix-blend-screen blur-sm" />
@@ -1115,7 +1139,7 @@ function Burning({ card, onDone }: { card: ReactNode; onDone: () => void }) {
       {Array.from({ length: 8 }, (_, k) => (
         <motion.span key={k} className="absolute bottom-1/4 size-1.5 rounded-full bg-amber-400 blur-[1px]" style={{ left: `${10 + k * 11}%` }}
           initial={{ y: 0, opacity: 0 }} animate={{ y: -60 - (k % 3) * 25, x: (k % 2 ? 1 : -1) * (6 + k * 2), opacity: [0, 1, 0] }}
-          transition={{ duration: 1.1, delay: 0.25 + (k % 4) * 0.15, ease: "easeOut" }} />
+          transition={{ duration: 1.8, delay: 0.3 + (k % 4) * 0.5, ease: "easeOut" }} />
       ))}
     </motion.div>
   );

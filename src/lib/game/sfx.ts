@@ -113,7 +113,7 @@ function noise(c: AudioContext, sec: number, brown = false) {
 }
 let burst: AudioBuffer | null = null;
 
-/** Carta queimando (mão cheia): a chama pega num sopro que abre, estala e se apaga em ~1,4 s. */
+/** Carta queimando (mão cheia): a chama pega num sopro que abre, estala e se apaga em ~2,9 s. */
 function cardBurn(strength = 1) {
   const lv = sfxLevel();
   if (!lv || !hasCtx()) return;
@@ -122,23 +122,25 @@ function cardBurn(strength = 1) {
   const vol = SFX_BASE * lv * strength;
   // o fogo: ruído marrom que abre do grave para o médio e some
   const fire = c.createBufferSource();
-  fire.buffer = noise(c, 1.6, true);
+  fire.buffer = noise(c, 3.1, true);
   const lp = c.createBiquadFilter();
   lp.type = "lowpass"; lp.Q.value = 0.7;
   lp.frequency.setValueAtTime(300, t);
-  lp.frequency.exponentialRampToValueAtTime(2600, t + 0.35);
-  lp.frequency.exponentialRampToValueAtTime(500, t + 1.4);
+  lp.frequency.exponentialRampToValueAtTime(2600, t + 0.5);
+  lp.frequency.exponentialRampToValueAtTime(1400, t + 2);
+  lp.frequency.exponentialRampToValueAtTime(500, t + 2.9);
   const fg = c.createGain();
   fg.gain.setValueAtTime(0.0001, t);
-  fg.gain.exponentialRampToValueAtTime(2.2 * vol, t + 0.12);
-  fg.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+  fg.gain.exponentialRampToValueAtTime(2.2 * vol, t + 0.15);
+  fg.gain.exponentialRampToValueAtTime(1.4 * vol, t + 2);
+  fg.gain.exponentialRampToValueAtTime(0.0001, t + 3);
   fire.connect(lp).connect(fg).connect(c.destination);
   fire.start(t);
-  fire.stop(t + 1.6);
+  fire.stop(t + 3.1);
   // estalos do papel: estouros curtos e agudos em momentos soltos
   burst ??= noise(c, 0.3);
-  for (let i = 0; i < 14; i++) {
-    const at = t + 0.05 + Math.random() * 1.1;
+  for (let i = 0; i < 24; i++) {
+    const at = t + 0.05 + Math.random() * 2.6;
     const pop = c.createBufferSource();
     pop.buffer = burst;
     const hp = c.createBiquadFilter();
