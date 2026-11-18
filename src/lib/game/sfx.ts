@@ -16,7 +16,7 @@ import win from "../../assets/sfx/win.ogg";
 const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, win };
 /** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
 const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
-export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover";
+export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn";
 
 /** Volume e mudo de cada canal (0 a 1). */
 export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
@@ -65,6 +65,7 @@ export function sfx(name: Sfx, volume = 1) {
   if (name in WOOD) return woodHit(WOOD[name as keyof typeof WOOD] * volume);
   if (name === "reveal") return revealSwell(volume);
   if (name === "hover") return cardFlick(volume);
+  if (name === "burn") return cardBurn(volume);
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
   const file = name as keyof typeof FILES;
@@ -111,6 +112,46 @@ function noise(c: AudioContext, sec: number, brown = false) {
   return b;
 }
 let burst: AudioBuffer | null = null;
+
+/** Carta queimando (mão cheia): a chama pega num sopro que abre, estala e se apaga em ~1,4 s. */
+function cardBurn(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  // o fogo: ruído marrom que abre do grave para o médio e some
+  const fire = c.createBufferSource();
+  fire.buffer = noise(c, 1.6, true);
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass"; lp.Q.value = 0.7;
+  lp.frequency.setValueAtTime(300, t);
+  lp.frequency.exponentialRampToValueAtTime(2600, t + 0.35);
+  lp.frequency.exponentialRampToValueAtTime(500, t + 1.4);
+  const fg = c.createGain();
+  fg.gain.setValueAtTime(0.0001, t);
+  fg.gain.exponentialRampToValueAtTime(2.2 * vol, t + 0.12);
+  fg.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+  fire.connect(lp).connect(fg).connect(c.destination);
+  fire.start(t);
+  fire.stop(t + 1.6);
+  // estalos do papel: estouros curtos e agudos em momentos soltos
+  burst ??= noise(c, 0.3);
+  for (let i = 0; i < 14; i++) {
+    const at = t + 0.05 + Math.random() * 1.1;
+    const pop = c.createBufferSource();
+    pop.buffer = burst;
+    const hp = c.createBiquadFilter();
+    hp.type = "highpass"; hp.frequency.value = 1800 + Math.random() * 2500;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime((0.4 + Math.random() * 0.8) * vol, at + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.03);
+    pop.connect(hp).connect(g).connect(c.destination);
+    pop.start(at, Math.random() * 0.25);
+    pop.stop(at + 0.04);
+  }
+}
 
 let lastFlick = 0;
 /** Passar o mouse pelas cartas da mão: o roçar curto de uma carta grossa na outra (no máximo um a cada 60 ms). */

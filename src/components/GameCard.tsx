@@ -149,13 +149,26 @@ export function CardBack({ className = "", tone = "ai", look }: { className?: st
 }
 
 /** Caixas de palavra-chave e status ao lado da carta ampliada. */
-export function TipBoxes({ tips, className = "" }: { tips: { title: string; text: string }[]; className?: string }) {
+/** Caixa de dica: título, texto e, se houver, linhas "rótulo · valor" (a primeira é a base, as outras somam com sinal). */
+export type Tip = { title: string; text: string; rows?: [string, number][] };
+
+export function TipBoxes({ tips, className = "" }: { tips: Tip[]; className?: string }) {
   if (!tips.length) return null;
   return (
     <div className={`flex w-48 flex-col gap-1.5 ${className}`}>
       {tips.map((x) => (
         <div key={x.title} className="rounded-lg bg-zinc-950/95 px-2.5 py-1.5 text-xs/snug text-zinc-200 shadow-lg ring-1 ring-white/10">
           <b className="block tracking-wide text-game-brass">{x.title}</b>
+          {x.rows && (
+            <span className="flex flex-col py-0.5">
+              {x.rows.map(([label, v], i) => (
+                <span key={`${label}-${i}`} className="flex items-baseline justify-between gap-2">
+                  <span>{label}</span>
+                  <b className={`tabular-nums ${i === 0 ? "text-zinc-100" : v > 0 ? "text-emerald-300" : "text-rose-300"}`}>{i === 0 ? v : v > 0 ? `+${v}` : `−${-v}`}</b>
+                </span>
+              ))}
+            </span>
+          )}
           {x.text}
         </div>
       ))}

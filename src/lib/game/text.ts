@@ -26,7 +26,7 @@ export type GameText = {
   shop: {
     title: string; hint: string; tier: (t: number) => string; price: (n: number) => string; noSouls: string; fitCards: (n: number) => string; fitLoc: (l: string) => string;
     pick: string; picked: string; mine: string; ai: string; hidden: string; pickFirst: string; paid: (n: number) => string; label: (name: string, tier: number) => string;
-    aim: (k: string) => string; undo: string; noTarget: string; on: (name: string) => string;
+    aim: (k: string) => string; undo: string; noTarget: string; on: (name: string) => string; hide: string;
   };
   log: Record<LogKey, Log>;
   deck: {
@@ -45,6 +45,8 @@ export type GameText = {
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
     turn: (t: number, total: number) => string; phase: (p: number) => string; phaseHint: string; prio: (me: boolean) => string; prioHint: string; record: (w: number, l: number) => string; souls: (n: number) => string; players: string; decks: string; comanda: { title: string; table: (n: number) => string; item: string; value: string };
+    /** Caixa que explica o poder da carta na mesa, parte por parte. */
+    powParts: { title: (v: number) => string; base: string; bonus: string; tmp: string; from: (n: string) => string; ab: (a: string) => string; loc: (l: string) => string; stun: string; burrow: string; floor: string };
     endTurn: string; newMatch: string; again: string; viewBoard: string; hint: string; hiddenLoc: string; revealsOn: (t: number) => string; next: (name: string) => string;
     cost: string; power: string; silenced: string; noAbility: string; tokenDesc: string; hand: string; arena: string;
     win: string; loss: string; draw: string; summary: (w: number, l: number, me: number, ai: number) => string; patron: string;
@@ -224,11 +226,12 @@ export const GAME_TEXT = strings<GameText>({
       tier: (t) => `Tier ${t}`, price: (n) => `Custa ${n} ${pl(n, "alma", "almas")}`, noSouls: "Almas insuficientes",
       fitCards: (n) => `Combina com ${n} ${pl(n, "carta sua", "cartas suas")}`, fitLoc: (l) => `Sinergia: ${l}`,
       pick: "Escolher", picked: "Comprado", mine: "Seus itens", ai: "Itens da IA", hidden: "Nenhum item ainda", aim: (k) => `Mire a carta que vai receber ${k}.`, undo: "Desfazer compra", noTarget: "Sem alvo na mesa",
-      pickFirst: "", paid: (n) => `pagou ${n} ${pl(n, "alma", "almas")}`, on: (n) => `em ${n}`,
+      pickFirst: "", paid: (n) => `pagou ${n} ${pl(n, "alma", "almas")}`, on: (n) => `em ${n}`, hide: "Ocultar",
       label: (name, tier) => `${name}, tier ${tier}`,
     },
     log: {
       back: (e, n) => `${n(e.c)} voltou para a mão (${e.loc}).`,
+      burnt: (e, n) => `Mão cheia: ${n(e.c)} queimou e saiu da partida.`,
       gone: (e, n) => `${n(e.c)} foi destruída em ${e.loc}.`,
       hoop: (e, n) => `${n(e.c)} acertou a cesta de 3!`,
       copy: (e, n) => `${n(e.c)} ganhou uma cópia em ${e.loc}.`,
@@ -326,6 +329,7 @@ export const GAME_TEXT = strings<GameText>({
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
       needCards: (n) => `Cadastre pelo menos ${n} cartas para jogar.`, you: "Você: Rei Oculto", ai: "IA: Arquimãe",
       turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 a 3 · Mid: 4 a 6 (cartas sobem para Profissional) · Late: 7 e 8 (Mestre e ultimates).", prio: (me) => `Prioridade: ${me ? "você" : "IA"}`, prioHint: "Quem tem prioridade revela primeiro. No turno 1 é o Rei Oculto; depois, quem estiver ganhando a partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, players: "Almas e itens", decks: "Baralhos e fim do turno", comanda: { title: "Comanda", table: (n) => `Mesa ${n}`, item: "Item", value: "Almas" },
+      powParts: { title: (v) => `Poder ${v}: de onde vem`, base: "Poder base", bonus: "Efeitos e itens recebidos", tmp: "Efeitos deste turno", from: (n) => `Efeito de ${n}`, ab: (a) => `Habilidade: ${a}`, loc: (l) => `Local: ${l}`, stun: "Erguida: 0 de poder neste turno", burrow: "Entocada: 0 de poder até o fim da partida", floor: "O poder nunca fica abaixo de 0." },
       endTurn: "Fim do turno", newMatch: "Nova partida", again: "Jogar de novo", viewBoard: "Ver tabuleiro",
       hint: "Arraste uma carta até um local para jogar (ou toque nela e depois no local). Passe o mouse para ler.", hiddenLoc: "Local oculto", revealsOn: (t) => `Revela no turno ${t}`, next: (name) => `Próxima carta: ${name}`,
       cost: "custo", power: "poder", silenced: "habilidade anulada", noAbility: "Sem habilidade.", tokenDesc: "Ficha criada por uma habilidade.",
@@ -512,11 +516,12 @@ export const GAME_TEXT = strings<GameText>({
       tier: (t) => `Tier ${t}`, price: (n) => `Costs ${n} ${pl(n, "soul", "souls")}`, noSouls: "Not enough souls",
       fitCards: (n) => `Fits ${n} of your ${pl(n, "card", "cards")}`, fitLoc: (l) => `Synergy: ${l}`,
       pick: "Pick", picked: "Bought", mine: "Your items", ai: "AI items", hidden: "No items yet", aim: (k) => `Aim at the card that gets ${k}.`, undo: "Undo purchase", noTarget: "No target on the board",
-      pickFirst: "", paid: (n) => `paid ${n} ${pl(n, "soul", "souls")}`, on: (n) => `on ${n}`,
+      pickFirst: "", paid: (n) => `paid ${n} ${pl(n, "soul", "souls")}`, on: (n) => `on ${n}`, hide: "Hide",
       label: (name, tier) => `${name}, tier ${tier}`,
     },
     log: {
       back: (e, n) => `${n(e.c)} returned to hand (${e.loc}).`,
+      burnt: (e, n) => `Hand full: ${n(e.c)} burned and left the match.`,
       gone: (e, n) => `${n(e.c)} was destroyed at ${e.loc}.`,
       hoop: (e, n) => `${n(e.c)} hit a three-pointer!`,
       copy: (e, n) => `${n(e.c)} got a copy at ${e.loc}.`,
@@ -614,6 +619,7 @@ export const GAME_TEXT = strings<GameText>({
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
       needCards: (n) => `Add at least ${n} cards to play.`, you: "You: Hidden King", ai: "AI: Archmother",
       turn: (t, total) => `Turn ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 to 3 · Mid: 4 to 6 (cards rise to Pro) · Late: 7 and 8 (Master and ultimates).", prio: (me) => `Priority: ${me ? "you" : "AI"}`, prioHint: "Whoever has priority reveals first. On turn 1 it's the Hidden King; after that, whoever is winning the match.", record: (w, l) => `${w}W ${l}L`, souls: (n) => `${n} ${pl(n, "soul", "souls")}`, players: "Souls and items", decks: "Decks and end turn", comanda: { title: "Bar tab", table: (n) => `Table ${n}`, item: "Item", value: "Souls" },
+      powParts: { title: (v) => `Power ${v}: where it comes from`, base: "Base power", bonus: "Effects and items received", tmp: "Effects this turn", from: (n) => `Effect from ${n}`, ab: (a) => `Ability: ${a}`, loc: (l) => `Location: ${l}`, stun: "Lifted: 0 power this turn", burrow: "Burrowed: 0 power until the end of the match", floor: "Power never goes below 0." },
       endTurn: "End turn", newMatch: "New match", again: "Play again", viewBoard: "View board",
       hint: "Drag a card onto a location to play it (or tap it, then the location). Hover to read.", hiddenLoc: "Hidden location", revealsOn: (t) => `Reveals on turn ${t}`, next: (name) => `Next card: ${name}`,
       cost: "cost", power: "power", silenced: "ability canceled", noAbility: "No ability.", tokenDesc: "Token created by an ability.",
@@ -800,11 +806,12 @@ export const GAME_TEXT = strings<GameText>({
       tier: (t) => `Tier ${t}`, price: (n) => `Cuesta ${n} ${pl(n, "alma", "almas")}`, noSouls: "Almas insuficientes",
       fitCards: (n) => `Combina con ${n} ${pl(n, "carta tuya", "cartas tuyas")}`, fitLoc: (l) => `Sinergia: ${l}`,
       pick: "Elegir", picked: "Comprado", mine: "Tus objetos", ai: "Objetos de la IA", hidden: "Ningún objeto aún", aim: (k) => `Apunta a la carta que recibe ${k}.`, undo: "Deshacer compra", noTarget: "Sin objetivo en la mesa",
-      pickFirst: "", paid: (n) => `pagó ${n} ${pl(n, "alma", "almas")}`, on: (n) => `en ${n}`,
+      pickFirst: "", paid: (n) => `pagó ${n} ${pl(n, "alma", "almas")}`, on: (n) => `en ${n}`, hide: "Ocultar",
       label: (name, tier) => `${name}, tier ${tier}`,
     },
     log: {
       back: (e, n) => `${n(e.c)} volvió a la mano (${e.loc}).`,
+      burnt: (e, n) => `Mano llena: ${n(e.c)} se quemó y salió de la partida.`,
       gone: (e, n) => `${n(e.c)} fue destruida en ${e.loc}.`,
       hoop: (e, n) => `¡${n(e.c)} encestó un triple!`,
       copy: (e, n) => `${n(e.c)} recibió una copia en ${e.loc}.`,
@@ -902,6 +909,7 @@ export const GAME_TEXT = strings<GameText>({
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",
       needCards: (n) => `Registra al menos ${n} cartas para jugar.`, you: "Tú: Rey Oculto", ai: "IA: Archimadre",
       turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rondas 1 a 3 · Mid: 4 a 6 (las cartas suben a Profesional) · Late: 7 y 8 (Maestro y ultimates).", prio: (me) => `Prioridad: ${me ? "tú" : "IA"}`, prioHint: "Quien tiene la prioridad revela primero. En el turno 1 es el Rey Oculto; después, quien vaya ganando la partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, players: "Almas y objetos", decks: "Mazos y fin del turno", comanda: { title: "Comanda", table: (n) => `Mesa ${n}`, item: "Objeto", value: "Almas" },
+      powParts: { title: (v) => `Poder ${v}: de dónde viene`, base: "Poder base", bonus: "Efectos y objetos recibidos", tmp: "Efectos de este turno", from: (n) => `Efecto de ${n}`, ab: (a) => `Habilidad: ${a}`, loc: (l) => `Lugar: ${l}`, stun: "Levantada: 0 de poder este turno", burrow: "Enterrada: 0 de poder hasta el final de la partida", floor: "El poder nunca baja de 0." },
       endTurn: "Fin del turno", newMatch: "Nueva partida", again: "Jugar de nuevo", viewBoard: "Ver tablero",
       hint: "Arrastra una carta a un lugar para jugarla (o tócala y luego el lugar). Pasa el ratón para leer.", hiddenLoc: "Lugar oculto", revealsOn: (t) => `Se revela en el turno ${t}`, next: (name) => `Próxima carta: ${name}`,
       cost: "coste", power: "poder", silenced: "habilidad anulada", noAbility: "Sin habilidad.", tokenDesc: "Ficha creada por una habilidad.",

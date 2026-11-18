@@ -122,6 +122,16 @@ describe("partida", () => {
     expect(m.loc.map((l) => l.rev)).toEqual([true, false, false]);
   });
 
+  it("com 7 cartas na mão, a carta comprada queima e sai da partida", () => {
+    const m = new Match(gameConfig(undefined), pool, seeded(1));
+    while (m.hand.length < 7) m.hand.push(m.deck.pop()!);
+    const top = m.deck[m.deck.length - 1], left = m.deck.length;
+    m.nextTurn();
+    expect(m.hand).toHaveLength(7);
+    expect(m.deck).toHaveLength(left - 1);
+    expect(m.burned).toEqual([{ s: "p", c: top }]);
+  });
+
   it("jogar sem almas é recusado; jogar e desfazer devolve as almas", () => {
     const m = new Match(gameConfig(undefined), pool, seeded(2));
     m.E = 0;

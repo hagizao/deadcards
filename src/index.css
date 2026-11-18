@@ -139,6 +139,30 @@
   100% { rotate: -5deg; }
 }
 
+/* Cardslock Game: carta queimando (mão cheia). A máscara come a carta de baixo para cima e a frente de fogo sobe junto. */
+@utility card-burn {
+  mask-image: linear-gradient(to top, transparent 40%, black 60%);
+  mask-size: 100% 250%;
+  mask-position: 0 0;
+  animation: card-burn 1.5s 0.2s ease-in forwards;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@keyframes card-burn {
+  to { mask-position: 0 100%; }
+}
+@utility burn-front {
+  bottom: -33%;
+  animation: burn-front 1.5s 0.2s ease-in forwards;
+  @media (prefers-reduced-motion: reduce) {
+    display: none;
+  }
+}
+@keyframes burn-front {
+  to { bottom: 100%; }
+}
+
 /* a mesma corrida da seta, no passo do tracejado de pincel (soma do BRUSH_DASH do TargetArrow) */
 @utility aim-brush {
   animation: aim-brush 1.1s linear infinite;

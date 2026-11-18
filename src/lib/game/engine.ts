@@ -69,6 +69,8 @@ export type Act = { c: GCard; l: Loc; exec?: boolean };
 /** O que a carta pede ao ser jogada: alvo inimigo (daqui ou de qualquer local) e/ou um local. */
 export type ChoiceSpec = { card?: "here" | "any"; loc?: boolean };
 
+/** Uma parte do poder da carta: de onde veio e quanto soma. */
+export type PowPart = { k: "base" | "bonus" | "tmp" | "from" | "ab" | "loc" | "stun" | "burrow"; v: number; n?: Name; ab?: AbilityKey; loc?: string };
 export type LogEntry = { k: LogKey; c?: Name; t?: Name; a?: Name; loc?: string; v?: number; n?: number; ab?: AbilityKey; side?: Side; item?: ItemKey };
 export type LogKey =
   | "riposte" | "push" | "wall" | "pigeon" | "hook" | "chain" | "calico" | "celeste" | "danny" | "drifter" | "dynamo" | "owl" | "owlBonus"
@@ -76,7 +78,7 @@ export type LogKey =
   | "paradox" | "pocket" | "rats" | "rem" | "storm" | "shiv" | "mark" | "wolf" | "illusion" | "portal" | "trap" | "vindicta" | "fall"
   | "cube" | "petrify" | "wraith" | "liftEnd" | "yamato" | "chanEnd" | "extraSouls" | "hookPull" | "trapHit" | "urn" | "boss" | "zipline"
   | "item" | "itemLost" | "shop" | "prio" | "phase" | "comeback" | "bounty" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves"
-  | "back" | "gone" | "hoop" | "copy" | "ratLoc" | "bell" | "bet" | "smoke" | "stock";
+  | "back" | "burnt" | "gone" | "hoop" | "copy" | "ratLoc" | "bell" | "bet" | "smoke" | "stock";
 
 export type Result = { outcome: "win" | "loss" | "draw"; won: number; lost: number; myPower: number; aiPower: number; patron: boolean };
 export type PlayError = "souls" | "frozen" | "full" | "closed" | "minCost";
@@ -206,6 +208,8 @@ export class Match {
   adeck: GCard[];
   hand: GCard[] = [];
   ahand: GCard[] = [];
+  /** Cartas compradas com a mão cheia (7): queimam e saem da partida para sempre, em ordem. */
+  burned: { s: Side; c: GCard }[] = [];
   result: Result | null = null;
   /** Loja aberta neste round: as 3 opções de cada lado (mesmos tiers, itens sorteados à parte). */
   offer: Record<Side, ItemKey[]> | null = null;
@@ -303,35 +307,45 @@ export class Match {
 
   /** Poder atual da carta no local (com bônus, auras, efeitos do local e status). */
   pow(c: GCard, l?: Loc): number {
+    const sum = this.powParts(c, l).reduce((a, x) => a + x.v, 0);
+    return (l ?? this.locOf(c)) ? Math.max(0, sum) : sum;
+  }
+  /** O poder da carta em partes (base, bônus, auras, local, status), para explicar o número da mesa. A soma, no mínimo 0, é o pow. */
+  powParts(c: GCard, l?: Loc): PowPart[] {
     l = l ?? this.locOf(c);
-    if (!l) return c.base + c.bonus;
-    if (c.st.burrow && !this.final) return 0;
-    if ((c.st.stun ?? 0) >= this.t) return 0;
-    let x = c.base + c.bonus;
-    c.st.tmp.forEach((m) => { if (this.t <= m.u) x += m.v; });
+    const out: PowPart[] = [{ k: "base", v: c.base }];
+    if (c.bonus) out.push({ k: "bonus", v: c.bonus });
+    if (!l) return out;
+    if (c.st.burrow && !this.final) return [{ k: "burrow", v: 0 }];
+    if ((c.st.stun ?? 0) >= this.t) return [{ k: "stun", v: 0 }];
+    const tmp = c.st.tmp.reduce((a, m) => (this.t <= m.u ? a + m.v : a), 0);
+    if (tmp) out.push({ k: "tmp", v: tmp });
     l.s[c.side].forEach((o) => {
       if (o === c || !o.rev) return;
       const a = this.abilityOf(o);
-      if (a === "aura" || a === "Paige") x += o.v;
+      if (a === "aura" || a === "Paige") out.push({ k: "from", v: o.v, n: this.N(o) });
     });
     // Nurse Harrow: drena constante da inimiga mais forte daqui para o aliado mais fraco daqui
     [...l.s.p, ...l.s.a].forEach((o) => {
       if (!o.rev || o.st.burrow || this.abilityOf(o) !== "Nurse Harrow") return;
       const h = this.harrow(o, l);
-      if (h.foe === c) x -= o.v;
-      if (h.ally === c) x += o.v;
+      if (h.foe === c) out.push({ k: "from", v: -o.v, n: this.N(o) });
+      if (h.ally === c) out.push({ k: "from", v: o.v, n: this.N(o) });
     });
     // Victor: aura contínua em todas as cartas daqui; o Mestre poupa o próprio lado
-    [...l.s.p, ...l.s.a].forEach((o) => { if (o !== c && o.rev && this.abilityOf(o) === "Victor" && (o.side !== c.side || !this.master(o))) x -= o.v; });
+    [...l.s.p, ...l.s.a].forEach((o) => {
+      if (o !== c && o.rev && this.abilityOf(o) === "Victor" && (o.side !== c.side || !this.master(o))) out.push({ k: "from", v: -o.v, n: this.N(o) });
+    });
     const a = this.abilityOf(c);
-    if (a === "Warden") x += c.v * l.s[opp(c.side)].filter((o) => o.rev).length;
-    if (a === "Solomon" && l.s[c.side].length >= this.cap(l) - (this.master(c) ? 1 : 0)) x += c.v;
-    if (a === "Mo & Krill" && this.final) x += c.v;
-    if (this.ty(l, "costLow") && c.cost <= l.L.n) x += l.L.v;
-    if (this.ty(l, "costHigh") && c.cost >= l.L.n) x += l.L.v;
-    if (this.ty(l, "gun") && isGun(c)) x += l.L.v;
-    if (this.ty(l, "crew")) x += l.L.v * l.s[c.side].filter((o) => o !== c && o.rev).length;
-    return Math.max(0, x);
+    if (a === "Warden") out.push({ k: "ab", v: c.v * l.s[opp(c.side)].filter((o) => o.rev).length, ab: a });
+    if (a === "Solomon" && l.s[c.side].length >= this.cap(l) - (this.master(c) ? 1 : 0)) out.push({ k: "ab", v: c.v, ab: a });
+    if (a === "Mo & Krill" && this.final) out.push({ k: "ab", v: c.v, ab: a });
+    const here = (v: number) => out.push({ k: "loc", v, loc: l.L.name });
+    if (this.ty(l, "costLow") && c.cost <= l.L.n) here(l.L.v);
+    if (this.ty(l, "costHigh") && c.cost >= l.L.n) here(l.L.v);
+    if (this.ty(l, "gun") && isGun(c)) here(l.L.v);
+    if (this.ty(l, "crew")) here(l.L.v * l.s[c.side].filter((o) => o !== c && o.rev).length);
+    return out.filter((x) => x.v !== 0 || x.k === "base");
   }
   total = (l: Loc, s: Side) => {
     const mine = l.s[s].filter((c) => c.rev);
@@ -409,8 +423,10 @@ export class Match {
   private draw(s: Side) {
     const d = s === "p" ? this.deck : this.adeck, h = this.handOf(s);
     const c = d.pop();
-    if (c && h.length < HAND_MAX) h.push(c);
-    else if (c) d.push(c);
+    if (!c) return;
+    if (h.length < HAND_MAX) return void h.push(c);
+    this.burned.push({ s, c });
+    this.say({ k: "burnt", c: this.N(c), side: s });
   }
   private wolfIn(c: GCard) {
     c.st.wolfAt = this.t + 1;

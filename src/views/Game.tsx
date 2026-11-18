@@ -1,6 +1,6 @@
 import { AnimatePresence, MotionConfig, motion, useAnimate, useReducedMotion } from "motion/react";
-import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
-import { CardBack, GameCard, TipBoxes } from "../components/GameCard";
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { CardBack, GameCard, TipBoxes, type Tip } from "../components/GameCard";
 import { GameHand } from "../components/GameHand";
 import { TargetArrow } from "../components/TargetArrow";
 import { AudioMenu, EndTurnButton, SoulOrb } from "../components/GameHud";
@@ -11,7 +11,7 @@ import { ABILITIES, ITEMS, gameConfig, itemCost, locArtUrl, phaseOf, type ItemKe
 import { DeckBuilder } from "../components/DeckBuilder";
 import { DeckPile } from "../components/DeckPile";
 import { versionPlayer, type DeckLook } from "../lib/game/deck";
-import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type Result, type Side, type Token } from "../lib/game/engine";
+import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type PowPart, type Result, type Side, type Token } from "../lib/game/engine";
 import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
@@ -102,6 +102,14 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   // carta da mesa ampliada no hover
   const [peek, setPeek] = useState<{ c: GCard; r: DOMRect } | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // cartas queimadas (mão cheia) que já terminaram de queimar na tela
+  const [ashes, setAshes] = useState<Set<number>>(() => new Set());
+  const burns = m.burned.length;
+  const heard = useRef(burns);
+  useEffect(() => {
+    if (burns > heard.current) sfx("burn");
+    heard.current = burns;
+  }, [burns]);
   // artes dos locais da partida já no cache, para a faixa não piscar ao revelar
   useEffect(() => { m.loc.forEach((l) => { if (l.L.art) new Image().src = locArtUrl(l.L.art); }); }, [m]);
   const [arena, shake] = useAnimate<HTMLDivElement>();
@@ -146,8 +154,27 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     ...(c.rev ? statusIcons(c, m, t).map(([icon, nm, k]) => ({ title: `${icon} ${nm}`, text: t.ui.statusTip[k] })) : []),
   ];
 
+  /** Caixa que explica o poder da carta na mesa: base, bônus, efeitos de outras cartas, habilidade e local. */
+  const powTip = (c: GCard): Tip => {
+    const parts = m.powParts(c);
+    const P = t.ui.powParts;
+    const label = (x: PowPart) => x.k === "from" ? P.from(logName(x.n)) : x.k === "ab" ? P.ab(t.abilities[x.ab ?? "none"].name) : x.k === "loc" ? P.loc(x.loc ?? "") : P[x.k];
+    const sum = parts.reduce((a, x) => a + x.v, 0);
+    return { title: P.title(m.pow(c)), text: sum < 0 ? P.floor : "", rows: parts.map((x) => [label(x), x.v]) };
+  };
+  /** Uma carta queimada na região do baralho do lado, enquanto queima. */
+  const burning = (s: Side) => {
+    const b = m.burned.find((x) => x.s === s && !ashes.has(x.c.id));
+    return (
+      <AnimatePresence>
+        {b && <Burning key={b.c.id} card={face(b.c, false)} onDone={() => setAshes((x) => new Set(x).add(b.c.id))} />}
+      </AnimatePresence>
+    );
+  };
+
   const restart = () => {
     timers.current.forEach(clearTimeout);
+    setAshes(new Set());
     timers.current = [];
     setM(newMatch());
     sfx("shuffle");
@@ -291,7 +318,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     if (c.staged && c.ch?.loc !== undefined) out.push({ from, to: `[data-drop="${c.ch.loc}"]` });
     if (c.st.exec?.u === m.t && c.st.exec.target !== undefined) out.push({ from, to: `[data-card="${c.st.exec.target}"]` });
     return out;
-  }).concat(m.buying.p ? [{ from: '[data-item-slot="p"]', to: `[data-card="${m.buying.p.target}"]` }] : []);
+  }).concat(m.buying.p ? [{ from: '[data-item-from="p"]', to: `[data-card="${m.buying.p.target}"]` }] : []);
   /** Nome do alvo de um item comprado (para a caixa do item). */
   const boughtOn = (b: Bought) => {
     const c = m.loc.flatMap((l) => [...l.s.p, ...l.s.a]).find((x) => x.id === b.target);
@@ -320,10 +347,10 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       </abbr>
     </div>
   );
-    const aiDeck = <DeckPile n={m.adeck.length} tone="ai" label={next.a ? `${t.deck.aiLeft(m.adeck.length)} · ${t.ui.next(name(next.a))}` : t.deck.aiLeft(m.adeck.length)} tipSide="left"
-    cover={next.a && face(next.a, false)} out={{ x: -80, y: -10 }} className={wide ? "w-full max-w-40" : "w-8 sm:w-11"} />;
-  const myDeck = <DeckPile n={m.deck.length} look={deckLook} label={next.p ? `${t.deck.left(m.deck.length)} · ${t.ui.next(name(next.p))}` : t.deck.left(m.deck.length)}
-    cover={next.p && face(next.p, false)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} />;
+    const aiDeck = <div className={wide ? "relative flex w-full justify-center" : "relative"}>{burning("a")}<DeckPile n={m.adeck.length} tone="ai" label={next.a ? `${t.deck.aiLeft(m.adeck.length)} · ${t.ui.next(name(next.a))}` : t.deck.aiLeft(m.adeck.length)} tipSide="left"
+    cover={next.a && face(next.a, false)} out={{ x: -80, y: -10 }} className={wide ? "w-full max-w-40" : "w-8 sm:w-11"} /></div>;
+  const myDeck = <div className={wide ? "relative flex w-full justify-center" : "relative"}>{burning("p")}<DeckPile n={m.deck.length} look={deckLook} label={next.p ? `${t.deck.left(m.deck.length)} · ${t.ui.next(name(next.p))}` : t.deck.left(m.deck.length)}
+    cover={next.p && face(next.p, false)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} /></div>;
   const endBtn = result && !showEnd
     ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
     : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady} big={wide}
@@ -391,19 +418,30 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
           ))}
         </section>
 
+        {/* loja: um item na região de cada local, numa caixa com a cor e a arte do local */}
         <AnimatePresence>
           {shopOpen && m.offer && !shopHidden && (
-            <motion.section aria-labelledby="game-shop" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.2 }}
-              className="noir-glass-strong absolute inset-x-0 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-2 rounded-xl p-3 shadow-2xl">
-              <div className="flex items-center justify-between gap-2">
-                <h2 id="game-shop" className="text-lg font-extrabold tracking-wider">{t.shop.title}</h2>
-                <button type="button" className={pill(false)} onClick={() => setShopHidden(true)}>{t.ui.viewBoard}</button>
+            <motion.section key="shop" aria-labelledby="game-shop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+              className="pointer-events-none absolute inset-0 z-30 flex flex-col justify-center gap-3">
+              <div className="flex flex-col items-center gap-1 px-2 text-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)]">
+                <h2 id="game-shop" className="bg-zinc-950 px-3 py-1 text-base font-extrabold tracking-wider uppercase [clip-path:polygon(1%_0,100%_6%,99%_100%,0_94%)] sm:text-xl">{t.shop.title}</h2>
+                <p className="max-w-xl bg-zinc-950/90 px-2 py-0.5 text-[11px] text-zinc-300 sm:text-xs">{t.shop.hint}</p>
               </div>
-              <p className="text-xs text-zinc-400">{t.shop.hint}</p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                {m.offer.p.map((k) => (
-                  <ItemOption key={k} k={k} m={m} t={t} icon={icons[k]} picked={m.buying.p?.k === k} disabled={m.busy || (m.buying.p?.k !== k && !m.canBuy(k))} onPick={() => pickItem(k)} />
-                ))}
+              <div className="flex w-full items-stretch gap-0.5 sm:gap-1">
+                {m.loc.map((l, i) => {
+                  const k = m.offer?.p[i];
+                  return (
+                    <div key={l.L.id + i} className="flex min-w-0 flex-1 justify-center px-1 sm:px-4">
+                      {k && <ShopBox k={k} i={i} l={l} m={m} t={t} icon={icons[k]} picked={m.buying.p?.k === k} disabled={m.busy || (m.buying.p?.k !== k && !m.canBuy(k))} onPick={() => pickItem(k)} />}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex w-full justify-end px-2 sm:px-4">
+                <button type="button" onClick={() => setShopHidden(true)}
+                  className={`pointer-events-auto grid min-h-11 cursor-pointer place-items-center text-sm font-extrabold tracking-wider text-zinc-950 uppercase transition hover:brightness-110 active:scale-95 ${focus}`}>
+                  <TickTag tone="bg-dl-text" className="px-4 py-1.5">{t.shop.hide}</TickTag>
+                </button>
               </div>
             </motion.section>
           )}
@@ -451,10 +489,10 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       </div>
 
       <AnimatePresence>
-        {peek && !drag && <Peek key={peek.c.id} r={peek.r} card={face(peek.c, true, true)} tips={tipsOf(peek.c)} />}
+        {peek && !drag && <Peek key={peek.c.id} r={peek.r} card={face(peek.c, true, true)} tips={peek.c.rev ? [powTip(peek.c), ...tipsOf(peek.c)] : tipsOf(peek.c)} />}
       </AnimatePresence>
 
-      <TargetArrow from={aim ? '[data-item-slot="p"]' : mode ? `[data-card="${mode.c.id}"]` : null} lines={result ? [] : aimLines}
+      <TargetArrow from={aim ? '[data-item-from="p"]' : mode ? `[data-card="${mode.c.id}"]` : null} lines={result ? [] : aimLines}
         onCancel={() => { setMode(null); if (aim) { setAim(null); setShopHidden(false); } }} />
 
       <AnimatePresence>
@@ -796,20 +834,22 @@ function Impact({ w }: { w: 1 | 2 | 3 }) {
   );
 }
 
-const PEEK_W = 208;
+const PEEK_W = 260;
 const TIP_W = 192;
 
 /** Carta da mesa ampliada ao lado dela, com as caixas do selo de momento e de status. */
-function Peek({ r, card, tips }: { r: DOMRect; card: React.ReactNode; tips: { title: string; text: string }[] }) {
-  const h = (PEEK_W * 430) / 295;
+function Peek({ r, card, tips }: { r: DOMRect; card: React.ReactNode; tips: Tip[] }) {
   const extra = tips.length ? TIP_W + 8 : 0;
-  const right = r.right + 12 + PEEK_W + extra <= window.innerWidth;
-  const left = Math.max(8, right ? r.right + 12 : r.left - 12 - PEEK_W - extra);
+  // no celular a carta encolhe para caber com as caixas ao lado
+  const w = Math.min(PEEK_W, Math.max(140, window.innerWidth - 24 - extra));
+  const h = (w * 430) / 295;
+  const right = r.right + 12 + w + extra <= window.innerWidth;
+  const left = Math.max(8, right ? r.right + 12 : r.left - 12 - w - extra);
   const top = Math.max(8, Math.min(window.innerHeight - h - 8, r.top + r.height / 2 - h / 2));
   return (
     <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}
       className={`pointer-events-none fixed z-60 flex items-start gap-2 ${right ? "" : "flex-row-reverse"}`} style={{ left, top }} aria-hidden="true">
-      <div style={{ width: PEEK_W }}>{card}</div>
+      <div style={{ width: w }}>{card}</div>
       <TipBoxes tips={tips} />
     </motion.div>
   );
@@ -840,29 +880,38 @@ function ItemIconBox({ k, icon, size }: { k: ItemKey; icon?: string; size: strin
   );
 }
 
-function ItemOption({ k, m, t, icon, picked, disabled, onPick }: { k: ItemKey; m: Match; t: T; icon?: string; picked: boolean; disabled: boolean; onPick: () => void }) {
+/** Foco que aparece dentro de caixas recortadas (o recorte cortaria o contorno de fora). */
+const focusIn = "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-dl-text";
+
+/** Item da loja na região de um local: caixa escura com a arte e a cor do local, nome numa etiqueta que dá o tique. */
+function ShopBox({ k, i, l, m, t, icon, picked, disabled, onPick }: { k: ItemKey; i: number; l: Loc; m: Match; t: T; icon?: string; picked: boolean; disabled: boolean; onPick: () => void }) {
   const it = ITEMS[k];
   const fit = m.itemFit("p", k);
+  const lane = LANE[i % 3];
+  const art = l.rev && l.L.art;
   return (
-    <button type="button" onClick={onPick} disabled={disabled} aria-pressed={picked} aria-label={`${t.shop.label(k, it.tier)}: ${t.items[k](m.itemV(k))}`}
-      className={`flex flex-1 cursor-pointer items-start gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-zinc-800/60 active:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 ${picked ? "bg-dl-text/10 outline-2 outline-game-brass" : "bg-zinc-950/50"} ${focus}`}>
-      <ItemIconBox k={k} icon={icon} size="size-12" />
-      <span className="flex min-w-0 flex-col gap-1">
-        <span className="flex flex-wrap items-baseline gap-x-2">
-          <b className="tracking-wide">{k}</b>
-          <span className={`text-[11px] font-bold tracking-wider uppercase ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }} transition={{ duration: 0.22, delay: i * 0.06 }}
+      className="pointer-events-auto flex w-full max-w-72 drop-shadow-[0_0.5rem_0.75rem_rgb(0_0_0/0.75)]">
+      <button type="button" onClick={onPick} disabled={disabled} aria-pressed={picked} aria-label={`${t.shop.label(k, it.tier)}: ${t.items[k](m.itemV(k))}`}
+        className={`relative isolate flex w-full cursor-pointer flex-col items-center gap-1.5 overflow-hidden bg-zinc-950 p-2 text-center transition [clip-path:polygon(1%_2%,99%_0,100%_98%,0_100%)] enabled:hover:brightness-125 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:brightness-60 disabled:saturate-50 sm:gap-2 sm:p-3 ${picked ? "outline-2 -outline-offset-4 outline-game-brass" : ""} ${focusIn}`}>
+        {art && <img src={locArtUrl(art)} alt="" draggable={false} className="absolute inset-0 -z-10 size-full object-cover opacity-30" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />}
+        <span aria-hidden="true" className={`absolute inset-0 -z-10 bg-linear-to-b to-zinc-950/70 to-70% ${lane.tint}`} />
+        <TickTag tone={lane.tag} className="max-w-full px-2 py-0.5 text-sm font-extrabold tracking-wide text-zinc-950 [font-variant-caps:small-caps] sm:px-3 sm:text-lg">{k}</TickTag>
+        <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+          <ItemIconBox k={k} icon={icon} size="size-9 sm:size-12" />
+          <span className={`text-[10px] font-bold tracking-wider uppercase sm:text-xs ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
         </span>
-        <span className="text-xs text-zinc-200">{t.items[k](m.itemV(k))}</span>
-        <span className="text-[11px] text-game-brass">{t.shop.price(m.itemPrice("p", k))}{!picked && !m.canBuy(k) && ` · ${m.itemTargets("p", k).length ? t.shop.noSouls : t.shop.noTarget}`}</span>
+        <span className="text-xs text-zinc-100 sm:text-sm">{t.items[k](m.itemV(k))}</span>
+        <span className="text-[11px] font-bold text-game-brass sm:text-xs">{t.shop.price(m.itemPrice("p", k))}{!picked && !m.canBuy(k) && ` · ${m.itemTargets("p", k).length ? t.shop.noSouls : t.shop.noTarget}`}</span>
         {(fit.cards > 0 || fit.loc) && (
-          <span className="flex flex-wrap gap-1">
+          <span className="flex flex-wrap justify-center gap-1">
             {fit.cards > 0 && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me">{t.shop.fitCards(fit.cards)}</span>}
             {fit.loc && <span className="rounded-full bg-game-me/15 px-1.5 text-[10px] text-game-me">{t.shop.fitLoc(fit.loc)}</span>}
           </span>
         )}
         {picked && <span className="text-[11px] font-bold tracking-wider text-game-brass uppercase">{t.shop.picked} · {t.shop.undo}</span>}
-      </span>
-    </button>
+      </button>
+    </motion.div>
   );
 }
 
@@ -873,13 +922,13 @@ function ItemSlot({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Reco
   const who = s === "p" ? t.shop.mine : t.shop.ai;
   if (!list.length) {
     return (
-      <span data-item-slot={s} title={`${who}: ${t.shop.hidden}`}
+      <span data-item-slot={s} data-item-from={s === "p" ? "p" : undefined} title={`${who}: ${t.shop.hidden}`}
         className="flex size-9 shrink-0 items-center justify-center rounded-md bg-zinc-950/70 text-sm text-zinc-500">?</span>
     );
   }
   const size = list.length > 1 ? "size-7" : "size-9";
   return (
-    <span className="relative shrink-0" data-item-slot={s}>
+    <span className="relative shrink-0" data-item-slot={s} data-item-from={s === "p" ? "p" : undefined}>
       <button type="button" onClick={() => setOpen((x) => !x)} onPointerEnter={(e) => { if (e.pointerType === "mouse") setOpen(true); }}
         onPointerLeave={(e) => { if (e.pointerType === "mouse") setOpen(false); }} onBlur={() => setOpen(false)}
         aria-expanded={open} aria-label={`${who}: ${list.map((b) => b.k).join(", ")}`}
@@ -932,7 +981,7 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
             </div>
             <ul className={`flex ${flip}`}>
               {rows.map((b, i) => (
-                <li key={b ? `${b.k}-${b.t}-${i}` : i} title={b ? `${t.items[b.k](m.itemV(b.k))} (${t.shop.on(on(b))})` : undefined}
+                <li key={b ? `${b.k}-${b.t}-${i}` : i} data-item-from={!ai && (m.buying.p ? b === m.buying.p : i === list.length) ? "p" : undefined} title={b ? `${t.items[b.k](m.itemV(b.k))} (${t.shop.on(on(b))})` : undefined}
                   className={`grid min-h-14 grid-cols-[1fr_3rem] border-comanda-ink/35 ${ai ? "border-t" : "border-b"} ${b && b === m.buying.p ? "animate-pulse" : ""}`}>
                   <span className="flex min-w-0 items-center gap-2 px-2 py-1.5">
                     {b ? (
@@ -957,9 +1006,21 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
 }
 
 /**
- * Placa do local entre os dois lados, em etiquetas como as do jogo: o nome numa etiqueta grande na cor da faixa, o efeito
- * numa etiqueta escura com a letra na cor da faixa (toque para ler inteiro) e o poder de cada lado nas pontas.
- * As etiquetas dão um tique seco de um lado para o outro a cada segundo (tag-tick).
+ * Etiqueta na cor da faixa, como as do jogo: só o fundo dá o tique seco a cada segundo (tag-tick); o texto fica parado.
+ * `tone` é a classe de fundo (bg-lane-yellow...).
+ */
+function TickTag({ tone, className = "", children }: { tone: string; className?: string; children: ReactNode }) {
+  return (
+    <span className={`relative isolate inline-block drop-shadow-[0_3px_0_rgb(0_0_0/0.6)] ${className}`}>
+      <span aria-hidden="true" className={`absolute inset-0 -z-10 tag-tick [clip-path:polygon(2%_6%,99%_0,100%_92%,0_100%)] ${tone}`} />
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Placa do local entre os dois lados: o nome numa etiqueta grande na cor da faixa (a única que dá o tique), o efeito numa
+ * caixa escura com a letra na cor da faixa (toque para ler inteiro) e o poder de cada lado nas pontas (o seu à esquerda).
  */
 function LocTile({ i, nm, desc, chips, a, p }: { i: number; nm: string; desc: string; chips: [boolean, string, string][]; a: number; p: number }) {
   const [full, setFull] = useState(false);
@@ -967,18 +1028,16 @@ function LocTile({ i, nm, desc, chips, a, p }: { i: number; nm: string; desc: st
   return (
     <div className="flex w-full flex-col items-center gap-2 text-center leading-tight">
       <div className="flex w-full flex-wrap items-center justify-between gap-1 sm:flex-nowrap">
-        <ScoreTag v={a} lead={a > p} side="a" />
-        <div className="order-first flex w-full min-w-0 justify-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)] sm:order-0 sm:w-auto sm:flex-1">
-          <motion.h3 key={nm} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.9 }}
-            className={`line-clamp-2 min-w-0 tag-tick px-2 py-1 text-sm font-extrabold tracking-wide text-zinc-950 [clip-path:polygon(2%_6%,99%_0,100%_92%,0_100%)] [font-variant-caps:small-caps] sm:px-4 sm:text-2xl ${lane.tag}`}>
-            {nm}
-          </motion.h3>
-        </div>
         <ScoreTag v={p} lead={p > a} side="p" />
+        <motion.h3 key={nm} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.9 }}
+          className="order-first flex w-full min-w-0 justify-center text-sm font-extrabold tracking-wide text-zinc-950 [font-variant-caps:small-caps] sm:order-0 sm:w-auto sm:flex-1 sm:text-2xl">
+          <TickTag tone={lane.tag} className="line-clamp-2 px-2 py-1 sm:px-4">{nm}</TickTag>
+        </motion.h3>
+        <ScoreTag v={a} lead={a > p} side="a" />
       </div>
       <div className="flex w-full justify-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)]">
         <button type="button" onClick={() => setFull((x) => !x)} aria-expanded={full} title={desc}
-          className={`max-w-full tag-tick cursor-pointer bg-zinc-950 px-2.5 py-1 text-[11px] font-bold transition-[filter] [clip-path:polygon(0_0,100%_5%,99%_100%,1%_94%)] hover:brightness-125 active:brightness-90 sm:text-xs ${lane.ink} ${full ? "" : "line-clamp-2"} ${focus}`}>
+          className={`max-w-full cursor-pointer bg-zinc-950 px-2.5 py-1 text-xs font-bold transition-[filter] [clip-path:polygon(0_0,100%_5%,99%_100%,1%_94%)] hover:brightness-125 active:brightness-90 sm:px-3 sm:py-1.5 sm:text-sm xl:text-base ${lane.ink} ${full ? "" : "line-clamp-3"} ${focusIn}`}>
           {desc}
         </button>
       </div>
@@ -991,10 +1050,10 @@ function LocTile({ i, nm, desc, chips, a, p }: { i: number; nm: string; desc: st
   );
 }
 
-/** Poder de um lado numa etiqueta escura (sem recorte, para o halo e o +N/−N não serem cortados). */
+/** Poder de um lado numa caixa escura parada (sem recorte, para o halo e o +N/−N não serem cortados). */
 function ScoreTag({ v, lead, side }: { v: number; lead: boolean; side: Side }) {
   return (
-    <span className="grid shrink-0 tag-tick place-items-center rounded-xs bg-zinc-950 px-0.5 py-1 shadow-[0_3px_0_rgb(0_0_0/0.6)] sm:px-1.5">
+    <span className="grid shrink-0 place-items-center rounded-xs bg-zinc-950 px-0.5 py-1 shadow-[0_3px_0_rgb(0_0_0/0.6)] sm:px-1.5">
       <Score v={v} lead={lead} side={side} />
     </span>
   );
@@ -1037,5 +1096,27 @@ function Score({ v, lead, side }: { v: number; lead: boolean; side: Side }) {
         )}
       </AnimatePresence>
     </span>
+  );
+}
+
+/**
+ * Carta comprada com a mão cheia: aparece sobre o baralho em preto e branco, pega fogo de baixo para cima e some.
+ * A carta está perdida (saiu da partida).
+ */
+function Burning({ card, onDone }: { card: ReactNode; onDone: () => void }) {
+  return (
+    <motion.div aria-hidden="true" className="pointer-events-none absolute bottom-0 left-1/2 z-30 w-full max-w-40 min-w-24 -translate-x-1/2"
+      initial={{ opacity: 0, y: 0, scale: 0.9 }} animate={{ opacity: [0, 1, 1, 0], y: -24, scale: 1.05 }} exit={{ opacity: 0 }}
+      transition={{ duration: 1.9, times: [0, 0.1, 0.75, 1], ease: "easeOut" }} onAnimationComplete={onDone}>
+      <div className="relative card-burn grayscale">
+        {card}
+        <span className="absolute inset-x-0 burn-front h-1/3 bg-linear-to-t from-transparent via-orange-500 to-amber-200/0 mix-blend-screen blur-sm" />
+      </div>
+      {Array.from({ length: 8 }, (_, k) => (
+        <motion.span key={k} className="absolute bottom-1/4 size-1.5 rounded-full bg-amber-400 blur-[1px]" style={{ left: `${10 + k * 11}%` }}
+          initial={{ y: 0, opacity: 0 }} animate={{ y: -60 - (k % 3) * 25, x: (k % 2 ? 1 : -1) * (6 + k * 2), opacity: [0, 1, 0] }}
+          transition={{ duration: 1.1, delay: 0.25 + (k % 4) * 0.15, ease: "easeOut" }} />
+      ))}
+    </motion.div>
   );
 }

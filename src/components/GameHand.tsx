@@ -4,9 +4,7 @@ import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, useVe
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { GCard } from "../lib/game/engine";
 import { sfx, slideSpeed, slideStart, slideStop } from "../lib/game/sfx";
-import { TipBoxes } from "./GameCard";
-
-type Tip = { title: string; text: string };
+import { TipBoxes, type Tip } from "./GameCard";
 type Props = {
   cards: GCard[];
   selected: GCard | null;
@@ -62,7 +60,7 @@ export function GameHand(p: Props) {
   const H = W * RATIO;
   const boxH = Math.round(H * SHOW + TOP);
   // a ampliada usa a tela, não só a faixa da mão (no celular a mão divide a linha com o orbe e o botão)
-  const zoomW = Math.max(W, Math.min(250, vw * 0.6, vh * 0.4));
+  const zoomW = Math.max(W, Math.min(325, vw * 0.75, vh * 0.52));
   const scale = Math.max(1, zoomW / W);
   const mid = (n - 1) / 2;
   const spacing = n > 1 ? Math.min(W * 0.78, (cw - W - 8) / (n - 1)) : 0;
