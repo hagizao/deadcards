@@ -16,7 +16,7 @@ import win from "../../assets/sfx/win.ogg";
 const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, win };
 /** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
 const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
-export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn" | "paper";
+export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn" | "paper" | "wow";
 
 /** Volume e mudo de cada canal (0 a 1). */
 export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
@@ -67,6 +67,7 @@ export function sfx(name: Sfx, volume = 1) {
   if (name === "hover") return cardFlick(volume);
   if (name === "burn") return cardBurn(volume);
   if (name === "paper") return paperRustle(volume);
+  if (name === "wow") return crowdWow(volume);
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
   const file = name as keyof typeof FILES;
@@ -154,6 +155,70 @@ function cardBurn(strength = 1) {
     pop.start(at, Math.random() * 0.25);
     pop.stop(at + 0.04);
   }
+}
+
+/**
+ * Plateia do bar soltando um "uaaau" (carta com 10 ou mais de poder): ~20 vozes de alturas diferentes, cada uma entrando
+ * um pouco depois, com a altura subindo e caindo; os formantes vão de "u" para "a" e voltam, e um murmúrio de ar fica por baixo.
+ */
+function crowdWow(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime + 0.05;
+  const vol = SFX_BASE * lv * strength;
+  const end = t + 1.9;
+  // as vozes somam aqui e passam pelos formantes da boca
+  const mix = c.createGain();
+  mix.gain.value = 1;
+  const out = c.createGain();
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(1.1 * vol, t + 0.3);
+  out.gain.setValueAtTime(1.1 * vol, t + 0.75);
+  out.gain.exponentialRampToValueAtTime(0.0001, end);
+  out.connect(c.destination);
+  // vogal: F1 e F2 de "u" (300/800) abrindo para "a" (750/1150) e fechando em "o" (500/900)
+  ([[300, 750, 500, 1.4], [800, 1150, 900, 1], [2600, 2600, 2500, 0.25]] as const).forEach(([a, b, z, g]) => {
+    const bp = c.createBiquadFilter();
+    bp.type = "bandpass"; bp.Q.value = 5;
+    bp.frequency.setValueAtTime(a, t);
+    bp.frequency.linearRampToValueAtTime(b, t + 0.45);
+    bp.frequency.linearRampToValueAtTime(z, t + 1.5);
+    const fg = c.createGain();
+    fg.gain.value = g;
+    mix.connect(bp).connect(fg).connect(out);
+  });
+  for (let i = 0; i < 20; i++) {
+    // metade voz grave, metade aguda
+    const f0 = (i % 2 ? 190 : 115) * (0.85 + Math.random() * 0.35);
+    const at = t + Math.random() * 0.14;
+    const o = c.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(f0 * 0.82, at);
+    o.frequency.exponentialRampToValueAtTime(f0 * 1.18, at + 0.38 + Math.random() * 0.1);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.9, end);
+    // tremido de voz, cada uma no seu ritmo
+    const vib = c.createOscillator();
+    vib.frequency.value = 4.5 + Math.random() * 2.5;
+    const vg = c.createGain();
+    vg.gain.value = f0 * 0.02;
+    vib.connect(vg).connect(o.frequency);
+    const g = c.createGain();
+    g.gain.value = 0.05 + Math.random() * 0.04;
+    o.connect(g).connect(mix);
+    o.start(at); vib.start(at);
+    o.stop(end); vib.stop(end);
+  }
+  // ar e murmúrio da multidão
+  const air = c.createBufferSource();
+  air.buffer = noise(c, 2);
+  const nb = c.createBiquadFilter();
+  nb.type = "bandpass"; nb.frequency.value = 900; nb.Q.value = 0.6;
+  const ng = c.createGain();
+  ng.gain.value = 0.35;
+  air.connect(nb).connect(ng).connect(out);
+  air.start(t);
+  air.stop(end);
 }
 
 let lastPaper = 0;

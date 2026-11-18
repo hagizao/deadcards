@@ -241,6 +241,14 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const land = (c: GCard) => {
     const w = weight(c);
     later(() => {
+      // 10 ou mais de poder: cai pesada (baque e tremor máximos) e a plateia solta um "uau"
+      if (m.pow(c) >= 10) {
+        sfx("slam");
+        thump(1.3);
+        sfx("wow");
+        if (!still && arena.current) shake(arena.current, { x: [0, -8, 7, -5, 3, 0], y: [0, 4, -3, 2, 0, 0] }, { duration: 0.4 });
+        return;
+      }
       if (w === 1) return sfx("land", 0.8);
       sfx("slam", w === 3 ? 1 : 0.7);
       thump(w === 3 ? 1 : 0.5);
@@ -429,7 +437,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
 
         {/* loja: um item na região de cada local, numa caixa com a cor e a arte do local */}
         <AnimatePresence>
-          {shopOpen && m.offer && !shopHidden && (
+          {shopOpen && m.offer && !aim && (
             <motion.section key="shop" aria-labelledby="game-shop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
               className="pointer-events-none absolute inset-0 z-30 flex flex-col justify-center gap-3">
               {/* borda das caixas a pincel: o fundo e a moldura tremem nas bordas como tinta */}
@@ -439,11 +447,12 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
                   <feDisplacementMap in="SourceGraphic" in2="wave" scale={11} xChannelSelector="R" yChannelSelector="G" />
                 </filter>
               </svg>
-              <div className="flex flex-col items-center gap-1 px-2 text-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)]">
+              {/* oculta: título e caixas somem, mas continuam ocupando o espaço, então o Exibir fica onde estava o Ocultar */}
+              <div className={`flex flex-col items-center gap-1 px-2 text-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)] transition-[opacity,visibility] duration-200 ${shopHidden ? "invisible opacity-0" : ""}`}>
                 <h2 id="game-shop" className="bg-zinc-950 px-3 py-1 text-base font-extrabold tracking-wider uppercase [clip-path:polygon(1%_0,100%_6%,99%_100%,0_94%)] sm:text-xl">{t.shop.title}</h2>
                 <p className="max-w-xl bg-zinc-950/90 px-2 py-0.5 text-[11px] text-zinc-300 sm:text-xs">{t.shop.hint}</p>
               </div>
-              <div className="flex w-full items-stretch gap-0.5 sm:gap-1">
+              <div className={`flex w-full items-stretch gap-0.5 transition-[opacity,visibility] duration-200 sm:gap-1 ${shopHidden ? "invisible opacity-0" : ""}`}>
                 {m.loc.map((l, i) => {
                   const k = m.offer?.p[i];
                   return (
@@ -453,10 +462,10 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
                   );
                 })}
               </div>
-              <div className="flex w-full justify-end px-2 sm:px-4">
-                <button type="button" onClick={() => setShopHidden(true)}
-                  className={`pointer-events-auto grid min-h-11 cursor-pointer place-items-center text-sm font-extrabold tracking-wider text-zinc-950 uppercase transition hover:brightness-110 active:scale-95 ${focus}`}>
-                  <TickTag tone="bg-dl-text" className="px-4 py-1.5">{t.shop.hide}</TickTag>
+              <div className="flex min-h-14 w-full items-center justify-end px-2 sm:px-4">
+                <button type="button" onClick={() => setShopHidden(!shopHidden)} aria-expanded={!shopHidden}
+                  className={`pointer-events-auto grid min-h-11 cursor-pointer place-items-center font-extrabold tracking-wider text-zinc-950 uppercase transition hover:brightness-110 active:scale-95 ${focus} ${shopHidden ? "text-lg" : "text-sm"}`}>
+                  <TickTag tone="bg-dl-text" className={shopHidden ? "px-7 py-2.5" : "px-4 py-1.5"}>{shopHidden ? t.shop.show : t.shop.hide}</TickTag>
                 </button>
               </div>
             </motion.section>
@@ -478,11 +487,6 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
             {(mode.k === "card" || mode.k === "loc") && mode.c.staged && <button type="button" className={pill(false)} onClick={undoPlay}>{t.ui.act.undo}</button>}
             {(mode.k === "move" || mode.k === "mark") && <button type="button" className={pill(false)} onClick={() => setMode(null)}>{t.ui.act.cancel}</button>}
           </>
-        ) : shopOpen && shopHidden ? (
-          <button type="button" onClick={() => setShopHidden(false)}
-            className={`grid min-h-14 cursor-pointer place-items-center text-lg font-extrabold tracking-wider text-zinc-950 uppercase transition hover:brightness-110 active:scale-95 ${focus}`}>
-            <TickTag tone="bg-dl-text" className="px-7 py-2.5">{t.shop.show}</TickTag>
-          </button>
         ) : <span className="line-clamp-1 text-zinc-300">{logLine || t.ui.hint}</span>}
       </div>
 
@@ -1020,10 +1024,10 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
  * Etiqueta na cor da faixa, como as do jogo: só o fundo dá o tique seco a cada segundo (tag-tick); o texto fica parado.
  * `tone` é a classe de fundo (bg-lane-yellow...).
  */
-function TickTag({ tone, className = "", children }: { tone: string; className?: string; children: ReactNode }) {
+function TickTag({ tone, className = "", still = false, children }: { tone: string; className?: string; /** Sem o tique (fica torta, parada). */ still?: boolean; children: ReactNode }) {
   return (
     <span className={`relative isolate inline-block drop-shadow-[0_3px_0_rgb(0_0_0/0.6)] ${className}`}>
-      <span aria-hidden="true" className={`absolute inset-0 -z-10 tag-tick [clip-path:polygon(2%_6%,99%_0,100%_92%,0_100%)] ${tone}`} />
+      <span aria-hidden="true" className={`absolute inset-0 -z-10 [clip-path:polygon(2%_6%,99%_0,100%_92%,0_100%)] ${still ? "-rotate-2" : "tag-tick"} ${tone}`} />
       {children}
     </span>
   );
@@ -1134,10 +1138,47 @@ function Burning({ card, onDone }: { card: ReactNode; onDone: () => void }) {
 
 /** Cor da tela de fim: verde na vitória, vermelho na derrota, âmbar no empate. */
 const END_TONE = {
-  win: { bg: "bg-radial from-emerald-500 via-emerald-800 to-emerald-950", ink: "text-emerald-900" },
-  loss: { bg: "bg-radial from-rose-500 via-rose-800 to-rose-950", ink: "text-rose-900" },
-  draw: { bg: "bg-radial from-amber-500 via-amber-800 to-zinc-950", ink: "text-amber-900" },
+  win: { fill: "from-emerald-500 via-emerald-700 to-emerald-950", stroke: "stroke-emerald-400", ink: "text-emerald-900" },
+  loss: { fill: "from-red-500 via-red-700 to-red-950", stroke: "stroke-red-500", ink: "text-red-900" },
+  draw: { fill: "from-amber-500 via-amber-700 to-zinc-950", stroke: "stroke-amber-400", ink: "text-amber-900" },
 } as const;
+/** Faixa larga da tela de fim, com as mesmas bordas a pincel das faixas do tabuleiro. */
+const END_BRUSH = { left: brushEdge(21, 0.06, 0.03), right: brushEdge(22, 0.94, 0.03), dash: gaps(21), dash2: gaps(22) };
+const END_CLIP = clipOf(END_BRUSH);
+
+/** Fundo da tela de fim no estilo do tabuleiro: a cor numa faixa a 50% (a mesa aparece por trás), bordas tortas a pincel com falhas e névoa. */
+function EndBackdrop({ tone }: { tone: (typeof END_TONE)[keyof typeof END_TONE] }) {
+  const [ref, { w, h }] = useSize();
+  const sw = Math.max(6, Math.min(20, w * 0.014));
+  return (
+    <div ref={ref} aria-hidden="true" className="absolute inset-0">
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 opacity-50" style={{ clipPath: "url(#end-clip)" }}>
+        <div className={`absolute inset-0 bg-radial ${tone.fill}`} />
+        <div className="absolute inset-0 opacity-40 mix-blend-overlay lane-fog" />
+        <div className="absolute inset-0 bg-linear-to-b from-black/60 via-transparent to-black/70" />
+      </div>
+      <svg className={`absolute inset-0 size-full overflow-visible fill-none ${tone.stroke}`}>
+        <defs>
+          <clipPath id="end-clip" clipPathUnits="objectBoundingBox"><path d={END_CLIP} /></clipPath>
+          <filter id="end-brush" filterUnits="userSpaceOnUse" x={-40} y={-40} width={w + 80} height={h + 80}>
+            <feTurbulence type="fractalNoise" baseFrequency="0.035 0.008" numOctaves={2} seed={21} result="wave" />
+            <feDisplacementMap in="SourceGraphic" in2="wave" scale={sw * 1.4} xChannelSelector="R" yChannelSelector="G" result="torn" />
+            <feTurbulence type="fractalNoise" baseFrequency="0.22 0.03" numOctaves={3} seed={23} result="grain" />
+            <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 7 -2.6" result="dry" />
+            <feComposite in="torn" in2="dry" operator="in" />
+          </filter>
+        </defs>
+        {w > 0 && (
+          <>
+            <BrushStroke id="end-brush" pts={END_BRUSH.left} w={w} h={h} sw={sw} dash={END_BRUSH.dash} dash2={END_BRUSH.dash2} inward={1} />
+            <BrushStroke id="end-brush" pts={END_BRUSH.right} w={w} h={h} sw={sw} dash={END_BRUSH.dash2} dash2={END_BRUSH.dash} inward={-1} />
+          </>
+        )}
+      </svg>
+    </div>
+  );
+}
 /** Cartas que caem pela tela de fim: coluna, atraso e giro de cada uma. */
 const FALLING = Array.from({ length: 12 }, (_, i) => ({ left: (i * 37 + 5) % 100, delay: i * 0.45, spin: (i % 2 ? 1 : -1) * (160 + i * 25), dur: 4.5 + (i % 4) }));
 
@@ -1150,11 +1191,8 @@ function EndScreen({ r, m, t, onAgain, onBoard, onDeck }: { r: Result; m: Match;
   const title = r.outcome === "win" ? t.ui.win : r.outcome === "loss" ? t.ui.loss : t.ui.draw;
   return (
     <motion.div role="dialog" aria-modal="true" aria-labelledby="game-end" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}
-      className={`fixed inset-0 z-80 flex items-center justify-center overflow-hidden p-4 ${tone.bg}`}>
-      {/* raios de luz girando devagar atrás de tudo */}
-      <motion.div aria-hidden="true" className="absolute top-1/2 left-1/2 size-[220vmax] -translate-1/2 bg-[repeating-conic-gradient(rgb(255_255_255/0.16)_0deg_7deg,transparent_7deg_18deg)] mix-blend-overlay"
-        animate={{ rotate: 360 }} transition={{ duration: 60, repeat: Infinity, ease: "linear" }} />
-      <div aria-hidden="true" className="absolute inset-0 bg-radial from-transparent from-30% to-black/75" />
+      className="fixed inset-0 z-80 flex items-center justify-center overflow-hidden p-4">
+      <EndBackdrop tone={tone} />
       {/* versos de carta caindo e girando */}
       {FALLING.map((f, i) => (
         <motion.div key={i} aria-hidden="true" className="absolute top-0 w-14 opacity-80 sm:w-20" style={{ left: `${f.left}%` }}
@@ -1188,21 +1226,22 @@ function EndScreen({ r, m, t, onAgain, onBoard, onDeck }: { r: Result; m: Match;
             );
           })}
         </ul>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="flex flex-wrap items-center justify-center gap-3">
+        {/* ações paradas: sem tique e sem entrada animada */}
+        <div className="flex flex-wrap items-center justify-center gap-3">
           {/* eslint-disable-next-line jsx-a11y/no-autofocus -- foco vai para a ação principal da tela que acabou de abrir */}
           <button type="button" autoFocus onClick={onAgain}
-            className={`grid min-h-14 cursor-pointer place-items-center text-lg font-extrabold tracking-wider text-zinc-950 uppercase transition hover:scale-105 hover:brightness-110 active:scale-95 sm:text-xl ${focus}`}>
-            <TickTag tone="bg-dl-text" className="px-7 py-2.5">{t.ui.again}</TickTag>
+            className={`grid min-h-14 cursor-pointer place-items-center text-lg font-extrabold tracking-wider text-zinc-950 uppercase transition hover:brightness-110 active:scale-95 sm:text-xl ${focus}`}>
+            <TickTag still tone="bg-dl-text" className="px-7 py-2.5">{t.ui.again}</TickTag>
           </button>
           <button type="button" onClick={onBoard}
             className={`grid min-h-11 cursor-pointer place-items-center text-sm font-extrabold tracking-wider text-zinc-100 uppercase transition hover:brightness-125 active:scale-95 ${focus}`}>
-            <TickTag tone="bg-zinc-950" className="px-4 py-2">{t.ui.viewBoard}</TickTag>
+            <TickTag still tone="bg-zinc-950" className="px-4 py-2">{t.ui.viewBoard}</TickTag>
           </button>
           <button type="button" onClick={onDeck}
             className={`grid min-h-11 cursor-pointer place-items-center text-sm font-extrabold tracking-wider text-zinc-100 uppercase transition hover:brightness-125 active:scale-95 ${focus}`}>
-            <TickTag tone="bg-zinc-950" className="px-4 py-2">{t.deck.change}</TickTag>
+            <TickTag still tone="bg-zinc-950" className="px-4 py-2">{t.deck.change}</TickTag>
           </button>
-        </motion.div>
+        </div>
       </div>
     </motion.div>
   );
