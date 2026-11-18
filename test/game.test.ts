@@ -106,6 +106,11 @@ describe("sanitizeGameConfig", () => {
   it("sem configuração salva, usa os locais padrão", () => {
     expect(gameConfig(undefined).locs).toHaveLength(DEFAULT_LOCS.length);
   });
+
+  it("locais salvos com o nome antigo de buff passam a se chamar só Vida, Arma...", () => {
+    const locs = DEFAULT_LOCS.slice(0, 3).map((l, i) => (i === 0 ? { ...l, name: "Buff de Vida" } : i === 1 ? { ...l, name: "Meu Buff" } : l));
+    expect(gameConfig({ locs }).locs.map((l) => l.name).slice(0, 2)).toEqual(["Vida", "Meu Buff"]);
+  });
 });
 
 describe("partida", () => {
@@ -1060,7 +1065,7 @@ describe("locais novos", () => {
     expect(m.pow(strong, L)).toBe(5);
   });
 
-  it("Buff de Vida limpa o dano; Cemitério devolve quem ficou com 0", () => {
+  it("Vida limpa o dano; Cemitério devolve quem ficou com 0", () => {
     const heal = at("heal");
     const c = heal.card("p", 5);
     c.bonus = -3; c.st.tmp.push({ v: -2, u: 99 });

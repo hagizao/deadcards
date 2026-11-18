@@ -129,8 +129,8 @@ export const GAME_TEXT = strings<GameText>({
     roles: {
       title: (r) => `Função: ${r}`,
       tips: {
-        Carry: "Dano principal do time. Ganha mais com o Buff de Arma e com itens de arma, como High-Velocity Rounds e Glass Cannon.",
-        OffCarry: "Dano secundário. Também ganha mais com o Buff de Arma e com itens de arma.",
+        Carry: "Dano principal do time. Ganha mais no local Arma e com itens de arma, como High-Velocity Rounds e Glass Cannon.",
+        OffCarry: "Dano secundário. Também ganha mais no local Arma e com itens de arma.",
         Frontline: "Linha de frente. Ganha mais com itens de defesa, como Battle Vest e Colossus.",
         Suporte: "Apoia o time. Ao ser revelado, solta os aliados erguidos pela Wraith no mesmo local.",
         Flex: "Joga em qualquer função, sem bônus próprio de função.",
@@ -417,8 +417,8 @@ export const GAME_TEXT = strings<GameText>({
     roles: {
       title: (r) => `Role: ${r}`,
       tips: {
-        Carry: "The team's main damage. Gets more from the Weapon buff and from weapon items like High-Velocity Rounds and Glass Cannon.",
-        OffCarry: "Secondary damage. Also gets more from the Weapon buff and from weapon items.",
+        Carry: "The team's main damage. Gets more at the Arma location and from weapon items like High-Velocity Rounds and Glass Cannon.",
+        OffCarry: "Secondary damage. Also gets more at the Arma location and from weapon items.",
         Frontline: "Front line. Gets more from defensive items like Battle Vest and Colossus.",
         Suporte: "Supports the team. When revealed, frees allies lifted by Wraith at the same location.",
         Flex: "Plays any role, with no role bonus of its own.",
@@ -705,8 +705,8 @@ export const GAME_TEXT = strings<GameText>({
     roles: {
       title: (r) => `Rol: ${r}`,
       tips: {
-        Carry: "Daño principal del equipo. Gana más con el Buff de Arma y con objetos de arma, como High-Velocity Rounds y Glass Cannon.",
-        OffCarry: "Daño secundario. También gana más con el Buff de Arma y con objetos de arma.",
+        Carry: "Daño principal del equipo. Gana más en el lugar Arma y con objetos de arma, como High-Velocity Rounds y Glass Cannon.",
+        OffCarry: "Daño secundario. También gana más en el lugar Arma y con objetos de arma.",
         Frontline: "Primera línea. Gana más con objetos defensivos, como Battle Vest y Colossus.",
         Suporte: "Apoya al equipo. Al revelarse, suelta a los aliados levantados por Wraith en el mismo lugar.",
         Flex: "Juega en cualquier rol, sin bonus propio de rol.",

@@ -36,10 +36,10 @@ export const DEFAULT_LOCS: GameLoc[] = ([
   ["bar", "Bar", "bet", 1, 1],
   ["bilheteria", "Bilheteria", "enter", 1, 1],
   ["bolsa-de-valores", "Bolsa de Valores", "stock", 0, 3],
-  ["buff-arma", "Buff de Arma", "gun", 2, 1],
-  ["buff-espirito", "Buff de Espírito", "spirit", 2, 1],
-  ["buff-movimento", "Buff de Movimento", "cheap", 1, 1],
-  ["buff-vida", "Buff de Vida", "heal", 0, 1],
+  ["buff-arma", "Arma", "gun", 2, 1],
+  ["buff-espirito", "Espiritualidade", "spirit", 2, 1],
+  ["buff-movimento", "Movimento", "cheap", 1, 1],
+  ["buff-vida", "Vida", "heal", 0, 1],
   ["casa-abandonada", "Casa Abandonada", "noplay", 0, 1],
   ["cemiterio", "Cemitério", "grave", 0, 1],
   ["chinatown", "Chinatown", "bell", 3, 4],
@@ -422,10 +422,15 @@ export function sanitizeGameConfig(raw: unknown): GameConfig | null {
   };
 }
 
+/** Nomes antigos dos locais padrão: a configuração salva com o nome antigo passa a usar o novo. */
+const RENAMED: Record<string, string> = { "Buff de Arma": "Arma", "Buff de Espírito": "Espiritualidade", "Buff de Movimento": "Movimento", "Buff de Vida": "Vida" };
+
 /** Configuração em uso: a salva, ou os locais padrão. */
 export function gameConfig(saved: unknown): GameConfig {
   const g = (isRecord(saved) ? saved : {}) as Partial<GameConfig>;
-  const locs = Array.isArray(g.locs) && g.locs.length >= MIN_LOCS ? g.locs.map(sanitizeLoc) : DEFAULT_LOCS.map((l) => ({ ...l }));
+  const locs = Array.isArray(g.locs) && g.locs.length >= MIN_LOCS
+    ? g.locs.map(sanitizeLoc).map((l) => (RENAMED[l.name] ? { ...l, name: RENAMED[l.name] } : l))
+    : DEFAULT_LOCS.map((l) => ({ ...l }));
   const clean = sanitizeGameConfig({ locs, cards: isRecord(g.cards) ? g.cards : {}, items: isRecord(g.items) ? g.items : {}, heroes: isRecord(g.heroes) ? g.heroes : {} });
   return { locs, cards: clean?.cards ?? {}, items: clean?.items ?? {}, heroes: clean?.heroes ?? {} };
 }
