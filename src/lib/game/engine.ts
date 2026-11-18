@@ -220,7 +220,7 @@ export class Match {
   AE = 0;
   extra: Record<Side, number> = { p: 0, a: 0 };
   /** Gancho do Bebop armado contra cada lado: local de destino e se é de Mestre. */
-  hook: Record<Side, { i: number; m: boolean } | null> = { p: null, a: null };
+  hook: Record<Side, { i: number; m: boolean; by: number } | null> = { p: null, a: null };
   pend: { t: number; f: () => void; cause?: Cause }[] = [];
   /** Origens em execução (a de dentro vale) e o bônus de cada carta quando cada uma começou. */
   private causes: Cause[] = [];
@@ -294,9 +294,10 @@ export class Match {
   private said = 0;
   /**
    * Habilidades que funcionaram (mudaram algo na partida), em ordem, para a tela tocar o som e a animação de cada uma.
-   * `to`: cartas que ela mexeu (poder, status, lugar, criadas ou destruídas), sem a própria; `at`: local da carta. A tela esvazia a lista.
+   * `to`: cartas que ela mexeu (poder, status, lugar, criadas ou destruídas), sem a própria; `at`: local da carta;
+   * `self`: a própria carta mudou (a Vindicta que cai do céu); `ev`: momento especial (o puxão do gancho do Bebop). A tela esvazia a lista.
    */
-  heard: { ab: AbilityKey; id: number; side: Side; to: number[]; at: number }[] = [];
+  heard: { ab: AbilityKey; id: number; side: Side; to: number[]; at: number; self: boolean; ev?: "pull" }[] = [];
   /** Retrato de cada carta da mesa, para saber quais a habilidade mexeu. */
   private cardSigs() {
     return new Map(this.loc.flatMap((l, i) => [...l.s.p, ...l.s.a].map((c) => [c.id, JSON.stringify([i, c.base, c.bonus, c.v, c.p.token, c.st, c.mv, c.rev])] as const)));
@@ -315,7 +316,7 @@ export class Match {
     if (this.sig() === before) return;
     const now = this.cardSigs();
     const to = [...new Set([...was.keys(), ...now.keys()])].filter((id) => id !== c.id && was.get(id) !== now.get(id));
-    this.heard.push({ ab: c.ab, id: c.id, side: c.side, to, at });
+    this.heard.push({ ab: c.ab, id: c.id, side: c.side, to, at, self: was.get(c.id) !== now.get(c.id) });
   }
   private handOf = (s: Side) => (s === "p" ? this.hand : this.ahand);
   private later(f: () => void, t = this.t + 1) { this.pend.push({ t, f, cause: this.causes.at(-1) }); }
@@ -718,7 +719,7 @@ export class Match {
       t.p = { ...t.p, name: "", hero: null, c1: "#71717a", c2: "#27272a", token: "pigeon" };
       t.base = v; t.bonus = 0; t.ab = "none"; t.desc = ""; t.st = nst(); t.tok = true;
     } },
-    "Bebop": { r: (c, l) => { this.hook[opp(c.side)] = { i: this.idx(l), m: this.master(c) }; this.say({ k: "hook", c: this.N(c), loc: l.L.name }); } },
+    "Bebop": { r: (c, l) => { this.hook[opp(c.side)] = { i: this.idx(l), m: this.master(c), by: c.id }; this.say({ k: "hook", c: this.N(c), loc: l.L.name }); } },
     "Billy": { r: (c, l, v) => {
       const t = this.strongest(this.tg(this.foes(c, l)));
       // no Santuário ela não perde poder, mas a corrente prende mesmo assim
@@ -1322,6 +1323,8 @@ export class Match {
         this.say({ k: "hookPull", c: this.N(c), loc: T.L.name });
         l = T;
         if (h.m) { c.rev = true; this.as({ k: "hook" }, () => this.hurt(c, 2, null)); c.st.chained = true; }
+        // o puxão acontece na revelação da outra carta: entra na lista como uma ação do Bebop, para a animação do gancho
+        this.heard.push({ ab: "Bebop", id: h.by, side: opp(s), to: [c.id], at: h.i, self: false, ev: "pull" });
       }
     }
     // Museu: a carta pode ser roubada de volta para a mão antes de agir
@@ -1352,7 +1355,7 @@ export class Match {
     const impl = this.IMPL[this.abilityOf(c)];
     if (impl?.r) for (let i = 0, n = this.ty(l, "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) this.fire(c, () => this.as(this.by(c), () => impl.r?.(c, at, c.v))); }
     // constante: toca só ao entrar em jogo, com a habilidade ativa
-    else if (ABILITIES[c.ab].kind === "c" && this.abilityOf(c) === c.ab && this.locOf(c)) this.heard.push({ ab: c.ab, id: c.id, side: s, to: [], at: this.idx(this.locOf(c)!) });
+    else if (ABILITIES[c.ab].kind === "c" && this.abilityOf(c) === c.ab && this.locOf(c)) this.heard.push({ ab: c.ab, id: c.id, side: s, to: [], at: this.idx(this.locOf(c)!), self: false });
     // Teatro: uma cópia com o mesmo poder, sem habilidade
     const at = this.locOf(c);
     if (at && this.ty(at, "copy") && !c.tok && this.room(at, s)) {

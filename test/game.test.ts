@@ -545,7 +545,19 @@ describe("escolhas, movimento e execução", () => {
     const gt = stage(pc("g", "Grey Talon", flat(70)), 0);
     m.choose(gt, { card: a });
     m.reveal(gt, m.loc[0]);
-    expect(m.heard).toEqual([{ ab: "Grey Talon", id: gt.id, side: "p", to: [a.id], at: 0 }]);
+    expect(m.heard).toEqual([{ ab: "Grey Talon", id: gt.id, side: "p", to: [a.id], at: 0, self: false }]);
+  });
+
+  it("o puxão do gancho do Bebop entra na lista como ação dele, para a animação do gancho", () => {
+    const { m, mk, put } = arena();
+    const b = put(pc("b", "Bebop", flat(70)), "p", 0);
+    m.heard.length = 0;
+    const a = mk(pc("a", "Herói Novo", flat(70)), "a");
+    a.staged = true;
+    m.loc[2].s.a.push(a);
+    m.reveal(a, m.loc[2]);
+    expect(m.locOf(a)).toBe(m.loc[0]);
+    expect(m.heard[0]).toEqual({ ab: "Bebop", id: b.id, side: "p", to: [a.id], at: 0, self: false, ev: "pull" });
   });
 
   it("Holliday leva a inimiga escolhida para o local escolhido", () => {
