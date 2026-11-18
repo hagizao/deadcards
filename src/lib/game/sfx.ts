@@ -1,6 +1,6 @@
 // Áudio do Cardslock Game: efeitos (Kenney, CC0; ver src/assets/sfx/LICENSE.txt), baque sintetizado para cartas pesadas
 // música de fundo ("Midnight on Miller Street", tcarisland, CC BY 4.0) e conversa do bar (SSE Library, CC0); ver src/assets/music/LICENSE.txt.
-// O copo arrastando na madeira é sintetizado. Volume e mudo de efeitos, música e conversa ficam separados e salvos no navegador.
+// O arrasto e a batida das cartas na madeira são sintetizados. Volume e mudo de efeitos, música e conversa ficam separados e salvos no navegador.
 import { useSyncExternalStore } from "react";
 import walla from "../../assets/music/bar-walla.mp3";
 import music from "../../assets/music/midnight-on-miller-street.mp3";
@@ -8,17 +8,16 @@ import draw from "../../assets/sfx/draw.ogg";
 import endTurn from "../../assets/sfx/end-turn.ogg";
 import error from "../../assets/sfx/error.ogg";
 import grab from "../../assets/sfx/grab.ogg";
-import land from "../../assets/sfx/land.ogg";
 import loss from "../../assets/sfx/loss.ogg";
-import place from "../../assets/sfx/place.ogg";
 import shuffle from "../../assets/sfx/shuffle.ogg";
-import slam from "../../assets/sfx/slam.ogg";
 import soul from "../../assets/sfx/soul.ogg";
 import target from "../../assets/sfx/target.ogg";
 import win from "../../assets/sfx/win.ogg";
 
-const FILES = { draw, endTurn, error, grab, land, loss, place, shuffle, slam, soul, target, win };
-export type Sfx = keyof typeof FILES;
+const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, target, win };
+/** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
+const WOOD = { place: 0.6, land: 0.75, slam: 1 } as const;
+export type Sfx = keyof typeof FILES | keyof typeof WOOD;
 
 /** Volume e mudo de cada canal (0 a 1). */
 export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
@@ -50,7 +49,7 @@ function load(): AudioPrefs {
 
 let prefs = load();
 const subs = new Set<() => void>();
-const cache = new Map<Sfx, HTMLAudioElement>();
+const cache = new Map<keyof typeof FILES, HTMLAudioElement>();
 let ctx: AudioContext | null = null;
 
 const sfxLevel = () => (prefs.sfxOn ? prefs.sfx : 0);
@@ -64,10 +63,12 @@ function audioCtx() {
 
 /** Toca um efeito (sem efeito com o canal mudo ou se o navegador bloquear). */
 export function sfx(name: Sfx, volume = 1) {
+  if (name in WOOD) return woodHit(WOOD[name as keyof typeof WOOD] * volume);
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
-  let base = cache.get(name);
-  if (!base) { base = new Audio(FILES[name]); base.preload = "auto"; cache.set(name, base); }
+  const file = name as keyof typeof FILES;
+  let base = cache.get(file);
+  if (!base) { base = new Audio(FILES[file]); base.preload = "auto"; cache.set(file, base); }
   const a = base.cloneNode() as HTMLAudioElement;
   a.volume = Math.min(1, SFX_BASE * volume * lv);
   a.play().catch(() => {});
@@ -96,11 +97,66 @@ export function thump(strength = 1) {
 let slide: { gain: GainNode; band: BiquadFilterNode; stop: () => void } | null = null;
 let slideIdle: ReturnType<typeof setTimeout> | null = null;
 
-function noise(c: AudioContext, sec: number) {
+/** Ruído branco (estalos) ou marrom (grave, como atrito pesado). */
+function noise(c: AudioContext, sec: number, brown = false) {
   const b = c.createBuffer(1, Math.floor(c.sampleRate * sec), c.sampleRate);
   const d = b.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  let last = 0;
+  for (let i = 0; i < d.length; i++) {
+    const w = Math.random() * 2 - 1;
+    // marrom: integra o branco, tirando o agudo; o ganho compensa a queda de volume
+    d[i] = brown ? (last = (last + 0.02 * w) / 1.02) * 3.5 : w;
+  }
   return b;
+}
+let burst: AudioBuffer | null = null;
+
+/** Carta pesada batendo na mesa de madeira: baque grave do tampo, o "toc" da tábua e o estalo do contato. */
+function woodHit(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  // tampo: um grave curto que cai, mais fundo quanto mais forte a batida
+  const body = c.createOscillator();
+  const bodyGain = c.createGain();
+  body.type = "sine";
+  body.frequency.setValueAtTime(140 - 35 * strength, t);
+  body.frequency.exponentialRampToValueAtTime(48, t + 0.2);
+  bodyGain.gain.setValueAtTime(0.0001, t);
+  bodyGain.gain.exponentialRampToValueAtTime(0.9 * vol, t + 0.005);
+  bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2 + 0.12 * strength);
+  body.connect(bodyGain).connect(c.destination);
+  body.start(t);
+  body.stop(t + 0.45);
+  // tábua: ruído curto passando pelas ressonâncias da madeira
+  burst ??= noise(c, 0.3);
+  const knock = c.createBufferSource();
+  knock.buffer = burst;
+  const knockGain = c.createGain();
+  knockGain.gain.setValueAtTime(0.0001, t);
+  knockGain.gain.exponentialRampToValueAtTime(1.4 * vol, t + 0.003);
+  knockGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09 + 0.05 * strength);
+  for (const [f, q] of [[190, 2.5], [420, 4], [760, 5]]) {
+    const band = c.createBiquadFilter();
+    band.type = "bandpass"; band.frequency.value = f; band.Q.value = q;
+    knock.connect(band).connect(knockGain);
+  }
+  knockGain.connect(c.destination);
+  // contato: estalo seco e baixo da borda da carta
+  const tick = c.createBufferSource();
+  tick.buffer = burst;
+  const high = c.createBiquadFilter();
+  high.type = "bandpass"; high.frequency.value = 1800; high.Q.value = 0.8;
+  const tickGain = c.createGain();
+  tickGain.gain.setValueAtTime(0.25 * vol, t);
+  tickGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.02);
+  tick.connect(high).connect(tickGain).connect(c.destination);
+  knock.start(t);
+  tick.start(t);
+  knock.stop(t + 0.3);
+  tick.stop(t + 0.05);
 }
 
 /** Começa o arrasto: o som fica pronto e só aparece quando a carta anda (ver slideSpeed). */
@@ -108,13 +164,13 @@ export function slideStart() {
   if (slide || !sfxLevel() || !hasCtx()) return;
   const c = audioCtx();
   const src = c.createBufferSource();
-  src.buffer = noise(c, 2);
+  src.buffer = noise(c, 2, true);
   src.loop = true;
-  // fricção: ruído estreitado numa faixa grave-média, como vidro grosso raspando
+  // fricção: ruído marrom numa faixa grave, como uma base pesada deslizando na madeira (sem o chiado agudo)
   const band = c.createBiquadFilter();
-  band.type = "bandpass"; band.frequency.value = 380; band.Q.value = 1.2;
+  band.type = "bandpass"; band.frequency.value = 160; band.Q.value = 0.9;
   const low = c.createBiquadFilter();
-  low.type = "lowpass"; low.frequency.value = 1800;
+  low.type = "lowpass"; low.frequency.value = 520;
   // veios da madeira: um ruído lento faz o volume tremer, como o fundo do copo pulando nas emendas
   const grain = c.createBufferSource();
   grain.buffer = noise(c, 2);
@@ -139,8 +195,8 @@ export function slideSpeed(v: number) {
   if (!slide || !ctx) return;
   const k = Math.min(1, v / 1400);
   const t = ctx.currentTime;
-  slide.gain.gain.setTargetAtTime(k * 2.5 * SFX_BASE * sfxLevel(), t, 0.04);
-  slide.band.frequency.setTargetAtTime(300 + k * 500, t, 0.05);
+  slide.gain.gain.setTargetAtTime(k * 3 * SFX_BASE * sfxLevel(), t, 0.05);
+  slide.band.frequency.setTargetAtTime(120 + k * 140, t, 0.06);
   // sem movimento por um instante, o copo para
   if (slideIdle) clearTimeout(slideIdle);
   slideIdle = v > 0 ? setTimeout(() => slideSpeed(0), 90) : null;
