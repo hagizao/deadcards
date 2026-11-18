@@ -657,13 +657,12 @@ export function slashSfx(volume = 1) {
   knife(k, 0.22, 1.1, { pan: 0.5, panTo: -0.4 });
 }
 
-/** "Começou": dois taikos, o sino do ringue e um acorde de metais. */
+/** "Começou": um sopro que entra macio, três sinos subindo e um acorde quente que fica no ar (nada de estrondo). */
 export function startSfx(volume = 1) {
-  const k = kit(volume);
+  const k = kit(volume * 0.8);
   if (!k) return;
-  k.thud(0, 1.4, 70, { wet: 0.5 });
-  k.thud(0.14, 1.6, 65, { wet: 0.5 });
-  [0.14, 0.34].forEach((a) => k.bell(a, [[1250, 0.35, 1.4], [2730, 0.12, 0.9], [3810, 0.06, 0.6]], 1, { wet: 0.5 }));
-  [196, 294, 392, 494].forEach((f, i) => k.tone({ f, at: 0.14, dur: 0.8, gain: 0.12, type: "sawtooth", lp: 2400, attack: 0.02, hold: 0.25, vib: [5, 6], pan: -0.3 + i * 0.2, wet: 0.5 }));
-  k.hiss({ f: 6000, at: 0.14, dur: 0.9, gain: 0.5, type: "highpass", wet: 0.5 });
+  k.hiss({ f: 500, to: 2500, dur: 0.5, gain: 0.35, q: 0.8, attack: 0.4, wet: 0.5 });
+  [784, 988, 1175].forEach((f, i) => k.bell(0.35 + i * 0.11, GLASS(f), 0.45, { wet: 0.6, pan: -0.3 + i * 0.3 }));
+  [392, 494, 587].forEach((f) => k.tone({ f, at: 0.35, dur: 1.4, gain: 0.06, type: "triangle", attack: 0.25, hold: 0.3, wet: 0.6 }));
+  k.tone({ f: 196, at: 0.35, dur: 1.4, gain: 0.08, attack: 0.3, hold: 0.3 });
 }
