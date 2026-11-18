@@ -157,8 +157,8 @@ const hc = (cost: number, prof: Profile, base: number): HeroCard => ({ cost, pro
 export const HERO_CARD: Partial<Record<AbilityKey, HeroCard>> = {
   "Calico": hc(1, "P", -1), "Holliday": hc(1, "P", 1), "Vyper": hc(1, "P", -2), "Venator": hc(1, "P", -1), "Violet": hc(1, "P", -2), "Graves": hc(1, "P", 1),
   "Abrams": hc(2, "P", 1), "Mina": hc(2, "P", -2), "Paige": hc(2, "H", 0), "Lash": hc(2, "P", 1), "Bebop": hc(2, "P", 1), "Rat King": hc(2, "P", 0),
-  "Viscous": hc(3, "H", 2), "Kelvin": hc(3, "P", 1), "Nurse Harrow": hc(3, "H", 2), "Mirage": hc(3, "P", 1), "Seven": hc(3, "P", 0), "Dynamo": hc(3, "H", 3),
-  "Billy": hc(4, "P", 3), "Celeste": hc(4, "P", 3), "Mo & Krill": hc(4, "P", 0), "Infernus": hc(4, "P", 3), "McGinnis": hc(4, "H", 4), "Warden": hc(4, "P", 1),
+  "Viscous": hc(3, "H", 2), "Kelvin": hc(3, "P", 1), "Nurse Harrow": hc(3, "H", 2), "Mirage": hc(3, "P", 1), "Dynamo": hc(3, "H", 3),
+  "Billy": hc(4, "P", 3), "Celeste": hc(4, "P", 3), "Mo & Krill": hc(4, "P", 0), "Infernus": hc(4, "P", 3), "McGinnis": hc(4, "H", 4), "Warden": hc(4, "P", 1), "Seven": hc(4, "P", 0),
   "Pocket": hc(5, "P", 3), "Grey Talon": hc(5, "P", 5), "Rem": hc(5, "H", 5), "Apollo": hc(5, "P", 5), "Sinclair": hc(5, "P", 6), "The Doorman": hc(5, "P", 6), "Lady Geist": hc(5, "H", 2),
   "Vindicta": hc(6, "P", 6), "Shiv": hc(6, "H", 7), "Ivy": hc(6, "H", 4), "Drifter": hc(6, "P", 6), "Silver": hc(6, "P", 6), "Deadman Danny": hc(6, "H", 6),
   "Wraith": hc(7, "P", 5), "Yamato": hc(7, "P", 6), "Haze": hc(7, "P", 9),
