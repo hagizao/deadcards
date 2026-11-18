@@ -403,8 +403,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   // linhas das escolhas já feitas no turno (alvo do Vindicta, local da Holliday, marca do Shiv...)
   const aimLines = m.loc.flatMap((l) => l.s.p).flatMap((c) => {
     const from = `[data-card="${c.id}"]`;
-    const out: { from: string; to: string }[] = [];
-    if (c.staged && c.ch?.card !== undefined) out.push({ from, to: `[data-card="${c.ch.card}"]` });
+    const out: { from: string; to: string; laser?: boolean }[] = [];
+    if (c.staged && c.ch?.card !== undefined) out.push({ from, to: `[data-card="${c.ch.card}"]`, laser: m.abilityOf(c) === "Vindicta" });
     if (c.staged && c.ch?.loc !== undefined) out.push({ from, to: `[data-drop="${c.ch.loc}"]` });
     if (c.st.exec?.u === m.t && c.st.exec.target !== undefined) out.push({ from, to: `[data-card="${c.st.exec.target}"]` });
     return out;
@@ -596,6 +596,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       </AnimatePresence>
 
       <TargetArrow from={aim ? '[data-item-from="p"]' : mode ? `[data-card="${mode.c.id}"]` : null} lines={result ? [] : aimLines}
+        laser={!aim && mode?.k === "card" && m.abilityOf(mode.c) === "Vindicta"}
         onCancel={() => { setMode(null); if (aim) { setAim(null); setShopHidden(false); } }} />
 
       <AnimatePresence>
