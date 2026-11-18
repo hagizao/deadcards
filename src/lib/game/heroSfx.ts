@@ -638,12 +638,23 @@ export function abilitySfx(ab: AbilityKey, volume = 1) {
 /** Habilidades com som próprio (para o teste conferir que nenhuma ficou de fora). */
 export const HAS_SOUND = new Set(Object.keys(RECIPES));
 
+/**
+ * Facada no ar: o "fsst" rápido da lâmina, o estalo do corte e o "shiiing" do aço (ruído em filtros
+ * bem estreitos, que soam como metal vibrando e descem um pouco de altura).
+ */
+const knife = (k: Kit, at: number, gain: number, o: Out) => {
+  k.hiss({ f: 2200, to: 9000, at, dur: 0.1, gain: gain * 1.1, q: 0.9, attack: 0.08, ...o });
+  k.hiss({ f: 3200, at: at + 0.085, dur: 0.035, gain: gain * 1.3, type: "highpass", attack: 0.001, ...o });
+  k.hiss({ f: 5600, to: 4300, at: at + 0.08, dur: 0.45, gain: gain * 3.2, q: 28, attack: 0.002, wet: 0.35, ...o });
+  k.hiss({ f: 8100, to: 7200, at: at + 0.08, dur: 0.3, gain: gain * 2.2, q: 34, attack: 0.002, wet: 0.35, ...o });
+  k.tone({ f: 4400, to: 3900, at: at + 0.08, dur: 0.35, gain: gain * 0.05, ...o });
+};
 /** Carta eliminada: duas facadas cruzadas, no tempo dos dois traços do X. */
 export function slashSfx(volume = 1) {
   const k = kit(volume);
   if (!k) return;
-  blade(k, 0, 1.2, { pan: -0.4, panTo: 0.4 });
-  blade(k, 0.22, 1.2, { pan: 0.4, panTo: -0.4 });
+  knife(k, 0, 1, { pan: -0.5, panTo: 0.4 });
+  knife(k, 0.22, 1.1, { pan: 0.5, panTo: -0.4 });
 }
 
 /** "Começou": dois taikos, o sino do ringue e um acorde de metais. */
