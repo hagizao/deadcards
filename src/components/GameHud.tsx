@@ -77,8 +77,6 @@ export function SoulOrb({ n, label, big }: { n: number; label: string; /** Na la
 type EndProps = {
   /** Texto principal (Fechar a conta). */
   label: string;
-  /** Linha de cima (Fim do turno). */
-  sub: string;
   turn: number;
   total: number;
   /** Revelando: mostra o texto de espera e trava o botão. */
@@ -99,11 +97,11 @@ const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
  * Fim do turno como a conta do bar: um canhoto de papel com a borda serrilhada, "Fechar a conta" carimbado em vermelho e o
  * turno anotado embaixo (o número vira como uma placa quando o turno muda). Pronto para fechar, a conta brilha e balança.
  */
-export function EndTurnButton({ label, sub, turn, total, busy, busyLabel, ready, disabled, describedBy, big, onClick }: EndProps) {
+export function EndTurnButton({ label, turn, total, busy, busyLabel, ready, disabled, describedBy, big, onClick }: EndProps) {
   const call = ready && !disabled;
   return (
     <button type="button" onClick={onClick} disabled={disabled} aria-describedby={describedBy}
-      onPointerEnter={(e) => { if (e.pointerType === "mouse" && !disabled) sfx("paper"); }} aria-label={`${busy ? busyLabel : `${label} (${sub})`} · ${turn}/${total}`}
+      onPointerEnter={(e) => { if (e.pointerType === "mouse" && !disabled) sfx("paper"); }} aria-label={`${busy ? busyLabel : label} · ${turn}/${total}`}
       className={`group relative flex shrink-0 cursor-pointer flex-col items-stretch transition duration-150 enabled:hover:-translate-y-1 enabled:hover:-rotate-2 enabled:active:translate-y-0 enabled:active:scale-95 disabled:cursor-not-allowed ${big ? "w-full max-w-44" : "w-22 sm:w-26"} ${focus}`}>
       {/* luz vermelha e quente por trás da conta, mais forte quando é hora de fechar */}
       <motion.span aria-hidden="true" className="pointer-events-none absolute -inset-3 rounded-2xl bg-radial from-rose-500/70 via-game-brass/40 to-transparent to-70% blur-lg"
@@ -111,7 +109,8 @@ export function EndTurnButton({ label, sub, turn, total, busy, busyLabel, ready,
         transition={call ? { duration: 1.3, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }} />
       <motion.span className={`relative flex flex-col items-center gap-1 bg-comanda-paper text-comanda-ink shadow-[inset_0_0_1.5rem_rgb(90_60_20/0.3)] transition-[filter] receipt-edge group-disabled:brightness-60 group-disabled:grayscale ${big ? "px-3 pt-3 pb-5" : "px-1.5 pt-1.5 pb-3"}`}
         animate={call ? { rotate: [0, -3, 3, -2, 0] } : { rotate: 0 }} transition={call ? { duration: 0.6, repeat: Infinity, repeatDelay: 1.6 } : { duration: 0.2 }}>
-        <span className={`w-full bg-comanda-ink text-center font-extrabold tracking-widest text-comanda-paper uppercase ${big ? "py-0.5 text-xs" : "text-[9px] sm:text-[10px]"}`}>{busy ? busyLabel : sub}</span>
+        {/* a faixa escura só aparece revelando ("Revelando…"); fora disso o espaço fica no papel, para a conta não mudar de tamanho */}
+        <span className={`w-full text-center font-extrabold tracking-widest uppercase ${busy ? "bg-comanda-ink text-comanda-paper" : "invisible"} ${big ? "py-0.5 text-xs" : "text-[9px] sm:text-[10px]"}`}>{busyLabel}</span>
         <span className={`-rotate-3 rounded-sm px-1 text-center leading-none font-extrabold text-rose-700 uppercase ring-2 ring-rose-700/80 ${big ? "py-1 text-2xl" : "py-0.5 text-[11px] sm:text-sm"}`}>{label}</span>
         <span className="w-full border-t-2 border-dashed border-comanda-ink/40" />
         <span className={`relative flex items-center overflow-hidden leading-none font-extrabold tabular-nums perspective-[20rem] ${big ? "h-12 text-5xl" : "h-7 text-2xl sm:h-8 sm:text-3xl"}`}>

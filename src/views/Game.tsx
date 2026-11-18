@@ -1,5 +1,5 @@
 import { AnimatePresence, MotionConfig, motion, useAnimate, useReducedMotion } from "motion/react";
-import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CardBack, GameCard, TipBoxes, type Tip } from "../components/GameCard";
 import { GameHand } from "../components/GameHand";
@@ -18,7 +18,7 @@ import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
 import tableArt from "../assets/game/table.webp";
 
-const REVEAL_MS = 650;
+const REVEAL_MS = 1000;
 const END_MS = 750;
 const TOAST_MS = 1300;
 /** Peso da carta pelo custo: 1 cai perto, 2 cai do alto, 3 vem do céu e treme a mesa. */
@@ -69,6 +69,24 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const [shopHidden, setShopHidden] = useState(false);
   // partida atual: as faixas remontam a cada partida nova, para o primeiro local revelar com efeito
   const [game, setGame] = useState(0);
+  // abertura da mesa: só no começo de uma partida (ao voltar para a aba no meio dela, a mesa já está posta)
+  const [intro, setIntro] = useState(() => m.t === 1 && m.loc.every((l) => !l.s.p.length && !l.s.a.length));
+  useEffect(() => {
+    if (!intro) return;
+    const at = (sec: number, fn: () => void) => setTimeout(fn, sec * 1000);
+    const ts = [
+      ...m.loc.map((_, i) => at(INTRO.lane(i), () => sfx("place", 0.7))),
+      at(INTRO.comanda, () => sfx("paper")),
+      at(INTRO.comanda + 0.15, () => sfx("paper")),
+      at(INTRO.side, () => sfx("shuffle", 0.6)),
+      at(INTRO.orb, () => sfx("soul", 0.6)),
+      ...m.hand.map((_, i) => at(INTRO.hand + i * INTRO.handStep, () => sfx("hover"))),
+      at(INTRO.done, () => setIntro(false)),
+    ];
+    return () => ts.forEach(clearTimeout);
+  }, [intro, game, m]);
+  /** Peça da mesa entrando na abertura: classe da entrada e o atraso dela. */
+  const deal = (k: keyof typeof INTRO_CLS, sec: number) => (intro ? { cls: INTRO_CLS[k], style: { "--d": `${sec.toFixed(2)}s` } as CSSProperties } : { cls: "", style: undefined });
   // tela cheia: a partida cobre o site (e pede tela cheia ao navegador quando dá)
   const [full, setFull] = useState(startFull);
   const wide = useWide();
@@ -138,7 +156,6 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const say = (text: string) => setToast({ id: ++toastSeq, text });
   const name = (c: GCard) => (c.p.token ? t.tokens[c.p.token] : c.p.name);
   const logName = (n: LogEntry["c"]) => (n === undefined ? "" : typeof n === "string" ? n : t.tokens[n.token]);
-  const logLine = m.log[0] ? t.log[m.log[0].k](m.log[0], logName, (k) => t.abilities[k].name) : "";
   const shopOpen = !!m.offer && !result && !m.busy;
   const errText: Record<PlayError, string> = { souls: t.ui.toast.souls, frozen: t.ui.toast.frozen, full: t.ui.toast.full, closed: t.ui.toast.closed, minCost: t.ui.toast.minCost };
 
@@ -147,17 +164,18 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     const key = m.abilityOf(c);
     const a = t.abilities[key];
     const body = key === "none" && c.ab !== "none" ? t.ui.noAbility : c.tok && c.ab === "none" ? t.ui.tokenDesc : c.desc || a.text(c.v);
-    const ms = t.abilities[c.ab].master();
     const icons = c.rev ? statusIcons(c, m, t) : [];
     return (
       <GameCard player={c.p.token ? null : versionPlayer(byId, c.p)} name={name(c)} cost={c.cost} power={c.rev ? m.pow(c) : c.base} base={c.base}
         glyph={c.p.token ? TOKEN_GLYPH[c.p.token] : undefined} master={c.lvl === 2 ? t.levels[2] : undefined} fx={fx}
         status={icons.map((x) => x[0]).join("") || undefined}
-        text={text ? { name: a.name, kind: t.kinds[ABILITIES[key].kind], body, master: c.lvl === 2 && key === c.ab && ms ? ms : undefined, masterLabel: t.ui.masterLine } : null} />
+        text={text ? { name: a.name, kind: t.kinds[ABILITIES[key].kind], body, masterLabel: t.ui.masterLine } : null} />
     );
   };
   /** Caixas ao lado da carta ampliada: selo de momento e status. */
   const tipsOf = (c: GCard) => [
+    // a frase de Mestre vai numa caixa ao lado (na carta não cabe junto com a habilidade)
+    ...(c.lvl === 2 && m.abilityOf(c) === c.ab && t.abilities[c.ab].master() ? [{ title: `★ ${t.ui.masterLine}`, text: t.abilities[c.ab].master() }] : []),
     ...(c.p.role && t.roles.tips[c.p.role] ? [{ title: t.roles.title(c.p.role), text: t.roles.tips[c.p.role] }] : []),
     ...(ABILITIES[m.abilityOf(c)].kind !== "-" ? [{ title: t.kinds[ABILITIES[m.abilityOf(c)].kind], text: t.kindTips[ABILITIES[m.abilityOf(c)].kind] }] : []),
     ...(c.rev ? statusIcons(c, m, t).map(([icon, nm, k]) => ({ title: `${icon} ${nm}`, text: t.ui.statusTip[k] })) : []),
@@ -187,6 +205,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     timers.current = [];
     setM(newMatch());
     setGame((x) => x + 1);
+    setIntro(true);
     sfx("shuffle");
     setSel(null);
     setLook(null);
@@ -358,7 +377,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       m.markOptions(c).length > 0 && { label: t.ui.act.mark, run: () => startMode("mark", c) },
     ].filter(Boolean) as { label: string; run: () => void }[];
   };
-  const dropAt = (l: Loc, i: number) => !drag || m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok";
+  /** Estado do local enquanto arrasta: o local sob a carta acende (se der para jogar lá) e os outros escurecem. */
+  const dropAt = (l: Loc, i: number): Drop => !drag ? "off" : drag.over !== null && drag.over !== i ? "dim" : m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok";
   const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && !m.canPlay(sel, l);
   /** The New York Oracle: próxima carta de cada baralho. */
   const next = { p: m.peek("p"), a: m.peek("a") };
@@ -378,7 +398,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     cover={next.p && face(next.p, false)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} /></div>;
   const endBtn = result && !showEnd
     ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
-    : <EndTurnButton label={t.ui.closeTab} sub={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady} big={wide}
+    : <EndTurnButton label={t.ui.closeTab} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady} big={wide}
         disabled={m.busy || !!result} onClick={endTurn} />;
   const prio = <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr>;
   const controls = (
@@ -408,19 +428,19 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     {/* tela larga: à esquerda a comanda da IA (vinda de cima), suas almas no meio e a sua comanda (vinda de baixo) */}
     {wide && (
       <aside aria-label={t.ui.players} className="grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] items-center justify-items-center gap-4 text-dl-text">
-        <Comanda s="a" m={m} t={t} icons={icons} on={boughtOn} />
-        <SoulOrb n={m.E} label={t.ui.souls(m.E)} big />
-        <Comanda s="p" m={m} t={t} icons={icons} on={boughtOn} />
+        <Comanda key={`a${game}`} s="a" m={m} t={t} icons={icons} on={boughtOn} deal={deal("left", INTRO.comanda)} />
+        <div key={`o${game}`} className={deal("pop", INTRO.orb).cls} style={deal("pop", INTRO.orb).style}><SoulOrb n={m.E} label={t.ui.souls(m.E)} big /></div>
+        <Comanda key={`p${game}`} s="p" m={m} t={t} icons={icons} on={boughtOn} deal={deal("left", INTRO.comanda + 0.15)} />
       </aside>
     )}
     <div className={`relative mx-auto flex flex-col gap-1.5 text-dl-text ${wide ? "h-full min-w-0 flex-[0_1_80rem]" : `${height} max-w-7xl`}`}>
       {/* as faixas vão de cima até embaixo da mão, como se a mesa fosse vista de cima */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 flex gap-0.5 sm:gap-1">
-        {m.loc.map((l, i) => <LaneBackdrop key={`${game}-${l.L.id}${i}`} l={l} i={i} drop={dropAt(l, i)} fresh={m.t === 1} />)}
+        {m.loc.map((l, i) => <LaneBackdrop key={`${game}-${l.L.id}${i}`} l={l} i={i} drop={dropAt(l, i)} fresh={m.t === 1} dealAt={intro ? INTRO.lane(i) : undefined} />)}
       </div>
       <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
         {wide ? <div /> : title}
-        <div className="order-last col-span-2 flex items-start justify-center gap-2 sm:order-0 sm:col-span-1">
+        <div key={`t${game}`} className={`order-last col-span-2 flex items-start justify-center gap-2 sm:order-0 sm:col-span-1 ${deal("drop", INTRO.side).cls}`} style={deal("drop", INTRO.side).style}>
           {!wide && <ItemSlot s="a" m={m} t={t} icons={icons} on={boughtOn} />}
           <AiHand n={m.ahand.length} t={t} />
         </div>
@@ -440,7 +460,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       <div ref={arena} className="relative flex min-h-0 w-full flex-1 flex-col">
         <section aria-label={t.ui.arena} className="lane-board flex min-h-0 w-full flex-1 gap-0.5 sm:gap-1">
           {m.loc.map((l, i) => (
-            <Location key={l.L.id + i} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
+            <Location key={`${game}-${l.L.id}${i}`} dealAt={intro ? INTRO.lane(i) + 0.08 : undefined} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
               drop={dropAt(l, i)}
               card={(c) => (
                 <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} acts={actsOf(c)}
@@ -500,24 +520,24 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
             {(mode.k === "card" || mode.k === "loc") && mode.c.staged && <button type="button" className={pill(false)} onClick={undoPlay}>{t.ui.act.undo}</button>}
             {(mode.k === "move" || mode.k === "mark") && <button type="button" className={pill(false)} onClick={() => setMode(null)}>{t.ui.act.cancel}</button>}
           </>
-        ) : <span className="line-clamp-1 text-zinc-300">{logLine || t.ui.hint}</span>}
+        ) : null}
       </div>
 
       <div className="flex w-full flex-wrap items-end justify-between gap-x-2 sm:flex-nowrap">
         {!wide && (
-          <div className="flex shrink-0 flex-col items-center gap-1 pb-1">
+          <div key={`l${game}`} className={`flex shrink-0 flex-col items-center gap-1 pb-1 ${deal("up", INTRO.orb).cls}`} style={deal("up", INTRO.orb).style}>
             <ItemSlot s="p" m={m} t={t} icons={icons} on={boughtOn} />
             <SoulOrb n={m.E} label={t.ui.souls(m.E)} />
           </div>
         )}
         <section aria-label={t.ui.hand} className="relative z-10 order-last w-full min-w-0 sm:order-0 sm:w-auto sm:flex-1">
-          <GameHand cards={m.hand} selected={sel} disabled={m.busy || !!result}
+          <GameHand deal={intro ? { at: INTRO.hand, step: INTRO.handStep } : undefined} cards={m.hand} selected={sel} disabled={m.busy || !!result}
             playable={(c) => !m.busy && !result && m.loc.some((l) => !m.canPlay(c, l))}
             label={(c) => t.ui.cardLabel(name(c), c.cost, c.base)} tips={tipsOf} render={(c, zoomed) => face(c, true, zoomed)}
             onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => { if (c && !drag) sfx("grab", 0.7); setDrag(c ? { c, over } : null); }} />
         </section>
         {!wide && (
-          <div className="flex shrink-0 items-end gap-2 pb-1">
+          <div key={`r${game}`} className={`flex shrink-0 items-end gap-2 pb-1 ${deal("up", INTRO.side).cls}`} style={deal("up", INTRO.side).style}>
             {myDeck}
             {endBtn}
           </div>
@@ -552,7 +572,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     </div>
     {/* tela larga: à direita os dois baralhos (IA em cima, o seu embaixo) e o fim do turno entre eles */}
     {wide && (
-      <aside aria-label={t.ui.decks} className="grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] justify-items-center gap-3 pb-3">
+      <aside key={`d${game}`} aria-label={t.ui.decks} className={`grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] justify-items-center gap-3 pb-3 ${deal("right", INTRO.side).cls}`} style={deal("right", INTRO.side).style}>
         <div className="flex w-full flex-col items-center gap-3">
           <div className="flex items-center gap-1 self-end text-xs text-zinc-400 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
             <span>{t.ui.record(record.w, record.l)}</span>
@@ -592,6 +612,13 @@ type T = (typeof GAME_TEXT)["pt"];
 type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
 /** Cores das três faixas (amarela, azul e verde, como as lanes do mapa), em classes inteiras. */
+/** Abertura da mesa (segundos): os locais pousam um a um, entram as comandas e os baralhos, a orbe acende e a mão é dada carta a carta. */
+const INTRO = { lane: (i: number) => 0.15 + i * 0.15, comanda: 0.75, side: 0.95, orb: 1.1, hand: 1.3, handStep: 0.13, reveal: 2.1, done: 3.4 };
+const INTRO_CLS = { drop: "intro-drop", up: "intro-up", left: "intro-left", right: "intro-right", pop: "intro-pop" } as const;
+
+/** Local durante o arrasto: fora, dá para soltar, sob a carta, ou escurecido (a carta está sobre outro). */
+type Drop = "off" | "ok" | "over" | "dim";
+
 const LANE = [
   { stroke: "stroke-lane-yellow", tint: "from-lane-yellow/30", glow: "from-lane-yellow/30", tag: "bg-lane-yellow", ink: "text-lane-yellow" },
   { stroke: "stroke-lane-blue", tint: "from-lane-blue/30", glow: "from-lane-blue/30", tag: "bg-lane-blue", ink: "text-lane-blue" },
@@ -671,21 +698,29 @@ function BarTable() {
 }
 
 /** Fundo da faixa: arte do local (ou névoa enquanto oculto), escurecida nas pontas e tingida com a cor da lane; bordas a pincel. A cor da lane vaza na mesa. */
-function LaneBackdrop({ l, i, drop, fresh }: { l: Loc; i: number; drop: "off" | "ok" | "over"; /** Começo da partida: o local já revelado também revela com efeito e som. */ fresh: boolean }) {
+function LaneBackdrop({ l, i, drop, fresh, dealAt }: {
+  l: Loc; i: number; drop: Drop; /** Começo da partida: o local já revelado também revela com efeito e som. */ fresh: boolean;
+  /** Abertura da mesa: a faixa pousa neste segundo, e o primeiro local só revela depois da mesa posta. */ dealAt?: number;
+}) {
   const b = BRUSH[i % 3], lane = LANE[i % 3];
   const [ref, { w, h }] = useSize();
   const id = `lane-${i}`;
   const art = l.rev && l.L.art;
   // som quando o local vira (não na montagem: um local já revelado ao abrir a partida fica quieto)
   const was = useRef(fresh ? false : l.rev);
+  const wait = dealAt !== undefined ? INTRO.reveal : 0;
   useEffect(() => {
-    if (l.rev && !was.current) sfx("reveal");
+    const now = l.rev && !was.current;
     was.current = l.rev;
-  }, [l.rev]);
+    if (!now) return;
+    if (!wait) return sfx("reveal");
+    const id = setTimeout(() => sfx("reveal"), wait * 1000);
+    return () => clearTimeout(id);
+  }, [l.rev, wait]);
   // espessura proporcional à faixa, como no mapa: fina no celular, grossa no desktop
   const sw = Math.max(4, Math.min(13, w * 0.03));
   return (
-    <div ref={ref} className="relative min-w-0 flex-1">
+    <div ref={ref} className={`relative min-w-0 flex-1 ${dealAt !== undefined ? "intro-drop" : ""}`} style={dealAt !== undefined ? ({ "--d": `${dealAt.toFixed(2)}s` } as CSSProperties) : undefined}>
       <div className={`absolute -inset-x-1/2 inset-y-0 bg-radial to-transparent to-70% mix-blend-screen ${lane.glow}`} />
       <div className="absolute inset-0 bg-zinc-950" style={{ clipPath: `url(#${id}-clip)` }}>
         {/* anima ao revelar; ao voltar para a tela no meio da partida, a arte já está lá */}
@@ -693,7 +728,7 @@ function LaneBackdrop({ l, i, drop, fresh }: { l: Loc; i: number; drop: "off" | 
           {art && (
           <motion.img key={art} src={locArtUrl(art)} alt="" draggable={false}
             initial={{ opacity: 0, scale: 1.12, filter: "blur(14px) brightness(0.3)" }} animate={{ opacity: 1, scale: 1, filter: "blur(0px) brightness(1)" }}
-            transition={{ duration: 1.4, ease: "easeOut" }}
+            transition={{ duration: 1.4, ease: "easeOut", delay: wait }}
             className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />
           )}
         </AnimatePresence>
@@ -702,7 +737,7 @@ function LaneBackdrop({ l, i, drop, fresh }: { l: Loc; i: number; drop: "off" | 
         </AnimatePresence>
         <div className="absolute inset-0 bg-linear-to-b from-black/80 via-black/10 to-black/85" />
         <div className={`absolute inset-0 bg-linear-to-t to-transparent to-60% ${lane.tint}`} />
-        <div className={`absolute inset-0 transition-colors duration-150 ${drop === "over" ? "bg-game-me/20" : drop === "ok" ? "bg-game-me/8" : ""}`} />
+        <div className={`absolute inset-0 transition-colors duration-150 ${drop === "over" ? "bg-game-me/20" : drop === "ok" ? "bg-game-me/8" : drop === "dim" ? "bg-black/65" : ""}`} />
       </div>
       <svg className={`absolute inset-0 size-full overflow-visible fill-none ${lane.stroke}`}>
         <defs>
@@ -726,8 +761,9 @@ function LaneBackdrop({ l, i, drop, fresh }: { l: Loc; i: number; drop: "off" | 
   );
 }
 
-function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
-  m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: "off" | "ok" | "over"; card: (c: GCard) => React.ReactNode;
+function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card, dealAt }: {
+  m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: Drop; card: (c: GCard) => React.ReactNode;
+  /** Abertura da mesa: a placa e os lados entram junto com a faixa. */ dealAt?: number;
 }) {
   const a = m.total(l, "a"), p = m.total(l, "p");
   const nm = l.rev ? l.L.name : t.ui.hiddenLoc;
@@ -749,7 +785,8 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
   const side = "grid h-[calc(var(--spacing-gc)*2.92+0.5rem)] w-full grid-cols-[repeat(2,var(--spacing-gc))] grid-rows-[repeat(2,calc(var(--spacing-gc)*1.46))] justify-center gap-1 p-0.5";
   return (
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
-      className="relative flex min-w-0 flex-1 flex-col items-center justify-between gap-1 px-2 py-1.5 sm:gap-2 sm:px-4 sm:py-3">
+      style={dealAt !== undefined ? ({ "--d": `${dealAt.toFixed(2)}s` } as CSSProperties) : undefined}
+      className={`relative flex min-w-0 flex-1 flex-col items-center justify-between gap-1 px-2 py-1.5 transition-[filter] duration-150 sm:gap-2 sm:px-4 sm:py-3 ${drop === "dim" ? "brightness-50" : ""} ${dealAt !== undefined ? "intro-drop" : ""}`}>
       <div className={`relative content-end ${side}`} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
       <div className="relative w-full"><LocTile i={i} nm={nm} desc={desc} chips={chips} a={a} p={p} /></div>
       <div className={`relative content-start ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
@@ -1030,7 +1067,10 @@ function ItemPeek({ b, r, m, t, icon, on }: { b: Bought; r: DOMRect; m: Match; t
   );
 }
 
-function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string }) {
+function Comanda({ s, m, t, icons, on, deal }: {
+  s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string;
+  /** Abertura da mesa: classe e atraso da entrada. */ deal?: { cls: string; style?: CSSProperties };
+}) {
   const list = [...m.owned[s], ...(s === "p" && m.buying.p ? [m.buying.p] : [])];
   const who = s === "p" ? t.shop.mine : t.shop.ai;
   const ai = s === "a";
@@ -1040,7 +1080,7 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
   const [peek, setPeek] = useState<{ b: Bought; r: DOMRect } | null>(null);
   return (
     // a borda da tela corta o bloco: é o papel saindo para fora da mesa
-    <div className="@container relative size-full min-h-0 overflow-hidden">
+    <div className={`@container relative size-full min-h-0 overflow-hidden ${deal?.cls ?? ""}`} style={deal?.style}>
       <section data-item-slot={s} aria-label={who}
         className={`absolute inset-x-3 flex h-[200%] ${flip} bg-comanda-paper text-comanda-ink shadow-[inset_0_0_2.5rem_rgb(90_60_20/0.25),0_0.5rem_1.25rem_rgb(0_0_0/0.6)] ${ai ? "bottom-2 rotate-1" : "top-2 -rotate-1"}`}>
         {/* capa de papelão do bloco, do lado das almas */}

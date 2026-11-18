@@ -18,6 +18,8 @@ type Props = {
   onDrop: (c: GCard, i: number) => void;
   /** Carta sendo arrastada e o local sob o cursor, para acender os locais. */
   onDrag: (c: GCard | null, over: number | null) => void;
+  /** Abertura da mesa: as cartas sobem da borda de baixo uma a uma, a partir de `at` segundos, a cada `step`. */
+  deal?: { at: number; step: number };
 };
 
 const RATIO = 430 / 295;
@@ -86,11 +88,12 @@ export function GameHand(p: Props) {
     // corta só embaixo: a carta afunda na borda, mas a ampliada pode subir por cima da mesa
     <div ref={measure} className="relative w-full [clip-path:inset(-100vh_-100vw_0_-100vw)]" style={{ height: boxH }}>
       {cw > 0 && (
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={!!p.deal}>
           {p.cards.map((c, i) => (
             <motion.div key={c.id} className="absolute origin-bottom" style={{ top: TOP, left: cw / 2 - W / 2, width: W, zIndex: c.id === drag ? 60 : i === li ? 50 : i + 1 }}
-              initial={{ x: cw / 2, y: -H, rotate: 25, opacity: 0 }} animate={{ ...pose(i), opacity: 1 }} exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.18 } }}
-              transition={{ type: "spring", stiffness: 380, damping: 30 }}>
+              initial={p.deal ? { x: pose(i).x, y: boxH + H, rotate: 0, opacity: 0 } : { x: cw / 2, y: -H, rotate: 25, opacity: 0 }}
+              animate={{ ...pose(i), opacity: 1 }} exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.18 } }}
+              transition={{ type: "spring", stiffness: 380, damping: 30, delay: p.deal ? p.deal.at + i * p.deal.step : 0 }}>
               <HandCard c={c} p={p} zoomed={i === li} dragging={c.id === drag}
                 onHover={(on) => setHover((h) => (on ? c.id : h === c.id ? null : h))}
                 onDragState={(on) => { setDrag(on ? c.id : null); if (on) setHover(null); }} />

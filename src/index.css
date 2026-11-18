@@ -184,6 +184,33 @@
   50% { transform: scale(1.18); opacity: 0.6; }
 }
 
+/* Cardslock Game: abertura da mesa. Cada peça entra no seu tempo (--d) e fica escondida até lá (fill both). */
+@utility intro-drop {
+  animation: intro-drop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
+  @media (prefers-reduced-motion: reduce) { animation: none; }
+}
+@utility intro-up {
+  animation: intro-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
+  @media (prefers-reduced-motion: reduce) { animation: none; }
+}
+@utility intro-left {
+  animation: intro-left 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
+  @media (prefers-reduced-motion: reduce) { animation: none; }
+}
+@utility intro-right {
+  animation: intro-right 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both;
+  @media (prefers-reduced-motion: reduce) { animation: none; }
+}
+@utility intro-pop {
+  animation: intro-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) var(--d, 0s) both;
+  @media (prefers-reduced-motion: reduce) { animation: none; }
+}
+@keyframes intro-drop { from { opacity: 0; transform: translateY(-3rem) scale(1.06); } }
+@keyframes intro-up { from { opacity: 0; transform: translateY(4rem); } }
+@keyframes intro-left { from { opacity: 0; transform: translateX(-8rem) rotate(-4deg); } }
+@keyframes intro-right { from { opacity: 0; transform: translateX(8rem); } }
+@keyframes intro-pop { from { opacity: 0; transform: scale(0.3); } }
+
 /* Cardslock Game: luz fraca e quente sobre a mesa do bar, que balança devagar como um lampião */
 @utility table-lamp {
   background: radial-gradient(ellipse 30% 26% at 50% 50%, rgb(255 184 110 / 0.09), transparent 70%);
