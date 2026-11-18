@@ -16,6 +16,8 @@ export type GameText = {
   kinds: Record<AbilityKind, string>;
   /** Explicação de cada selo de momento (no detalhe da carta). */
   kindTips: Record<AbilityKind, string>;
+  /** Função da carta (posição do jogador no time), mostrada numa caixa no hover. */
+  roles: { title: (role: string) => string; tips: Record<string, string> };
   locs: Record<LocType, LocText>;
   tokens: Record<Token, string>;
   /** Efeito de cada item (o nome fica em inglês, como no jogo e na API). */
@@ -42,7 +44,7 @@ export type GameText = {
   };
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
-    turn: (t: number, total: number) => string; phase: (p: number) => string; phaseHint: string; prio: (me: boolean) => string; prioHint: string; record: (w: number, l: number) => string; souls: (n: number) => string; players: string; decks: string; comanda: { title: string; table: string; item: string; value: string };
+    turn: (t: number, total: number) => string; phase: (p: number) => string; phaseHint: string; prio: (me: boolean) => string; prioHint: string; record: (w: number, l: number) => string; souls: (n: number) => string; players: string; decks: string; comanda: { title: string; table: (n: number) => string; item: string; value: string };
     endTurn: string; newMatch: string; again: string; viewBoard: string; hint: string; hiddenLoc: string; revealsOn: (t: number) => string; next: (name: string) => string;
     cost: string; power: string; silenced: string; noAbility: string; tokenDesc: string; hand: string; arena: string;
     win: string; loss: string; draw: string; summary: (w: number, l: number, me: number, ai: number) => string; patron: string;
@@ -124,6 +126,16 @@ export const GAME_TEXT = strings<GameText>({
     stats: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" },
     levels: ["Aprendiz", "Profissional", "Mestre"],
     kinds: { r: "Ao revelar", c: "Constante", f: "Fim do turno", x: "Movimento", a: "Reação", "-": "" },
+    roles: {
+      title: (r) => `Função: ${r}`,
+      tips: {
+        Carry: "Dano principal do time. Ganha mais com o Buff de Arma e com itens de arma, como High-Velocity Rounds e Glass Cannon.",
+        OffCarry: "Dano secundário. Também ganha mais com o Buff de Arma e com itens de arma.",
+        Frontline: "Linha de frente. Ganha mais com itens de defesa, como Battle Vest e Colossus.",
+        Suporte: "Apoia o time. Ao ser revelado, solta os aliados erguidos pela Wraith no mesmo local.",
+        Flex: "Joga em qualquer função, sem bônus próprio de função.",
+      },
+    },
     kindTips: {
       r: "Age uma vez, quando a carta vira no fim do turno.",
       c: "Vale o tempo todo enquanto a carta estiver no local e com a habilidade.",
@@ -313,7 +325,7 @@ export const GAME_TEXT = strings<GameText>({
     ui: {
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
       needCards: (n) => `Cadastre pelo menos ${n} cartas para jogar.`, you: "Você: Rei Oculto", ai: "IA: Arquimãe",
-      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 a 3 · Mid: 4 a 6 (cartas sobem para Profissional) · Late: 7 e 8 (Mestre e ultimates).", prio: (me) => `Prioridade: ${me ? "você" : "IA"}`, prioHint: "Quem tem prioridade revela primeiro. No turno 1 é o Rei Oculto; depois, quem estiver ganhando a partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, players: "Almas e itens", decks: "Baralhos e fim do turno", comanda: { title: "Comanda", table: "Mesa 7", item: "Item", value: "Almas" },
+      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 a 3 · Mid: 4 a 6 (cartas sobem para Profissional) · Late: 7 e 8 (Mestre e ultimates).", prio: (me) => `Prioridade: ${me ? "você" : "IA"}`, prioHint: "Quem tem prioridade revela primeiro. No turno 1 é o Rei Oculto; depois, quem estiver ganhando a partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, players: "Almas e itens", decks: "Baralhos e fim do turno", comanda: { title: "Comanda", table: (n) => `Mesa ${n}`, item: "Item", value: "Almas" },
       endTurn: "Fim do turno", newMatch: "Nova partida", again: "Jogar de novo", viewBoard: "Ver tabuleiro",
       hint: "Arraste uma carta até um local para jogar (ou toque nela e depois no local). Passe o mouse para ler.", hiddenLoc: "Local oculto", revealsOn: (t) => `Revela no turno ${t}`, next: (name) => `Próxima carta: ${name}`,
       cost: "custo", power: "poder", silenced: "habilidade anulada", noAbility: "Sem habilidade.", tokenDesc: "Ficha criada por uma habilidade.",
@@ -402,6 +414,16 @@ export const GAME_TEXT = strings<GameText>({
     stats: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" },
     levels: ["Apprentice", "Pro", "Master"],
     kinds: { r: "On reveal", c: "Ongoing", f: "End of turn", x: "Movement", a: "Reaction", "-": "" },
+    roles: {
+      title: (r) => `Role: ${r}`,
+      tips: {
+        Carry: "The team's main damage. Gets more from the Weapon buff and from weapon items like High-Velocity Rounds and Glass Cannon.",
+        OffCarry: "Secondary damage. Also gets more from the Weapon buff and from weapon items.",
+        Frontline: "Front line. Gets more from defensive items like Battle Vest and Colossus.",
+        Suporte: "Supports the team. When revealed, frees allies lifted by Wraith at the same location.",
+        Flex: "Plays any role, with no role bonus of its own.",
+      },
+    },
     kindTips: {
       r: "Acts once, when the card flips at the end of the turn.",
       c: "Works all the time while the card is at the location and keeps its ability.",
@@ -591,7 +613,7 @@ export const GAME_TEXT = strings<GameText>({
     ui: {
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
       needCards: (n) => `Add at least ${n} cards to play.`, you: "You: Hidden King", ai: "AI: Archmother",
-      turn: (t, total) => `Turn ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 to 3 · Mid: 4 to 6 (cards rise to Pro) · Late: 7 and 8 (Master and ultimates).", prio: (me) => `Priority: ${me ? "you" : "AI"}`, prioHint: "Whoever has priority reveals first. On turn 1 it's the Hidden King; after that, whoever is winning the match.", record: (w, l) => `${w}W ${l}L`, souls: (n) => `${n} ${pl(n, "soul", "souls")}`, players: "Souls and items", decks: "Decks and end turn", comanda: { title: "Bar tab", table: "Table 7", item: "Item", value: "Souls" },
+      turn: (t, total) => `Turn ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rounds 1 to 3 · Mid: 4 to 6 (cards rise to Pro) · Late: 7 and 8 (Master and ultimates).", prio: (me) => `Priority: ${me ? "you" : "AI"}`, prioHint: "Whoever has priority reveals first. On turn 1 it's the Hidden King; after that, whoever is winning the match.", record: (w, l) => `${w}W ${l}L`, souls: (n) => `${n} ${pl(n, "soul", "souls")}`, players: "Souls and items", decks: "Decks and end turn", comanda: { title: "Bar tab", table: (n) => `Table ${n}`, item: "Item", value: "Souls" },
       endTurn: "End turn", newMatch: "New match", again: "Play again", viewBoard: "View board",
       hint: "Drag a card onto a location to play it (or tap it, then the location). Hover to read.", hiddenLoc: "Hidden location", revealsOn: (t) => `Reveals on turn ${t}`, next: (name) => `Next card: ${name}`,
       cost: "cost", power: "power", silenced: "ability canceled", noAbility: "No ability.", tokenDesc: "Token created by an ability.",
@@ -680,6 +702,16 @@ export const GAME_TEXT = strings<GameText>({
     stats: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" },
     levels: ["Aprendiz", "Profesional", "Maestro"],
     kinds: { r: "Al revelar", c: "Constante", f: "Fin del turno", x: "Movimiento", a: "Reacción", "-": "" },
+    roles: {
+      title: (r) => `Rol: ${r}`,
+      tips: {
+        Carry: "Daño principal del equipo. Gana más con el Buff de Arma y con objetos de arma, como High-Velocity Rounds y Glass Cannon.",
+        OffCarry: "Daño secundario. También gana más con el Buff de Arma y con objetos de arma.",
+        Frontline: "Primera línea. Gana más con objetos defensivos, como Battle Vest y Colossus.",
+        Suporte: "Apoya al equipo. Al revelarse, suelta a los aliados levantados por Wraith en el mismo lugar.",
+        Flex: "Juega en cualquier rol, sin bonus propio de rol.",
+      },
+    },
     kindTips: {
       r: "Actúa una vez, cuando la carta se voltea al final del turno.",
       c: "Vale todo el tiempo mientras la carta esté en el lugar y con la habilidad.",
@@ -869,7 +901,7 @@ export const GAME_TEXT = strings<GameText>({
     ui: {
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",
       needCards: (n) => `Registra al menos ${n} cartas para jugar.`, you: "Tú: Rey Oculto", ai: "IA: Archimadre",
-      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rondas 1 a 3 · Mid: 4 a 6 (las cartas suben a Profesional) · Late: 7 y 8 (Maestro y ultimates).", prio: (me) => `Prioridad: ${me ? "tú" : "IA"}`, prioHint: "Quien tiene la prioridad revela primero. En el turno 1 es el Rey Oculto; después, quien vaya ganando la partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, players: "Almas y objetos", decks: "Mazos y fin del turno", comanda: { title: "Comanda", table: "Mesa 7", item: "Objeto", value: "Almas" },
+      turn: (t, total) => `Turno ${t}/${total}`, phase: (p) => ["Early game", "Mid game", "Late game"][p], phaseHint: "Early: rondas 1 a 3 · Mid: 4 a 6 (las cartas suben a Profesional) · Late: 7 y 8 (Maestro y ultimates).", prio: (me) => `Prioridad: ${me ? "tú" : "IA"}`, prioHint: "Quien tiene la prioridad revela primero. En el turno 1 es el Rey Oculto; después, quien vaya ganando la partida.", record: (w, l) => `${w}V ${l}D`, souls: (n) => `${n} ${pl(n, "alma", "almas")}`, players: "Almas y objetos", decks: "Mazos y fin del turno", comanda: { title: "Comanda", table: (n) => `Mesa ${n}`, item: "Objeto", value: "Almas" },
       endTurn: "Fin del turno", newMatch: "Nueva partida", again: "Jugar de nuevo", viewBoard: "Ver tablero",
       hint: "Arrastra una carta a un lugar para jugarla (o tócala y luego el lugar). Pasa el ratón para leer.", hiddenLoc: "Lugar oculto", revealsOn: (t) => `Se revela en el turno ${t}`, next: (name) => `Próxima carta: ${name}`,
       cost: "coste", power: "poder", silenced: "habilidad anulada", noAbility: "Sin habilidad.", tokenDesc: "Ficha creada por una habilidad.",

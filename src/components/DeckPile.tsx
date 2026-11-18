@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { forwardRef, useState } from "react";
+import { forwardRef, useState, type ReactNode } from "react";
 import { CardBack } from "./GameCard";
 import type { DeckLook } from "../lib/game/deck";
 
@@ -20,13 +20,15 @@ type Props = {
   className?: string;
   /** Lado em que a caixa de contagem abre. */
   tipSide?: "left" | "top" | "bottom";
+  /** Carta virada no topo da pilha (The New York Oracle mostra a próxima carta). */
+  cover?: ReactNode;
 };
 
 /**
  * Baralho físico: versos empilhados, um por carta, com a espessura caindo a cada compra. A carta de cima sai voando ao ser
  * comprada e uma nova cai na pilha ao entrar. Hover, foco ou toque mostram quantas cartas faltam.
  */
-export const DeckPile = forwardRef<HTMLButtonElement, Props>(function DeckPile({ n, label, tone = "me", look, out = { x: -60, y: 0 }, className = "w-14", tipSide = "left" }, ref) {
+export const DeckPile = forwardRef<HTMLButtonElement, Props>(function DeckPile({ n, label, tone = "me", look, out = { x: -60, y: 0 }, className = "w-14", tipSide = "left", cover }, ref) {
   const [open, setOpen] = useState(false);
   const layers = Math.min(n, MAX_LAYERS);
   const tip = { left: "top-1/2 right-full -translate-x-2 -translate-y-1/2", top: "bottom-full left-1/2 -translate-x-1/2 -translate-y-2", bottom: "top-full left-1/2 -translate-x-1/2 translate-y-2" }[tipSide];
@@ -42,7 +44,9 @@ export const DeckPile = forwardRef<HTMLButtonElement, Props>(function DeckPile({
             initial={{ y: -28, x: 0, opacity: 0, rotate: -6 }}
             animate={{ y: -i * 1.6, x: -i * 0.6, opacity: 1, rotate: 0, transition: { duration: 0.22, ease: "easeOut" } }}
             exit={{ x: out.x, y: out.y, opacity: 0, rotate: out.x < 0 ? -12 : 12, transition: { duration: 0.28, ease: "easeIn" } }}>
-            <CardBack tone={tone} look={look} className={i === layers - 1 ? "drop-shadow-[0_0.3rem_0.5rem_rgb(0_0_0/0.6)]" : ""} />
+            {i === layers - 1 && cover
+              ? <div className="drop-shadow-[0_0.3rem_0.5rem_rgb(0_0_0/0.6)]">{cover}</div>
+              : <CardBack tone={tone} look={look} className={i === layers - 1 ? "drop-shadow-[0_0.3rem_0.5rem_rgb(0_0_0/0.6)]" : ""} />}
           </motion.div>
         ))}
       </AnimatePresence>

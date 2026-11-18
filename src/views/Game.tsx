@@ -141,6 +141,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   };
   /** Caixas ao lado da carta ampliada: selo de momento e status. */
   const tipsOf = (c: GCard) => [
+    ...(c.p.role && t.roles.tips[c.p.role] ? [{ title: t.roles.title(c.p.role), text: t.roles.tips[c.p.role] }] : []),
     ...(ABILITIES[m.abilityOf(c)].kind !== "-" ? [{ title: t.kinds[ABILITIES[m.abilityOf(c)].kind], text: t.kindTips[ABILITIES[m.abilityOf(c)].kind] }] : []),
     ...(c.rev ? statusIcons(c, m, t).map(([icon, nm, k]) => ({ title: `${icon} ${nm}`, text: t.ui.statusTip[k] })) : []),
   ];
@@ -312,15 +313,17 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
 
   const height = full ? "h-full" : "h-[calc(100dvh-5.5rem)] min-h-120 sm:h-[calc(100dvh-7.5rem)]";
   const title = (
-    <div className="flex flex-col items-start gap-1 pt-1">
+    <div className={`flex flex-col gap-1 pt-1 ${wide ? "items-center text-center" : "items-start"}`}>
       <h1 className="font-display text-sm font-extrabold tracking-[0.11em] uppercase sm:text-xl">{t.ui.title}</h1>
       <abbr title={t.ui.phaseHint} className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold tracking-widest uppercase no-underline sm:text-xs ${PHASE_TONE[phaseOf(Math.min(m.t, TURNS))]}`}>
         {t.ui.phase(phaseOf(Math.min(m.t, TURNS)))}
       </abbr>
     </div>
   );
-    const aiDeck = <DeckPile n={m.adeck.length} tone="ai" label={t.deck.aiLeft(m.adeck.length)} tipSide="left" out={{ x: -80, y: -10 }} className={wide ? "w-full max-w-40" : "w-8 sm:w-11"} />;
-  const myDeck = <DeckPile n={m.deck.length} look={deckLook} label={t.deck.left(m.deck.length)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} />;
+    const aiDeck = <DeckPile n={m.adeck.length} tone="ai" label={next.a ? `${t.deck.aiLeft(m.adeck.length)} · ${t.ui.next(name(next.a))}` : t.deck.aiLeft(m.adeck.length)} tipSide="left"
+    cover={next.a && face(next.a, false)} out={{ x: -80, y: -10 }} className={wide ? "w-full max-w-40" : "w-8 sm:w-11"} />;
+  const myDeck = <DeckPile n={m.deck.length} look={deckLook} label={next.p ? `${t.deck.left(m.deck.length)} · ${t.ui.next(name(next.p))}` : t.deck.left(m.deck.length)}
+    cover={next.p && face(next.p, false)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} />;
   const endBtn = result && !showEnd
     ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
     : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady} big={wide}
@@ -357,7 +360,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
         {m.loc.map((l, i) => <LaneBackdrop key={l.L.id + i} l={l} i={i} drop={dropAt(l, i)} />)}
       </div>
       <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
-        {title}
+        {wide ? <div /> : title}
         <div className="order-last col-span-2 flex items-start justify-center gap-2 sm:order-0 sm:col-span-1">
           {!wide && <ItemSlot s="a" m={m} t={t} icons={icons} on={boughtOn} />}
           <AiHand n={m.ahand.length} t={t} />
@@ -370,7 +373,6 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
               <span>{t.ui.record(record.w, record.l)}</span>
               {controls}
             </div>
-            {next.a && <NextCard name={name(next.a)} t={t} />}
             {aiDeck}
           </div>
         )}
@@ -442,7 +444,6 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
         </section>
         {!wide && (
           <div className="flex shrink-0 items-end gap-2 pb-1">
-            {next.p && <NextCard name={name(next.p)} t={t} />}
             {myDeck}
             {endBtn}
           </div>
@@ -486,20 +487,21 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     {/* tela larga: à direita os dois baralhos (IA em cima, o seu embaixo) e o fim do turno entre eles */}
     {wide && (
       <aside aria-label={t.ui.decks} className="grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] justify-items-center gap-3 pb-3">
-        <div className="flex w-full flex-col items-center gap-1">
-          <div className="flex items-center gap-1 self-end text-xs text-zinc-400 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
-            <span>{t.ui.record(record.w, record.l)}</span>
-            {controls}
+        <div className="flex w-full flex-col items-center justify-between gap-3">
+          <div className="flex w-full flex-col items-center gap-1">
+            <div className="flex items-center gap-1 self-end text-xs text-zinc-400 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
+              <span>{t.ui.record(record.w, record.l)}</span>
+              {controls}
+            </div>
+            {aiDeck}
           </div>
-          {aiDeck}
-          {next.a && <NextCard name={name(next.a)} t={t} />}
+          {title}
         </div>
         <div className="flex flex-col items-center gap-2 text-sm font-bold">
           {endBtn}
           {prio}
         </div>
         <div className="flex w-full flex-col items-center justify-end gap-1">
-          {next.p && <NextCard name={name(next.p)} t={t} />}
           {myDeck}
         </div>
       </aside>
@@ -660,7 +662,7 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
   ] as [boolean, string, string][]).filter((x) => x[0]);
   const desc = l.rev ? l.L.desc || t.locs[l.L.type].text(l.L) : t.ui.revealsOn(i + 1);
   // cada lado numa área translúcida da faixa: grade 2x2 (no máximo 4 cartas por lado), nunca sobrepostas
-  const side = "grid h-[calc(var(--spacing-gc)*2.92+0.5rem)] w-full grid-cols-[repeat(2,var(--spacing-gc))] grid-rows-[repeat(2,calc(var(--spacing-gc)*1.46))] justify-center gap-1 rounded-lg bg-black/25 p-0.5";
+  const side = "grid h-[calc(var(--spacing-gc)*2.92+0.5rem)] w-full grid-cols-[repeat(2,var(--spacing-gc))] grid-rows-[repeat(2,calc(var(--spacing-gc)*1.46))] justify-center gap-1 p-0.5";
   return (
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
       className="relative flex min-w-0 flex-1 flex-col items-center justify-between gap-1 px-2 py-1.5 sm:gap-2 sm:px-4 sm:py-3">
@@ -905,7 +907,7 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
           <header className="flex flex-col gap-1">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="font-display text-xl font-extrabold tracking-wide uppercase @[15rem]:text-2xl">{t.ui.comanda.title}</h2>
-              <span className="hidden text-xs font-bold uppercase @[15rem]:inline">{t.ui.comanda.table}</span>
+              <span className="hidden text-xs font-bold uppercase @[15rem]:inline">{t.ui.comanda.table(ai ? 6 : 7)}</span>
             </div>
             <p className={`border-b border-comanda-ink/60 pb-0.5 text-xs font-extrabold tracking-wider uppercase ${ai ? "text-game-ai" : "text-teal-800"}`}>{who}</p>
           </header>
@@ -960,15 +962,6 @@ function LocTile({ nm, desc, chips, a, p }: { nm: string; desc: string; chips: [
         </div>
       )}
     </div>
-  );
-}
-
-/** The New York Oracle: a próxima carta do baralho ao lado dele. */
-function NextCard({ name, t }: { name: string; t: T }) {
-  return (
-    <span role="note" title={t.ui.next(name)} className="max-w-24 self-center truncate rounded-md bg-zinc-950/80 px-1.5 py-0.5 text-[10px] text-game-brass sm:max-w-32 sm:text-xs">
-      <span aria-hidden="true">🔮 </span>{t.ui.next(name)}
-    </span>
   );
 }
 
