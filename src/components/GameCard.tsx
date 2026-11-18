@@ -33,7 +33,7 @@ type Props = {
 };
 
 /** Posição e tamanho dos selos de custo e poder nos cantos de cima. */
-const gem = "absolute top-[3cqw] grid size-[21cqw] place-items-center rounded-full text-[12cqw] leading-none font-extrabold";
+const gem = "absolute top-[3cqw] z-10 grid size-[21cqw] place-items-center rounded-full text-[12cqw] leading-none font-extrabold";
 /** Número sobre os selos: contorno escuro para ler em cima da luz. */
 const ink = "relative [text-shadow:0_0.5cqw_0_rgb(0_0_0/0.9),0_0_1.5cqw_rgb(0_0_0/0.8)]";
 
@@ -47,11 +47,14 @@ function CostOrb({ cost }: { cost: number }) {
   );
 }
 
-/** Ficha de cassino do poder: borda listrada e miolo na cor do momento (latão, verde acima do impresso, vermelho abaixo). */
+/**
+ * Ficha de cassino do poder no metal da raridade (o mesmo da moldura da carta). O momento fica no número e num aro:
+ * verde acima do poder impresso, vermelho abaixo, branco no impresso.
+ */
 const CHIP = {
-  up: { edge: "bg-[repeating-conic-gradient(var(--color-emerald-300)_0deg_16deg,var(--color-zinc-950)_16deg_45deg)]", face: "from-emerald-300 to-emerald-600" },
-  down: { edge: "bg-[repeating-conic-gradient(var(--color-red-400)_0deg_16deg,var(--color-zinc-950)_16deg_45deg)]", face: "from-red-400 to-red-700" },
-  even: { edge: "bg-[repeating-conic-gradient(var(--color-amber-200)_0deg_16deg,var(--color-zinc-950)_16deg_45deg)]", face: "from-amber-200 to-game-brass" },
+  up: { num: "text-emerald-300", ring: "shadow-[0_0_0_0.9cqw_var(--color-emerald-400),0_0.8cqw_2cqw_rgb(0_0_0/0.7)]" },
+  down: { num: "text-red-400", ring: "shadow-[0_0_0_0.9cqw_var(--color-red-500),0_0.8cqw_2cqw_rgb(0_0_0/0.7)]" },
+  even: { num: "text-white", ring: "shadow-[0_0.8cqw_2cqw_rgb(0_0_0/0.7)]" },
 } as const;
 
 /** Carta com a largura do container (`@container`); todas as medidas internas são em cqw, então ela escala inteira. */
@@ -71,7 +74,7 @@ export function GameCard({ player, name, cost, power, base, glyph, master, text,
             <CostOrb cost={cost} />
             <PowerGem power={power} base={base} />
             {master && (
-              <span className="absolute inset-x-[26cqw] top-[5cqw] flex items-center justify-center gap-[1cqw] rounded-full bg-game-brass py-[0.8cqw] text-[6.5cqw] font-extrabold tracking-wider text-dl-black uppercase shadow-[0_0.6cqw_2cqw_rgb(0_0_0/0.6)]">
+              <span className="absolute inset-x-[26cqw] top-[5cqw] z-10 flex items-center justify-center gap-[1cqw] rounded-full bg-game-brass py-[0.8cqw] text-[6.5cqw] font-extrabold tracking-wider text-dl-black uppercase shadow-[0_0.6cqw_2cqw_rgb(0_0_0/0.6)]">
                 <span aria-hidden="true">★</span><span className="hidden @min-[5.5rem]:inline">{master}</span>
               </span>
             )}
@@ -116,9 +119,9 @@ function PowerGem({ power, base }: { power: number; base: number }) {
   return (
     <>
       <motion.b key={pop?.id ?? 0} initial={pop ? { scale: 1.45 } : false} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }}
-        className={`${gem} right-[3cqw] p-[1.6cqw] shadow-[0_0.8cqw_2cqw_rgb(0_0_0/0.7)] ${chip.edge}`}>
-        {/* miolo da ficha, com o anel tracejado de dentro */}
-        <span className={`grid size-full place-items-center rounded-full bg-linear-160 text-white shadow-[inset_0_-1cqw_1.5cqw_rgb(0_0_0/0.45)] outline-[0.5cqw] outline-offset-[-1.6cqw] outline-black/35 outline-dashed ${chip.face}`}>
+        className={`${gem} right-[3cqw] bg-zinc-500 bg-[repeating-conic-gradient(rgb(255_255_255/0.75)_0deg_16deg,rgb(0_0_0/0.5)_16deg_45deg),var(--rk-bg,none)] p-[1.6cqw] ${chip.ring}`}>
+        {/* miolo da ficha no metal da raridade, com o anel tracejado de dentro */}
+        <span className={`grid size-full place-items-center rounded-full bg-zinc-500 bg-(image:--rk-bg) shadow-[inset_0_-1cqw_1.5cqw_rgb(0_0_0/0.45)] outline-[0.5cqw] outline-offset-[-1.6cqw] outline-black/35 outline-dashed ${chip.num}`}>
           <span className={ink}>{power}</span>
         </span>
       </motion.b>
