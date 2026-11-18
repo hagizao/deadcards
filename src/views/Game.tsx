@@ -1,8 +1,9 @@
 import { AnimatePresence, MotionConfig, motion, useAnimate, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { CardBack, GameCard, TipBoxes, type Tip } from "../components/GameCard";
 import { AbilityFx, FxLayer, type Box, type FxScene } from "../components/AbilityFx";
+import { CHOREO, Rig } from "../lib/game/choreo";
 import { GameHand } from "../components/GameHand";
 import { dropUnder, pointOf } from "../lib/game/drop";
 import { TargetArrow } from "../components/TargetArrow";
@@ -161,7 +162,11 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   /** Roda um passo da partida e mostra o X nas cartas que saíram da mesa sem voltar para a mão. */
   const watch = (f: () => void) => {
     const was = boardCards(m).filter((c) => c.rev).map((c) => ({ c, r: document.querySelector(`[data-card="${c.id}"]`)?.getBoundingClientRect() }));
-    was.forEach(({ c, r }) => { if (r) seen.current.set(c.id, { r, side: c.side }); });
+    // todas as cartas da mesa (as viradas também, para o puxão do gancho saber de onde a carta saiu)
+    boardCards(m).forEach((c) => {
+      const r = document.querySelector(`[data-card="${c.id}"]`)?.getBoundingClientRect();
+      if (r) seen.current.set(c.id, { r, side: c.side });
+    });
     f();
     const on = new Set([...boardCards(m), ...m.hand, ...m.ahand, ...m.deck, ...m.adeck]);
     const gone = was.filter((x): x is { c: GCard; r: DOMRect } => !!x.r && !on.has(x.c));
@@ -272,15 +277,15 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       if (i < queue.length) {
         const a = queue[i++];
         watch(() => m.act(a));
-        bump();
+        // já na tela: as coreografias precisam das cartas nos lugares novos
+        flushSync(bump);
         if (!a.exec) land(a.c);
-        // som da habilidade: logo depois de a carta tocar a mesa (ou na hora, na execução marcada da Shiv)
-        playHeard(a.exec ? 0 : FALL_MS[weight(a.c)] + 120);
-        return later(step, REVEAL_MS);
+        // som da habilidade: logo depois de a carta tocar a mesa (ou na hora, na execução marcada da Shiv); a próxima
+        // carta espera a coreografia acabar
+        return later(step, Math.max(REVEAL_MS, playHeard(a.exec ? 0 : FALL_MS[weight(a.c)] + 120)));
       }
       watch(() => m.endOfTurn());
-      bump();
-      playHeard(0);
+      flushSync(bump);
       later(() => {
         if (m.over) {
           const r = m.finish();
@@ -298,7 +303,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
           later(() => sfx("soul", 0.8), 180);
         }
         bump();
-      }, END_MS);
+      }, Math.max(END_MS, playHeard(0)));
     };
     step();
   };
@@ -314,8 +319,39 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       const own = tuned[ab]?.sound;
       later(() => (own ? cardSfx(own) : abilitySfx(ab)), wait + i * 260);
     });
-    // a animação de cada habilidade, da carta que agiu até as cartas que ela mexeu (a sua e a do inimigo)
-    heard.slice(0, 6).forEach((h, i) => later(() => {
+    // a animação de cada habilidade, uma depois da outra: nas que têm coreografia as próprias cartas se mexem; nas
+    // outras, o efeito vai da carta que agiu até as cartas que ela mexeu (a sua e a do inimigo)
+    let t = wait, end = 0;
+    const taken = new Set<number>();
+    const sideOf = new Map(boardCards(m).map((c) => [c.id, c.side]));
+    heard.slice(0, 6).forEach((h) => {
+      const recipe = still ? undefined : CHOREO[h.ab];
+      if (!recipe) { playFx(h, t); t += 220; return; }
+      const rig = new Rig();
+      const dst = h.to.map((id) => ({ id, foe: (sideOf.get(id) ?? seen.current.get(id)?.side) !== h.side }));
+      // quem trocou de local fica parado onde estava até a cena levar a carta
+      dst.forEach((d) => {
+        const r = seen.current.get(d.id)?.r;
+        if (!taken.has(d.id) && r?.width) rig.hold(d.id, boxOf(r), d.foe);
+        taken.add(d.id);
+      });
+      const self = h.self, pull = h.ev === "pull";
+      const ms = recipe.ms(dst.length, self, pull);
+      const was = seen.current.get(h.id)?.r;
+      later(() => rig.start(h.ab, { id: h.id, box: was?.width ? boxOf(was) : null }, dst, self, pull, quake), t);
+      t += ms;
+      end = Math.max(end, t + 150);
+    });
+    return end;
+  };
+  /** Tremor da mesa nas coreografias, de 1 (leve) a 3 (forte). */
+  const quake = (power: 1 | 2 | 3) => {
+    if (still || !arena.current) return;
+    const k = power * 3;
+    shake(arena.current, { x: [0, -k, k * 0.8, -k * 0.5, k * 0.3, 0], y: [0, k * 0.5, -k * 0.4, k * 0.2, 0, 0] }, { duration: 0.25 + power * 0.06 });
+  };
+  /** O efeito por cima da mesa das habilidades sem coreografia. */
+  const playFx = (h: Match["heard"][number], wait: number) => later(() => {
       const on = new Map(boardCards(m).map((c) => [c.id, c.side]));
       const at = (id: number) => {
         const r = document.querySelector(`[data-card="${id}"]`)?.getBoundingClientRect() ?? seen.current.get(id)?.r;
@@ -330,8 +366,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       const lane = document.querySelector(`[data-drop="${h.at}"]`)?.getBoundingClientRect();
       const k = ++fxKey.current;
       setFxs((s) => [...s, { k, ab: h.ab, scene: { src, dst, loc: lane ? boxOf(lane) : null, me: h.side === "p" } }]);
-    }, wait + i * 220));
-  };
+    }, wait);
   /** Som (e tremor, nas pesadas) quando a carta revelada toca a mesa. */
   const land = (c: GCard) => {
     const w = weight(c);
@@ -1003,7 +1038,7 @@ function BoardCard({ c, m, t, name, face, looking, target, mark = false, acts, s
   const touch = useRef(false);
   const moved = useRef(false);
   const [held, setHeld] = useState(false);
-  if (c.side === "a" && !c.rev) return <div role="img" aria-label={t.ui.facedown} className={slot}><CardBack className={`w-gc ${REST}`} /></div>;
+  if (c.side === "a" && !c.rev) return <div role="img" aria-label={t.ui.facedown} className={slot} data-card={c.id}><CardBack className={`w-gc ${REST}`} /></div>;
   const pw = c.rev ? m.pow(c) : c.base;
   const icons = statusIcons(c, m, t);
   const w = weight(c);
