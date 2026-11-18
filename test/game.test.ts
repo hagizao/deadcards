@@ -200,11 +200,11 @@ describe("itens: configuração", () => {
     expect(sanitizeGameConfig({ locs: DEFAULT_LOCS, items: [] })).toBeNull();
   });
 
-  it("tem 6 itens por tier, 2 de cada categoria", () => {
+  it("tem 54 itens, com pelo menos 4 de cada categoria em cada tier", () => {
+    expect(ITEM_KEYS).toHaveLength(54);
     for (const tier of [1, 2, 3, 4]) {
       const ks = ITEM_KEYS.filter((k) => ITEMS[k].tier === tier);
-      expect(ks).toHaveLength(6);
-      for (const slot of ["weapon", "vitality", "spirit"]) expect(ks.filter((k) => ITEMS[k].slot === slot)).toHaveLength(2);
+      for (const slot of ["weapon", "vitality", "spirit"]) expect(ks.filter((k) => ITEMS[k].slot === slot).length).toBeGreaterThanOrEqual(4);
     }
   });
 
@@ -317,6 +317,51 @@ describe("itens: lojas e alvo", () => {
       for (const l of m.loc) for (const s of ["p", "a"] as const) for (const c of l.s[s]) expect(m.pow(c, l)).toBeGreaterThanOrEqual(0);
     }
     expect(aiBought).toBeGreaterThan(0);
+  });
+});
+
+describe("itens novos", () => {
+  type Fx = { ITEM_FX: Record<string, (c: GCard, s: Side, v: number) => void> };
+  const dummy = (put: ReturnType<typeof arena>["put"], side: Side, li: number, power: number, id: string) => {
+    const c = put(pc(id, "Herói Novo", flat(70)), side, li);
+    c.ab = "none"; c.base = power; c.bonus = 0;
+    return c;
+  };
+
+  it("Healing Nova dá o bônus à carta e às aliadas do mesmo local, não às de outro", () => {
+    const { m, put } = arena();
+    const a = dummy(put, "p", 0, 3, "a"), b = dummy(put, "p", 0, 3, "b"), far = dummy(put, "p", 1, 3, "far");
+    (m as unknown as Fx).ITEM_FX["Healing Nova"](a, "p", 3);
+    expect([a.bonus, b.bonus, far.bonus]).toEqual([3, 3, 0]);
+  });
+
+  it("Cold Front tira poder de todas as inimigas do local só até o fim do próximo turno", () => {
+    const { m, put } = arena();
+    const x = dummy(put, "a", 0, 5, "x"), y = dummy(put, "a", 0, 5, "y");
+    (m as unknown as Fx).ITEM_FX["Cold Front"](x, "p", 2);
+    expect([m.pow(x), m.pow(y)]).toEqual([3, 3]);
+    m.t += 2;
+    expect([m.pow(x), m.pow(y)]).toEqual([5, 5]);
+  });
+
+  it("Cheat Death deixa a carta imune até o fim do próximo turno", () => {
+    const { m, put } = arena();
+    const c = dummy(put, "p", 0, 3, "c");
+    (m as unknown as Fx).ITEM_FX["Cheat Death"](c, "p", 7);
+    expect(m.immune(c)).toBe(true);
+    m.t += 1;
+    expect(m.immune(c)).toBe(true);
+    m.t += 1;
+    expect(m.immune(c)).toBe(false);
+  });
+
+  it("Extra Regen soma agora e no fim dos 2 turnos seguintes", () => {
+    const { m, put } = arena();
+    const c = dummy(put, "p", 0, 3, "c");
+    (m as unknown as Fx).ITEM_FX["Extra Regen"](c, "p", 1);
+    expect(c.bonus).toBe(1);
+    for (let k = 0; k < 3; k++) { m.t++; m.endOfTurn(); }
+    expect(c.bonus).toBe(3);
   });
 });
 

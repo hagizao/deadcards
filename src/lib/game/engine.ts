@@ -183,6 +183,14 @@ const ITEM_FIT: Partial<Record<ItemKey, { card?: (c: GCard) => boolean; loc?: Lo
   "Colossus": { card: isFront },
   "Echo Shard": { card: onReveal },
   "Refresher": { card: onReveal },
+  "Rapid Rounds": { card: isGun },
+  "Rebuttal": { card: isFront },
+  "Return Fire": { card: isFront },
+  "Berserker": { card: isFront },
+  "Headhunter": { card: isGun },
+  "Fortitude": { card: isFront },
+  "Healing Nova": { card: (c) => SUPPORT.has(c.ab) },
+  "Frenzy": { card: isGun },
 };
 
 export type ItemFit = { cards: number; loc: string | null };
@@ -859,6 +867,58 @@ export class Match {
     "Unstoppable": (c, _s, v) => { this.cleanse(c); c.st.chained = false; c.st.root = 0; c.st.unstop = true; c.bonus += v; },
     "Echo Shard": (c, _s, v) => { c.bonus += v; this.reReveal(c, 2); },
     "Refresher": (c, _s, v) => { this.cleanse(c); c.bonus += v; this.reReveal(c); },
+
+    // tier 1
+    "Monster Rounds": (c, _s, v) => { const l = this.locOf(c); c.bonus += v + (l && [...l.s.p, ...l.s.a].some((x) => x.tok) ? 2 : 0); },
+    "Rapid Rounds": (c, _s, v) => { c.bonus += 1; this.later(() => { if (this.locOf(c)) c.bonus += v; }); },
+    "Extra Regen": (c, _s, v) => { c.bonus += v; for (const k of [1, 2]) this.later(() => { if (this.locOf(c)) c.bonus += v; }, this.t + k); },
+    "Grit": (c, _s, v) => { c.bonus += v; c.st.immU = Math.max(c.st.immU ?? 0, this.t + 1); },
+    "Rebuttal": (c, _s, v) => { c.bonus += v; c.st.rip = (c.st.rip ?? 0) + 1; c.st.ripV = Math.max(c.st.ripV ?? 0, 2); },
+    "Spirit Strike": (c, _s, v) => { this.hurt(c, v, null); },
+    "Rusted Barrel": (c, _s, v) => { this.hurt(c, v, null, this.t + 1); },
+    // tier 2
+    "Slowing Bullets": (c, _s, v) => {
+      c.bonus += v;
+      const l = this.locOf(c), t = l && this.strongest(this.tg(this.foes(c, l)));
+      if (t) t.st.root = Math.max(t.st.root ?? 0, this.t + 1);
+    },
+    "Titanic Magazine": (c, _s, v) => { const l = this.locOf(c); c.bonus += v + Math.min(3, l ? this.friends(c, l).length : 0); },
+    "Mystic Shot": (c, _s, v) => { c.bonus += v; const l = this.locOf(c); if (l) this.hurt(this.weakest(this.tg(this.foes(c, l))), 1, c); },
+    "Guardian Ward": (c, _s, v) => { c.bonus += v; const l = this.locOf(c); if (l) this.friends(c, l).forEach((x) => { x.bonus += 1; }); },
+    "Return Fire": (c, _s, v) => { c.bonus += v; c.st.rip = (c.st.rip ?? 0) + 2; c.st.ripV = Math.max(c.st.ripV ?? 0, 2); },
+    "Healbane": (c, _s, v) => { if (this.hurt(c, v, null)) c.st.tmp = c.st.tmp.filter((m) => m.v < 0); },
+    "Cold Front": (c, _s, v) => { const l = this.locOf(c); if (l) this.tg(l.s[c.side].filter((x) => x.rev && !x.st.burrow)).forEach((x) => this.hurt(x, v, null, this.t + 1)); },
+    "Mystic Vulnerability": (c, _s, v) => { this.hurt(c, v, null); c.st.vuln = Math.max(c.st.vuln ?? 0, this.t + 1); },
+    "Spirit Sap": (c, _s, v) => { this.hurt(c, v, null); if (ABILITIES[c.ab].usesV) c.v = Math.max(0, c.v - 1); },
+    // tier 3
+    "Berserker": (c, _s, v) => { const hit = this.pow(c) < c.base; c.bonus += v + (hit ? 2 : 0); },
+    "Alchemical Fire": (c, _s, v) => {
+      const l = this.locOf(c);
+      if (!l || this.ty(l, "shrine")) return;
+      this.tg(l.s[c.side].filter((x) => x.rev && !x.st.burrow)).forEach((x) => { (x.st.tburn ??= []).push({ v: x === c ? v : 1, u: this.t + 1 }); });
+    },
+    "Headhunter": (c, s, v) => { c.bonus += v; const l = this.locOf(c); if (l && this.leading(s, l)) this.extra[s] += 1; },
+    "Fortitude": (c, _s, v) => { const clean = c.bonus >= 0 && !c.st.tmp.some((m) => m.v < 0 && this.t <= m.u); c.bonus += v + (clean ? 2 : 0); },
+    "Dispel Magic": (c, _s, v) => { const l = this.locOf(c); const any = [c, ...(l ? this.friends(c, l) : [])].map((x) => this.cleanse(x)).some(Boolean); c.bonus += any ? v : 1; },
+    "Healing Nova": (c, _s, v) => { const l = this.locOf(c); [c, ...(l ? this.friends(c, l) : [])].forEach((x) => { x.bonus += v; }); },
+    "Decay": (c, _s, v) => { if (!this.ty(this.locOf(c), "shrine")) (c.st.tburn ??= []).push({ v, u: this.t + 2 }); },
+    "Silence Wave": (c, _s, v) => {
+      const l = this.locOf(c);
+      this.hurt(c, v, null);
+      if (l) this.tg(l.s[c.side].filter((x) => x.rev)).forEach((x) => { x.st.silU = Math.max(x.st.silU ?? 0, this.t + 1); this.interrupt(x); });
+    },
+    // tier 4
+    "Frenzy": (c, s, v) => { const l = this.locOf(c); c.bonus += v + (l && this.losing(s, l) ? 4 : 0); },
+    "Crippling Headshot": (c, _s, v) => { this.hurt(c, v, null); c.st.tmp = c.st.tmp.filter((m) => m.v < 0); c.st.vuln = Math.max(c.st.vuln ?? 0, this.t + 1); },
+    "Cheat Death": (c, _s, v) => { this.cleanse(c); c.bonus += v; c.st.immU = Math.max(c.st.immU ?? 0, this.t + 1); },
+    "Divine Barrier": (c, s, v) => { this.cleanse(c); c.bonus += v; const l = this.locOf(c); if (l) l.shield[s] = Math.max(l.shield[s], this.t + 1); },
+    "Arctic Blast": (c, _s, v) => {
+      const l = this.locOf(c);
+      c.st.stun = Math.max(c.st.stun ?? 0, this.t + 1);
+      this.interrupt(c);
+      if (l) this.tg(l.s[c.side].filter((x) => x !== c && x.rev && !x.st.burrow)).forEach((x) => this.hurt(x, v, null, this.t + 1));
+    },
+    "Cursed Relic": (c, _s, v) => { this.hurt(c, v, null); this.silence(c); c.st.chained = true; },
   };
 
   /** Quantas cartas suas (mão e mesa) e qual local em jogo combinam com o item. */

@@ -228,7 +228,7 @@ export const itemCost = (tier: ItemTier) => TIER_COST[tier];
 type ItemDef = { tier: ItemTier; slot: ItemSlot; v: number; usesV: boolean; foe?: boolean };
 const I = (tier: ItemTier, slot: ItemSlot, v: number, foe = false): ItemDef => ({ tier, slot, v, usesV: true, ...(foe && { foe }) });
 
-/** Chave = nome do item no Deadlock (inglês, igual à API), com o tier real do jogo. 2 de cada categoria por tier. */
+/** Chave = nome do item no Deadlock (inglês, igual à API), com o tier real do jogo. Efeitos tirados do deadlock.wiki. */
 export const ITEMS = {
   "High-Velocity Rounds": I(1, "weapon", 3), "Close Quarters": I(1, "weapon", 3),
   "Extra Health": I(1, "vitality", 2), "Healing Rite": I(1, "vitality", 2),
@@ -242,6 +242,22 @@ export const ITEMS = {
   "Glass Cannon": I(4, "weapon", 10), "Ricochet": I(4, "weapon", 5, true),
   "Colossus": I(4, "vitality", 7), "Unstoppable": I(4, "vitality", 6),
   "Echo Shard": I(4, "spirit", 3), "Refresher": I(4, "spirit", 4),
+  // tier 1
+  "Monster Rounds": I(1, "weapon", 2), "Rapid Rounds": I(1, "weapon", 2),
+  "Extra Regen": I(1, "vitality", 1), "Grit": I(1, "vitality", 2), "Rebuttal": I(1, "vitality", 1),
+  "Spirit Strike": I(1, "spirit", 2, true), "Rusted Barrel": I(1, "spirit", 3, true),
+  // tier 2
+  "Slowing Bullets": I(2, "weapon", 3), "Titanic Magazine": I(2, "weapon", 3), "Mystic Shot": I(2, "weapon", 3),
+  "Guardian Ward": I(2, "vitality", 3), "Return Fire": I(2, "vitality", 2), "Healbane": I(2, "vitality", 3, true),
+  "Cold Front": I(2, "spirit", 2, true), "Mystic Vulnerability": I(2, "spirit", 2, true), "Spirit Sap": I(2, "spirit", 3, true),
+  // tier 3
+  "Berserker": I(3, "weapon", 5), "Alchemical Fire": I(3, "weapon", 2, true), "Headhunter": I(3, "weapon", 6),
+  "Fortitude": I(3, "vitality", 5), "Dispel Magic": I(3, "vitality", 5), "Healing Nova": I(3, "vitality", 3),
+  "Decay": I(3, "spirit", 2, true), "Silence Wave": I(3, "spirit", 3, true),
+  // tier 4
+  "Frenzy": I(4, "weapon", 7), "Crippling Headshot": I(4, "weapon", 6, true),
+  "Cheat Death": I(4, "vitality", 7), "Divine Barrier": I(4, "vitality", 6),
+  "Arctic Blast": I(4, "spirit", 3, true), "Cursed Relic": I(4, "spirit", 6, true),
 } satisfies Record<string, ItemDef>;
 export type ItemKey = keyof typeof ITEMS;
 export const ITEM_KEYS = Object.keys(ITEMS) as ItemKey[];
