@@ -92,7 +92,8 @@ const ICON = {
   bell: `<path d="M5 17c1.5-1.5 1.5-3 1.5-6a5.5 5.5 0 0111 0c0 3 0 4.5 1.5 6z" fill="#eab308" stroke="#713f12" stroke-width="1.2"/><rect x="4" y="17" width="16" height="2" rx="1" fill="#a16207"/><circle cx="12" cy="20.5" r="1.6" fill="#713f12"/>`,
   door: `<path d="M3 23V8a9 7 0 0118 0v15z" fill="#fcd34d" fill-opacity="0.9"/><path d="M3 23V8a9 7 0 0118 0v15" fill="none" stroke="#78350f" stroke-width="2"/>`,
   cart: `<rect x="3" y="8" width="18" height="9" rx="1" fill="#a16207" stroke="#422006" stroke-width="1.2"/><rect x="5" y="4" width="6" height="5" fill="#7c2d12"/><rect x="12" y="2" width="7" height="7" fill="#1e3a8a"/><circle cx="7" cy="19.5" r="2" fill="#27272a"/><circle cx="17" cy="19.5" r="2" fill="#27272a"/>`,
-  trapOpen: `<path d="M2 15h20" stroke="#52525b" stroke-width="2.4"/><path d="M3 15L5 7l2 6 2-7 2 7 2-7 2 7 2-6 2 8" fill="none" stroke="#d4d4d8" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="17" r="2.2" fill="#3f3f46"/>`,
+  // armadilha de urso aberta, vista de cima em perspectiva: aro de ferro, dentes e o prato no meio
+  trapOpen: `<ellipse cx="12" cy="14" rx="10.5" ry="5.5" fill="#1c1917" fill-opacity="0.55" stroke="#57534e" stroke-width="2"/><path d="M3 13.2l1.6-2.6 1.2 2 1.5-3 1.4 3 1.6-3.3 1.7 3.2 1.7-3.2 1.6 3.3 1.4-3 1.5 3 1.2-2 1.6 2.6M3 14.8l1.6 2.6 1.2-2 1.5 3 1.4-3 1.6 3.3 1.7-3.2 1.7 3.2 1.6-3.3 1.4 3 1.5-3 1.2 2 1.6-2.6" fill="none" stroke="#d6d3d1" stroke-width="1" stroke-linejoin="round"/><ellipse cx="12" cy="14" rx="3.2" ry="1.8" fill="#78716c" stroke="#292524" stroke-width="0.8"/>`,
   trapShut: `<path d="M3 14c3-6 15-6 18 0" fill="none" stroke="#d4d4d8" stroke-width="2.2"/><path d="M5 10l1.5 3 1.5-3 1.5 3 1.5-3 1.5 3 1.5-3 1.5 3 1.5-3 1.5 3" fill="none" stroke="#e4e4e7" stroke-width="1.3"/><path d="M3 14c3 4 15 4 18 0" fill="none" stroke="#71717a" stroke-width="2.2"/>`,
   eye: `<path d="M1 12C5 5 19 5 23 12 19 19 5 19 1 12z" fill="#a3e635" stroke="#365314" stroke-width="1.2"/><ellipse cx="12" cy="12" rx="1.6" ry="5.5" fill="#1a2e05"/>`,
   tomb: `<path d="M5 23V10a7 7 0 0114 0v13z" fill="#57534e" stroke="#1c1917" stroke-width="1.4"/><path d="M12 9v8M9 12h6" stroke="#a8a29e" stroke-width="1.8"/>`,
@@ -100,9 +101,18 @@ const ICON = {
   knight: `<path d="M7 21h11v-2.5c0-4.5-1.5-8-4-10.5l.8-3.5-3.3 1.5L6 10.5l1.2 2.4 3.6-1.3L6.5 18z" fill="#fafaf9" stroke="#44403c" stroke-width="1.2"/>`,
   banner: `<path d="M5 2v20" stroke="#78350f" stroke-width="1.8"/><path d="M5.8 3h13l-3 4.5 3 4.5h-13z" fill="#0ea5e9" stroke="#0c4a6e" stroke-width="1"/>`,
   page: `<rect x="5" y="3" width="14" height="18" rx="1" fill="#fafaf9" stroke="#a8a29e"/><path d="M8 8h8M8 11h8M8 14h6" stroke="#a8a29e"/>`,
+  // flecha do Grey Talon: haste e penas escuras, ponta e brilho verdes (aponta para cima)
+  arrow: `<path d="M12 0l5.4 8h-3.6v11h-3.6V8H6.6z" fill="#4ade80" stroke="#14532d" stroke-width="1" stroke-linejoin="round"/><path d="M10.2 15.5l-4.2 4.3V24l4.2-4.2zM13.8 15.5l4.2 4.3V24l-4.2-4.2z" fill="#16a34a" stroke="#052e16" stroke-width="0.8"/><path d="M12 1.6l3 4.6H9z" fill="#dcfce7"/>`,
+  // almas da Lady Geist: a vida que ela rouba (vermelho-sangue) e a dela, pálida, que vai para a outra carta
+  soulRed: `<path d="M12 2.5c-4.4 0-7 3.3-7 7.4 0 3.6 1.4 6 1.4 8.4 0 1.8-1.4 3-2.4 3.7 2.2.4 4.3-.4 5.4-1.8.6 1.2 1.6 2 2.6 2.3 1-.3 2-1.1 2.6-2.3 1.1 1.4 3.2 2.2 5.4 1.8-1-.7-2.4-1.9-2.4-3.7 0-2.4 1.4-4.8 1.4-8.4 0-4.1-2.6-7.4-7-7.4z" fill="#dc2626" fill-opacity="0.85" stroke="#fecaca" stroke-width="0.9"/><ellipse cx="9.6" cy="9.8" rx="1.3" ry="1.8" fill="#450a0a"/><ellipse cx="14.4" cy="9.8" rx="1.3" ry="1.8" fill="#450a0a"/>`,
+  soulPale: `<path d="M12 2.5c-4.4 0-7 3.3-7 7.4 0 3.6 1.4 6 1.4 8.4 0 1.8-1.4 3-2.4 3.7 2.2.4 4.3-.4 5.4-1.8.6 1.2 1.6 2 2.6 2.3 1-.3 2-1.1 2.6-2.3 1.1 1.4 3.2 2.2 5.4 1.8-1-.7-2.4-1.9-2.4-3.7 0-2.4 1.4-4.8 1.4-8.4 0-4.1-2.6-7.4-7-7.4z" fill="#e0e7ff" fill-opacity="0.75" stroke="#ffffff" stroke-width="0.9"/><ellipse cx="9.6" cy="9.8" rx="1.3" ry="1.8" fill="#312e81"/><ellipse cx="14.4" cy="9.8" rx="1.3" ry="1.8" fill="#312e81"/>`,
+  // gota de sangue (Mina, Nurse Harrow, Lady Geist)
+  drop: `<path d="M12 1.5C9 7 5.5 10.6 5.5 15a6.5 6.5 0 0013 0c0-4.4-3.5-8-6.5-13.5z" fill="#b91c1c" stroke="#450a0a" stroke-width="1"/><ellipse cx="9.6" cy="14.5" rx="1.3" ry="2.2" fill="#fca5a5" fill-opacity="0.7"/>`,
   spade: `<rect x="3" y="2" width="18" height="20" rx="2" fill="#c4b5fd" fill-opacity="0.55" stroke="#ede9fe" stroke-width="1.2"/><path d="M12 6c-3 3.5-5 5-5 7.5a2.6 2.6 0 005 1L11 18h2l-1-3.5a2.6 2.6 0 005-1C17 11 15 9.5 12 6z" fill="#4c1d95"/>`,
 } as const;
 export type Icon = keyof typeof ICON;
+/** O SVG de um desenho, para as marcas que ficam na mesa (a armadilha armada do Venator). */
+export const svgOf = (k: Icon) => `<svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true">${ICON[k]}</svg>`;
 
 /** Um desenho solto na camada. */
 export function icon(s: Stage, k: Icon, at: Box, size: number, life: number, cls = "") {
@@ -198,6 +208,24 @@ export function beam(s: Stage, a: Box, b: Box, cls: string, w: number, grow = 12
   move(el, [{ scale: "0 1", opacity: 1 }, { scale: "1 1", opacity: 1, offset: grow / total }, { scale: "1 1", opacity: 1, offset: (grow + hold) / total }, { scale: "1 1", opacity: 0 }], total, delay, ease.lin);
   later(() => el.remove(), total + delay + 50);
   return el;
+}
+
+/**
+ * Linha curva que cresce de `path(0)` até `path(1)` em `grow` ms, feita de `n` segmentos que acendem em ordem
+ * (a vinha da Ivy), e some `hold` ms depois de chegar.
+ */
+export function vine(s: Stage, path: (u: number) => Box, cls: string, w: number, grow: number, hold: number, delay = 0, n = 26) {
+  const total = grow + hold + 200;
+  for (let i = 0; i < n; i++) {
+    const a = path(i / n), b = path((i + 1) / n), o = off(a, b);
+    const el = document.createElement("div");
+    el.className = `absolute left-0 top-0 origin-left rounded-full ${cls}`;
+    Object.assign(el.style, { width: `${o.len + 1}px`, height: `${w}px`, transform: `translate(${a.x}px, ${a.y - w / 2}px) rotate(${o.ang}rad)` });
+    s.layer.appendChild(el);
+    const t0 = (grow * i) / n, step = grow / n;
+    move(el, [{ scale: "0 1", offset: 0 }, { scale: "0 1", offset: t0 / total }, { scale: "1 1", offset: (t0 + step) / total }, { scale: "1 1", opacity: 1, offset: (grow + hold) / total }, { scale: "1 1", opacity: 0 }], total, delay, ease.lin);
+    later(() => el.remove(), total + delay + 50);
+  }
 }
 
 /** Centro atual de um dublê na tela (com as animações dele). */

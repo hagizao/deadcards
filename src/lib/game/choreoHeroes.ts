@@ -2,7 +2,7 @@
 // choreoKit.ts; quem roda a cena é o Rig (choreo.ts).
 import type { AbilityKey } from "./config";
 import {
-  beam, burst, cable, cover, dust, ease, ease3, flash, where, half, hop, icon, jitter, jostle, knock, later, mix, move, now, off, pt, rise,
+  beam, burst, cable, cover, vine, dust, ease, ease3, flash, where, half, hop, icon, jitter, jostle, knock, later, mix, move, now, off, pt, rise,
   shock, spawn, stick, swap, tf, vignette, type Actor, type Box, type Recipe, type Stage,
 } from "./choreoKit";
 
@@ -238,27 +238,39 @@ function calico(s: Stage) {
   }, 150 + vs.length * 380);
 }
 
-/** Celeste: vira vitral, o feixe dourado empurra a mais forte, se parte num prisma e ricocheteia nas outras. */
+/** Celeste: ergue a mão e solta uma bola de luz azul e roxa que quica na cabeça de cada inimiga, uma depois da outra. */
 function celeste(s: Stage) {
   const { src } = s;
-  const [v, ...rest] = foesOf(s);
-  lift(src, 500, -14, 1.1);
-  cover(src, "bg-[conic-gradient(from_90deg,#f472b680,#facc1580,#4ade8080,#38bdf880,#a78bfa80,#f472b680)] mix-blend-screen", [{ opacity: 0 }, { opacity: 0.9, offset: 0.5 }, { opacity: 0 }], 700);
-  if (!v) return;
-  later(() => {
-    beam(s, src.from, v.from, "bg-linear-to-r from-yellow-100 via-amber-300 to-yellow-100 shadow-[0_0_14px_var(--color-amber-300)]", 9, 110, 180);
-    later(() => knock(s, v, src.from, 18, 1, "bg-amber-200 mix-blend-screen"), 110);
-  }, 260);
-  const prism = pt(v.from.x, v.from.y - v.from.h * 0.62, 22);
-  later(() => {
-    const p = spawn(s, "rotate-45 bg-linear-to-br from-white via-sky-200 to-fuchsia-300 shadow-[0_0_12px_white]", prism, 18, 300 + rest.length * 260);
-    move(p, [{ transform: "rotate(45deg) scale(0)" }, { transform: "rotate(225deg) scale(1.2)" }, { transform: "rotate(405deg) scale(0)" }], 300 + rest.length * 260);
-  }, 480);
-  rest.forEach((r, i) => later(() => {
-    beam(s, i ? rest[i - 1].from : prism, r.from, "bg-linear-to-r from-sky-100 via-fuchsia-200 to-amber-100 shadow-[0_0_10px_var(--color-fuchsia-300)]", 5, 90, 120);
-    later(() => knock(s, r, prism, 10, 1, "bg-fuchsia-100 mix-blend-screen"), 90);
-  }, 560 + i * 260));
+  const vs = foesOf(s);
+  lift(src, 420, -10, 1.08);
+  cover(src, "bg-violet-400/40 mix-blend-screen", [{ opacity: 0 }, { opacity: 1, offset: 0.5 }, { opacity: 0 }], 520);
+  const head = (b: Box) => pt(b.x, b.y - b.h * 0.42);
+  const stops = [pt(src.from.x, src.from.y - src.from.h * 0.35), ...(vs.length ? vs.map((v) => head(v.from)) : [pt(src.from.x, src.from.y - src.from.h * 0.42)])];
+  const size = Math.max(26, src.from.w * 0.42);
+  const ball = spawn(s, "rounded-full bg-radial-[at_35%_30%] from-white via-sky-300 to-violet-600 shadow-[0_0_18px_var(--color-violet-500),0_0_6px_var(--color-sky-200)]", stops[0], size, CELESTE_UP + stops.length * CELESTE_HOP + 200);
+  // cada quique: sobe em arco (desacelerando), desce (acelerando), amassa na cabeça e segue
+  const kf: Keyframe[] = [{ transform: tf(0, 0, 0, 0.2), opacity: 0, offset: 0, easing: ease.out }];
+  const total = CELESTE_UP + (stops.length - 1) * CELESTE_HOP + 260;
+  const at = (ms: number) => ms / total;
+  kf.push({ transform: tf(0, -src.from.h * 0.3, 0, 1), opacity: 1, offset: at(CELESTE_UP), easing: ease.out });
+  stops.slice(1).forEach((p, i) => {
+    const a = stops[i], t0 = CELESTE_UP + i * CELESTE_HOP;
+    const top = Math.min(a.y, p.y) - Math.max(60, Math.abs(p.x - a.x) * 0.35);
+    kf.push({ transform: tf((a.x + p.x) / 2 - stops[0].x, top - stops[0].y, 0, 1), offset: at(t0 + CELESTE_HOP * 0.5), easing: ease.in });
+    kf.push({ transform: tf(p.x - stops[0].x, p.y - stops[0].y, 0, 1.25, 0.75), offset: at(t0 + CELESTE_HOP), easing: ease.out });
+  });
+  const last = stops.at(-1)!;
+  kf.push({ transform: tf(last.x - stops[0].x, last.y - stops[0].y - 50, 0, 0.6), opacity: 0, offset: 1 });
+  move(ball, kf, total, 0, ease.lin);
+  // rastro de faíscas atrás da bola
+  for (let k = 1; k < total / 45; k++) later(() => spawn(s, k % 2 ? "rounded-full bg-sky-200/80 blur-[1px]" : "rounded-full bg-violet-300/80 blur-[1px]", where(ball, src.from), 7, 300), k * 45);
+  vs.forEach((v, i) => later(() => {
+    knock(s, v, pt(v.from.x, v.from.y - 200), 12, 1, "bg-violet-200 mix-blend-screen");
+    spawn(s, "rounded-full bg-radial from-white via-sky-300/70 to-transparent to-70%", head(v.from), v.from.w * 1.1, 240);
+    burst(s, head(v.from), 8, i % 2 ? "size-1.5 rotate-45 bg-violet-200" : "size-1.5 rotate-45 bg-sky-200", v.from.w * 0.55, 420, -6);
+  }, CELESTE_UP + (i + 1) * CELESTE_HOP));
 }
+const CELESTE_UP = 260, CELESTE_HOP = 300;
 
 /** Deadman Danny: trava como lançador e solta mísseis que fazem a curva no alto e mergulham, com explosões e crateras. */
 function danny(s: Stage) {
@@ -269,7 +281,7 @@ function danny(s: Stage) {
   const targets = vs.length ? vs.map((v) => v.from) : [half(s, true)];
   targets.forEach((b, i) => later(() => {
     const top = pt((src.from.x + b.x) / 2, Math.min(src.from.y, b.y) - src.from.h * 1.3);
-    const r = icon(s, "rocket", src.from, 26, 640);
+    const r = icon(s, "rocket", src.from, 34, 640);
     const ang = (p: Box, q: Box) => (Math.atan2(q.y - p.y, q.x - p.x) * 180) / Math.PI + 90;
     move(r, [
       { transform: `translate(0,0) rotate(0deg)` },
@@ -351,30 +363,39 @@ function graves(s: Stage) {
   }, 380 + i * 180));
 }
 
-/** Grey Talon: puxa o arco, a coruja espiritual sai num rasante, faz a curva no alto e mergulha atravessando a vítima. */
+/** Grey Talon: puxa o arco, a ponta acende em verde e a flecha cruza a mesa deixando um rastro e crava na vítima. */
 function greyTalon(s: Stage) {
   const { src } = s;
   const v = foesOf(s)[0];
   if (!v) return lift(src);
-  lean(src, v.from, 300, 10);
-  const top = pt((src.from.x + v.from.x) / 2 + (v.from.x >= src.from.x ? -1 : 1) * src.from.w, Math.min(src.from.y, v.from.y) - src.from.h * 1.4);
+  const o = off(src.from, v.from);
+  const deg = (o.ang * 180) / Math.PI + 90;
+  const size = Math.max(60, src.from.h * 0.9);
+  // tensiona: a carta recua, treme e a ponta da flecha brilha antes de soltar
+  move(src.g, [{ transform: tf() }, { transform: tf(-o.ux * 12, -o.uy * 12, o.ux >= 0 ? -5 : 5, 1.06), offset: 0.7 }, { transform: tf(-o.ux * 12, -o.uy * 12, o.ux >= 0 ? -5 : 5, 1.06) }], TALON_DRAW);
+  later(() => jitter(src.g, 120, 2, false, tf(-o.ux * 12, -o.uy * 12, o.ux >= 0 ? -5 : 5, 1.06)), TALON_DRAW - 120);
+  const glow = spawn(s, "rounded-full bg-radial from-lime-100 via-green-400/80 to-transparent to-70%", mix(src.from, v.from, 0.12), 44, TALON_DRAW + 80);
+  move(glow, [{ transform: "scale(0.2)", opacity: 0 }, { transform: "scale(1.2)", opacity: 1 }], TALON_DRAW, 0, ease.in);
   later(() => {
-    const owl = icon(s, "owl", src.from, 40, 700);
-    const p = [src.from, pt(src.from.x, src.from.y - src.from.h * 0.8), top, pt(v.from.x, v.from.y - v.from.h * 0.9), v.from];
-    move(owl, p.map((q, i) => ({ transform: `translate(${q.x - src.from.x}px, ${q.y - src.from.y}px) scale(${i === 4 ? 1.4 : 1})`, opacity: i === 4 ? 0.2 : 1 })), 560, 0, ease.io);
-    for (let k = 1; k < 6; k++) later(() => spawn(s, "rounded-full bg-cyan-200/70 blur-[1px]", where(owl, src.from), 8, 380), k * 80);
-  }, 260);
+    move(src.g, [{ transform: tf(-o.ux * 12, -o.uy * 12, 0, 1.06) }, { transform: tf(o.ux * 6, o.uy * 6, 0, 0.98) }, { transform: tf() }], 300);
+    const a = icon(s, "arrow", src.from, size, TALON_FLY + 40, "drop-shadow-[0_0_10px_var(--color-green-400)]");
+    move(a, [{ transform: `translate(0px, 0px) rotate(${deg}deg) scale(0.8)` }, { transform: `translate(${o.dx}px, ${o.dy}px) rotate(${deg}deg) scale(1)` }], TALON_FLY, 0, ease.lin);
+    beam(s, src.from, v.from, "bg-linear-to-r from-transparent via-green-400/70 to-lime-200 shadow-[0_0_12px_var(--color-green-400)]", 6, TALON_FLY, 140);
+    for (let k = 1; k < 6; k++) later(() => spawn(s, "rounded-full bg-lime-200/80 blur-[1px]", where(a, src.from), 8, 320), k * (TALON_FLY / 6));
+  }, TALON_DRAW);
   later(() => {
-    burst(s, v.from, 10, "", v.from.w * 0.9, 650, 20, 16, "featherSky");
-    knock(s, v, top, 14, 1, "bg-cyan-100 mix-blend-screen");
-  }, 820);
+    stick(v, "arrow", size * 0.7, 0.5 - o.ux * 0.12, 0.42 - o.uy * 0.12, deg);
+    burst(s, v.from, 12, "size-1.5 rotate-45 bg-green-300 shadow-[0_0_6px_var(--color-green-400)]", v.from.w * 0.8, 520);
+    knock(s, v, src.from, 18, 2, "bg-green-200 mix-blend-screen");
+  }, TALON_DRAW + TALON_FLY);
   if (s.self) later(() => {
-    const f = icon(s, "featherSky", v.from, 18, 500);
-    const o = off(v.from, src.from);
-    move(f, [{ transform: "translate(0,0) rotate(0deg)" }, { transform: `translate(${o.dx}px, ${o.dy}px) rotate(540deg)` }], 420, 0, ease.io);
-    later(() => { flash(src, 300, "bg-cyan-200 mix-blend-screen"); move(src.g, [{ transform: tf() }, { transform: tf(0, -6, 0, 1.08) }, { transform: tf() }], 300); }, 420);
-  }, 1000);
+    // derrubou: o brilho verde volta para ela
+    const g = spawn(s, "rounded-full bg-radial from-lime-100 via-green-400/80 to-transparent to-70%", v.from, 26, 460);
+    move(g, [{ transform: "translate(0,0)" }, { transform: `translate(${-o.dx}px, ${-o.dy}px)` }], 420, 0, ease.io);
+    later(() => { flash(src, 300, "bg-green-300 mix-blend-screen"); move(src.g, [{ transform: tf() }, { transform: tf(0, -6, 0, 1.08) }, { transform: tf() }], 300); }, 420);
+  }, TALON_DRAW + TALON_FLY + 380);
 }
+const TALON_DRAW = 360, TALON_FLY = 240;
 
 /** Haze: gira a adaga, arremessa, crava, e a vítima tomba de sono com o alvo pintado; na dança, pisca em volta dela atirando. */
 function haze(s: Stage) {
@@ -401,11 +422,11 @@ function haze(s: Stage) {
   lean(src, v.from, 320, 8);
   later(() => {
     const o = off(src.from, v.from);
-    const t = icon(s, "dagger", src.from, 26, 300);
+    const t = icon(s, "dagger", src.from, 34, 300);
     move(t, [{ transform: "translate(0,0) rotate(0deg)" }, { transform: `translate(${o.dx}px, ${o.dy}px) rotate(${900 + (o.ang * 180) / Math.PI + 90}deg)` }], 260, 0, ease.in);
   }, 320);
   later(() => {
-    stick(v, "dagger", 22, 0.72, 0.3, 160);
+    stick(v, "dagger", 30, 0.72, 0.3, 160);
     knock(s, v, src.from, 10, 1, "bg-purple-200 mix-blend-screen");
     stay(v, "m-auto size-[60%] rounded-full border-2 border-dashed border-red-500/90 inset-[20%]", { opacity: 0, transform: "scale(1.6)" });
   }, 580);
@@ -459,7 +480,7 @@ function infernus(s: Stage) {
   }, 980);
 }
 
-/** Ivy: brotos nascem em volta dela, um cipó cresce até o aliado do outro local e flores abrem nas duas cartas. */
+/** Ivy: brotos nascem em volta dela, duas vinhas se enroscam até o aliado do outro local, soltando folhas, e flores abrem nas duas cartas. */
 function ivy(s: Stage) {
   const { src } = s;
   const a = alliesOf(s)[0];
@@ -469,10 +490,26 @@ function ivy(s: Stage) {
     move(l, [{ transform: "scale(0) rotate(0deg)" }, { transform: `scale(1) rotate(${i * 70}deg)`, offset: 0.4 }, { transform: `scale(0.8) rotate(${i * 70}deg)`, opacity: 0 }], 680, i * 50);
   }
   if (!a) return lift(src);
-  later(() => cable(s, "bg-linear-to-r from-emerald-700 via-green-500 to-emerald-700 shadow-[0_0_5px_var(--color-green-900)]", 5, () => src.from, (t) => {
-    const p = mix(src.from, a.from, ease3(Math.min(1, t * 2)));
-    return { ...p, y: p.y + Math.sin(t * 18) * 6 * (1 - t) };
-  }, 950, "leaf", 18), 250);
+  const o = off(src.from, a.from);
+  // a vinha anda com uma ondulação perpendicular ao caminho, que some quando ela chega
+  const path = (t: number, k: number) => {
+    const p = mix(src.from, a.from, t);
+    const w = Math.sin(t * Math.PI * 5 + k * Math.PI) * 10 * Math.sin(t * Math.PI);
+    return { ...p, x: p.x - o.uy * w, y: p.y + o.ux * w };
+  };
+  const grow = IVY_VINE * 0.55;
+  // duas vinhas enroscadas (fases opostas), a grossa com nós e a fina mais clara
+  vine(s, (u) => path(u, 0), "bg-linear-to-r from-green-800 via-emerald-600 to-green-800 shadow-[0_0_3px_rgb(0_0_0/0.8)]", 6, grow, IVY_VINE - grow, 250);
+  vine(s, (u) => path(u, 1), "bg-lime-500", 3, grow, IVY_VINE - grow, 290);
+  // folhas brotando pelo caminho, conforme a vinha passa
+  for (let i = 1; i < 10; i++) {
+    const f = i / 10;
+    later(() => {
+      const p = path(f, i % 2);
+      const l = icon(s, "leaf", pt(p.x - o.uy * (i % 2 ? 8 : -8), p.y + o.ux * (i % 2 ? 8 : -8)), 14, IVY_VINE);
+      move(l, [{ transform: `scale(0) rotate(${i * 50}deg)` }, { transform: `scale(1.1) rotate(${i * 50 + 20}deg)`, offset: 0.2 }, { transform: `scale(1) rotate(${i * 50 + 20}deg)`, offset: 0.85 }, { transform: "scale(0.6)", opacity: 0 }], IVY_VINE - grow * f);
+    }, 250 + grow * f);
+  }
   later(() => [src, a].forEach((x) => {
     const f = stick(x, "flower", 26, 0.75, 0.2);
     move(f, [{ transform: "scale(0) rotate(-90deg)" }, { transform: "scale(1.3) rotate(0deg)", offset: 0.6 }, { transform: "scale(1)" }], 320);
@@ -480,27 +517,35 @@ function ivy(s: Stage) {
     cover(x, "bg-green-400/40 mix-blend-screen", [{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }], 420);
   }), 760);
 }
+const IVY_VINE = 950;
 
-/** Kelvin: bate no chão, o gelo se espalha, uma cúpula cobre as aliadas e a geada sobe por elas. */
+/** Kelvin: bate no chão e o gelo se espalha pelo lado dele no local; a área fica azulada até o fim do próximo turno. */
 function kelvin(s: Stage) {
   const { src } = s;
   const allies = alliesOf(s).filter((a) => a.id !== src.id);
   move(src.g, [{ transform: tf() }, { transform: tf(0, -10, 0, 1.06), offset: 0.35 }, { transform: tf(0, 4, 0, 1.04, 0.94), offset: 0.6 }, { transform: tf() }], 420);
-  later(() => { shock(s, src.from, "border-cyan-200/80", 2.2, 600); burst(s, pt(src.from.x, src.from.y + src.from.h * 0.45), 12, "size-2 rotate-45 bg-cyan-100", src.from.w * 1.2, 520); }, 250);
-  const mine = [src.from, ...allies.map((a) => a.from)];
-  const x0 = Math.min(...mine.map((b) => b.x - b.w / 2)) - 14, x1 = Math.max(...mine.map((b) => b.x + b.w / 2)) + 14;
-  const y0 = Math.min(...mine.map((b) => b.y - b.h / 2)) - 18, y1 = Math.max(...mine.map((b) => b.y + b.h / 2)) + 6;
-  const dome = spawn(s, "origin-bottom rounded-t-[50%] border-2 border-cyan-100/80 bg-linear-to-b from-cyan-100/35 to-cyan-400/15 shadow-[inset_0_0_20px_var(--color-cyan-200)]", pt((x0 + x1) / 2, (y0 + y1) / 2), x1 - x0, 1400, y1 - y0);
-  move(dome, [{ transform: "scaleY(0)", opacity: 0 }, { transform: "scaleY(1.05)", opacity: 1, offset: 0.3 }, { transform: "scaleY(1)", opacity: 1, offset: 0.8 }, { transform: "scaleY(1)", opacity: 0 }], 1350, 300);
+  const mine = half(s, false);
+  later(() => {
+    shock(s, src.from, "border-cyan-200/80", 2.2, 600);
+    burst(s, pt(src.from.x, src.from.y + src.from.h * 0.45), 12, "size-2 rotate-45 bg-cyan-100", src.from.w * 1.2, 520);
+    // a geada nasce no pé dele e cobre o lado inteiro (a marca da mesa assume quando a cena acaba)
+    const sheet = spawn(s, "rounded-xl bg-radial from-cyan-100/60 via-sky-300/35 to-sky-500/15 shadow-[inset_0_0_24px_var(--color-cyan-100)]", mine, mine.w * 0.9, KELVIN_MS, mine.h * 0.9);
+    sheet.style.transformOrigin = `${src.from.x - (mine.x - mine.w * 0.45)}px ${src.from.y - (mine.y - mine.h * 0.45)}px`;
+    move(sheet, [{ transform: "scale(0)", opacity: 0 }, { transform: "scale(1.04)", opacity: 1, offset: 0.35 }, { transform: "scale(1)", opacity: 1, offset: 0.75 }, { transform: "scale(1)", opacity: 0 }], KELVIN_MS - 250, 0, ease.out);
+    for (let i = 0; i < 9; i++) {
+      const c = spawn(s, "rotate-45 bg-white/90 shadow-[0_0_6px_var(--color-cyan-200)]", pt(mine.x + (((i * 37) % 100) / 100 - 0.5) * mine.w * 0.8, mine.y + (((i * 61) % 100) / 100 - 0.5) * mine.h * 0.8), 5, 900);
+      move(c, [{ transform: "rotate(45deg) scale(0)" }, { transform: "rotate(45deg) scale(1.4)", offset: 0.4 }, { transform: "rotate(45deg) scale(0)" }], 800, 150 + i * 50);
+    }
+  }, 250);
   [src, ...allies].forEach((a, i) => later(() => {
     cover(a, "bg-linear-to-t from-cyan-100/80 to-transparent mix-blend-screen", [{ opacity: 0, transform: "scaleY(0)" }, { opacity: 1, transform: "scaleY(1)" }, { opacity: 0 }], 520);
     burst(s, a.from, 5, "size-1 rotate-45 bg-white", a.from.w * 0.5, 400);
-  }, 600 + i * 120));
+  }, 550 + i * 110));
   foesOf(s).forEach((f) => later(() => { jitter(f.g, 300, 2); cover(f, "bg-cyan-300/40 mix-blend-screen", [{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }], 400); }, 900));
-  later(() => rise(s, pt((x0 + x1) / 2, y0, x1 - x0, 20), 10, "rounded-full bg-cyan-200/80", 5, -60, 500, x1 - x0), 1250);
 }
+const KELVIN_MS = 1350;
 
-/** Lady Geist: as duas cartas tremem, as almas saem, se cruzam num redemoinho e trocam de carta. */
+/** Lady Geist: as duas cartas tremem, as almas saem (a vida da inimiga, pingando sangue, e a dela), giram juntas e trocam de carta. */
 function geist(s: Stage) {
   const { src } = s;
   const v = foesOf(s)[0];
@@ -509,19 +554,25 @@ function geist(s: Stage) {
   jitter(src.g, 300, 2);
   jitter(v.g, 300, 2);
   const mid = mix(src.from, v.from, 0.5);
-  [[src, v], [v, src]].forEach(([a, b], i) => later(() => {
-    const soul = spawn(s, `rounded-full blur-[2px] ${i ? "bg-radial from-zinc-100 via-zinc-300/70 to-transparent to-70%" : "bg-radial from-rose-200 via-rose-500/70 to-transparent to-70%"}`, a.from, a.from.w * 0.6, 900);
-    const m = off(a.from, mid), e = off(a.from, b.from);
+  [[v, src, "soulRed"], [src, v, "soulPale"]].forEach(([a, b, k], i) => later(() => {
+    const A = a as Actor, B = b as Actor;
+    const soul = icon(s, k as "soulRed" | "soulPale", A.from, A.from.w * 0.62, 900, i ? "drop-shadow-[0_0_8px_var(--color-indigo-200)]" : "drop-shadow-[0_0_10px_var(--color-red-600)]");
+    const m = off(A.from, mid), e = off(A.from, B.from);
     const r = 26;
     move(soul, [
       { transform: tf(0, 0, 0, 0.3), opacity: 0 },
-      { transform: tf(m.dx * 0.6, m.dy * 0.6, 0, 1), opacity: 1 },
-      { transform: tf(m.dx + (i ? r : -r), m.dy, 0, 1) },
-      { transform: tf(m.dx, m.dy + (i ? r : -r), 0, 1) },
+      { transform: tf(m.dx * 0.6, m.dy * 0.6, i ? 10 : -10, 1), opacity: 1 },
+      { transform: tf(m.dx + (i ? r : -r), m.dy, i ? -10 : 10, 1) },
+      { transform: tf(m.dx, m.dy + (i ? r : -r), i ? 10 : -10, 1) },
       { transform: tf(m.dx + (i ? -r : r), m.dy, 0, 1) },
       { transform: tf(e.dx, e.dy, 0, 0.5), opacity: 0.9 },
     ], 820, 0, ease.io);
-    later(() => flash(b, 220, i ? "bg-zinc-100 mix-blend-screen" : "bg-rose-300 mix-blend-screen"), 820);
+    // a alma roubada vai pingando sangue pelo caminho
+    if (!i) for (let k = 1; k < 8; k++) later(() => {
+      const d = icon(s, "drop", where(soul, A.from), 11, 520);
+      move(d, [{ transform: "translateY(0) scale(1)" }, { transform: "translateY(26px) scale(0.6)", opacity: 0 }], 480, 0, ease.in);
+    }, k * 100);
+    later(() => flash(B, 220, i ? "bg-indigo-100 mix-blend-screen" : "bg-red-500 mix-blend-screen"), 820);
   }, 300));
   later(() => {
     stay(v, "bg-zinc-200/40 mix-blend-saturation", { opacity: 0 });
@@ -594,7 +645,7 @@ function mcginnis(s: Stage) {
   }, 1100);
 }
 
-/** Mina: solta um beijo que vira morcegos; no fim do turno a revoada morde e um fio vermelho leva o poder para ela. */
+/** Mina: solta um beijo que vira morcegos; no fim do turno a revoada morde e uma veia de sangue leva o poder para ela, pingando. */
 function mina(s: Stage) {
   const { src } = s;
   const v = foesOf(s)[0];
@@ -614,19 +665,29 @@ function mina(s: Stage) {
   bats(src.from, v.from, 6, 520);
   later(() => {
     jitter(v.g, 260, 3);
-    flash(v, 220, "bg-red-400 mix-blend-screen");
+    flash(v, 220, "bg-red-600 mix-blend-screen");
+    burst(s, v.from, 6, "", v.from.w * 0.5, 480, 20, 12, "drop");
     move(v.g, [{ transform: tf() }, { transform: tf(0, 0, 0, 0.92) }, { transform: tf() }], 400);
   }, 560);
   later(() => {
-    cable(s, "bg-red-600 shadow-[0_0_6px_var(--color-red-500)]", 2, () => v.from, (t) => mix(v.from, src.from, ease3(Math.min(1, t * 3))), 650);
-    for (let k = 0; k < 4; k++) later(() => {
-      const d = spawn(s, "rounded-full bg-red-500 shadow-[0_0_6px_var(--color-red-400)]", v.from, 7, 420);
-      const o = off(v.from, src.from);
-      move(d, [{ transform: "translate(0,0)" }, { transform: `translate(${o.dx}px, ${o.dy}px)` }], 380, 0, ease.in);
+    const o = off(v.from, src.from);
+    const tip = (t: number) => mix(v.from, src.from, ease3(Math.min(1, t * 3)));
+    // a veia: grossa, vermelho-escuro pulsando, com o sangue correndo por dentro
+    cable(s, "bg-[repeating-linear-gradient(90deg,var(--color-red-950)_0_6px,var(--color-red-700)_6px_14px,var(--color-red-900)_14px_18px)] shadow-[0_0_8px_var(--color-red-700)]", 5, () => v.from, tip, MINA_VEIN);
+    for (let k = 0; k < 5; k++) later(() => {
+      const d = icon(s, "drop", v.from, 14, 440, "drop-shadow-[0_0_4px_var(--color-red-600)]");
+      move(d, [{ transform: `translate(0px, 0px) rotate(${(o.ang * 180) / Math.PI - 90}deg)` }, { transform: `translate(${o.dx}px, ${o.dy}px) rotate(${(o.ang * 180) / Math.PI - 90}deg)` }], 400, 0, ease.in);
     }, 150 + k * 90);
+    // gotas que escorrem da veia e caem
+    for (let k = 1; k < 6; k++) later(() => {
+      const p = mix(v.from, src.from, k / 6);
+      const d = icon(s, "drop", p, 10, 560);
+      move(d, [{ transform: "translateY(0) scale(0.4)" }, { transform: "translateY(4px) scale(1)", offset: 0.25 }, { transform: "translateY(34px) scale(0.8)", opacity: 0 }], 520, 0, ease.in);
+    }, 260 + k * 70);
   }, 720);
-  later(() => { move(src.g, [{ transform: tf() }, { transform: tf(0, -6, 0, 1.08) }, { transform: tf() }], 320); flash(src, 260, "bg-red-300 mix-blend-screen"); }, 1250);
+  later(() => { move(src.g, [{ transform: tf() }, { transform: tf(0, -6, 0, 1.08) }, { transform: tf() }], 320); flash(src, 260, "bg-red-500 mix-blend-screen"); }, 1250);
 }
+const MINA_VEIN = 650;
 
 /** Mirage: gira, a moldura vira areia e um tornado de areia sobe da carta. */
 function mirage(s: Stage) {
@@ -674,31 +735,32 @@ function harrow(s: Stage) {
     if (!a) return;
     cable(s, "bg-red-700/80 shadow-[0_0_5px_var(--color-red-600)]", 4, () => v.from, (t) => mix(v.from, a.from, ease3(Math.min(1, t * 2.5))), 700);
     for (let k = 0; k < 4; k++) later(() => {
-      const d = spawn(s, "rounded-full bg-red-400", v.from, 6, 380);
       const o = off(v.from, a.from);
-      move(d, [{ transform: "translate(0,0)" }, { transform: `translate(${o.dx}px, ${o.dy}px)` }], 340, 0, ease.in);
+      const d = icon(s, "drop", v.from, 12, 380);
+      move(d, [{ transform: `translate(0px, 0px) rotate(${(o.ang * 180) / Math.PI - 90}deg)` }, { transform: `translate(${o.dx}px, ${o.dy}px) rotate(${(o.ang * 180) / Math.PI - 90}deg)` }], 340, 0, ease.in);
     }, 200 + k * 90);
     later(() => { move(a.g, [{ transform: tf() }, { transform: tf(0, -6, 0, 1.1) }, { transform: tf() }], 340); flash(a, 260, "bg-red-200 mix-blend-screen"); }, 650);
   }, 600);
 }
 
-/** Paige: ergue o livro, as páginas viram cavaleiros de papel que galopam pelo local e estandartes sobem atrás das aliadas. */
+/** Paige: ergue o livro e a luz verde se espalha pelo lado dela no local, envolvendo as aliadas (a área continua verde enquanto ela estiver ali). */
 function paige(s: Stage) {
   const { src } = s;
   lift(src, 420, -10, 1.06);
-  burst(s, pt(src.from.x, src.from.y - src.from.h * 0.3), 7, "", src.from.w * 0.8, 600, -30, 16, "page");
-  const enemy = half(s, true);
-  for (let i = 0; i < 3; i++) later(() => {
-    const k = icon(s, "knight", pt(enemy.x - enemy.w * 0.6, enemy.y + (i - 1) * enemy.h * 0.18), 30, 800);
-    move(k, [0, 1, 2, 3, 4, 5, 6].map((j) => ({ transform: `translate(${(enemy.w * 1.2 * j) / 6}px, ${j % 2 ? -8 : 0}px)` })), 650, 0, ease.lin);
-  }, 300 + i * 90);
-  later(() => jostle(s, enemy, [], 1, 4), 500);
+  cover(src, "bg-emerald-300/40 mix-blend-screen", [{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }], 520);
+  const mine = half(s, false);
+  later(() => {
+    const area = spawn(s, "rounded-xl bg-radial from-emerald-300/55 via-emerald-500/30 to-emerald-700/10 shadow-[inset_0_0_26px_var(--color-emerald-300)]", mine, mine.w * 0.9, PAIGE_MS, mine.h * 0.9);
+    area.style.transformOrigin = `${src.from.x - (mine.x - mine.w * 0.45)}px ${src.from.y - (mine.y - mine.h * 0.45)}px`;
+    move(area, [{ transform: "scale(0)", opacity: 0 }, { transform: "scale(1.03)", opacity: 1, offset: 0.4 }, { transform: "scale(1)", opacity: 1, offset: 0.75 }, { transform: "scale(1)", opacity: 0 }], PAIGE_MS - 250, 0, ease.out);
+    rise(s, mine, 12, "rounded-full bg-emerald-200/80 shadow-[0_0_6px_var(--color-emerald-300)]", 5, 50, 900, mine.w * 0.8);
+  }, 250);
   s.dst.forEach((a, i) => later(() => {
-    const b = icon(s, "banner", pt(a.from.x + a.from.w * 0.35, a.from.y - a.from.h * 0.35), 26, 700);
-    move(b, [{ transform: "translateY(20px) scaleY(0)", opacity: 0 }, { transform: "translateY(0) scaleY(1)", opacity: 1, offset: 0.4 }, { transform: "rotate(-4deg)", opacity: 1, offset: 0.7 }, { opacity: 0 }], 680);
     move(a.g, [{ transform: tf() }, { transform: tf(0, -5, 0, 1.06) }, { transform: tf() }], 300);
-  }, 700 + i * 90));
+    cover(a, "bg-emerald-300/40 mix-blend-screen", [{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }], 420);
+  }, 550 + i * 90));
 }
+const PAIGE_MS = 1250;
 
 /** Paradox: o tempo para (a mesa perde a cor e um relógio aparece) e as duas cartas deslizam trocando de lugar. */
 function paradox(s: Stage) {
@@ -1011,30 +1073,46 @@ function viscous(s: Stage) {
   }, a === src ? 420 : 680);
 }
 
-/** Vyper: olhos de cobra se abrem sobre o local; quando a inimiga é revelada ali, os olhos travam e ela vira pedra. */
+/** Vyper: cospe um jato de veneno que vira uma poça verde do lado inimigo; quando a inimiga é revelada ali, o veneno sobe por ela e ela vira pedra. */
 function vyper(s: Stage) {
   const { src } = s;
   const v = s.dst[0];
-  const eyes = (at: Box, ms: number) => [-1, 1].forEach((k) => {
-    const e = icon(s, "eye", pt(at.x + k * 16, at.y), 28, ms, "drop-shadow-[0_0_8px_var(--color-lime-400)]");
-    move(e, [{ transform: "scaleY(0.05)", opacity: 0 }, { transform: "scaleY(1)", opacity: 1, offset: 0.2 }, { transform: "scaleY(0.1)", offset: 0.45 }, { transform: "scaleY(1)", opacity: 1, offset: 0.6 }, { transform: "scaleY(1)", opacity: 1, offset: 0.9 }, { opacity: 0 }], ms);
-  });
   if (s.ev === "petri" && v) {
-    eyes(pt(v.from.x, v.from.y - v.from.h * 0.7), 900);
+    const pool = pt(v.from.x, v.from.y + v.from.h * 0.38);
+    // a poça borbulha embaixo da carta
+    for (let i = 0; i < 6; i++) {
+      const b = spawn(s, "rounded-full bg-lime-300/90 ring-1 ring-green-700", pt(pool.x + (i - 2.5) * v.from.w * 0.15, pool.y), 7, 500);
+      move(b, [{ transform: "translateY(0) scale(0.3)", opacity: 0 }, { transform: "translateY(-10px) scale(1)", opacity: 1, offset: 0.6 }, { transform: "translateY(-16px) scale(1.4)", opacity: 0 }], 420, i * 40);
+    }
     later(() => {
-      cover(v, "origin-bottom bg-linear-to-t from-stone-400/90 via-stone-500/80 to-stone-600/70 mix-blend-multiply", [{ transform: "scaleY(0)", opacity: 1 }, { transform: "scaleY(1)", opacity: 1 }], 500, 0);
+      // o veneno sobe pela carta e endurece em pedra
+      cover(v, "origin-bottom bg-linear-to-t from-lime-400/80 via-green-500/60 to-transparent mix-blend-screen", [{ transform: "scaleY(0)", opacity: 1 }, { transform: "scaleY(1)", opacity: 1, offset: 0.6 }, { transform: "scaleY(1)", opacity: 0 }], 520);
+      cover(v, "origin-bottom bg-zinc-400 mix-blend-color", [{ transform: "scaleY(0)", opacity: 1 }, { transform: "scaleY(1)", opacity: 1 }], 500, 260);
       later(() => {
         stay(v, "bg-[linear-gradient(115deg,transparent_45%,rgb(41_37_36/0.9)_46%,transparent_48%),linear-gradient(60deg,transparent_60%,rgb(41_37_36/0.8)_61%,transparent_63%)]", { opacity: 0 });
         const chip = spawn(s, "bg-stone-500 [clip-path:polygon(0_0,100%_30%,60%_100%)]", pt(v.from.x + v.from.w * 0.35, v.from.y + v.from.h * 0.2), 10, 600);
         move(chip, [{ transform: "translateY(0) rotate(0deg)" }, { transform: "translateY(50px) rotate(200deg)", opacity: 0 }], 560, 0, ease.in);
         s.shake(1);
-      }, 500);
-    }, 350);
+      }, 760);
+    }, 300);
     return;
   }
   lift(src, 400, -6, 1.04);
   const enemy = half(s, true);
-  later(() => eyes(pt(enemy.x, enemy.y - enemy.h * 0.2), 750), 150);
+  const o = off(src.from, enemy);
+  later(() => {
+    // o jato em arco até o meio do lado inimigo
+    const glob = spawn(s, "rounded-full bg-radial-[at_35%_30%] from-lime-200 via-green-500 to-green-800 shadow-[0_0_12px_var(--color-lime-400)]", src.from, 20, 420);
+    move(glob, [{ transform: tf(0, 0, 0, 0.5) }, { transform: tf(o.dx * 0.5, o.dy * 0.5 - 70, 0, 1, 0.85), easing: ease.in }, { transform: tf(o.dx, o.dy, 0, 1.4, 0.6) }], 380, 0, ease.out);
+    for (let k = 1; k < 7; k++) later(() => spawn(s, "rounded-full bg-lime-300/80 blur-[1px]", where(glob, src.from), 7, 300), k * 55);
+  }, 220);
+  later(() => {
+    // espirra e a poça se espalha (a marca da mesa assume quando a cena acaba)
+    burst(s, enemy, 10, "size-2 rounded-full bg-lime-300", enemy.w * 0.45, 420, -6);
+    const p = spawn(s, "rounded-[50%] bg-radial from-lime-300/80 via-green-600/60 to-green-900/0 to-70%", pt(enemy.x, enemy.y + enemy.h * 0.1), enemy.w * 0.9, 700, enemy.h * 0.3);
+    move(p, [{ transform: "scale(0.1, 0.05)", opacity: 1 }, { transform: "scale(1.06, 1.1)", opacity: 1, offset: 0.5 }, { transform: "scale(1)", opacity: 0 }], 650, 0, ease.out);
+    jostle(s, enemy, [], 1, 3);
+  }, 600);
 }
 
 /** Warden: finca o pé e cerra o punho; um fio de energia sai de cada inimiga até ele, que cresce a cada fio. */
@@ -1113,17 +1191,17 @@ export const CHOREO: Partial<Record<AbilityKey, Recipe>> = {
   "Bebop": H((n, _s, ev) => (ev === "pull" && n ? 1250 : 700), bebop),
   "Billy": H((n) => (n ? 1350 : 600), billy, () => 800),
   "Calico": H((n, _s, ev) => (ev === "late" ? 450 + Math.max(1, n) * 380 + 300 : 1000), calico, () => 400),
-  "Celeste": H((n) => 700 + Math.max(0, n - 1) * 260 + 300, celeste, () => 370),
+  "Celeste": H((n) => CELESTE_UP + Math.max(1, n) * CELESTE_HOP + 450, celeste, () => CELESTE_UP + CELESTE_HOP),
   "Deadman Danny": H((n) => 240 + Math.max(1, n) * 170 + 900, danny, () => 760),
   "Drifter": H((n, self) => (n ? (self ? 1700 : 1450) : 350), drifter, () => 920),
   "Dynamo": H(() => 1350, dynamo, () => 1150),
   "Graves": H((n) => 400 + n * 180 + 600, graves),
-  "Grey Talon": H((n, self) => (n ? (self ? 1550 : 1150) : 350), greyTalon, () => 820),
+  "Grey Talon": H((n, self) => (n ? TALON_DRAW + TALON_FLY + (self ? 950 : 600) : 350), greyTalon, () => TALON_DRAW + TALON_FLY),
   "Haze": H((n, _s, ev) => (ev === "late" ? 1000 : n ? 1450 : 400), haze, (_n, _s, ev) => (ev === "late" ? 840 : 580)),
   "Holliday": H(() => 1250, holliday),
   "Infernus": H((n) => (n ? 1350 : 500), infernus, () => 980),
-  "Ivy": H((n) => (n ? 1250 : 700), ivy),
-  "Kelvin": H(() => 1450, kelvin),
+  "Ivy": H((n) => (n ? 250 + IVY_VINE + 150 : 700), ivy),
+  "Kelvin": H(() => KELVIN_MS, kelvin),
   "Lady Geist": H((n) => (n ? 1450 : 400), geist, () => 1130),
   "Lash": H((n) => (n ? 1150 : 0), lash, () => 800),
   "McGinnis": H((n) => (n ? 1600 : 300), mcginnis),
@@ -1131,7 +1209,7 @@ export const CHOREO: Partial<Record<AbilityKey, Recipe>> = {
   "Mirage": H(() => 950, mirage),
   "Mo & Krill": H(() => 1200, moKrill),
   "Nurse Harrow": H((n) => (n ? 1450 : 600), harrow, () => 600),
-  "Paige": H((n) => 800 + n * 90 + 400, paige),
+  "Paige": H(() => PAIGE_MS, paige),
   "Paradox": H(() => 1350, paradox),
   "Pocket": H((n) => 1100 + n * 120 + 300, pocket, () => 500),
   "Rat King": H(() => 1150, ratKing),
@@ -1147,7 +1225,7 @@ export const CHOREO: Partial<Record<AbilityKey, Recipe>> = {
   "Vindicta": H((n, self) => (n ? (self ? 1500 : 1150) : 0), vindicta, () => 540),
   "Violet": H(() => 1150, violet),
   "Viscous": H(() => 1300, viscous),
-  "Vyper": H((_n, _s, ev) => (ev === "petri" ? 1150 : 950), vyper, () => 350),
+  "Vyper": H((_n, _s, ev) => (ev === "petri" ? 1600 : 1150), vyper, (_n, _s, ev) => (ev === "petri" ? 1060 : 600)),
   "Warden": H((n) => 600 + n * 150 + 350, warden),
   "Wraith": H((n, _s, ev) => (ev === "late" ? 750 : n ? 1350 : 650), wraith),
   "Yamato": H(() => 1250, yamato, () => 580),
