@@ -60,6 +60,13 @@ export function spawn(s: Stage, cls: string, at: Box, w: number, life: number, h
   return el;
 }
 
+/** Clarão (impacto, explosão, luz): cresce, acende e se desfaz suave, sem aparecer nem sumir de uma vez. */
+export function glow(s: Stage, cls: string, at: Box, w: number, life: number, h = w) {
+  const el = spawn(s, cls, at, w, life + 40, h);
+  move(el, [{ transform: "scale(0.55)", opacity: 0 }, { transform: "scale(1)", opacity: 1, offset: 0.3 }, { transform: "scale(1.15)", opacity: 0 }], life, 0, ease.out);
+  return el;
+}
+
 /** Desenhos dos heróis (SVG no traço do jogo), sempre com a cor do herói. */
 const ICON = {
   // garra do braço do Bebop: aço escuro com o laranja e amarelo do robô
@@ -187,9 +194,11 @@ export function cable(s: Stage, cls: string, w: number, from: () => Box, tip: (t
   const frame = (now: number) => {
     const t = Math.min(1, (now - t0) / ms);
     const a = from(), b = tip(t), o = off(a, b);
+    const fade = String(Math.min(1, (1 - t) / 0.2));
     line.style.width = `${o.len}px`;
     line.style.transform = `translate(${a.x}px, ${a.y - w / 2}px) rotate(${o.ang}rad)`;
-    if (cap) cap.style.transform = `translate(${b.x - headSize / 2}px, ${b.y - headSize / 2}px) rotate(${o.ang - Math.PI / 2}rad)`;
+    line.style.opacity = fade;
+    if (cap) { cap.style.transform = `translate(${b.x - headSize / 2}px, ${b.y - headSize / 2}px) rotate(${o.ang - Math.PI / 2}rad)`; cap.style.opacity = fade; }
     if (t < 1) id = requestAnimationFrame(frame);
     else { line.remove(); cap?.remove(); }
   };
@@ -214,18 +223,40 @@ export function beam(s: Stage, a: Box, b: Box, cls: string, w: number, grow = 12
  * Linha curva que cresce de `path(0)` até `path(1)` em `grow` ms, feita de `n` segmentos que acendem em ordem
  * (a vinha da Ivy), e some `hold` ms depois de chegar.
  */
-export function vine(s: Stage, path: (u: number) => Box, cls: string, w: number, grow: number, hold: number, delay = 0, n = 26) {
-  const total = grow + hold + 200;
+export function vine(s: Stage, path: (u: number) => Box, cls: string, w: number, grow: number, hold: number, delay = 0, n = 30) {
+  const out = 360, total = grow + hold + out;
+  // quando a ponta passa pela fração u do caminho (a vinha desacelera ao chegar)
+  const when = (u: number) => grow * (1 - Math.cbrt(1 - Math.min(1, u)));
   for (let i = 0; i < n; i++) {
     const a = path(i / n), b = path((i + 1) / n), o = off(a, b);
     const el = document.createElement("div");
     el.className = `absolute left-0 top-0 origin-left rounded-full ${cls}`;
     Object.assign(el.style, { width: `${o.len + 1}px`, height: `${w}px`, transform: `translate(${a.x}px, ${a.y - w / 2}px) rotate(${o.ang}rad)` });
     s.layer.appendChild(el);
-    const t0 = (grow * i) / n, step = grow / n;
-    move(el, [{ scale: "0 1", offset: 0 }, { scale: "0 1", offset: t0 / total }, { scale: "1 1", offset: (t0 + step) / total }, { scale: "1 1", opacity: 1, offset: (grow + hold) / total }, { scale: "1 1", opacity: 0 }], total, delay, ease.lin);
+    const t0 = when(i / n), t1 = Math.max(t0 + 1, when((i + 1) / n)), gone = grow + hold + (out * 0.6 * i) / n;
+    move(el, [{ scale: "0 1", offset: 0 }, { scale: "0 1", offset: t0 / total }, { scale: "1 1", offset: t1 / total }, { scale: "1 1", opacity: 1, offset: gone / total }, { scale: "1 1", opacity: 0, offset: Math.min(1, (gone + out * 0.4) / total) }, { scale: "1 1", opacity: 0 }], total, delay, ease.lin);
     later(() => el.remove(), total + delay + 50);
   }
+}
+
+/**
+ * Névoa colorida sem bordas (a mesma da mesa): nasce em `from` (ou no centro), se espalha por `at` e se desfaz
+ * no fim. `tone` é uma cor CSS (de preferência uma variável do tema).
+ */
+export function mist(s: Stage, at: Box, tone: string, ms: number, from?: Box, k = 60) {
+  const el = spawn(s, "", at, at.w * 1.15, ms + 50, at.h * 1.15);
+  el.style.setProperty("--mist", tone);
+  el.style.setProperty("--mist-k", `${k}%`);
+  const o = from ?? at;
+  el.style.transformOrigin = `${o.x - (at.x - at.w * 0.575)}px ${o.y - (at.y - at.h * 0.575)}px`;
+  [[-10, 2, 70], [40, -6, 66], [4, 38, 68], [36, 34, 72]].forEach(([x, y, z], i) => {
+    const b = document.createElement("span");
+    b.className = "absolute mist-blob rounded-full";
+    Object.assign(b.style, { left: `${x}%`, top: `${y}%`, width: `${z}%`, height: `${z}%`, animationDelay: `${-i * 2.3}s` });
+    el.appendChild(b);
+  });
+  move(el, [{ transform: "scale(0.15)", opacity: 0 }, { transform: "scale(1)", opacity: 1, offset: 0.45 }, { transform: "scale(1.02)", opacity: 1, offset: 0.75 }, { transform: "scale(1.08)", opacity: 0 }], ms, 0, ease.io);
+  return el;
 }
 
 /** Centro atual de um dublê na tela (com as animações dele). */
