@@ -235,64 +235,59 @@ const blade = (k: Kit, at: number, gain: number, o: Out = {}) => {
 };
 
 const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
-  // Investida: passos pesados acelerando, o rosnado do Abrams e a vítima estourando na parede com cascalho
+  // Investida (touro): bufa duas vezes, os cascos disparam acelerando e o choque estoura com cascalho
   "Abrams": (k) => {
-    [0, 0.13, 0.23].forEach((a, i) => k.thud(a, 0.5 + i * 0.2, 70, { pan: -0.6 + i * 0.3 }));
-    k.hiss({ f: 120, to: 900, at: 0.05, dur: 0.38, gain: 1.6, brown: true, type: "lowpass", attack: 0.33, pan: -0.5, panTo: 0.3 });
-    k.tone({ f: 150, to: 95, at: 0.22, dur: 0.3, gain: 0.3, type: "sawtooth", lp: 800, drive: 3, trem: [28, 0.6] });
-    k.thud(0.4, 1.8, 80, { pan: 0.4, wet: 0.45 });
-    k.hiss({ f: 2200, at: 0.4, dur: 0.15, gain: 0.8, q: 0.6, pan: 0.4 });
-    debris(k, 0.45, 12, 0.5, 0.45);
+    [0, 0.2].forEach((a) => k.hiss({ f: 900, to: 500, at: a, dur: 0.16, gain: 1, q: 2, attack: 0.01, trem: [30, 0.6] }));
+    [0.4, 0.52, 0.62, 0.7, 0.77, 0.83].forEach((a, i) => k.thud(a, 0.4 + i * 0.08, 90, { pan: -0.6 + i * 0.2 }));
+    boom(k, 0.9, 1.4, { pan: 0.4 });
+    clang(k, 0.9, 300, 0.6, { pan: 0.4 });
+    debris(k, 0.95, 14, 0.6, 0.5);
   },
-  // Riposta: o florete desvia num choque de aço, a lâmina raspa na outra e devolve a estocada
+  // Riposta (duelo): tic, tic e TLAN, a última lâmina soando longa
   "Apollo": (k) => {
-    whoosh(k, 0, 0.1, 0.7, 1500, 6000, { pan: -0.4, panTo: 0.1 });
-    clang(k, 0.1, 2300, 1.2, { pan: 0.1 });
-    k.hiss({ f: 7000, to: 3500, at: 0.13, dur: 0.28, gain: 0.6, q: 6, pan: 0.1, panTo: 0.5 });
-    whoosh(k, 0.42, 0.08, 0.8, 2000, 8000, { pan: 0.5 });
-    k.thud(0.5, 0.6, 220, { pan: 0.6 });
-    k.bell(0.5, [[3100, 0.08, 0.6], [6200, 0.04, 0.4]], 1, { pan: 0.6, wet: 0.5 });
+    [0, 0.12].forEach((a, i) => { k.click(a, 0.9, 4000, { pan: i ? 0.3 : -0.3 }); k.bell(a, [[3300 + i * 300, 0.1, 0.18], [6100, 0.04, 0.1]], 1, { pan: i ? 0.3 : -0.3 }); });
+    whoosh(k, 0.2, 0.08, 0.7, 1500, 6000);
+    clang(k, 0.28, 2100, 1.5);
+    k.hiss({ f: 6500, to: 4000, at: 0.3, dur: 0.4, gain: 1.6, q: 25, wet: 0.4 });
   },
-  // Revoada: um "puf" de feitiço, a vítima vira pombo (dois arrulhos) e o bando sai batendo asas pela mesa
+  // Revoada (bruxa): a gargalhada da bruxa e um "puf" de feitiço com brilho
   "Baba": (k) => {
-    k.hiss({ f: 900, to: 300, dur: 0.3, gain: 1.2, brown: true, type: "lowpass" });
-    [2093, 2637, 3136].forEach((f, i) => k.bell(0.04 + i * 0.04, GLASS(f), 0.3, { pan: -0.3 + i * 0.3, wet: 0.6 }));
-    [0.3, 0.6].forEach((a) => k.tone({ f: 420, path: [[0, 420], [0.07, 500], [0.22, 360]], at: a, dur: 0.24, gain: 0.32, type: "triangle", lp: 1000, trem: [22, 0.7], attack: 0.03 }));
-    for (let i = 0; i < 16; i++) k.hiss({ f: rnd(900, 1600), at: 0.62 + i * 0.045 + rnd(0, 0.015), dur: 0.045, gain: 0.6, q: 1.4, attack: 0.004, pan: -0.8 + i * 0.1 });
+    [880, 860, 830, 800, 760, 700].forEach((f, i) => k.tone({ f, path: [[0, f], [0.06, f * 1.08], [0.11, f * 0.92]], at: i * 0.11, dur: 0.11, gain: 0.2, type: "sawtooth", lp: 2200, q: 3, attack: 0.01, vib: [9, 20], wet: 0.35 }));
+    k.hiss({ f: 900, to: 250, at: 0.72, dur: 0.35, gain: 1.3, brown: true, type: "lowpass" });
+    [2093, 2637, 3136, 4186].forEach((f, i) => k.bell(0.76 + i * 0.04, GLASS(f), 0.3, { pan: -0.4 + i * 0.25, wet: 0.6 }));
   },
-  // Gancho: o servo do robô zune, o gancho dispara na pressão, a corrente corre, prende com um clangue e a catraca recolhe
+  // Gancho (robô): voz de robô dizendo "al-vo", bipes e a corrente puxando com um clangue
   "Bebop": (k) => {
-    k.tone({ f: 300, to: 1400, dur: 0.18, gain: 0.12, type: "square", lp: 2500 });
-    k.hiss({ f: 1200, to: 300, at: 0.15, dur: 0.12, gain: 1.2, q: 0.7 });
-    chain(k, 0.18, 9, 0.9, { pan: -0.5, panTo: 0.6 });
-    clang(k, 0.5, 650, 1.3, { pan: 0.6 });
-    ratchet(k, 0.65, 9, 0.6, { pan: 0.4 });
-    k.tone({ f: 880, at: 1.05, dur: 0.07, gain: 0.12, type: "square", lp: 3000 });
-    k.tone({ f: 1320, at: 1.13, dur: 0.1, gain: 0.12, type: "square", lp: 3000 });
+    ([[300, 0, 0.16], [220, 0.2, 0.22]] as const).forEach(([f, a, d]) => k.tone({ f, at: a, dur: d, gain: 0.22, type: "square", lp: 1400, q: 4, fm: [0.5, 0.6], hold: d * 0.6, attack: 0.01 }));
+    [0.5, 0.58].forEach((a, i) => k.tone({ f: i ? 1320 : 990, at: a, dur: 0.06, gain: 0.12, type: "square", lp: 3500 }));
+    chain(k, 0.66, 9, 0.9, { pan: 0.6, panTo: -0.2 });
+    clang(k, 0.98, 650, 1.2);
+    k.thud(0.98, 0.6, 140);
   },
-  // Gangue da Corrente: um acorde de guitarra distorcida, as correntes voam e batem, e o cadeado fecha
+  // Gangue da Corrente: só correntes, girando no ar, chicoteando e travando no cadeado
   "Billy": (k) => {
-    [82.4, 123.5, 164.8].forEach((f) => k.pluck({ f, dur: 1.2, gain: 0.55, bright: 0.85, drive: 8, lp: 3200, wet: 0.3 }));
-    chain(k, 0.15, 10, 1, { pan: -0.6, panTo: 0.6 });
-    k.thud(0.52, 1, 90, { pan: 0.5 });
-    clang(k, 0.52, 520, 1.3, { pan: 0.5 });
-    k.click(0.8, 1, 1800, { pan: 0.5 });
-    k.click(0.86, 0.7, 2700, { pan: 0.5 });
+    [0, 0.18, 0.33].forEach((a, i) => { k.hiss({ f: 700, to: 1800, at: a, dur: 0.18, gain: 0.6, q: 1.4, attack: 0.1, pan: i % 2 ? 0.5 : -0.5, panTo: i % 2 ? -0.5 : 0.5 }); chain(k, a + 0.05, 4, 0.6, { pan: i % 2 ? 0.4 : -0.4 }); });
+    chain(k, 0.5, 12, 1.2, { pan: -0.3, panTo: 0.5 });
+    k.thud(0.75, 0.9, 110, { pan: 0.5 });
+    clang(k, 0.75, 520, 1.3, { pan: 0.5 });
+    k.click(0.95, 1, 1800, { pan: 0.5 });
+    k.click(1.01, 0.8, 2700, { pan: 0.5 });
   },
-  // Retorno às Sombras: o miado e o chiado da gata, ela some na sombra e as garras riscam três vezes
+  // Retorno às Sombras: um ronronar grave que cresce e vira rosnado
   "Calico": (k) => {
-    k.tone({ f: 600, path: [[0, 600], [0.12, 950], [0.36, 620]], dur: 0.38, gain: 0.22, type: "sawtooth", lp: 2600, vib: [6, 10], attack: 0.03, wet: 0.3 });
-    k.hiss({ f: 4500, at: 0.42, dur: 0.35, gain: 0.9, q: 0.6, type: "highpass", attack: 0.01 });
-    k.hiss({ f: 600, to: 120, at: 0.5, dur: 0.6, gain: 1.1, brown: true, type: "lowpass", attack: 0.1, pan: 0.3, panTo: -0.4, wet: 0.6 });
-    [0.85, 0.93, 1.01].forEach((a, i) => k.hiss({ f: 3500, to: 7500, at: a, dur: 0.06, gain: 0.8, q: 3, pan: -0.4 + i * 0.4, attack: 0.02 }));
+    k.hiss({ f: 260, dur: 0.8, gain: 1.1, brown: true, type: "lowpass", attack: 0.2, hold: 0.3, trem: [24, 0.8] });
+    k.tone({ f: 55, dur: 0.8, gain: 0.25, attack: 0.2, hold: 0.3, trem: [24, 0.8] });
+    k.tone({ f: 110, to: 140, at: 0.6, dur: 0.6, gain: 0.32, type: "sawtooth", lp: 1300, drive: 4, trem: [38, 0.7], attack: 0.15 });
+    k.hiss({ f: 3500, at: 0.75, dur: 0.4, gain: 0.5, type: "highpass", attack: 0.05 });
   },
-  // Maravilha Radiante: a luz sobe num brilho, acerta e ricocheteia de um lado para o outro
+  // Maravilha Radiante (flash): o flash carrega num zumbido agudo, o obturador estala, o flash estoura e a luz fica zumbindo
   "Celeste": (k) => {
-    k.tone({ f: 400, to: 2400, dur: 0.25, gain: 0.15, fm: [2, 1.5, 0.2] });
-    [1047, 1319, 1568, 2093, 2637].forEach((f, i) => k.bell(i * 0.05, GLASS(f), 0.45, { pan: -0.6 + i * 0.3, wet: 0.5 }));
-    k.tone({ f: 3200, to: 900, at: 0.35, dur: 0.18, gain: 0.18, pan: 0.6, wet: 0.4 });
-    k.tone({ f: 2800, to: 700, at: 0.6, dur: 0.2, gain: 0.14, pan: -0.7, wet: 0.6 });
-    k.hiss({ f: 9000, dur: 0.8, gain: 0.25, type: "highpass", attack: 0.15, wet: 0.6 });
+    k.tone({ f: 1500, to: 7000, dur: 0.45, gain: 0.07, attack: 0.3 });
+    k.click(0.45, 1, 2500);
+    k.click(0.49, 0.7, 1800);
+    k.hiss({ f: 5000, at: 0.47, dur: 0.3, gain: 1.4, type: "highpass", attack: 0.002, wet: 0.5 });
+    k.bell(0.47, GLASS(2637), 0.5, { wet: 0.7 });
+    k.tone({ f: 120, at: 0.5, dur: 0.8, gain: 0.08, type: "sawtooth", lp: 1500, trem: [60, 0.3] });
   },
   // Salva de Mísseis: três tubos disparam, os foguetes assobiam pela mesa e explodem no chão com fogo estalando
   "Deadman Danny": (k) => {
@@ -305,14 +300,12 @@ const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
     }
     for (let i = 0; i < 10; i++) k.click(rnd(0.6, 1.3), 0.35, rnd(2500, 5000), { pan: rnd(-0.3, 0.8) });
   },
-  // Faro de Sangue: o coração da presa bate, o Drifter fareja, a tensão cresce e ele salta rosnando
+  // Faro de Sangue: respiração pesada no escuro e o golpe de garra
   "Drifter": (k) => {
-    [0, 0.45].forEach((a) => { k.thud(a, 0.9, 60); k.thud(a + 0.13, 0.6, 55); });
-    k.hiss({ f: 1500, to: 3000, at: 0.2, dur: 0.35, gain: 0.5, q: 1.5, attack: 0.3, trem: [14, 0.6] });
-    k.tone({ f: 110, at: 0.1, dur: 1, gain: 0.14, type: "sawtooth", lp: 600, attack: 0.5, hold: 0.2 });
-    k.tone({ f: 155.6, at: 0.1, dur: 1, gain: 0.1, type: "sawtooth", lp: 600, attack: 0.5, hold: 0.2 });
-    k.tone({ f: 120, to: 85, at: 0.8, dur: 0.35, gain: 0.3, type: "sawtooth", lp: 1500, drive: 4, trem: [35, 0.7] });
-    blade(k, 0.85, 0.9, { pan: 0.3 });
+    ([[0, 0.35, 900], [0.42, 0.3, 700], [0.8, 0.25, 900]] as const).forEach(([a, d, f]) => k.hiss({ f, at: a, dur: d, gain: 0.7, q: 1.6, attack: d * 0.6, wet: 0.3 }));
+    k.tone({ f: 70, dur: 1.1, gain: 0.12, attack: 0.5 });
+    [1.05, 1.12, 1.19].forEach((a, i) => k.hiss({ f: 2500, to: 7500, at: a, dur: 0.07, gain: 0.9, q: 2.5, attack: 0.03, pan: -0.4 + i * 0.4 }));
+    k.thud(1.12, 0.7, 160);
   },
   // Singularidade: o grave cresce, o ar é sugado dos dois lados para o centro e tudo implode
   "Dynamo": (k) => {
@@ -323,61 +316,54 @@ const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
     k.thud(1, 1.6, 60, { wet: 0.6 });
     k.bell(1, GLASS(220), 0.5, { wet: 0.8 });
   },
-  // Lápide Emprestada: a lápide arrasta na pedra e cai, a terra se mexe e um carniçal geme de cada lado
+  // Lápide Emprestada: o sino fúnebre bate duas vezes e uma mão rompe a terra
   "Graves": (k) => {
-    k.hiss({ f: 350, dur: 0.5, gain: 1.2, brown: true, type: "lowpass", trem: [18, 0.7] });
-    k.thud(0.5, 1.1, 75, { wet: 0.4 });
-    for (let i = 0; i < 8; i++) k.hiss({ f: 700, at: 0.6 + rnd(0, 0.3), dur: 0.06, gain: 0.6, brown: true, type: "lowpass", pan: rnd(-0.6, 0.6) });
-    k.tone({ f: 180, path: [[0, 180], [0.3, 220], [0.8, 150]], at: 0.7, dur: 0.9, gain: 0.2, type: "sawtooth", lp: 700, vib: [5, 6], attack: 0.25, pan: -0.6, wet: 0.5 });
-    k.tone({ f: 160, path: [[0, 160], [0.3, 200], [0.8, 135]], at: 0.85, dur: 0.9, gain: 0.2, type: "sawtooth", lp: 700, vib: [4, 6], attack: 0.25, pan: 0.6, wet: 0.5 });
+    [0, 0.7].forEach((a) => { k.bell(a, [[180, 0.35, 2.4], [361, 0.15, 1.6], [497, 0.12, 1.2], [742, 0.06, 0.8]], 1, { wet: 0.8 }); k.thud(a, 0.3, 90, { wet: 0.6 }); });
+    k.hiss({ f: 500, at: 1.1, dur: 0.4, gain: 1, brown: true, type: "lowpass", trem: [16, 0.6] });
+    for (let i = 0; i < 9; i++) k.hiss({ f: rnd(500, 1200), at: 1.2 + rnd(0, 0.35), dur: 0.05, gain: 0.6, q: 1.5, pan: rnd(-0.5, 0.5) });
   },
-  // Coruja Guiada: dois pios, as asas batem, o mergulho assobia atravessando a mesa e a coruja acerta
+  // Coruja Guiada (arco): a corda estala "tuc", a flecha assobia de um lado ao outro e crava
   "Grey Talon": (k) => {
-    [[0, 0.2], [0.28, 0.32]].forEach(([a, d]) => {
-      k.tone({ f: 390, path: [[0, 370], [0.05, 410], [d, 350]], at: a, dur: d, gain: 0.35, attack: 0.04, lp: 1200, wet: 0.5 });
-      k.hiss({ f: 400, at: a, dur: d, gain: 0.25, q: 3, attack: 0.04 });
-    });
-    [0.65, 0.77, 0.89].forEach((a) => k.hiss({ f: 500, at: a, dur: 0.12, gain: 0.9, brown: true, type: "lowpass", attack: 0.03 }));
-    k.tone({ f: 2600, to: 900, at: 0.9, dur: 0.35, gain: 0.14, pan: -0.7, panTo: 0.5 });
-    whoosh(k, 0.9, 0.35, 0.8, 800, 4000, { pan: -0.7, panTo: 0.5 });
-    k.thud(1.25, 1, 130, { pan: 0.5 });
-    k.hiss({ f: 2500, at: 1.25, dur: 0.1, gain: 0.6, q: 0.8, pan: 0.5 });
+    k.pluck({ f: 110, dur: 0.5, gain: 0.7, bright: 0.2, pan: -0.5 });
+    k.click(0, 1, 900, { pan: -0.5 });
+    k.hiss({ f: 1800, to: 3500, at: 0.04, dur: 0.38, gain: 0.8, q: 3, attack: 0.05, pan: -0.5, panTo: 0.6 });
+    k.tone({ f: 2400, to: 1500, at: 0.04, dur: 0.38, gain: 0.05, pan: -0.5, panTo: 0.6 });
+    wood(k, 0.44, 1.2, 600, { pan: 0.6 });
+    k.thud(0.44, 0.6, 180, { pan: 0.6 });
+    k.pluck({ f: 330, at: 0.45, dur: 0.3, gain: 0.25, bright: 0.9, pan: 0.6 });
   },
-  // Adaga do Sono: a adaga voa girando, crava, e uma canção de ninar desce num sopro sonolento
+  // Adaga do Sono: um "shhh" de silêncio e a adaga voando e cravando
   "Haze": (k) => {
-    k.hiss({ f: 2500, to: 4500, dur: 0.25, gain: 0.8, q: 2, trem: [28, 0.8], pan: -0.6, panTo: 0.3 });
-    k.click(0.25, 1, 1800, { pan: 0.3 });
-    k.thud(0.25, 0.5, 220, { pan: 0.3 });
-    [988, 784, 659, 587, 494].forEach((f, i) => k.bell(0.4 + i * 0.15, GLASS(f), 0.4, { wet: 0.7, pan: Math.sin(i * 1.7) * 0.4 }));
-    k.hiss({ f: 3000, at: 0.5, dur: 0.9, gain: 0.25, attack: 0.45, q: 0.6, wet: 0.5 });
+    k.hiss({ f: 3200, dur: 0.6, gain: 0.8, q: 1.2, attack: 0.25, hold: 0.1, wet: 0.4 });
+    k.hiss({ f: 2500, to: 4500, at: 0.65, dur: 0.22, gain: 0.8, q: 2, trem: [28, 0.8], pan: -0.6, panTo: 0.3 });
+    k.click(0.87, 1, 1800, { pan: 0.3 });
+    k.thud(0.87, 0.5, 220, { pan: 0.3 });
   },
-  // Plataforma de Salto: o laço gira acelerando, voa, prende com a corda esticando, as esporas tilintam e o pad lança as duas
+  // Plataforma de Salto: um "yeehaw" assobiado, o tiro do revólver ecoando e as esporas tilintando
   "Holliday": (k) => {
-    [0, 0.2, 0.35].forEach((a, i) => k.hiss({ f: 600, to: 1900, at: a, dur: 0.2 - i * 0.04, gain: 0.75, q: 1.6, attack: 0.1, pan: i % 2 ? 0.6 : -0.6, panTo: i % 2 ? -0.6 : 0.6 }));
-    k.hiss({ f: 1500, to: 5000, at: 0.48, dur: 0.18, gain: 0.8, q: 3, pan: -0.2, panTo: 0.7 });
-    k.pluck({ f: 98, at: 0.66, dur: 0.7, gain: 0.7, bright: 0.3, pan: 0.7 });
-    k.click(0.66, 0.9, 1200, { pan: 0.7 });
-    k.tone({ f: 180, to: 140, at: 0.72, dur: 0.25, gain: 0.1, type: "sawtooth", lp: 1500, vib: [40, 30], pan: 0.6 });
-    for (let i = 0; i < 6; i++) k.bell(0.82 + i * 0.04, [[rnd(4000, 5000), 0.1, 0.25], [rnd(6500, 7200), 0.05, 0.18]], 1, { pan: 0.3 });
-    k.tone({ f: 150, to: 620, at: 1, dur: 0.42, gain: 0.35, type: "triangle", vib: [18, 80] });
-    whoosh(k, 1.05, 0.3, 0.6, 400, 2500);
+    k.tone({ f: 1300, path: [[0, 1300], [0.18, 2300], [0.35, 1700], [0.55, 1100]], dur: 0.55, gain: 0.14, vib: [6, 25], attack: 0.04, hold: 0.2, wet: 0.4 });
+    k.hiss({ f: 2500, at: 0.65, dur: 0.06, gain: 1.8, type: "highpass", attack: 0.001 });
+    k.thud(0.65, 1.2, 110);
+    k.hiss({ f: 800, at: 0.65, dur: 0.8, gain: 0.6, brown: true, type: "lowpass", wet: 0.9 });
+    ([[0.9, 0.4, -0.6], [1.15, 0.2, 0.6]] as const).forEach(([a, g, p]) => k.hiss({ f: 1800, at: a, dur: 0.06, gain: g, q: 0.6, pan: p, wet: 0.8 }));
+    for (let i = 0; i < 6; i++) k.bell(1.05 + i * 0.05, [[rnd(4000, 5000), 0.1, 0.25], [rnd(6500, 7200), 0.05, 0.18]], 1, { pan: 0.3 });
   },
-  // Pós-combustão: o "fuoomp" da ignição, a chama ronca, estala e chia na carta
+  // Pós-combustão: o isqueiro estala, a pedra risca, o fogo pega e uma risada grave
   "Infernus": (k) => {
-    k.thud(0, 0.6, 90);
-    k.hiss({ f: 200, to: 1800, dur: 0.25, gain: 1.6, brown: true, type: "lowpass", attack: 0.03, wet: 0.3 });
-    k.hiss({ f: 900, dur: 0.9, gain: 0.7, q: 0.5, attack: 0.1, trem: [11, 0.35], pan: -0.3, panTo: 0.3 });
-    for (let i = 0; i < 14; i++) k.click(rnd(0.1, 1), 0.4, rnd(2500, 5500), { pan: rnd(-0.6, 0.6) });
-    k.hiss({ f: 7000, at: 0.2, dur: 0.8, gain: 0.25, type: "highpass", attack: 0.2 });
+    k.click(0, 1, 2600);
+    k.bell(0, METAL(2400), 0.3);
+    k.hiss({ f: 4000, at: 0.18, dur: 0.06, gain: 0.9, q: 1.5 });
+    k.hiss({ f: 200, to: 1800, at: 0.22, dur: 0.3, gain: 1.5, brown: true, type: "lowpass", attack: 0.04 });
+    k.hiss({ f: 900, at: 0.3, dur: 0.6, gain: 0.5, q: 0.5, trem: [11, 0.35] });
+    [0.75, 0.9, 1.05].forEach((a, i) => { const f = 130 - i * 8; k.tone({ f, path: [[0, f], [0.05, f * 1.12], [0.11, f * 0.85]], at: a, dur: 0.12, gain: 0.3, type: "sawtooth", lp: 900, q: 3, drive: 3, attack: 0.01, wet: 0.4 }); });
   },
-  // Pacto do Vigia: a gárgula de pedra resmunga, um fio mágico sai de cada lado e os dois se ligam num sino
+  // Pacto do Vigia: folhas farfalham, as vinhas crescem rangendo e um sino suave fecha o laço
   "Ivy": (k) => {
-    k.hiss({ f: 300, dur: 0.3, gain: 1, brown: true, type: "lowpass", trem: [24, 0.6] });
-    k.tone({ f: 90, dur: 0.35, gain: 0.2, type: "sawtooth", lp: 400, trem: [20, 0.6] });
-    k.tone({ f: 440, to: 660, at: 0.25, dur: 0.6, gain: 0.15, pan: -0.8, panTo: 0, fm: [2, 0.5], wet: 0.5, attack: 0.2 });
-    k.tone({ f: 660, to: 990, at: 0.25, dur: 0.6, gain: 0.13, pan: 0.8, panTo: 0, fm: [2, 0.5], wet: 0.5, attack: 0.2 });
-    k.bell(0.85, GLASS(1320), 0.7, { wet: 0.6 });
-    k.bell(0.85, GLASS(1980), 0.4, { wet: 0.6 });
+    for (let i = 0; i < 14; i++) k.hiss({ f: rnd(2500, 5000), at: i * 0.04 + rnd(0, 0.02), dur: 0.05, gain: 0.35, q: 1.2, pan: rnd(-0.7, 0.7) });
+    k.tone({ f: 110, path: [[0, 110], [0.5, 170]], at: 0.15, dur: 0.6, gain: 0.08, type: "sawtooth", lp: 1200, vib: [30, 12], attack: 0.2 });
+    k.hiss({ f: 600, to: 1500, at: 0.15, dur: 0.6, gain: 0.4, q: 3, attack: 0.4 });
+    k.bell(0.75, GLASS(988), 0.6, { wet: 0.7 });
+    k.bell(0.75, GLASS(1480), 0.3, { wet: 0.7 });
   },
   // Abrigo Congelado: o vento gelado sopra, cristais estalam, a cúpula fecha com um sino grave e a cura soa
   "Kelvin": (k) => {
@@ -388,22 +374,20 @@ const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
     k.tone({ f: 261.6, at: 0.5, dur: 1, gain: 0.15, attack: 0.05 });
     [784, 988, 1175].forEach((f, i) => k.bell(0.75 + i * 0.08, GLASS(f), 0.4, { wet: 0.6 }));
   },
-  // Troca de Almas: um sussurro fantasma, as duas almas se cruzam no estéreo e um acorde diminuto fica no ar
+  // Troca de Almas: o grito curto da banshee, ecoando na sala
   "Lady Geist": (k) => {
-    k.hiss({ f: 2500, dur: 0.6, gain: 0.4, q: 5, trem: [7, 0.7], attack: 0.2, wet: 0.5 });
-    k.tone({ f: 300, to: 900, at: 0.1, dur: 0.8, gain: 0.22, vib: [6, 20], attack: 0.2, pan: -0.8, panTo: 0.8, wet: 0.6 });
-    k.tone({ f: 900, to: 300, at: 0.1, dur: 0.8, gain: 0.22, vib: [7, 20], attack: 0.2, pan: 0.8, panTo: -0.8, wet: 0.6 });
-    [220, 261.6, 311.1].forEach((f) => k.tone({ f, at: 0.7, dur: 0.7, gain: 0.08, type: "triangle", attack: 0.05, wet: 0.7 }));
+    k.tone({ f: 800, path: [[0, 800], [0.15, 1400], [0.55, 1250], [0.9, 600]], dur: 0.95, gain: 0.25, type: "sawtooth", lp: 3200, q: 2, vib: [7, 45], attack: 0.06, hold: 0.3, wet: 0.8 });
+    k.tone({ f: 1200, path: [[0, 1200], [0.15, 2100], [0.55, 1900], [0.9, 900]], dur: 0.95, gain: 0.08, vib: [6, 60], attack: 0.06, hold: 0.3, wet: 0.8 });
+    k.hiss({ f: 3000, dur: 0.9, gain: 0.5, q: 2, attack: 0.08, hold: 0.2, wet: 0.7 });
   },
-  // Queda Mortal: o chicote estala, as vítimas sobem, caem assobiando e o chão treme
+  // Queda Mortal: só o chicote, estalando duas vezes
   "Lash": (k) => {
-    k.tone({ f: 2200, to: 600, dur: 0.08, gain: 0.1 });
-    k.hiss({ f: 4000, at: 0.07, dur: 0.03, gain: 1.8, type: "highpass", attack: 0.001 });
-    k.click(0.07, 1, 3000);
-    whoosh(k, 0.1, 0.35, 0.6, 300, 1500);
-    k.hiss({ f: 2000, to: 300, at: 0.45, dur: 0.25, gain: 0.7, q: 1.2, attack: 0.05 });
-    boom(k, 0.7, 1.2, { wet: 0.5 });
-    debris(k, 0.75, 12, 0.5, 0.4);
+    ([[0, -0.5], [0.4, 0.5]] as const).forEach(([a, p]) => {
+      whoosh(k, a, 0.14, 0.7, 500, 2500, { pan: -p, panTo: p });
+      k.tone({ f: 2200, to: 500, at: a + 0.06, dur: 0.08, gain: 0.08, pan: p });
+      k.hiss({ f: 4000, at: a + 0.14, dur: 0.03, gain: 2, type: "highpass", attack: 0.001, pan: p, wet: 0.5 });
+      k.click(a + 0.14, 1.2, 3000, { pan: p });
+    });
   },
   // Mini Torreta: a chave de catraca aperta, a peça monta, o servo gira, bipa e dispara uma rajada com cápsulas caindo
   "McGinnis": (k) => {
@@ -417,36 +401,35 @@ const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
       k.bell(0.78 + i * 0.07, [[rnd(5000, 7000), 0.05, 0.12]], 1, { pan: -0.3 });
     }
   },
-  // Mordidas de Amor: asas de morcego, a mordida, o gole demorado e um brilho doce
+  // Mordidas de Amor: um beijo estalado e uma risadinha
   "Mina": (k) => {
-    for (let i = 0; i < 8; i++) k.hiss({ f: 1200, at: i * 0.035, dur: 0.03, gain: 0.5, q: 1.5, pan: -0.5 + i * 0.1 });
-    k.hiss({ f: 2500, at: 0.3, dur: 0.04, gain: 1.2, q: 1 });
-    k.click(0.3, 1, 1500);
-    k.thud(0.3, 0.4, 250);
-    k.hiss({ f: 600, to: 1100, at: 0.38, dur: 0.35, gain: 0.8, q: 8, trem: [12, 0.6] });
-    k.tone({ f: 300, to: 150, at: 0.75, dur: 0.1, gain: 0.25 });
-    k.bell(0.85, GLASS(1568), 0.4, { wet: 0.6 });
+    k.hiss({ f: 1200, to: 600, dur: 0.06, gain: 0.8, q: 3, attack: 0.01 });
+    k.hiss({ f: 2500, at: 0.06, dur: 0.02, gain: 1.4, q: 1, attack: 0.001 });
+    k.tone({ f: 600, to: 300, at: 0.06, dur: 0.05, gain: 0.2 });
+    [1250, 1180, 1100, 1020, 950].forEach((f, i) => k.tone({ f, path: [[0, f], [0.04, f * 1.12], [0.08, f * 0.95]], at: 0.3 + i * 0.09, dur: 0.08, gain: 0.12, type: "triangle", vib: [12, 25], attack: 0.01, wet: 0.4 }));
+    k.bell(0.8, GLASS(1568), 0.3, { wet: 0.6 });
   },
-  // Viajante: a areia rodopia, uma escala do deserto sobe na corda e a carta some num brilho
+  // Viajante: um tornado de areia que passa de um lado ao outro
   "Mirage": (k) => {
-    for (let i = 0; i < 4; i++) k.hiss({ f: 1800 + i * 400, at: i * 0.18, dur: 0.3, gain: 0.6, q: 1.2, attack: 0.15, pan: i % 2 ? 0.6 : -0.6, panTo: i % 2 ? -0.6 : 0.6 });
-    [330, 349, 415, 440, 494, 523].forEach((f, i) => k.pluck({ f, at: 0.1 + i * 0.08, dur: 0.6, gain: 0.35, bright: 0.85, pan: -0.5 + i * 0.2, wet: 0.4 }));
-    k.tone({ f: 400, to: 2000, at: 0.6, dur: 0.35, gain: 0.12, fm: [1.5, 1], wet: 0.6 });
-    k.hiss({ f: 900, to: 200, at: 0.85, dur: 0.3, gain: 0.9, brown: true, type: "lowpass" });
+    k.hiss({ f: 700, to: 2500, dur: 0.7, gain: 1.1, q: 1.5, attack: 0.6, trem: [9, 0.5], pan: -0.9, panTo: 0 });
+    k.hiss({ f: 2500, to: 600, at: 0.7, dur: 0.7, gain: 1.1, q: 1.5, attack: 0.05, trem: [9, 0.5], pan: 0, panTo: 0.9 });
+    k.hiss({ f: 200, dur: 1.4, gain: 0.8, brown: true, type: "lowpass", attack: 0.6, pan: -0.5, panTo: 0.5 });
+    for (let i = 0; i < 10; i++) k.click(rnd(0.3, 1.1), 0.25, rnd(4000, 7000), { pan: rnd(-0.6, 0.6) });
   },
-  // Entocar: o Krill guincha, as pazadas cavam de um lado e do outro e a terra fecha por cima
+  // Entocar: a broca gira e desce cavando a terra
   "Mo & Krill": (k) => {
-    for (let i = 0; i < 4; i++) { const f = rnd(900, 1400); k.tone({ f, to: f * 1.4, at: i * 0.06, dur: 0.05, gain: 0.12, type: "triangle" }); }
-    for (let i = 0; i < 5; i++) { const a = 0.25 + i * 0.11; k.hiss({ f: 500, at: a, dur: 0.1, gain: 1.1, brown: true, type: "lowpass", pan: i % 2 ? 0.4 : -0.4 }); k.click(a, 0.4, 900); }
-    k.hiss({ f: 200, at: 0.8, dur: 0.6, gain: 1, brown: true, type: "lowpass", attack: 0.05 });
-    k.thud(0.85, 0.8, 60);
+    k.tone({ f: 120, path: [[0, 120], [0.2, 220], [0.8, 180], [1, 90]], dur: 1, gain: 0.18, type: "sawtooth", lp: 1600, fm: [2.5, 0.8], trem: [32, 0.4], attack: 0.1, hold: 0.5 });
+    k.hiss({ f: 500, to: 250, at: 0.15, dur: 0.9, gain: 1.1, brown: true, type: "lowpass", trem: [18, 0.5], attack: 0.1 });
+    debris(k, 0.25, 12, 0.5, 0.7);
+    k.thud(1, 0.7, 60);
   },
-  // Terapia de Sanguessuga: as sanguessugas grudam molhadas na inimiga, chupam e o monitor do hospital bipa no aliado
+  // Terapia de Sanguessuga: a seringa espirra "psst" e a sanguessuga gruda molhada
   "Nurse Harrow": (k) => {
-    [0, 0.2].forEach((a) => { k.hiss({ f: 900, to: 250, at: a, dur: 0.22, gain: 0.9, q: 7, pan: 0.5 }); k.tone({ f: 200, to: 80, at: a, dur: 0.15, gain: 0.2, pan: 0.5 }); });
-    k.hiss({ f: 400, to: 1200, at: 0.45, dur: 0.3, gain: 0.6, q: 6, trem: [16, 0.5], pan: 0.5, panTo: -0.5 });
-    k.tone({ f: 988, at: 0.78, dur: 0.08, gain: 0.15, pan: -0.5, wet: 0.3 });
-    k.tone({ f: 1319, at: 0.95, dur: 0.18, gain: 0.15, pan: -0.5, wet: 0.3, hold: 0.08 });
+    k.click(0, 0.6, 3500);
+    k.hiss({ f: 6000, to: 4500, at: 0.05, dur: 0.25, gain: 1, q: 3, attack: 0.01, pan: -0.3 });
+    k.hiss({ f: 900, to: 250, at: 0.4, dur: 0.24, gain: 1, q: 7, pan: 0.4 });
+    k.tone({ f: 200, to: 80, at: 0.4, dur: 0.15, gain: 0.2, pan: 0.4 });
+    k.hiss({ f: 400, to: 1100, at: 0.62, dur: 0.3, gain: 0.6, q: 6, trem: [16, 0.5], pan: 0.4 });
   },
   // Carga dos Cavaleiros: a corneta toca o ataque e o galope atravessa a mesa com armaduras batendo
   "Paige": (k) => {
@@ -461,14 +444,13 @@ const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
     });
     chain(k, 0.65, 6, 0.5, { pan: -0.4, panTo: 0.6 });
   },
-  // Troca Paradoxal: o relógio faz tique-taque, o tempo se contrai ao contrário e as duas cartas trocam num zap
+  // Troca Paradoxal: a fita rebobina rápido, chiando, e trava num estalo
   "Paradox": (k) => {
-    [0, 0.18, 0.36].forEach((a, i) => k.click(a, 0.8, i % 2 ? 2200 : 3200, { pan: i % 2 ? 0.3 : -0.3, wet: 0.4 }));
-    k.hiss({ f: 3000, at: 0.4, dur: 0.4, gain: 0.8, q: 0.8, attack: 0.38 });
-    k.tone({ f: 1200, to: 200, at: 0.4, dur: 0.4, gain: 0.12, fm: [1.5, 4], pan: 0.8, panTo: -0.8 });
-    k.tone({ f: 200, to: 1200, at: 0.4, dur: 0.4, gain: 0.12, fm: [1.5, 4], pan: -0.8, panTo: 0.8 });
-    k.tone({ f: 2000, to: 100, at: 0.8, dur: 0.12, gain: 0.15, type: "square", lp: 4000 });
-    k.bell(0.82, GLASS(880), 0.6, { wet: 0.6 });
+    k.tone({ f: 500, path: [[0, 500], [0.15, 1800], [0.6, 2600], [0.75, 900]], dur: 0.75, gain: 0.12, type: "sawtooth", lp: 4000, fm: [0.25, 0.4], trem: [22, 0.5], attack: 0.05, hold: 0.4 });
+    k.hiss({ f: 3000, to: 5000, dur: 0.75, gain: 0.4, q: 2, trem: [22, 0.5], attack: 0.05 });
+    k.click(0.78, 1, 1500);
+    k.thud(0.78, 0.5, 200);
+    k.bell(0.8, GLASS(880), 0.4, { wet: 0.6 });
   },
   // Aflição: as travas da maleta abrem, a tampa range e uma nuvem maldita e dissonante se espalha
   "Pocket": (k) => {
@@ -492,127 +474,114 @@ const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
     k.tone({ f: 350, path: [[0, 350], [0.25, 520], [0.7, 260]], at: 0.5, dur: 0.75, gain: 0.15, type: "sawtooth", lp: 1300, attack: 0.15, wet: 0.3 });
     k.hiss({ f: 300, at: 1.1, dur: 0.5, gain: 0.7, brown: true, type: "lowpass", attack: 0.25, trem: [30, 0.5] });
   },
-  // Nuvem de Tempestade: o raio racha, o trovão rola na sala, a chuva cai e a eletricidade estala
+  // Nuvem de Tempestade: só o trovão, enorme, rolando pela sala
   "Seven": (k) => {
-    k.hiss({ f: 3000, dur: 0.08, gain: 1.8, type: "highpass", attack: 0.001 });
-    k.thud(0.02, 1.4, 60);
-    k.hiss({ f: 300, at: 0.05, dur: 1.4, gain: 1.4, brown: true, type: "lowpass", attack: 0.1, trem: [3, 0.4], wet: 0.7 });
-    for (let i = 0; i < 6; i++) { const a = rnd(0.2, 0.9); k.tone({ f: rnd(80, 140), at: a, dur: 0.05, gain: 0.2, type: "square", fm: [3.7, 8], pan: rnd(-0.6, 0.6) }); k.click(a, 0.4, 5000); }
-    k.hiss({ f: 5000, at: 0.2, dur: 1.2, gain: 0.25, type: "highpass", attack: 0.3 });
+    k.hiss({ f: 3000, dur: 0.1, gain: 2, type: "highpass", attack: 0.001 });
+    k.hiss({ f: 1500, to: 400, dur: 0.25, gain: 1.4, q: 0.6, attack: 0.002 });
+    k.thud(0.02, 1.8, 50, { wet: 0.7 });
+    k.hiss({ f: 400, to: 120, at: 0.05, dur: 2, gain: 1.8, brown: true, type: "lowpass", attack: 0.08, trem: [2.5, 0.5], wet: 0.8 });
+    k.tone({ f: 40, at: 0.05, dur: 1.6, gain: 0.3, attack: 0.1, trem: [3, 0.5] });
   },
-  // Golpe Mortal: a faca sai da bainha, a Shiv salta e crava com o aço soando
+  // Golpe Mortal: o canivete abre "clic-schhk" e crava
   "Shiv": (k) => {
-    k.hiss({ f: 6000, to: 3000, dur: 0.2, gain: 0.6, q: 5, attack: 0.1 });
-    k.bell(0.05, METAL(3200), 0.6);
-    whoosh(k, 0.2, 0.2, 0.7, 600, 3000, { pan: -0.5, panTo: 0.4 });
-    blade(k, 0.32, 1.3, { pan: 0.4 });
+    k.click(0, 1.2, 3000);
+    k.bell(0, METAL(2800), 0.4);
+    k.hiss({ f: 7000, to: 3500, at: 0.05, dur: 0.16, gain: 1.4, q: 6, attack: 0.02 });
+    k.click(0.2, 1, 2200);
+    blade(k, 0.35, 1.3, { pan: 0.3 });
   },
-  // Maldição Licana: o rosnado, o uivo do lobisomem com um segundo lobo ao fundo e a lua no reverb
+  // Maldição Licana: um uivo distante, ecoando sob a lua
   "Silver": (k) => {
-    k.tone({ f: 90, to: 75, dur: 0.4, gain: 0.25, type: "sawtooth", lp: 900, drive: 4, trem: [40, 0.7] });
-    k.tone({ f: 300, path: [[0, 300], [0.25, 620], [0.9, 600], [1.3, 380]], at: 0.2, dur: 1.35, gain: 0.28, type: "sawtooth", lp: 1600, vib: [5.5, 10], attack: 0.15, hold: 0.6, wet: 0.6 });
-    k.tone({ f: 450, path: [[0, 450], [0.25, 930], [0.9, 900], [1.3, 570]], at: 0.3, dur: 1.35, gain: 0.1, type: "triangle", vib: [5, 12], attack: 0.15, hold: 0.6, pan: 0.5, wet: 0.7 });
-    k.bell(0.8, GLASS(1568), 0.3, { wet: 0.8 });
+    k.tone({ f: 300, path: [[0, 300], [0.3, 600], [1.1, 590], [1.6, 380]], dur: 1.65, gain: 0.18, type: "sawtooth", lp: 1100, vib: [5, 9], attack: 0.25, hold: 0.8, wet: 1 });
+    k.tone({ f: 450, path: [[0, 450], [0.3, 900], [1.1, 880], [1.6, 570]], at: 0.15, dur: 1.65, gain: 0.06, type: "triangle", vib: [5, 12], attack: 0.25, hold: 0.8, pan: 0.5, wet: 1 });
+    k.hiss({ f: 300, dur: 1.6, gain: 0.25, brown: true, type: "lowpass", attack: 0.6, wet: 0.5 });
   },
-  // Ilusionismo: rufar de caixa, prato e "ta-dá" com um puf de fumaça e brilho
+  // Ilusionismo: a varinha faz "plim-plim" e a plateia aplaude rapidinho
   "Sinclair": (k) => {
-    for (let i = 0; i < 14; i++) k.hiss({ f: 2500, at: i * 0.035, dur: 0.03, gain: 0.2 + i * 0.04, q: 0.8 });
-    k.hiss({ f: 7000, at: 0.5, dur: 0.9, gain: 0.7, type: "highpass", attack: 0.003, wet: 0.5 });
-    [392, 494, 587, 784].forEach((f) => k.tone({ f, at: 0.5, dur: 0.55, gain: 0.1, type: "sawtooth", lp: 2500, attack: 0.01, hold: 0.2, wet: 0.4 }));
-    k.hiss({ f: 900, at: 0.5, dur: 0.3, gain: 1, brown: true, type: "lowpass" });
-    [2093, 2637, 3136].forEach((f, i) => k.bell(0.6 + i * 0.05, GLASS(f), 0.4, { wet: 0.6, pan: -0.4 + i * 0.4 }));
+    ([[0, 1568], [0.14, 2093]] as const).forEach(([a, f]) => { k.bell(a, GLASS(f), 0.7, { wet: 0.6 }); k.bell(a, [[f * 2.76, 0.06, 0.5]], 1, { wet: 0.6 }); });
+    k.hiss({ f: 8000, at: 0.1, dur: 0.5, gain: 0.25, type: "highpass", attack: 0.05, wet: 0.5 });
+    for (let i = 0; i < 34; i++) k.hiss({ f: rnd(1300, 3000), at: 0.45 + rnd(0, 0.8) * (i / 34 + 0.2), dur: 0.02, gain: rnd(0.3, 0.7), q: 1.2, attack: 0.001, pan: rnd(-0.8, 0.8), wet: 0.4 });
   },
-  // Xeque-mate: as peças de madeira batem, uma desliza e a última cai com força num acorde de vitória
+  // Xeque-mate: o tabuleiro vira e as peças caem espalhadas
   "Solomon": (k) => {
-    wood(k, 0, 1, 900, { pan: -0.3 });
-    wood(k, 0.18, 0.9, 800, { pan: 0.3 });
-    k.hiss({ f: 900, at: 0.3, dur: 0.18, gain: 0.4, q: 1 });
-    wood(k, 0.5, 1.4, 700);
-    k.thud(0.5, 0.8, 120);
-    [196, 247, 294, 392].forEach((f) => k.pluck({ f, at: 0.55, dur: 1.2, gain: 0.3, bright: 0.5, wet: 0.5 }));
+    whoosh(k, 0, 0.18, 0.7, 400, 2000);
+    k.thud(0.18, 1, 140);
+    wood(k, 0.18, 1.3, 500);
+    for (let i = 0; i < 14; i++) wood(k, 0.25 + rnd(0, 0.6) * (i / 14 + 0.2), rnd(0.4, 0.9), rnd(700, 1300), { pan: rnd(-0.8, 0.8) });
   },
-  // Portas do Hotel: a campainha da recepção, a porta range, o ar do outro lado passa e ela fecha
+  // Portas do Hotel: a chave gira, a maçaneta estala e a porta abre rangendo
   "The Doorman": (k) => {
-    k.bell(0, [[2093, 0.3, 1.2], [5230, 0.08, 0.6], [6280, 0.05, 0.4]], 1, { wet: 0.5 });
-    k.tone({ f: 140, path: [[0, 140], [0.2, 240], [0.45, 180]], at: 0.3, dur: 0.5, gain: 0.12, type: "sawtooth", lp: 1800, vib: [38, 25] });
-    whoosh(k, 0.6, 0.35, 0.6, 300, 1500, { pan: -0.4, panTo: 0.4, wet: 0.4 });
-    k.thud(1, 0.7, 110);
-    k.click(1, 0.6, 1500);
+    [0, 0.06, 0.12, 0.2].forEach((a, i) => k.click(a, 0.7, 2600 - i * 200));
+    k.bell(0.2, METAL(1700), 0.4);
+    k.click(0.4, 1, 1400);
+    k.thud(0.4, 0.3, 300);
+    k.tone({ f: 140, path: [[0, 140], [0.2, 240], [0.5, 170]], at: 0.5, dur: 0.55, gain: 0.12, type: "sawtooth", lp: 1800, vib: [38, 25] });
+    whoosh(k, 0.75, 0.35, 0.5, 300, 1500, { pan: -0.4, panTo: 0.4, wet: 0.4 });
   },
-  // Armadilha de Mola: a catraca enrola a mola, ela vibra tensa e a mandíbula de aço trava
+  // Armadilha de Mola: a mola tensiona rangendo e a armadilha de urso fecha num CLACK
   "Venator": (k) => {
-    ratchet(k, 0, 6, 0.6);
-    k.pluck({ f: 220, at: 0.25, dur: 0.5, gain: 0.4, bright: 0.95 });
-    k.tone({ f: 300, to: 150, at: 0.25, dur: 0.3, gain: 0.2, type: "triangle", vib: [20, 40] });
-    k.click(0.5, 1, 2500);
-    clang(k, 0.52, 1100, 0.9);
+    k.tone({ f: 150, path: [[0, 150], [0.4, 320]], dur: 0.45, gain: 0.1, type: "sawtooth", lp: 2000, vib: [45, 30], attack: 0.1 });
+    ratchet(k, 0.05, 6, 0.4);
+    k.hiss({ f: 3000, at: 0.5, dur: 0.05, gain: 1.6, q: 0.8, attack: 0.001 });
+    clang(k, 0.5, 900, 1.6);
+    clang(k, 0.5, 1340, 0.8);
+    k.thud(0.5, 1.2, 120);
   },
-  // Campo de Dor: o zumbido da máquina, arcos de eletricidade pulando e o gemido do monstro
+  // Campo de Dor: a alavanca do laboratório desce "TCHUNK" e a descarga elétrica estala
   "Victor": (k) => {
-    k.tone({ f: 60, dur: 1.1, gain: 0.22, type: "sawtooth", lp: 900, attack: 0.2 });
-    k.tone({ f: 120, dur: 1.1, gain: 0.1, type: "square", lp: 1500, attack: 0.2, trem: [8, 0.4] });
-    for (let i = 0; i < 4; i++) { const a = 0.15 + i * 0.2; const p = rnd(-0.7, 0.7); k.tone({ f: 180, at: a, dur: 0.08, gain: 0.15, type: "sawtooth", fm: [3.3, 10], pan: p }); k.hiss({ f: 4000, at: a, dur: 0.04, gain: 0.6, type: "highpass", attack: 0.002, pan: p }); }
-    k.tone({ f: 110, to: 85, at: 0.5, dur: 0.6, gain: 0.2, type: "sawtooth", lp: 600, drive: 3, vib: [5, 4], attack: 0.1 });
+    k.tone({ f: 160, path: [[0, 160], [0.15, 260]], dur: 0.18, gain: 0.08, type: "sawtooth", lp: 1500, vib: [40, 20] });
+    k.thud(0.2, 1.4, 90);
+    clang(k, 0.2, 380, 1);
+    k.tone({ f: 120, at: 0.3, dur: 0.9, gain: 0.22, type: "sawtooth", fm: [3.3, 12, 2], lp: 3000, attack: 0.01, trem: [14, 0.5] });
+    for (let i = 0; i < 8; i++) k.hiss({ f: 5000, at: rnd(0.3, 1.1), dur: 0.03, gain: 0.8, type: "highpass", attack: 0.001, pan: rnd(-0.7, 0.7) });
   },
-  // Assassinar: os corvos grasnam, o ferrolho arma e o tiro de sniper ecoa pela sala
+  // Assassinar: só o tiro, seco e alto
   "Vindicta": (k) => {
-    [0, 0.2].forEach((a, i) => k.tone({ f: 950, path: [[0, 950], [0.05, 1050], [0.16, 700]], at: a, dur: 0.17, gain: 0.18, type: "sawtooth", lp: 2600, fm: [0.51, 0.8], wet: 0.4, pan: i ? 0.5 : -0.5 }));
-    k.click(0.42, 1, 2000);
-    k.click(0.49, 0.8, 1400);
-    k.hiss({ f: 2500, at: 0.62, dur: 0.08, gain: 2, type: "highpass", attack: 0.001 });
-    k.thud(0.62, 1.4, 100);
-    k.hiss({ f: 600, at: 0.62, dur: 0.9, gain: 0.8, brown: true, type: "lowpass", wet: 0.9 });
-    [[0.88, 0.5, -0.6], [1.12, 0.25, 0.6]].forEach(([a, g, p]) => k.hiss({ f: 2000, at: a, dur: 0.07, gain: g, q: 0.6, pan: p, wet: 0.8 }));
+    k.hiss({ f: 2500, dur: 0.07, gain: 2.2, type: "highpass", attack: 0.001, wet: 0.1 });
+    k.hiss({ f: 1200, dur: 0.12, gain: 1.4, q: 0.6, attack: 0.001, wet: 0.1 });
+    k.thud(0, 1.6, 100, { wet: 0.1 });
+    k.tone({ f: 70, to: 40, dur: 0.25, gain: 0.4, drive: 3 });
   },
-  // Natureza-morta: três pinceladas, o respingo de tinta e um glissando de harpa
+  // Natureza-morta: o lápis rabisca rápido e um "plim"
   "Violet": (k) => {
-    for (let i = 0; i < 3; i++) k.hiss({ f: 1200, to: 2800, at: i * 0.15, dur: 0.14, gain: 0.5, q: 1.5, attack: 0.08, pan: -0.4 + i * 0.4 });
-    k.hiss({ f: 700, to: 250, at: 0.5, dur: 0.18, gain: 1, q: 2 });
-    k.thud(0.5, 0.4, 200);
-    [523, 587, 659, 784, 880, 1047].forEach((f, i) => k.pluck({ f, at: 0.6 + i * 0.04, dur: 0.8, gain: 0.25, bright: 0.6, wet: 0.5, pan: -0.5 + i * 0.2 }));
+    [0, 0.13, 0.24, 0.38].forEach((a, i) => k.hiss({ f: 3000 + i * 300, to: 4500, at: a, dur: 0.11, gain: 0.7, q: 2, trem: [45, 0.6], attack: 0.02, pan: -0.4 + i * 0.25 }));
+    k.click(0.5, 0.6, 3500);
+    k.bell(0.58, GLASS(1760), 0.6, { wet: 0.6 });
   },
-  // O Cubo: bolhas de gosma sobem, a geleia se espreme, o cubo balança e o escudo fecha
+  // O Cubo: a gelatina faz "bloing-bloing"
   "Viscous": (k) => {
-    for (let i = 0; i < 5; i++) { const f = rnd(250, 450); k.tone({ f, to: f * 2.5, at: i * 0.07, dur: 0.07, gain: 0.25, pan: rnd(-0.5, 0.5) }); }
-    k.hiss({ f: 500, to: 200, at: 0.3, dur: 0.3, gain: 0.8, q: 6, trem: [20, 0.6] });
-    k.tone({ f: 180, at: 0.45, dur: 0.5, gain: 0.25, vib: [9, 40], fm: [0.5, 0.3] });
-    k.bell(0.6, GLASS(660), 0.5, { wet: 0.6 });
+    ([[0, 260], [0.32, 200]] as const).forEach(([a, f]) => {
+      k.tone({ f: f * 0.6, path: [[0, f * 0.6], [0.06, f * 1.6], [0.3, f]], at: a, dur: 0.32, gain: 0.35, vib: [11, f * 0.25], attack: 0.01 });
+      k.hiss({ f: 500, to: 250, at: a, dur: 0.15, gain: 0.5, q: 6 });
+    });
+    k.bell(0.7, GLASS(660), 0.4, { wet: 0.6 });
   },
-  // Olhar Petrificante: o chocalho da cobra, o sibilo, o olhar brilha e a pedra estala sobre a vítima
+  // Olhar Petrificante: o sibilo longo da cobra
   "Vyper": (k) => {
-    k.hiss({ f: 5000, dur: 0.4, gain: 0.6, q: 2, trem: [45, 0.9] });
-    k.hiss({ f: 6500, at: 0.35, dur: 0.4, gain: 0.5, type: "highpass", attack: 0.08 });
-    k.tone({ f: 700, to: 1400, at: 0.5, dur: 0.4, gain: 0.1, fm: [1.41, 2], wet: 0.6 });
-    k.hiss({ f: 900, at: 0.8, dur: 0.25, gain: 1.2, brown: true, type: "lowpass" });
-    debris(k, 0.8, 10, 0.6, 0.3);
-    k.thud(0.8, 0.8, 140);
+    k.hiss({ f: 6000, dur: 1.3, gain: 1.2, type: "highpass", attack: 0.2, hold: 0.6, trem: [7, 0.25], pan: -0.3, panTo: 0.3 });
+    k.hiss({ f: 4200, dur: 1.3, gain: 0.6, q: 4, attack: 0.25, hold: 0.6 });
+    k.hiss({ f: 5000, at: 1.3, dur: 0.25, gain: 0.5, q: 2, trem: [45, 0.9] });
   },
-  // Força de Vontade: o molho de chaves, a força cresce num acorde, o escudo bate e o campo fica zumbindo
+  // Força de Vontade: o apito do guarda e passos firmes
   "Warden": (k) => {
-    chain(k, 0.05, 5, 0.5);
-    k.tone({ f: 110, to: 220, dur: 0.5, gain: 0.2, type: "sawtooth", lp: 1200, attack: 0.3, pan: -0.3 });
-    k.tone({ f: 111, to: 222, dur: 0.5, gain: 0.2, type: "sawtooth", lp: 1200, attack: 0.3, pan: 0.3 });
-    clang(k, 0.5, 400, 1.3);
-    k.thud(0.5, 1.2, 90, { wet: 0.5 });
-    k.tone({ f: 220, at: 0.5, dur: 0.8, gain: 0.12, type: "triangle", trem: [6, 0.3], fm: [2, 0.3] });
+    ([[0, 0.3], [0.38, 0.5]] as const).forEach(([a, d]) => { k.tone({ f: 2800, at: a, dur: d, gain: 0.18, vib: [32, 90], attack: 0.01, hold: d * 0.7, wet: 0.5 }); k.hiss({ f: 2800, at: a, dur: d, gain: 0.4, q: 4, trem: [32, 0.7], hold: d * 0.7, attack: 0.01 }); });
+    [1, 1.3, 1.6].forEach((a, i) => { k.thud(a, 0.7, 120, { pan: -0.3 + i * 0.3 }); k.click(a, 0.7, 1500, { pan: -0.3 + i * 0.3 }); });
   },
-  // Telecinese: as cartas embaralham num leque, um floreio e a vítima flutua num tom etéreo
+  // Telecinese: a carta estala no dedo e voa "fsst"
   "Wraith": (k) => {
-    for (let i = 0; i < 16; i++) k.hiss({ f: rnd(2800, 4300), at: i * 0.022, dur: 0.02, gain: 0.45, q: 1.2, attack: 0.002, pan: -0.5 + i * 0.06 });
-    whoosh(k, 0.38, 0.15, 0.6, 1500, 6000);
-    k.tone({ f: 220, to: 880, at: 0.5, dur: 0.7, gain: 0.16, vib: [7, 15], fm: [2, 0.4], attack: 0.3, wet: 0.7 });
-    k.tone({ f: 330, to: 1320, at: 0.5, dur: 0.7, gain: 0.08, vib: [7, 15], attack: 0.3, wet: 0.7 });
-    k.hiss({ f: 8000, at: 0.5, dur: 0.7, gain: 0.2, type: "highpass", attack: 0.3, wet: 0.6 });
+    k.hiss({ f: 3500, dur: 0.02, gain: 1.6, q: 1, attack: 0.001 });
+    k.click(0, 1.2, 5000);
+    k.tone({ f: 900, to: 500, dur: 0.04, gain: 0.15 });
+    k.hiss({ f: 1500, to: 7000, at: 0.08, dur: 0.22, gain: 0.9, q: 1.4, attack: 0.15, pan: -0.3, panTo: 0.7 });
+    k.bell(0.3, GLASS(2093), 0.3, { wet: 0.6, pan: 0.7 });
   },
-  // Transformação Sombria: a katana sai da bainha, a sombra cresce grave e o golpe fecha num taiko
+  // Transformação Sombria: o grito de guerra e um corte rápido
   "Yamato": (k) => {
-    k.hiss({ f: 3000, to: 7000, dur: 0.35, gain: 0.7, q: 6, attack: 0.2 });
-    k.bell(0.35, METAL(3200), 1, { wet: 0.5 });
-    k.tone({ f: 50, to: 110, at: 0.1, dur: 0.6, gain: 0.25, type: "sawtooth", lp: 500, drive: 3, attack: 0.4 });
-    k.hiss({ f: 200, to: 600, at: 0.1, dur: 0.6, gain: 1, brown: true, type: "lowpass", attack: 0.4 });
-    whoosh(k, 0.62, 0.1, 0.8, 2000, 8000, { pan: 0.5, panTo: -0.5 });
-    k.thud(0.72, 1.6, 65, { wet: 0.6 });
-    k.click(0.72, 0.6, 600);
+    k.tone({ f: 280, path: [[0, 280], [0.1, 420], [0.5, 380], [0.65, 300]], dur: 0.65, gain: 0.3, type: "sawtooth", lp: 2000, q: 3, drive: 3, vib: [6, 10], attack: 0.03, hold: 0.3, wet: 0.4 });
+    k.hiss({ f: 1500, dur: 0.6, gain: 0.4, q: 2, attack: 0.03, hold: 0.3 });
+    whoosh(k, 0.62, 0.1, 0.9, 2000, 9000, { pan: 0.5, panTo: -0.5 });
+    k.hiss({ f: 6500, to: 4500, at: 0.72, dur: 0.4, gain: 2.2, q: 26, wet: 0.4 });
+    k.click(0.72, 1, 2500);
   },
   // genéricas (cartas sem herói)
   self: (k) => {
