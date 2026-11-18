@@ -2,7 +2,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import soulsIcon from "../assets/game/souls.png";
-import { setAudio, useAudio } from "../lib/game/sfx";
+import { setAudio, sfx, useAudio } from "../lib/game/sfx";
 
 /** Posição pseudoaleatória estável para as partículas (sem Math.random no render). */
 /** Faíscas sempre subindo da orbe (enquanto há almas). */
@@ -102,7 +102,8 @@ const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 export function EndTurnButton({ label, sub, turn, total, busy, busyLabel, ready, disabled, describedBy, big, onClick }: EndProps) {
   const call = ready && !disabled;
   return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-describedby={describedBy} aria-label={`${busy ? busyLabel : `${label} (${sub})`} · ${turn}/${total}`}
+    <button type="button" onClick={onClick} disabled={disabled} aria-describedby={describedBy}
+      onPointerEnter={(e) => { if (e.pointerType === "mouse" && !disabled) sfx("paper"); }} aria-label={`${busy ? busyLabel : `${label} (${sub})`} · ${turn}/${total}`}
       className={`group relative flex shrink-0 cursor-pointer flex-col items-stretch transition duration-150 enabled:hover:-translate-y-1 enabled:hover:-rotate-2 enabled:active:translate-y-0 enabled:active:scale-95 disabled:cursor-not-allowed ${big ? "w-full max-w-44" : "w-22 sm:w-26"} ${focus}`}>
       {/* luz vermelha e quente por trás da conta, mais forte quando é hora de fechar */}
       <motion.span aria-hidden="true" className="pointer-events-none absolute -inset-3 rounded-2xl bg-radial from-rose-500/70 via-game-brass/40 to-transparent to-70% blur-lg"

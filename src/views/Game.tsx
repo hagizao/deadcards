@@ -52,11 +52,11 @@ export function Game() {
   // deck escolhido na tela de deck; null = mostrar a tela
   const [deck, setDeck] = useState<{ cards: PoolCard[]; look?: DeckLook } | null>(null);
   if (pool.length < MIN_POOL) return <p className="text-sm text-zinc-300">{t.ui.needCards(MIN_POOL)}</p>;
-  if (!deck) return <DeckBuilder versions={versions} cfg={cfg} onPlay={(cards, look) => setDeck({ cards, look })} />;
-  return <Board key={JSON.stringify(cfg)} newMatch={() => new Match(cfg, pool, Math.random, { p: deck.cards })} deckLook={deck.look} onDeck={() => setDeck(null)} />;
+  if (!deck) return <DeckBuilder versions={versions} cfg={cfg} onPlay={(cards, look) => { document.documentElement.requestFullscreen?.().catch(() => {}); setDeck({ cards, look }); }} />;
+  return <Board key={JSON.stringify(cfg)} newMatch={() => new Match(cfg, pool, Math.random, { p: deck.cards })} deckLook={deck.look} startFull onDeck={() => setDeck(null)} />;
 }
 
-function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook?: DeckLook; onDeck: () => void }) {
+function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: () => Match; deckLook?: DeckLook; /** Começa em tela cheia (ao clicar em Jogar). */ startFull?: boolean; onDeck: () => void }) {
   const t = useT(GAME_TEXT);
   const { players } = useData();
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
@@ -69,7 +69,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   // partida atual: as faixas remontam a cada partida nova, para o primeiro local revelar com efeito
   const [game, setGame] = useState(0);
   // tela cheia: a partida cobre o site (e pede tela cheia ao navegador quando dá)
-  const [full, setFull] = useState(false);
+  const [full, setFull] = useState(startFull);
   const wide = useWide();
   useEffect(() => {
     if (!full) return;
@@ -115,7 +115,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   const burns = m.burned.length;
   const heard = useRef(burns);
   useEffect(() => {
-    if (burns > heard.current) sfx("burn");
+    if (burns > heard.current) sfx("burn", 0.8);
     heard.current = burns;
   }, [burns]);
   // artes dos locais da partida já no cache, para a faixa não piscar ao revelar
@@ -525,19 +525,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
 
       <AnimatePresence>
         {result && showEnd && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-labelledby="game-end">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <h2 id="game-end" className="text-4xl font-extrabold text-game-brass">{result.outcome === "win" ? t.ui.win : result.outcome === "loss" ? t.ui.loss : t.ui.draw}</h2>
-              <p className="text-sm text-zinc-200">{t.ui.summary(result.won, result.lost, result.myPower, result.aiPower)}{result.patron ? ` · ${t.ui.patron}` : ""}</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {/* eslint-disable-next-line jsx-a11y/no-autofocus -- foco vai para a ação principal do diálogo que acabou de abrir */}
-                <button type="button" autoFocus className={primaryBtn} onClick={restart}>{t.ui.again}</button>
-                <button type="button" className={pill(false)} onClick={() => setShowEnd(false)}>{t.ui.viewBoard}</button>
-                <button type="button" className={pill(false)} onClick={onDeck}>{t.deck.change}</button>
-              </div>
-            </div>
-          </motion.div>
+          <EndScreen key="end" r={result} m={m} t={t} onAgain={restart} onBoard={() => setShowEnd(false)} onDeck={onDeck} />
         )}
       </AnimatePresence>
     </div>
@@ -874,14 +862,13 @@ function Peek({ r, card, tips }: { r: DOMRect; card: React.ReactNode; tips: Tip[
   );
 }
 
-/** Mão da IA: versos de carta em leque no topo. */
 /** Mão da IA: versos em leque afundados na borda de cima (menores que a sua mão, mas à vista). */
 function AiHand({ n, t }: { n: number; t: T }) {
   const mid = (n - 1) / 2;
   return (
-    <div role="img" aria-label={t.ui.aiHand(n)} className="relative h-14 w-36 [clip-path:inset(0_-100vw_-100vh_-100vw)] sm:h-20 sm:w-68">
+    <div role="img" aria-label={t.ui.aiHand(n)} className="relative h-18 w-47 [clip-path:inset(0_-100vw_-100vh_-100vw)] sm:h-26 sm:w-88">
       {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="absolute top-0 left-1/2 w-10 origin-bottom sm:w-16"
+        <div key={i} className="absolute top-0 left-1/2 w-13 origin-bottom sm:w-21"
           style={{ transform: `translate(-50%, -38%) translateX(${(i - mid) * 62}%) rotate(${(mid - i) * 6}deg) translateY(${-Math.abs(i - mid) * 4}%)` }}>
           <CardBack />
         </div>
@@ -1054,7 +1041,7 @@ function LocTile({ i, nm, desc, chips, a, p }: { i: number; nm: string; desc: st
       <div className="flex w-full flex-wrap items-center justify-between gap-1 @sm:flex-nowrap">
         <ScoreTag v={p} lead={p > a} side="p" />
         <motion.h3 key={nm} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.9 }}
-          className="order-first flex w-full min-w-0 justify-center text-sm font-extrabold tracking-wide wrap-break-word hyphens-auto text-zinc-950 [font-variant-caps:small-caps] @3xs:text-lg @sm:order-0 @sm:w-auto @sm:flex-1 @sm:text-xl @[26rem]:text-2xl">
+          className="order-first flex w-full min-w-0 justify-center text-lg font-extrabold tracking-wide wrap-break-word hyphens-auto text-zinc-950 [font-variant-caps:small-caps] @3xs:text-2xl @sm:order-0 @sm:w-auto @sm:flex-1 @sm:text-2xl @[26rem]:text-3xl">
           <TickTag tone={lane.tag} className="line-clamp-2 max-w-full min-w-0 px-2 py-1 sm:px-4">{nm}</TickTag>
         </motion.h3>
         <ScoreTag v={a} lead={a > p} side="a" />
@@ -1141,6 +1128,82 @@ function Burning({ card, onDone }: { card: ReactNode; onDone: () => void }) {
           initial={{ y: 0, opacity: 0 }} animate={{ y: -60 - (k % 3) * 25, x: (k % 2 ? 1 : -1) * (6 + k * 2), opacity: [0, 1, 0] }}
           transition={{ duration: 1.8, delay: 0.3 + (k % 4) * 0.5, ease: "easeOut" }} />
       ))}
+    </motion.div>
+  );
+}
+
+/** Cor da tela de fim: verde na vitória, vermelho na derrota, âmbar no empate. */
+const END_TONE = {
+  win: { bg: "bg-radial from-emerald-500 via-emerald-800 to-emerald-950", ink: "text-emerald-900" },
+  loss: { bg: "bg-radial from-rose-500 via-rose-800 to-rose-950", ink: "text-rose-900" },
+  draw: { bg: "bg-radial from-amber-500 via-amber-800 to-zinc-950", ink: "text-amber-900" },
+} as const;
+/** Cartas que caem pela tela de fim: coluna, atraso e giro de cada uma. */
+const FALLING = Array.from({ length: 12 }, (_, i) => ({ left: (i * 37 + 5) % 100, delay: i * 0.45, spin: (i % 2 ? 1 : -1) * (160 + i * 25), dur: 4.5 + (i % 4) }));
+
+/**
+ * Fim da partida na tela inteira: verde na vitória e vermelho na derrota, com raios girando, versos de carta caindo,
+ * o resultado numa etiqueta que bate na mesa, o placar final de cada local e as ações em etiquetas.
+ */
+function EndScreen({ r, m, t, onAgain, onBoard, onDeck }: { r: Result; m: Match; t: T; onAgain: () => void; onBoard: () => void; onDeck: () => void }) {
+  const tone = END_TONE[r.outcome];
+  const title = r.outcome === "win" ? t.ui.win : r.outcome === "loss" ? t.ui.loss : t.ui.draw;
+  return (
+    <motion.div role="dialog" aria-modal="true" aria-labelledby="game-end" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}
+      className={`fixed inset-0 z-80 flex items-center justify-center overflow-hidden p-4 ${tone.bg}`}>
+      {/* raios de luz girando devagar atrás de tudo */}
+      <motion.div aria-hidden="true" className="absolute top-1/2 left-1/2 size-[220vmax] -translate-1/2 bg-[repeating-conic-gradient(rgb(255_255_255/0.16)_0deg_7deg,transparent_7deg_18deg)] mix-blend-overlay"
+        animate={{ rotate: 360 }} transition={{ duration: 60, repeat: Infinity, ease: "linear" }} />
+      <div aria-hidden="true" className="absolute inset-0 bg-radial from-transparent from-30% to-black/75" />
+      {/* versos de carta caindo e girando */}
+      {FALLING.map((f, i) => (
+        <motion.div key={i} aria-hidden="true" className="absolute top-0 w-14 opacity-80 sm:w-20" style={{ left: `${f.left}%` }}
+          initial={{ y: "-30vh", rotate: 0, opacity: 0 }} animate={{ y: "125vh", rotate: f.spin, opacity: [0, 0.85, 0.85, 0] }}
+          transition={{ duration: f.dur, delay: f.delay, repeat: Infinity, ease: "linear" }}>
+          <CardBack />
+        </motion.div>
+      ))}
+      <div className="relative flex max-w-3xl flex-col items-center gap-5 text-center sm:gap-6">
+        <motion.h2 id="game-end" initial={{ scale: 2.6, opacity: 0, rotate: -10 }} animate={{ scale: 1, opacity: 1, rotate: -3 }} transition={{ type: "spring", stiffness: 240, damping: 13 }}
+          className={`text-5xl font-extrabold tracking-wider uppercase [font-variant-caps:small-caps] sm:text-8xl ${tone.ink}`}>
+          <TickTag tone="bg-dl-text" className="px-6 py-2 sm:px-12 sm:py-3">{title}</TickTag>
+        </motion.h2>
+        <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+          className="bg-zinc-950/85 px-3 py-1.5 text-sm font-bold text-zinc-100 [clip-path:polygon(1%_0,100%_6%,99%_100%,0_94%)] sm:text-lg">
+          {t.ui.summary(r.won, r.lost, r.myPower, r.aiPower)}{r.patron ? ` · ${t.ui.patron}` : ""}
+        </motion.p>
+        <ul className="flex flex-wrap justify-center gap-3">
+          {m.loc.map((l, i) => {
+            const a = m.total(l, "a"), p = m.total(l, "p");
+            return (
+              <motion.li key={l.L.id + i} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 + i * 0.12 }}
+                className="flex min-w-28 flex-col items-center gap-1 bg-zinc-950/85 px-3 py-2 [clip-path:polygon(2%_4%,98%_0,100%_96%,0_100%)] sm:min-w-36">
+                <span className={`text-xs font-extrabold tracking-wider uppercase sm:text-sm ${LANE[i % 3].ink}`}>{l.L.name}</span>
+                <span className="flex items-baseline gap-2 text-2xl font-extrabold tabular-nums sm:text-3xl">
+                  <span className={p > a ? "text-game-me" : "text-zinc-400"}>{p}</span>
+                  <span className="text-base text-zinc-500">×</span>
+                  <span className={a > p ? "text-game-ai" : "text-zinc-400"}>{a}</span>
+                </span>
+              </motion.li>
+            );
+          })}
+        </ul>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="flex flex-wrap items-center justify-center gap-3">
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus -- foco vai para a ação principal da tela que acabou de abrir */}
+          <button type="button" autoFocus onClick={onAgain}
+            className={`grid min-h-14 cursor-pointer place-items-center text-lg font-extrabold tracking-wider text-zinc-950 uppercase transition hover:scale-105 hover:brightness-110 active:scale-95 sm:text-xl ${focus}`}>
+            <TickTag tone="bg-dl-text" className="px-7 py-2.5">{t.ui.again}</TickTag>
+          </button>
+          <button type="button" onClick={onBoard}
+            className={`grid min-h-11 cursor-pointer place-items-center text-sm font-extrabold tracking-wider text-zinc-100 uppercase transition hover:brightness-125 active:scale-95 ${focus}`}>
+            <TickTag tone="bg-zinc-950" className="px-4 py-2">{t.ui.viewBoard}</TickTag>
+          </button>
+          <button type="button" onClick={onDeck}
+            className={`grid min-h-11 cursor-pointer place-items-center text-sm font-extrabold tracking-wider text-zinc-100 uppercase transition hover:brightness-125 active:scale-95 ${focus}`}>
+            <TickTag tone="bg-zinc-950" className="px-4 py-2">{t.deck.change}</TickTag>
+          </button>
+        </motion.div>
+      </div>
     </motion.div>
   );
 }

@@ -16,7 +16,7 @@ import win from "../../assets/sfx/win.ogg";
 const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, win };
 /** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
 const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
-export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn";
+export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn" | "paper";
 
 /** Volume e mudo de cada canal (0 a 1). */
 export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
@@ -66,6 +66,7 @@ export function sfx(name: Sfx, volume = 1) {
   if (name === "reveal") return revealSwell(volume);
   if (name === "hover") return cardFlick(volume);
   if (name === "burn") return cardBurn(volume);
+  if (name === "paper") return paperRustle(volume);
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
   const file = name as keyof typeof FILES;
@@ -153,6 +154,46 @@ function cardBurn(strength = 1) {
     pop.start(at, Math.random() * 0.25);
     pop.stop(at + 0.04);
   }
+}
+
+let lastPaper = 0;
+/** A conta de papel sendo levantada da mesa: um farfalhar curto e seco (no máximo um a cada 150 ms). */
+function paperRustle(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  if (t - lastPaper < 0.15) return;
+  lastPaper = t;
+  const vol = SFX_BASE * lv * strength;
+  burst ??= noise(c, 0.3);
+  // o papel dobrando: estalinhos agudos em sequência
+  for (let i = 0; i < 6; i++) {
+    const at = t + i * 0.02 + Math.random() * 0.012;
+    const src = c.createBufferSource();
+    src.buffer = burst;
+    const band = c.createBiquadFilter();
+    band.type = "bandpass"; band.frequency.value = 2500 + Math.random() * 2500; band.Q.value = 0.8;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime((0.25 + Math.random() * 0.25) * vol, at + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.035);
+    src.connect(band).connect(g).connect(c.destination);
+    src.start(at, Math.random() * 0.25);
+    src.stop(at + 0.05);
+  }
+  // o ar do papel subindo: um sopro curto e macio
+  const air = c.createBufferSource();
+  air.buffer = burst;
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass"; lp.frequency.value = 1400;
+  const ag = c.createGain();
+  ag.gain.setValueAtTime(0.0001, t);
+  ag.gain.exponentialRampToValueAtTime(0.18 * vol, t + 0.04);
+  ag.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  air.connect(lp).connect(ag).connect(c.destination);
+  air.start(t);
+  air.stop(t + 0.16);
 }
 
 let lastFlick = 0;
