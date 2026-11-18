@@ -35,7 +35,10 @@ type Status = {
   /** Histórico do bônus permanente por origem (soma = bonus), para explicar o número da mesa. */
   fx?: (Cause & { v: number })[];
   burrow?: boolean; stun?: number; immune?: boolean; immU?: number; rip?: number; ripV?: number; chained?: boolean; silenced?: boolean; silU?: number;
-  burn?: number; tburn?: { v: number; u: number }[]; vuln?: number; sleep?: number; root?: number; petri?: boolean; unstop?: boolean;
+  burn?: number; tburn?: { v: number; u: number }[];
+  /** Aflição do Pocket Mestre: perde `v` no fim de cada turno, sem nunca passar de 1. */
+  ail?: { v: number; src: Cause };
+  vuln?: number; sleep?: number; root?: number; petri?: boolean; unstop?: boolean;
   /** Rato do Metrô: fica preso no Metrô (não se move nem troca de local). */
   home?: boolean;
   chan?: { u: number }; drainU?: number; grown?: number; cd?: boolean; wolf?: boolean; wolfAt?: number; exec?: { u: number; target?: number }; duel?: boolean; mvT?: number; grow?: number;
@@ -431,10 +434,12 @@ export class Match {
   };
 
   /** Dano: perder poder por efeito. Respeita imunidade, Santuário, escudo do Kelvin, Riposta e vulnerabilidade. */
-  private hurt(t: GCard | null | undefined, amt: number, src: GCard | null, until?: number): boolean {
+  /** Tira poder de `t`. Com `floor`, a perda para em `floor` de poder (a Aflição do Pocket nunca zera ninguém). */
+  private hurt(t: GCard | null | undefined, amt: number, src: GCard | null, until?: number, floor = 0): boolean {
     const l = t && this.locOf(t);
     if (!t || !l || amt <= 0) return false;
     if (this.immune(t) || t.st.unstop || this.ty(l, "shrine") || l.shield[t.side] >= this.t) return false;
+    if (floor && this.pow(t, l) <= floor) return false;
     if ((t.st.rip ?? 0) > 0 && src && src.side !== t.side) {
       t.st.rip = (t.st.rip ?? 1) - 1;
       this.say({ k: "riposte", c: this.N(t), t: this.N(src) });
@@ -442,6 +447,7 @@ export class Match {
       return false;
     }
     if ((t.st.vuln ?? 0) >= this.t) { amt *= 2; t.st.vuln = 0; }
+    if (floor) amt = Math.min(amt, this.pow(t, l) - floor);
     if (until) t.st.tmp.push({ v: -amt, u: until, src: this.causes.at(-1) });
     else t.bonus -= amt;
     this.interrupt(t);
@@ -491,11 +497,10 @@ export class Match {
     const h = this.handOf(c.side);
     if (h.length < HAND_MAX) h.push(c);
   }
-  /** Próxima carta do baralho de cada lado, se The New York Oracle estiver revelado. */
-  peek(s: Side): GCard | null {
+  /** Sua próxima carta do baralho, se The New York Oracle estiver revelado (a do adversário continua escondida). */
+  peek(): GCard | null {
     if (!this.loc.some((l) => this.ty(l, "oracle"))) return null;
-    const d = s === "p" ? this.deck : this.adeck;
-    return d[d.length - 1] ?? null;
+    return this.deck[this.deck.length - 1] ?? null;
   }
   private draw(s: Side) {
     const d = s === "p" ? this.deck : this.adeck, h = this.handOf(s);
@@ -732,6 +737,7 @@ export class Match {
         x.st.tmp = x.st.tmp.filter((m) => m.v >= 0);
         x.st.burn = 0;
         x.st.tburn = [];
+        x.st.ail = undefined;
         // o gelo também solta quem a Wraith ergueu
         if ((x.st.stun ?? 0) >= this.t) { x.st.stun = 0; this.say({ k: "liftEnd", c: this.N(x) }); }
       });
@@ -789,7 +795,8 @@ export class Match {
       this.say({ k: "paradox", c: this.N(c), t: this.N(t) });
     } },
     "Pocket": { r: (c, l, v) => {
-      this.foes(c, l).forEach((t) => { if (this.hurt(t, v, c) && this.master(c)) t.st.burn = (t.st.burn ?? 0) + 1; });
+      // nunca zera: quem tem 1 fica com 1, e quem tem pouco desce até 1
+      this.foes(c, l).forEach((t) => { if (this.hurt(t, v, c, undefined, 1) && this.master(c)) t.st.ail = { v: (t.st.ail?.v ?? 0) + 1, src: this.by(c) }; });
       this.say({ k: "pocket", c: this.N(c) });
     } },
     "Rat King": { r: (c) => {
@@ -905,8 +912,8 @@ export class Match {
   }
   private cleanse(c: GCard) {
     const st = c.st;
-    const bad = !!st.burn || !!st.tburn?.length || !!st.petri || !!st.silenced || (st.stun ?? 0) >= this.t || (st.vuln ?? 0) >= this.t || st.tmp.some((m) => m.v < 0 && this.t <= m.u);
-    st.burn = 0; st.tburn = []; st.petri = false; st.silenced = false; st.stun = 0; st.vuln = 0; st.sleep = 0; st.tmp = st.tmp.filter((m) => m.v >= 0);
+    const bad = !!st.burn || !!st.tburn?.length || !!st.ail || !!st.petri || !!st.silenced || (st.stun ?? 0) >= this.t || (st.vuln ?? 0) >= this.t || st.tmp.some((m) => m.v < 0 && this.t <= m.u);
+    st.burn = 0; st.tburn = []; st.ail = undefined; st.petri = false; st.silenced = false; st.stun = 0; st.vuln = 0; st.sleep = 0; st.tmp = st.tmp.filter((m) => m.v >= 0);
     return bad;
   }
 
@@ -1294,6 +1301,8 @@ export class Match {
       const b = (c.st.burn ?? 0) + (c.st.tburn ?? []).filter((x) => x.u >= this.t).reduce((a, x) => a + x.v, 0);
       if (b) this.as({ k: "burn" }, () => this.hurt(c, b, null));
       if (c.st.tburn) c.st.tburn = c.st.tburn.filter((x) => x.u > this.t);
+      const ail = c.st.ail;
+      if (ail) this.as(ail.src, () => this.hurt(c, ail.v, null, undefined, 1));
     });
     this.sweep();
     this.loc.forEach((l) => this.as({ k: "loc", loc: l.L.name }, () => {

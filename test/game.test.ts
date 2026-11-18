@@ -1162,10 +1162,10 @@ describe("locais novos", () => {
     expect(L.s.p).toHaveLength(1);
   });
 
-  it("The New York Oracle mostra a próxima carta do baralho", () => {
+  it("The New York Oracle revela só a sua próxima carta", () => {
     const { m } = at("oracle");
-    expect(m.peek("p")).toBe(m.deck[m.deck.length - 1]);
-    expect(arena().m.peek("p")).toBeNull();
+    expect(m.peek()).toBe(m.deck[m.deck.length - 1]);
+    expect(arena().m.peek()).toBeNull();
   });
 
   it("os 45 locais padrão têm id único e arte no R2", () => {
@@ -1244,6 +1244,21 @@ describe("poder zerado e origem dos efeitos", () => {
     expect(m.locOf(rat)).toBeUndefined();
     expect(m.pow(v)).toBe(before);
     expect(m.log.some((e) => e.k === "zero")).toBe(true);
+  });
+
+  it("a Aflição do Pocket nunca zera: para em 1, também na perda por turno do Mestre", () => {
+    const { m, put, mk } = arena();
+    const one = dummy(put, "a", 0, 1, "one"), three = dummy(put, "a", 0, 3, "three"), big = dummy(put, "a", 0, 9, "big");
+    const p = mk(pc("p", "Pocket", flat(70)), "p");
+    p.v = 5;
+    p.lvl = 2;
+    m.loc[0].s.p.push(p);
+    m.act({ c: p, l: m.loc[0] });
+    expect([m.pow(one), m.pow(three), m.pow(big)]).toEqual([1, 1, 4]);
+    m.endOfTurn();
+    m.endOfTurn();
+    expect([m.pow(one), m.pow(three), m.pow(big)]).toEqual([1, 1, 2]);
+    expect(m.locOf(one) && m.locOf(three)).toBeTruthy();
   });
 
   it("entocada, erguida ou com 0 impresso não é eliminada", () => {

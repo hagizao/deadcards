@@ -22,7 +22,7 @@ import tableArt from "../assets/game/table.webp";
 
 const REVEAL_MS = 1000;
 /** Quanto a caixa de "Começou!" fica na tela antes de sumir (ms). */
-const START_MS = 1500;
+const START_MS = 2000;
 /** Quanto a carta eliminada fica na mesa com o X antes de sumir (s). */
 const SLAIN_S = 1.5;
 const END_MS = 750;
@@ -426,8 +426,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   /** Estado do local enquanto arrasta: o local sob a carta acende (se der para jogar lá) e os outros escurecem. */
   const dropAt = (l: Loc, i: number): Drop => shift ? (!m.moveOptions(shift.c).includes(l) ? "dim" : shift.over === i ? "over" : "ok") : !drag ? "off" : drag.over !== null && drag.over !== i ? "dim" : m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok";
   const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && !m.canPlay(sel, l);
-  /** The New York Oracle: próxima carta de cada baralho. */
-  const next = { p: m.peek("p"), a: m.peek("a") };
+  /** The New York Oracle: só a sua próxima carta aparece. */
+  const next = m.peek();
 
   const height = full ? "h-full" : "h-[calc(100dvh-5.5rem)] min-h-120 sm:h-[calc(100dvh-7.5rem)]";
   const title = (
@@ -438,10 +438,10 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       </abbr>
     </div>
   );
-    const aiDeck = <div className={wide ? "relative flex w-full justify-center" : "relative"}>{burning("a")}<DeckPile n={m.adeck.length} tone="ai" label={next.a ? `${t.deck.aiLeft(m.adeck.length)} · ${t.ui.next(name(next.a))}` : t.deck.aiLeft(m.adeck.length)} tipSide="left"
-    cover={next.a && face(next.a, false)} out={{ x: -80, y: -10 }} className={wide ? "w-full max-w-40" : "w-8 sm:w-11"} /></div>;
-  const myDeck = <div className={wide ? "relative flex w-full justify-center" : "relative"}>{burning("p")}<DeckPile n={m.deck.length} look={deckLook} label={next.p ? `${t.deck.left(m.deck.length)} · ${t.ui.next(name(next.p))}` : t.deck.left(m.deck.length)}
-    cover={next.p && face(next.p, false)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} /></div>;
+    const aiDeck = <div className={wide ? "relative flex w-full justify-center" : "relative"}>{burning("a")}<DeckPile n={m.adeck.length} tone="ai" label={t.deck.aiLeft(m.adeck.length)} tipSide="left"
+    out={{ x: -80, y: -10 }} className={wide ? "w-full max-w-40" : "w-8 sm:w-11"} /></div>;
+  const myDeck = <div className={wide ? "relative flex w-full justify-center" : "relative"}>{burning("p")}<DeckPile n={m.deck.length} look={deckLook} label={next ? `${t.deck.left(m.deck.length)} · ${t.ui.next(name(next))}` : t.deck.left(m.deck.length)}
+    cover={next && face(next, false)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} /></div>;
   const endBtn = result && !showEnd
     ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
     : <EndTurnButton label={t.ui.closeTab} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady} big={wide}
@@ -509,7 +509,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
             <Location key={`${game}-${l.L.id}${i}`} dealAt={intro ? INTRO.lane(i) + 0.08 : undefined} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
               drop={dropAt(l, i)}
               card={(c) => (
-                <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} acts={actsOf(c)}
+                <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} mark={mode?.k === "card" && m.abilityOf(mode.c) === "Vindicta" && targets.includes(c)} acts={actsOf(c)}
                   shift={canShift(c) ? { on: (over) => { if (!shift) { sfx("grab", 0.7); setPeek(null); } setShift({ c, over }); }, drop: (i) => shiftTo(c, i) } : undefined}
                   onClick={(r) => { pickBoard(c); setPeek(r && look !== c ? { c, r } : null); }}
                   onPeek={(r) => setPeek(r && !drag && !shift ? { c, r } : null)} />
@@ -612,8 +612,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
           <motion.div key="start" role="status" className="pointer-events-none fixed inset-0 z-50 grid place-items-center"
             initial={{ opacity: 0, scale: 1.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, transition: { duration: 0.35 } }}
             transition={{ type: "spring", stiffness: 420, damping: 22 }}>
-            <TickTag tone="bg-game-brass" className="px-3 py-2 sm:px-5 sm:py-3">
-              <span className="block bg-zinc-950 px-5 py-1.5 text-3xl font-black tracking-widest text-zinc-50 uppercase [clip-path:polygon(1%_0,100%_6%,99%_100%,0_94%)] sm:px-10 sm:py-3 sm:text-6xl">
+            <TickTag tone="bg-game-brass" className="px-3 py-2 sm:px-8 sm:py-4">
+              <span className="block bg-zinc-950 px-5 py-2 text-[clamp(2.25rem,11vw,5.625rem)] font-black tracking-wider text-zinc-50 uppercase [clip-path:polygon(1%_0,100%_6%,99%_100%,0_94%)] sm:px-16 sm:py-4 sm:tracking-widest">
                 {t.ui.toast.start}
               </span>
             </TickTag>
@@ -733,6 +733,70 @@ function useSize() {
     return () => ro.disconnect();
   }, []);
   return [ref, size] as const;
+}
+
+/** Linha torta ao longo de um segmento (em px): ondas largas e tremido, como as bordas das faixas. */
+function brushLine(seed: number, a: [number, number], b: [number, number], amp: number): [number, number][] {
+  const r = rng(seed);
+  const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+  return Array.from({ length: 13 }, (_, k) => {
+    const o = Math.sin(k * 0.8 + seed) * amp * 0.4 + (r() - 0.5) * amp;
+    return [a[0] + (dx * k) / 12 - (dy / len) * o, a[1] + (dy * k) / 12 + (dx / len) * o];
+  });
+}
+/** As duas diagonais do X, em frações da caixa, com a semente de cada traço. */
+const X_LINES = [{ seed: 31, a: [0.1, 0.06], b: [0.9, 0.94] }, { seed: 32, a: [0.9, 0.06], b: [0.1, 0.94] }] as const;
+
+/**
+ * X vermelho no traço das faixas da mesa: duas pinceladas grossas, tortas, de borda rasgada e com falhas.
+ * Com `draw`, a primeira corta e a segunda vem logo depois (no tempo das duas facadas do som).
+ */
+function BrushX({ id, w, h, draw }: { id: string; w: number; h: number; draw: boolean }) {
+  if (w <= 0 || h <= 0) return null;
+  const sw = Math.max(7, Math.min(20, w * 0.11));
+  const lines = X_LINES.map(({ seed, a, b }) => {
+    const pts = brushLine(seed, [a[0] * w, a[1] * h], [b[0] * w, b[1] * h], sw * 0.6);
+    const len = Math.hypot((b[0] - a[0]) * w, (b[1] - a[1]) * h);
+    const scale = (g: number[], k = 1) => g.map((x, i) => (x * len * (i % 2 ? k : 1)).toFixed(1)).join(" ");
+    return { seed, d: `M ${smooth(pts)}`, d2: `M ${smooth(pts.map(([x, y]) => [x + sw * 0.5, y - sw * 0.3]))}`, dash: scale(gaps(seed), 0.7), dash2: scale(gaps(seed + 9), 3) };
+  });
+  return (
+    <svg aria-hidden="true" className="pointer-events-none absolute inset-0 size-full overflow-visible fill-none stroke-red-600 drop-shadow-[0_0_6px_var(--color-red-800)]">
+      <defs>
+        <filter id={id} filterUnits="userSpaceOnUse" x={-40} y={-40} width={w + 80} height={h + 80}>
+          <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves={2} seed={4} result="wave" />
+          <feDisplacementMap in="SourceGraphic" in2="wave" scale={sw * 0.9} xChannelSelector="R" yChannelSelector="G" result="torn" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.2 0.05" numOctaves={3} seed={6} result="grain" />
+          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 7 -2.4" result="dry" />
+          <feComposite in="torn" in2="dry" operator="in" />
+        </filter>
+        {lines.map((l, k) => (
+          <mask key={l.seed} id={`${id}-m${k}`} maskUnits="userSpaceOnUse" x={-40} y={-40} width={w + 80} height={h + 80}>
+            <motion.path d={l.d} stroke="white" strokeWidth={sw * 3} strokeLinecap="round"
+              initial={{ pathLength: draw ? 0 : 1 }} animate={{ pathLength: 1 }} transition={{ duration: 0.13, delay: k * 0.22, ease: "easeIn" }} />
+          </mask>
+        ))}
+      </defs>
+      {lines.map((l, k) => (
+        <g key={l.seed} mask={`url(#${id}-m${k})`}>
+          <g filter={`url(#${id})`}>
+            <path d={l.d} strokeWidth={sw} strokeDasharray={l.dash} strokeLinecap="butt" />
+            <path d={l.d2} strokeWidth={sw * 0.4} strokeDasharray={l.dash2} strokeLinecap="butt" />
+          </g>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+/** X da mira (Vindicta): aparece sobre a carta enquanto o cursor ou o foco está nela. */
+function AimX({ id }: { id: string }) {
+  const [ref, { w, h }] = useSize();
+  return (
+    <div ref={ref} aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-has-focus-visible:opacity-100">
+      <BrushX id={id} w={w} h={h} draw={false} />
+    </div>
+  );
 }
 
 /** Traço de pincel seco: grosso, com a borda rasgada (deslocamento por ruído), fiapos (erosão por ruído) e falhas (tracejado irregular). */
@@ -876,7 +940,7 @@ type StatusKey = keyof T["ui"]["status"];
 function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
   const s = c.st, now = (u?: number) => (u ?? 0) >= m.t;
   const list: [boolean, string, StatusKey][] = [
-    [!!s.burn || !!s.tburn?.some((x) => x.u >= m.t), "🔥", "burn"], [now(s.stun), "💫", "stun"], [m.immune(c), "🛡️", "immune"],
+    [!!s.burn || !!s.ail || !!s.tburn?.some((x) => x.u >= m.t), "🔥", "burn"], [now(s.stun), "💫", "stun"], [m.immune(c), "🛡️", "immune"],
     [!!s.chained, "⛓️", "chained"], [!!s.burrow && !m.final, "⛏️", "burrow"], [now(s.sleep), "💤", "sleep"],
     [(s.rip ?? 0) > 0, "⚔️", "riposte"], [!!s.wolf, "🐺", "wolf"], [now(s.vuln), "🎯", "vuln"],
     [!!s.petri, "🗿", "petri"], [!!s.unstop, "⚡", "unstop"], [now(s.chan?.u), "🌩️", "chan"],
@@ -888,8 +952,9 @@ function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
 /** Vaga da carta na fileira do local: encolhe quando não cabe (a carta transborda e fica por baixo da seguinte). */
 const slot = "w-gc hover:z-10 focus-within:z-10";
 
-function BoardCard({ c, m, t, name, face, looking, target, acts, shift, onClick, onPeek }: {
+function BoardCard({ c, m, t, name, face, looking, target, mark = false, acts, shift, onClick, onPeek }: {
   c: GCard; m: Match; t: T; name: string; face: React.ReactNode; looking: boolean; target: boolean; acts: { label: string; run: () => void }[];
+  /** Alvo de uma mira que mata (Vindicta): o X vermelho aparece no hover. */ mark?: boolean;
   /** Pode ser arrastada para outro local neste turno: treme na mesa e avisa o local sob o cursor e onde foi solta. */
   shift?: { on: (over: number | null) => void; drop: (i: number | null) => void };
   /** Clique; no toque vem o retângulo da carta para ampliar (no mouse, o hover já amplia). */
@@ -903,7 +968,7 @@ function BoardCard({ c, m, t, name, face, looking, target, acts, shift, onClick,
   const icons = statusIcons(c, m, t);
   const w = weight(c);
   return (
-    <motion.div className={`relative perspective-[40rem] ${slot} ${shift ? "touch-none" : ""} ${held ? "z-50" : ""}`} data-card={c.id} data-target={target ? "" : undefined}
+    <motion.div className={`group relative perspective-[40rem] ${slot} ${shift ? "touch-none" : ""} ${held ? "z-50" : ""}`} data-card={c.id} data-target={target ? "" : undefined}
       drag={!!shift} dragSnapToOrigin dragMomentum={false} dragElastic={1} whileDrag={{ scale: 0.9 }}
       onDragStart={() => { moved.current = true; setHeld(true); onPeek(null); }}
       onDrag={(e) => { const pt = pointOf(e); shift?.on(dropUnder(pt.x, pt.y)); }}
@@ -920,6 +985,7 @@ function BoardCard({ c, m, t, name, face, looking, target, acts, shift, onClick,
       className={`relative block w-gc rounded-lg ${shift ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${c.staged || c.st.wait ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
       {face}
     </motion.button>
+    {mark && <AimX id={`aim-${c.id}`} />}
     </div>
     {c.rev ? <Impact w={w} /> : c.side === "p" && <Impact w={1} />}
     {acts.length > 0 && (
@@ -1306,16 +1372,8 @@ function Score({ v, lead, side }: { v: number; lead: boolean; side: Side }) {
  * Carta comprada com a mão cheia: aparece sobre o baralho em preto e branco, pega fogo de baixo para cima e some.
  * A carta está perdida (saiu da partida).
  */
-/** Carta eliminada: dois cortes vermelhos em X atravessam a carta e ela some em 1,5 s. */
+/** Carta eliminada: dois traços vermelhos a pincel cortam a carta em X e ela some em 1,5 s. */
 function Slain({ r, card, still, onDone }: { r: DOMRect; card: ReactNode; still: boolean; onDone: () => void }) {
-  const cut = (d: string, delay: number) => (
-    <>
-      <motion.path d={d} className="stroke-red-600" strokeWidth={14} strokeLinecap="round" vectorEffect="non-scaling-stroke" fill="none"
-        initial={{ pathLength: still ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.14, delay, ease: "easeIn" }} />
-      <motion.path d={d} className="stroke-red-100" strokeWidth={3} strokeLinecap="round" vectorEffect="non-scaling-stroke" fill="none"
-        initial={{ pathLength: still ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.14, delay, ease: "easeIn" }} />
-    </>
-  );
   return (
     <motion.div aria-hidden="true" className="pointer-events-none fixed z-60" style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
       initial={{ opacity: 1, scale: 1 }} animate={{ opacity: [1, 1, 0], scale: still ? 1 : [1, 1.06, 0.92] }} exit={{ opacity: 0 }}
@@ -1323,10 +1381,7 @@ function Slain({ r, card, still, onDone }: { r: DOMRect; card: ReactNode; still:
       <motion.div className="size-full" initial={{ filter: "grayscale(0) brightness(1)" }} animate={{ filter: "grayscale(0.8) brightness(0.6)" }} transition={{ duration: 0.3, delay: 0.25 }}>
         {card}
       </motion.div>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible drop-shadow-[0_0_8px_var(--color-red-600)]">
-        {cut("M 4 6 L 96 94", 0)}
-        {cut("M 96 6 L 4 94", 0.22)}
-      </svg>
+      <BrushX id={`slain-${Math.round(r.left)}-${Math.round(r.top)}`} w={r.width} h={r.height} draw={!still} />
     </motion.div>
   );
 }

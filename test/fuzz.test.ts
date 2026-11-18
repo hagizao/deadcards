@@ -78,7 +78,8 @@ function runMatch(seed: number, issues: string[]) {
     const ok = l && m.abilityOf(c) === a;
     const safe = (x: GCard, b: { loc: Loc }) => !m.immune(x) && !x.st.unstop && !x.st.burrow && b.loc.L.type !== "shrine" && !(b.loc.shield[x.side] >= m.t) && !m.log.some((e) => e.k === "riposte");
     if (ok && a === "Pocket" && !someoneLeft) [...before].forEach(([x, b]) => {
-      if (x.side !== c.side && b.loc === l && safe(x, b) && m.locOf(x) && m.pow(x) > Math.max(0, b.pow - c.v)) bad(`Pocket não tirou ${c.v} de ${nm(x)} (${b.pow} → ${m.pow(x)})`);
+      if (x.side !== c.side && b.loc === l && safe(x, b) && m.locOf(x) && m.pow(x) > Math.max(Math.min(1, b.pow), b.pow - c.v)) bad(`Pocket não tirou ${c.v} de ${nm(x)} (${b.pow} → ${m.pow(x)})`);
+      if (x.side !== c.side && b.pow >= 1 && m.locOf(x) === b.loc && m.pow(x) < 1) bad(`Pocket zerou ${nm(x)}`);
     });
     if (ok && a === "Shiv") {
       const fs = [...before].filter(([x, b]) => x.side !== c.side && b.loc === l && !m.immune(x) && !x.st.unstop);
@@ -90,7 +91,7 @@ function runMatch(seed: number, issues: string[]) {
       if (t && !m.locOf(t[0]) && !m.log.some((e) => e.k === "owlBonus")) bad(`Grey Talon zerou ${nm(t[0])} e não ganhou o bônus`);
     }
     if (ok && a === "Kelvin") l.s[c.side].filter((x) => x.rev).forEach((x) => {
-      if (x.bonus < 0 || x.st.tmp.some((t) => t.v < 0 && t.u >= m.t) || x.st.burn) bad(`Kelvin não curou ${nm(x)}`);
+      if (x.bonus < 0 || x.st.tmp.some((t) => t.v < 0 && t.u >= m.t) || x.st.burn || x.st.ail) bad(`Kelvin não curou ${nm(x)}`);
     });
     // ninguém do outro lado ganha poder com uma habilidade inimiga; aliados só perdem com quem diz isso
     [...before].forEach(([x, b]) => {
