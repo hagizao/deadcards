@@ -539,11 +539,15 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {result && showEnd && (
-          <EndScreen key="end" r={result} m={m} t={t} onAgain={restart} onBoard={() => setShowEnd(false)} onDeck={onDeck} />
-        )}
-      </AnimatePresence>
+      {/* no body: fica acima do cabeçalho do site e de qualquer camada do jogo */}
+      {createPortal(
+        <AnimatePresence>
+          {result && showEnd && (
+            <EndScreen key="end" r={result} m={m} t={t} onAgain={restart} onBoard={() => setShowEnd(false)} onDeck={onDeck} />
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
     {/* tela larga: à direita os dois baralhos (IA em cima, o seu embaixo) e o fim do turno entre eles */}
     {wide && (
@@ -637,7 +641,10 @@ function useSize() {
 }
 
 /** Traço de pincel seco: grosso, com a borda rasgada (deslocamento por ruído), fiapos (erosão por ruído) e falhas (tracejado irregular). */
-function BrushStroke({ id, pts, w, h, sw, dash, dash2, inward }: { id: string; pts: [number, number][]; w: number; h: number; sw: number; dash: number[]; dash2: number[]; inward: number }) {
+function BrushStroke({ id, pts, w, h, sw, dash, dash2, inward, caps = false }: {
+  id: string; pts: [number, number][]; w: number; h: number; sw: number; dash: number[]; dash2: number[]; inward: number;
+  /** Pontas sempre cheias (a falha nunca cai na borda da tela). */ caps?: boolean;
+}) {
   const px = pts.map(([x, y]): [number, number] => [x * w, y * h]);
   const d = `M ${smooth(px)}`;
   // pincelada de apoio, mais fina e por dentro, que aparece só em trechos
@@ -646,6 +653,7 @@ function BrushStroke({ id, pts, w, h, sw, dash, dash2, inward }: { id: string; p
     <g filter={`url(#${id})`}>
       <path d={d} strokeWidth={sw} strokeDasharray={dash.map((x) => (x * h).toFixed(1)).join(" ")} strokeLinecap="butt" />
       <path d={d2} strokeWidth={sw * 0.45} strokeDasharray={dash2.map((x, k) => (x * h * (k % 2 ? 3 : 0.6)).toFixed(1)).join(" ")} strokeDashoffset={h * 0.1} strokeLinecap="butt" />
+      {caps && <path d={d} strokeWidth={sw} pathLength={100} strokeDasharray="14 72 14" strokeLinecap="butt" />}
     </g>
   );
 }
@@ -1248,8 +1256,8 @@ function EndBackdrop({ tone }: { tone: (typeof END_TONE)[keyof typeof END_TONE] 
             <path d={fill} fill="url(#end-tone)" />
             <path d={fill} fill="url(#end-shade)" />
           </g>
-          <BrushStroke id="end-brush" pts={END_BRUSH.left} w={w} h={h} sw={sw} dash={END_BRUSH.dash} dash2={END_BRUSH.dash2} inward={1} />
-          <BrushStroke id="end-brush" pts={END_BRUSH.right} w={w} h={h} sw={sw} dash={END_BRUSH.dash2} dash2={END_BRUSH.dash} inward={-1} />
+          <BrushStroke id="end-brush" caps pts={stretch(END_BRUSH.left)} w={w} h={h} sw={sw} dash={END_BRUSH.dash} dash2={END_BRUSH.dash2} inward={1} />
+          <BrushStroke id="end-brush" caps pts={stretch(END_BRUSH.right)} w={w} h={h} sw={sw} dash={END_BRUSH.dash2} dash2={END_BRUSH.dash} inward={-1} />
         </svg>
       )}
     </div>
