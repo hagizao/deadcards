@@ -8,6 +8,12 @@ import {
 } from "./config";
 
 export type Side = "p" | "a";
+/**
+ * Momento especial de uma habilidade, para a animação: `pull` o gancho do Bebop puxando, `late` o efeito marcado para
+ * depois (bote da Calico, dança da Haze, lobisomem), `end` o fim do turno (raios do Seven), `trap` a armadilha do Venator
+ * fechando, `petri` o olhar da Vyper, `parry` o contra-golpe do Apollo.
+ */
+export type HeardEv = "pull" | "late" | "end" | "trap" | "petri" | "parry";
 export const opp = (s: Side): Side => (s === "p" ? "a" : "p");
 
 export const TURNS = 8;
@@ -295,9 +301,9 @@ export class Match {
   /**
    * Habilidades que funcionaram (mudaram algo na partida), em ordem, para a tela tocar o som e a animação de cada uma.
    * `to`: cartas que ela mexeu (poder, status, lugar, criadas ou destruídas), sem a própria; `at`: local da carta;
-   * `self`: a própria carta mudou (a Vindicta que cai do céu); `ev`: momento especial (o puxão do gancho do Bebop). A tela esvazia a lista.
+   * `self`: a própria carta mudou (a Vindicta que cai do céu); `ev`: momento especial (ver {@link HeardEv}). A tela esvazia a lista.
    */
-  heard: { ab: AbilityKey; id: number; side: Side; to: number[]; at: number; self: boolean; ev?: "pull" }[] = [];
+  heard: { ab: AbilityKey; id: number; side: Side; to: number[]; at: number; self: boolean; ev?: HeardEv }[] = [];
   /** Retrato de cada carta da mesa, para saber quais a habilidade mexeu. */
   private cardSigs() {
     return new Map(this.loc.flatMap((l, i) => [...l.s.p, ...l.s.a].map((c) => [c.id, JSON.stringify([i, c.base, c.bonus, c.v, c.p.token, c.st, c.mv, c.rev])] as const)));
@@ -307,16 +313,36 @@ export class Match {
     const cards = this.loc.map((l) => [l.s.p, l.s.a].map((a) => a.map((c) => [c.id, c.base, c.bonus, c.v, c.p.token, c.st, c.mv])));
     return JSON.stringify([cards, this.loc.map((l) => [l.trap, l.petri, l.lock, l.shield]), this.hand.length, this.ahand.length, this.pend.length, this.portals.length, this.hook, this.said]);
   }
-  /** Roda a habilidade da carta e, se ela mudou alguma coisa, registra para o som. */
-  private fire(c: GCard, f: () => void) {
+  /**
+   * Roda a habilidade da carta e, se ela mudou alguma coisa, registra para o som e a animação. Entra na lista antes
+   * do que ela mesma provocou (o contra-golpe do Apollo vem depois do golpe).
+   */
+  private fire(c: GCard, f: () => void, ev?: HeardEv) {
     const before = this.sig();
     const was = this.cardSigs();
     const at = this.idx(this.locOf(c)!);
+    const i = this.heard.length;
     f();
     if (this.sig() === before) return;
     const now = this.cardSigs();
     const to = [...new Set([...was.keys(), ...now.keys()])].filter((id) => id !== c.id && was.get(id) !== now.get(id));
-    this.heard.push({ ab: c.ab, id: c.id, side: c.side, to, at, self: was.get(c.id) !== now.get(c.id) });
+    this.heard.splice(i, 0, { ab: c.ab, id: c.id, side: c.side, to, at, self: was.get(c.id) !== now.get(c.id), ...(ev ? { ev } : {}) });
+  }
+  /** O efeito marcado para depois (o bote da Calico, a dança da Haze, o lobisomem): entra na lista como `late`. */
+  private fireLate(c: GCard, f: () => void) {
+    if (this.locOf(c)) this.fire(c, f, "late");
+    else f();
+  }
+  /** Em quem a constante age, para a animação: os alvos da Nurse Harrow, as inimigas do Warden, as aliadas da Paige e do Solomon, todas do Victor. */
+  private constTargets(c: GCard, l: Loc): number[] {
+    const foes = l.s[opp(c.side)].filter((x) => x.rev), mine = l.s[c.side].filter((x) => x.rev && x !== c);
+    switch (c.ab) {
+      case "Nurse Harrow": { const h = this.harrow(c, l); return [h.foe, h.ally].flatMap((x) => (x && x !== c ? [x.id] : [])); }
+      case "Warden": return foes.map((x) => x.id);
+      case "Paige": case "Solomon": case "aura": return mine.map((x) => x.id);
+      case "Victor": return [...mine, ...foes].map((x) => x.id);
+      default: return [];
+    }
   }
   private handOf = (s: Side) => (s === "p" ? this.hand : this.ahand);
   private later(f: () => void, t = this.t + 1) { this.pend.push({ t, f, cause: this.causes.at(-1) }); }
@@ -470,7 +496,10 @@ export class Match {
     if ((t.st.rip ?? 0) > 0 && src && src.side !== t.side) {
       t.st.rip = (t.st.rip ?? 1) - 1;
       this.say({ k: "riposte", c: this.N(t), t: this.N(src) });
-      if (this.locOf(src)) this.as(this.by(t), () => this.hurt(src, t.st.ripV ?? 2, null));
+      if (this.locOf(src)) {
+        this.heard.push({ ab: "Apollo", id: t.id, side: t.side, to: [src.id], at: this.idx(l), self: false, ev: "parry" });
+        this.as(this.by(t), () => this.hurt(src, t.st.ripV ?? 2, null));
+      }
       return false;
     }
     if ((t.st.vuln ?? 0) >= this.t) { amt *= 2; t.st.vuln = 0; }
@@ -549,14 +578,14 @@ export class Match {
   }
   private wolfIn(c: GCard) {
     c.st.wolfAt = this.t + 1;
-    this.later(() => this.as(this.by(c), () => {
+    this.later(() => this.as(this.by(c), () => this.fireLate(c, () => {
       const l = this.locOf(c);
       if (!l || c.st.wolf) return;
       c.st.wolf = true;
       c.bonus += c.v;
       const t = this.master(c) ? this.weakest(this.capped("Silver", this.tg(this.foes(c, l)))) : null;
       this.say({ k: "wolf", c: this.N(c), t: t && this.destroy(t) ? this.N(t) : undefined });
-    }), c.st.wolfAt);
+    })), c.st.wolfAt);
   }
 
   /* ---------- escolhas ao jogar ---------- */
@@ -729,14 +758,14 @@ export class Match {
       this.say({ k: "chain", c: this.N(c), t: this.N(t) });
     } },
     "Calico": { r: (c, _l, v) => {
-      this.later(() => {
+      this.later(() => this.fireLate(c, () => {
         const l = this.locOf(c);
         if (!l || this.abilityOf(c) !== "Calico") return;
         this.foes(c, l).forEach((t) => this.hurt(t, v, c));
         c.st.immune = true;
         if (this.master(c)) c.mv.push({ n: 1, u: this.t + 1, bonus: 0 });
         this.say({ k: "calico", c: this.N(c), v });
-      });
+      }));
     } },
     "Celeste": { r: (c, l, v) => {
       const t = this.strongest(this.tg(this.foes(c, l)));
@@ -780,14 +809,14 @@ export class Match {
       if (t) { t.st.vuln = this.t + 1; t.st.sleep = this.t + 1; this.say({ k: "haze", c: this.N(c), t: this.N(t) }); }
       if (!this.master(c)) return;
       c.st.chan = { u: this.t + 1 };
-      this.later(() => {
+      this.later(() => this.fireLate(c, () => {
         const L = this.locOf(c);
         if (!L || !c.st.chan) return;
         c.st.chan = undefined;
         // só a dorminhoca, se ainda estiver aqui: o sono ainda vale, então o dano sai dobrado
         if (t && this.locOf(t) === L) this.hurt(t, 3, c);
         this.say({ k: "dance", c: this.N(c) });
-      });
+      }));
     } },
     "Holliday": { r: (c, l) => {
       const to = this.chosenLoc(c, l) ?? this.sh(this.loc.filter((L) => L !== l && this.room(L, c.side) && this.room(L, opp(c.side))))[0];
@@ -935,11 +964,11 @@ export class Match {
       const t = this.strongest(this.capped("Wraith", this.tg(this.foes(c, l))));
       if (t) { t.st.stun = this.t + 1; this.interrupt(t); this.say({ k: "wraith", c: this.N(c), t: this.N(t) }); }
       if (!this.master(c)) return;
-      this.later(() => {
+      this.later(() => this.fireLate(c, () => {
         const L = this.locOf(c);
         const to = L && this.losing(c.side, L) ? this.pickLoc(L, c.side) : null;
         if (L && to && this.move(c, L, to)) this.say({ k: "move", c: this.N(c), loc: to.L.name });
-      });
+      }));
     } },
     "Yamato": { r: (c, l, v) => {
       if (this.total(l, c.side) - this.pow(c, l) >= this.total(l, opp(c.side))) return;
@@ -1332,10 +1361,13 @@ export class Match {
     c.rev = true;
     c.staged = false;
     c.st.wait = undefined;
-    if (l.trap[s]) { const v = l.trap[s]; l.trap[s] = 0; if (this.as({ k: "trap" }, () => this.hurt(c, v, null))) this.say({ k: "trapHit", c: this.N(c), v }); }
+    // armadilha do Venator e olhar da Vyper: entram na lista como ação de quem armou, com a própria carta como alvo
+    const sprung = (ab: AbilityKey, ev: HeardEv) => this.heard.push({ ab, id: c.id, side: opp(s), to: [c.id], at: this.idx(l), self: false, ev });
+    if (l.trap[s]) { const v = l.trap[s]; l.trap[s] = 0; sprung("Venator", "trap"); if (this.as({ k: "trap" }, () => this.hurt(c, v, null))) this.say({ k: "trapHit", c: this.N(c), v }); }
     const pt = l.petri[s];
     if (pt) {
       l.petri[s] = null;
+      sprung("Vyper", "petri");
       if (!this.immune(c) && !c.st.unstop) { c.st.petri = true; this.say({ k: "petrify", c: this.N(c) }); if (pt.m) this.as({ k: "trap" }, () => this.hurt(c, 2, null)); }
     }
     const here = l;
@@ -1353,9 +1385,17 @@ export class Match {
     this.as({ k: "mentor" }, () => this.mentor(c));
     this.as({ k: "duel" }, () => this.duel(c, here));
     const impl = this.IMPL[this.abilityOf(c)];
+    const n0 = this.heard.length;
     if (impl?.r) for (let i = 0, n = this.ty(l, "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) this.fire(c, () => this.as(this.by(c), () => impl.r?.(c, at, c.v))); }
-    // constante: toca só ao entrar em jogo, com a habilidade ativa
-    else if (ABILITIES[c.ab].kind === "c" && this.abilityOf(c) === c.ab && this.locOf(c)) this.heard.push({ ab: c.ab, id: c.id, side: s, to: [], at: this.idx(this.locOf(c)!), self: false });
+    // constante: toca só ao entrar em jogo, com a habilidade ativa, mirando em quem ela age (a Nurse Harrow sem
+    // Maestria tem um "ao revelar" que não muda nada, e toca do mesmo jeito)
+    const on = this.locOf(c);
+    if (ABILITIES[c.ab].kind === "c" && this.abilityOf(c) === c.ab && on) {
+      const to = this.constTargets(c, on);
+      const had = this.heard.slice(n0).find((h) => h.id === c.id);
+      if (had) had.to = [...new Set([...had.to, ...to])];
+      else this.heard.push({ ab: c.ab, id: c.id, side: s, to, at: this.idx(on), self: false });
+    }
     // Teatro: uma cópia com o mesmo poder, sem habilidade
     const at = this.locOf(c);
     if (at && this.ty(at, "copy") && !c.tok && this.room(at, s)) {
@@ -1373,7 +1413,7 @@ export class Match {
       for (let i = 0, n = (c.st.cd ? 2 : 1) * (this.ty(l, "clock") ? 2 : 1); i < n; i++) {
         const L = this.locOf(c);
         const f = this.IMPL[this.abilityOf(c)]?.f;
-        if (c.rev && L === l && f) this.fire(c, () => this.as(this.by(c), () => f(c, L, c.v)));
+        if (c.rev && L === l && f) this.fire(c, () => this.as(this.by(c), () => f(c, L, c.v)), "end");
       }
     }));
     this.sweep();

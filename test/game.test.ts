@@ -560,6 +560,54 @@ describe("escolhas, movimento e execução", () => {
     expect(m.heard[0]).toEqual({ ab: "Bebop", id: b.id, side: "p", to: [a.id], at: 0, self: false, ev: "pull" });
   });
 
+  it("armadilha do Venator e olhar da Vyper entram na lista quando a inimiga é revelada", () => {
+    for (const [ab, ev] of [["Venator", "trap"], ["Vyper", "petri"]] as const) {
+      const { m, mk, put } = arena();
+      put(pc("v", ab, flat(70)), "p", 0);
+      m.heard.length = 0;
+      const a = mk(pc("a", "Herói Novo", flat(70)), "a");
+      a.staged = true;
+      m.loc[0].s.a.push(a);
+      m.reveal(a, m.loc[0]);
+      expect(m.heard[0]).toEqual({ ab, id: a.id, side: "p", to: [a.id], at: 0, self: false, ev });
+    }
+  });
+
+  it("o contra-golpe do Apollo entra na lista depois do golpe que ele aparou", () => {
+    const { m, put, stage } = arena();
+    const ap = put(pc("ap", "Apollo", flat(70)), "a", 0);
+    m.heard.length = 0;
+    const gt = stage(pc("g", "Grey Talon", flat(70)), 0);
+    m.choose(gt, { card: ap });
+    m.reveal(gt, m.loc[0]);
+    expect(m.heard.map((h) => [h.ab, h.ev])).toEqual([["Grey Talon", undefined], ["Apollo", "parry"]]);
+    expect(m.heard[1]).toMatchObject({ id: ap.id, to: [gt.id] });
+  });
+
+  it("os raios do Seven no fim do turno e o bote da Calico entram na lista com o momento", () => {
+    const { m, put } = arena();
+    const foe = put(pc("a", "Herói Novo", flat(70)), "a", 0);
+    foe.base = 20;
+    const sv = put(pc("s", "Seven", flat(70)), "p", 0);
+    const ca = put(pc("c", "Calico", flat(70)), "p", 0);
+    m.heard.length = 0;
+    m.t++;
+    m.endOfTurn();
+    expect(m.heard).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ab: "Seven", id: sv.id, ev: "end", to: expect.arrayContaining([foe.id]) }),
+      expect.objectContaining({ ab: "Calico", id: ca.id, ev: "late", to: expect.arrayContaining([foe.id]) }),
+    ]));
+  });
+
+  it("a Nurse Harrow mostra para a animação a inimiga drenada e o aliado curado", () => {
+    const { m, put } = arena();
+    const foe = put(pc("a", "Herói Novo", flat(70)), "a", 0);
+    const ally = put(pc("b", "Herói Novo", flat(70)), "p", 0);
+    m.heard.length = 0;
+    const nh = put(pc("n", "Nurse Harrow", flat(70)), "p", 0);
+    expect(m.heard).toEqual([{ ab: "Nurse Harrow", id: nh.id, side: "p", to: [foe.id, ally.id], at: 0, self: false }]);
+  });
+
   it("Holliday leva a inimiga escolhida para o local escolhido", () => {
     const { m, put, stage } = arena();
     const a = put(pc("a", "Herói Novo", flat(70)), "a", 0);
