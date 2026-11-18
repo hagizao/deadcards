@@ -42,6 +42,10 @@
   --color-lane-yellow: #f0c443;
   --color-lane-blue: #52c4dd;
   --color-lane-green: #8edc78;
+  /* comanda do bar (itens comprados): papel creme, tinta e a capa de papelão do bloco */
+  --color-comanda-paper: #e6ddb5;
+  --color-comanda-ink: #2a2622;
+  --color-comanda-kraft: #b0844f;
 }
 
 /* mesa em faixas: cada lado de um local é uma grade 2x2, então a carta mede 1/6 da largura da mesa

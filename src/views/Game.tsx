@@ -7,7 +7,7 @@ import { AudioMenu, EndTurnButton, SoulOrb } from "../components/GameHud";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, ITEMS, gameConfig, locArtUrl, phaseOf, type ItemKey, type ItemSlot, type PoolCard } from "../lib/game/config";
+import { ABILITIES, ITEMS, gameConfig, itemCost, locArtUrl, phaseOf, type ItemKey, type ItemSlot, type PoolCard } from "../lib/game/config";
 import { DeckBuilder } from "../components/DeckBuilder";
 import { DeckPile } from "../components/DeckPile";
 import { versionPlayer, type DeckLook } from "../lib/game/deck";
@@ -248,7 +248,6 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     const err = m.play(c, l);
     if (err) { sfx("error"); return say(errText[err]); }
     sfx("place");
-    thump(0.35);
     const spec = m.choiceOf(c);
     if (spec?.card && m.choiceCards(c).length) setMode({ k: "card", c });
     else if (spec?.loc) setMode({ k: "loc", c });
@@ -344,17 +343,12 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     <div className={full ? "fixed inset-0 z-50 overflow-hidden px-3 sm:px-6" : "contents"}>
     <BarTable />
     <div className={wide ? `flex gap-4 ${height}` : "contents"}>
-    {/* tela larga: à esquerda o título, os itens da IA em cima, suas almas no meio e seus itens embaixo */}
+    {/* tela larga: à esquerda a comanda da IA (vinda de cima), suas almas no meio e a sua comanda (vinda de baixo) */}
     {wide && (
-      <aside aria-label={t.ui.players} className="grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] justify-items-center gap-4 py-3 text-dl-text">
-        <div className="flex min-h-0 w-full flex-col items-start gap-4">
-          {title}
-          <ItemBox s="a" m={m} t={t} icons={icons} on={boughtOn} />
-        </div>
+      <aside aria-label={t.ui.players} className="grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] items-center justify-items-center gap-4 text-dl-text">
+        <Comanda s="a" m={m} t={t} icons={icons} on={boughtOn} />
         <SoulOrb n={m.E} label={t.ui.souls(m.E)} big />
-        <div className="flex min-h-0 w-full flex-col justify-end">
-          <ItemBox s="p" m={m} t={t} icons={icons} on={boughtOn} />
-        </div>
+        <Comanda s="p" m={m} t={t} icons={icons} on={boughtOn} />
       </aside>
     )}
     <div className={`relative mx-auto flex flex-col gap-1.5 text-dl-text ${wide ? "h-full min-w-0 flex-[0_1_80rem]" : `${height} max-w-7xl`}`}>
@@ -363,7 +357,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
         {m.loc.map((l, i) => <LaneBackdrop key={l.L.id + i} l={l} i={i} drop={dropAt(l, i)} />)}
       </div>
       <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
-        {wide ? <div /> : title}
+        {title}
         <div className="order-last col-span-2 flex items-start justify-center gap-2 sm:order-0 sm:col-span-1">
           {!wide && <ItemSlot s="a" m={m} t={t} icons={icons} on={boughtOn} />}
           <AiHand n={m.ahand.length} t={t} />
@@ -886,30 +880,63 @@ function ItemSlot({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Reco
   );
 }
 
-/** Tela larga: caixa grande com os itens comprados de um jogador, legível de longe. A compra da IA só aparece no fim do turno. */
-function ItemBox({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string }) {
+/** Linhas da comanda: mais do que cabem, para o papel seguir pautado até a borda da tela. */
+const COMANDA_ROWS = 12;
+
+/**
+ * Tela larga: comanda do bar com os itens comprados de um jogador. O bloco sai da borda da tela e só a metade dele fica
+ * na mesa (o resto é cortado de propósito pela borda). A do adversário é espelhada: o cabeçalho fica perto das almas e as
+ * linhas seguem para o topo. A compra da IA só aparece no fim do turno.
+ */
+function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string }) {
   const list = [...m.owned[s], ...(s === "p" && m.buying.p ? [m.buying.p] : [])];
   const who = s === "p" ? t.shop.mine : t.shop.ai;
+  const ai = s === "a";
+  const rows = Array.from({ length: Math.max(COMANDA_ROWS, list.length) }, (_, i) => list[i]);
+  const flip = ai ? "flex-col-reverse" : "flex-col";
   return (
-    <section data-item-slot={s} aria-label={who}
-      className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto rounded-xl bg-black/55 p-3 shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_0.5rem_1.5rem_rgb(0_0_0/0.5)]">
-      <h2 className={`font-display text-sm font-extrabold tracking-widest uppercase ${s === "p" ? "text-game-me" : "text-game-ai"}`}>{who}</h2>
-      {list.length ? (
-        <ul className="flex flex-col gap-3">
-          {list.map((b, i) => (
-            <li key={`${b.k}-${b.t}-${i}`} title={`${t.items[b.k](m.itemV(b.k))} (${t.shop.on(on(b))})`}
-              className={`flex items-center gap-3 ${b === m.buying.p ? "animate-pulse" : ""}`}>
-              <ItemIconBox k={b.k} icon={icons[b.k]} size="size-14" />
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <b className="font-display text-lg/tight">{b.k}</b>
-                <span className={`text-xs font-bold tracking-wider uppercase ${SLOT_TEXT[ITEMS[b.k].slot]}`}>{t.slots[ITEMS[b.k].slot]} · {t.shop.tier(ITEMS[b.k].tier)}</span>
-                <span className="line-clamp-2 text-sm text-zinc-300">{t.shop.on(on(b))}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : <p className="text-base text-zinc-500">{t.shop.hidden}</p>}
-    </section>
+    // a borda da tela corta o bloco: é o papel saindo para fora da mesa
+    <div className="@container relative size-full min-h-0 overflow-hidden">
+      <section data-item-slot={s} aria-label={who}
+        className={`absolute inset-x-3 flex h-[200%] ${flip} bg-comanda-paper text-comanda-ink shadow-[inset_0_0_2.5rem_rgb(90_60_20/0.25),0_0.5rem_1.25rem_rgb(0_0_0/0.6)] ${ai ? "bottom-2 rotate-1" : "top-2 -rotate-1"}`}>
+        {/* capa de papelão do bloco, do lado das almas */}
+        <div className="h-3 shrink-0 bg-comanda-kraft shadow-[0_1px_0_rgb(0_0_0/0.25)]" />
+        <div className={`flex min-h-0 flex-1 ${flip} gap-2 p-3`}>
+          <header className="flex flex-col gap-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="font-display text-xl font-extrabold tracking-wide uppercase @[15rem]:text-2xl">{t.ui.comanda.title}</h2>
+              <span className="hidden text-xs font-bold uppercase @[15rem]:inline">{t.ui.comanda.table}</span>
+            </div>
+            <p className={`border-b border-comanda-ink/60 pb-0.5 text-xs font-extrabold tracking-wider uppercase ${ai ? "text-game-ai" : "text-teal-800"}`}>{who}</p>
+          </header>
+          <div className={`flex min-h-0 flex-1 ${flip} border-2 border-comanda-ink`}>
+            <div className="grid shrink-0 grid-cols-[1fr_3rem] bg-comanda-ink text-[10px] font-extrabold tracking-widest text-comanda-paper uppercase">
+              <span className="px-2 py-1">{t.ui.comanda.item}</span>
+              <span className="border-l border-comanda-paper/40 py-1 text-center">{t.ui.comanda.value}</span>
+            </div>
+            <ul className={`flex ${flip}`}>
+              {rows.map((b, i) => (
+                <li key={b ? `${b.k}-${b.t}-${i}` : i} title={b ? `${t.items[b.k](m.itemV(b.k))} (${t.shop.on(on(b))})` : undefined}
+                  className={`grid min-h-14 grid-cols-[1fr_3rem] border-comanda-ink/35 ${ai ? "border-t" : "border-b"} ${b && b === m.buying.p ? "animate-pulse" : ""}`}>
+                  <span className="flex min-w-0 items-center gap-2 px-2 py-1.5">
+                    {b ? (
+                      <>
+                        <ItemIconBox k={b.k} icon={icons[b.k]} size="size-10" />
+                        <span className="flex min-w-0 flex-col">
+                          <b className="font-display text-base/tight">{b.k}</b>
+                          <span className="truncate text-xs text-comanda-ink/70">{t.shop.on(on(b))}</span>
+                        </span>
+                      </>
+                    ) : i === 0 && <span className="text-sm text-comanda-ink/50 italic">{t.shop.hidden}</span>}
+                  </span>
+                  <span className="grid place-items-center border-l border-comanda-ink/35 font-display text-lg">{b ? itemCost(ITEMS[b.k].tier) : ""}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
