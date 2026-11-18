@@ -16,7 +16,7 @@ import win from "../../assets/sfx/win.ogg";
 const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, win };
 /** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
 const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
-export type Sfx = keyof typeof FILES | keyof typeof WOOD;
+export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal";
 
 /** Volume e mudo de cada canal (0 a 1). */
 export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
@@ -63,6 +63,7 @@ function audioCtx() {
 /** Toca um efeito (sem efeito com o canal mudo ou se o navegador bloquear). */
 export function sfx(name: Sfx, volume = 1) {
   if (name in WOOD) return woodHit(WOOD[name as keyof typeof WOOD] * volume);
+  if (name === "reveal") return revealSwell(volume);
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
   const file = name as keyof typeof FILES;
@@ -109,6 +110,39 @@ function noise(c: AudioContext, sec: number, brown = false) {
   return b;
 }
 let burst: AudioBuffer | null = null;
+
+/** Local se revelando: a névoa se abre num sopro que sobe e o tampo ressoa grave por baixo. */
+function revealSwell(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  const air = c.createBufferSource();
+  air.buffer = noise(c, 1.6, true);
+  const band = c.createBiquadFilter();
+  band.type = "bandpass"; band.Q.value = 1.4;
+  band.frequency.setValueAtTime(220, t);
+  band.frequency.exponentialRampToValueAtTime(1300, t + 1.1);
+  const airGain = c.createGain();
+  airGain.gain.setValueAtTime(0.0001, t);
+  airGain.gain.exponentialRampToValueAtTime(1.6 * vol, t + 0.55);
+  airGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+  air.connect(band).connect(airGain).connect(c.destination);
+  air.start(t);
+  air.stop(t + 1.5);
+  const low = c.createOscillator();
+  low.type = "sine";
+  low.frequency.setValueAtTime(55, t);
+  low.frequency.linearRampToValueAtTime(80, t + 1.1);
+  const lowGain = c.createGain();
+  lowGain.gain.setValueAtTime(0.0001, t);
+  lowGain.gain.exponentialRampToValueAtTime(0.5 * vol, t + 0.6);
+  lowGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+  low.connect(lowGain).connect(c.destination);
+  low.start(t);
+  low.stop(t + 1.5);
+}
 
 /** Carta pesada batendo na mesa de madeira: baque grave do tampo, o "toc" da tábua e o estalo do contato. */
 function woodHit(strength = 1) {

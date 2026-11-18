@@ -314,7 +314,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
   const height = full ? "h-full" : "h-[calc(100dvh-5.5rem)] min-h-120 sm:h-[calc(100dvh-7.5rem)]";
   const title = (
     <div className={`flex flex-col gap-1 pt-1 ${wide ? "items-center text-center" : "items-start"}`}>
-      <h1 className="font-display text-sm font-extrabold tracking-[0.11em] uppercase sm:text-xl">{t.ui.title}</h1>
+      <h1 className="text-sm font-extrabold tracking-[0.11em] uppercase sm:text-xl">{t.ui.title}</h1>
       <abbr title={t.ui.phaseHint} className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold tracking-widest uppercase no-underline sm:text-xs ${PHASE_TONE[phaseOf(Math.min(m.t, TURNS))]}`}>
         {t.ui.phase(phaseOf(Math.min(m.t, TURNS)))}
       </abbr>
@@ -396,7 +396,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
             <motion.section aria-labelledby="game-shop" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.2 }}
               className="noir-glass-strong absolute inset-x-0 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-2 rounded-xl p-3 shadow-2xl">
               <div className="flex items-center justify-between gap-2">
-                <h2 id="game-shop" className="font-display text-lg font-extrabold tracking-wider">{t.shop.title}</h2>
+                <h2 id="game-shop" className="text-lg font-extrabold tracking-wider">{t.shop.title}</h2>
                 <button type="button" className={pill(false)} onClick={() => setShopHidden(true)}>{t.ui.viewBoard}</button>
               </div>
               <p className="text-xs text-zinc-400">{t.shop.hint}</p>
@@ -460,7 +460,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       <AnimatePresence>
         {toast && (
           <motion.div key={toast.id} role="status" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-            className="pointer-events-none fixed top-1/4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-black/85 px-5 py-2 text-center font-display text-xl font-extrabold tracking-wider text-white">
+            className="pointer-events-none fixed top-1/4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-black/85 px-5 py-2 text-center text-xl font-extrabold tracking-wider text-white">
             {toast.text}
           </motion.div>
         )}
@@ -471,7 +471,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-labelledby="game-end">
             <div className="flex flex-col items-center gap-3 text-center">
-              <h2 id="game-end" className="font-display text-4xl font-extrabold text-game-brass">{result.outcome === "win" ? t.ui.win : result.outcome === "loss" ? t.ui.loss : t.ui.draw}</h2>
+              <h2 id="game-end" className="text-4xl font-extrabold text-game-brass">{result.outcome === "win" ? t.ui.win : result.outcome === "loss" ? t.ui.loss : t.ui.draw}</h2>
               <p className="text-sm text-zinc-200">{t.ui.summary(result.won, result.lost, result.myPower, result.aiPower)}{result.patron ? ` · ${t.ui.patron}` : ""}</p>
               <div className="flex flex-wrap justify-center gap-2">
                 {/* eslint-disable-next-line jsx-a11y/no-autofocus -- foco vai para a ação principal do diálogo que acabou de abrir */}
@@ -487,21 +487,21 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     {/* tela larga: à direita os dois baralhos (IA em cima, o seu embaixo) e o fim do turno entre eles */}
     {wide && (
       <aside aria-label={t.ui.decks} className="grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] justify-items-center gap-3 pb-3">
-        <div className="flex w-full flex-col items-center justify-between gap-3">
-          <div className="flex w-full flex-col items-center gap-1">
-            <div className="flex items-center gap-1 self-end text-xs text-zinc-400 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
-              <span>{t.ui.record(record.w, record.l)}</span>
-              {controls}
-            </div>
-            {aiDeck}
+        <div className="flex w-full flex-col items-center gap-3">
+          <div className="flex items-center gap-1 self-end text-xs text-zinc-400 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
+            <span>{t.ui.record(record.w, record.l)}</span>
+            {controls}
           </div>
-          {title}
+          <div className="flex w-full flex-1 flex-col items-center justify-end gap-3">
+            {aiDeck}
+            {title}
+          </div>
         </div>
         <div className="flex flex-col items-center gap-2 text-sm font-bold">
           {endBtn}
           {prio}
         </div>
-        <div className="flex w-full flex-col items-center justify-end gap-1">
+        <div className="flex w-full flex-col items-center justify-center gap-1">
           {myDeck}
         </div>
       </aside>
@@ -606,16 +606,30 @@ function LaneBackdrop({ l, i, drop }: { l: Loc; i: number; drop: "off" | "ok" | 
   const [ref, { w, h }] = useSize();
   const id = `lane-${i}`;
   const art = l.rev && l.L.art;
+  // som quando o local vira (não na montagem: um local já revelado ao abrir a partida fica quieto)
+  const was = useRef(l.rev);
+  useEffect(() => {
+    if (l.rev && !was.current) sfx("reveal");
+    was.current = l.rev;
+  }, [l.rev]);
   // espessura proporcional à faixa, como no mapa: fina no celular, grossa no desktop
   const sw = Math.max(4, Math.min(13, w * 0.03));
   return (
     <div ref={ref} className="relative min-w-0 flex-1">
       <div className={`absolute -inset-x-1/2 inset-y-0 bg-radial to-transparent to-70% mix-blend-screen ${lane.glow}`} />
       <div className="absolute inset-0 bg-zinc-950" style={{ clipPath: `url(#${id}-clip)` }}>
-        {art ? (
-          <motion.img key={art} src={locArtUrl(art)} alt="" draggable={false} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}
+        {/* só anima ao revelar durante a partida; ao abrir a tela com o local já revelado, a arte já está lá */}
+        <AnimatePresence initial={false}>
+          {art && (
+          <motion.img key={art} src={locArtUrl(art)} alt="" draggable={false}
+            initial={{ opacity: 0, scale: 1.12, filter: "blur(14px) brightness(0.3)" }} animate={{ opacity: 1, scale: 1, filter: "blur(0px) brightness(1)" }}
+            transition={{ duration: 1.4, ease: "easeOut" }}
             className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />
-        ) : <div className="absolute inset-0 lane-fog" />}
+          )}
+        </AnimatePresence>
+        <AnimatePresence initial={false}>
+          {!l.rev && <motion.div key="fog" className="absolute inset-0 lane-fog" exit={{ opacity: 0 }} transition={{ duration: 1.4, ease: "easeIn" }} />}
+        </AnimatePresence>
         <div className="absolute inset-0 bg-linear-to-b from-black/80 via-black/10 to-black/85" />
         <div className={`absolute inset-0 bg-linear-to-t to-transparent to-60% ${lane.tint}`} />
         <div className={`absolute inset-0 transition-colors duration-150 ${drop === "over" ? "bg-game-me/20" : drop === "ok" ? "bg-game-me/8" : ""}`} />
@@ -821,7 +835,7 @@ function ItemIconBox({ k, icon, size }: { k: ItemKey; icon?: string; size: strin
   const slot = ITEMS[k].slot;
   return (
     <span className={`flex ${size} shrink-0 items-center justify-center overflow-hidden rounded-md bg-zinc-950/80 ring-2 ${SLOT_RING[slot]}`}>
-      {icon ? <img src={icon} alt="" className="size-full object-contain p-0.5" /> : <span className={`font-display text-xs font-extrabold ${SLOT_TEXT[slot]}`} aria-hidden="true">T{ITEMS[k].tier}</span>}
+      {icon ? <img src={icon} alt="" className="size-full object-contain p-0.5" /> : <span className={`text-xs font-extrabold ${SLOT_TEXT[slot]}`} aria-hidden="true">T{ITEMS[k].tier}</span>}
     </span>
   );
 }
@@ -835,7 +849,7 @@ function ItemOption({ k, m, t, icon, picked, disabled, onPick }: { k: ItemKey; m
       <ItemIconBox k={k} icon={icon} size="size-12" />
       <span className="flex min-w-0 flex-col gap-1">
         <span className="flex flex-wrap items-baseline gap-x-2">
-          <b className="font-display tracking-wide">{k}</b>
+          <b className="tracking-wide">{k}</b>
           <span className={`text-[11px] font-bold tracking-wider uppercase ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
         </span>
         <span className="text-xs text-zinc-200">{t.items[k](m.itemV(k))}</span>
@@ -860,7 +874,7 @@ function ItemSlot({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Reco
   if (!list.length) {
     return (
       <span data-item-slot={s} title={`${who}: ${t.shop.hidden}`}
-        className="flex size-9 shrink-0 items-center justify-center rounded-md bg-zinc-950/70 font-display text-sm text-zinc-500">?</span>
+        className="flex size-9 shrink-0 items-center justify-center rounded-md bg-zinc-950/70 text-sm text-zinc-500">?</span>
     );
   }
   const size = list.length > 1 ? "size-7" : "size-9";
@@ -906,7 +920,7 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
         <div className={`flex min-h-0 flex-1 ${flip} gap-2 p-3`}>
           <header className="flex flex-col gap-1">
             <div className="flex items-baseline justify-between gap-2">
-              <h2 className="font-display text-xl font-extrabold tracking-wide uppercase @[15rem]:text-2xl">{t.ui.comanda.title}</h2>
+              <h2 className="text-xl font-extrabold tracking-wide uppercase @[15rem]:text-2xl">{t.ui.comanda.title}</h2>
               <span className="hidden text-xs font-bold uppercase @[15rem]:inline">{t.ui.comanda.table(ai ? 6 : 7)}</span>
             </div>
             <p className={`border-b border-comanda-ink/60 pb-0.5 text-xs font-extrabold tracking-wider uppercase ${ai ? "text-game-ai" : "text-teal-800"}`}>{who}</p>
@@ -925,13 +939,13 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
                       <>
                         <ItemIconBox k={b.k} icon={icons[b.k]} size="size-10" />
                         <span className="flex min-w-0 flex-col">
-                          <b className="font-display text-base/tight">{b.k}</b>
+                          <b className="text-base/tight">{b.k}</b>
                           <span className="truncate text-xs text-comanda-ink/70">{t.shop.on(on(b))}</span>
                         </span>
                       </>
                     ) : i === 0 && <span className="text-sm text-comanda-ink/50 italic">{t.shop.hidden}</span>}
                   </span>
-                  <span className="grid place-items-center border-l border-comanda-ink/35 font-display text-lg">{b ? itemCost(ITEMS[b.k].tier) : ""}</span>
+                  <span className="grid place-items-center border-l border-comanda-ink/35 text-lg">{b ? itemCost(ITEMS[b.k].tier) : ""}</span>
                 </li>
               ))}
             </ul>
@@ -948,9 +962,10 @@ function LocTile({ nm, desc, chips, a, p }: { nm: string; desc: string; chips: [
   return (
     <div className="flex w-full flex-col items-center gap-0.5 rounded-lg bg-zinc-950/70 p-1 text-center leading-tight shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]">
       <div className="flex w-full flex-wrap items-center justify-between gap-1 sm:flex-nowrap">
-        <Score v={a} lead={a > p} tone="text-game-ai" />
-        <strong className="order-first line-clamp-2 w-full min-w-0 font-display text-[11px] tracking-wide sm:order-0 sm:w-auto sm:flex-1 sm:text-sm">{nm}</strong>
-        <Score v={p} lead={p > a} tone="text-game-me" />
+        <Score v={a} lead={a > p} side="a" />
+        <motion.strong key={nm} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.9 }}
+          className="order-first line-clamp-2 w-full min-w-0 text-sm font-extrabold tracking-wide sm:order-0 sm:w-auto sm:flex-1 sm:text-lg">{nm}</motion.strong>
+        <Score v={p} lead={p > a} side="p" />
       </div>
       <button type="button" onClick={() => setFull((x) => !x)} aria-expanded={full} title={desc}
         className={`w-full cursor-pointer rounded-sm text-[10px] text-zinc-400 hover:text-zinc-200 sm:text-[11px] ${full ? "" : "line-clamp-2"} ${focus}`}>
@@ -965,13 +980,42 @@ function LocTile({ nm, desc, chips, a, p }: { nm: string; desc: string; chips: [
   );
 }
 
-function Score({ v, lead, tone }: { v: number; lead: boolean; tone: string }) {
+/**
+ * Poder de um lado no local: número grande que brilha na cor do lado. Quem lidera cresce e ganha um halo que respira;
+ * quando o número muda, ele salta e solta o +N ou −N subindo.
+ */
+function Score({ v, lead, side }: { v: number; lead: boolean; side: Side }) {
+  const [prev, setPrev] = useState(v);
+  const [delta, setDelta] = useState<{ id: number; d: number } | null>(null);
+  if (v !== prev) {
+    setPrev(v);
+    setDelta((x) => ({ id: (x?.id ?? 0) + 1, d: v - prev }));
+  }
+  const tone = side === "p" ? "text-game-me" : "text-game-ai";
   return (
-    <AnimatePresence mode="popLayout" initial={false}>
-      <motion.em key={v} initial={{ scale: 1.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={{ type: "spring", stiffness: 500, damping: 22 }}
-        className={`min-w-6 shrink-0 rounded-md px-1 font-display text-base font-extrabold not-italic sm:text-lg ${tone} ${lead ? "bg-dl-text/15" : ""}`}>
-        {v}
-      </motion.em>
-    </AnimatePresence>
+    <span className="relative grid min-w-10 shrink-0 place-items-center sm:min-w-14">
+      <AnimatePresence>
+        {lead && (
+          <motion.span key="halo" aria-hidden="true" className={`absolute inset-0 rounded-full blur-md ${side === "p" ? "bg-game-me" : "bg-game-ai"}`}
+            initial={{ opacity: 0 }} animate={{ opacity: [0.2, 0.55, 0.2] }} exit={{ opacity: 0 }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.em key={v} initial={{ scale: 1.9, opacity: 0, y: -8 }} animate={{ scale: lead ? 1.15 : 1, opacity: 1, y: 0 }} exit={{ scale: 0.5, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 520, damping: 18 }}
+          className={`relative text-2xl leading-none font-extrabold not-italic tabular-nums [text-shadow:0_0_12px_currentColor,0_2px_0_rgb(0_0_0/0.85)] sm:text-4xl ${tone}`}>
+          {v}
+        </motion.em>
+      </AnimatePresence>
+      <AnimatePresence>
+        {delta && delta.d !== 0 && (
+          <motion.span key={delta.id} aria-hidden="true" className={`pointer-events-none absolute -top-3 text-sm font-extrabold sm:text-base ${tone}`}
+            initial={{ y: 0, opacity: 0 }} animate={{ y: -24, opacity: [0, 1, 0] }} transition={{ duration: 0.9, ease: "easeOut" }}
+            onAnimationComplete={() => setDelta((x) => (x?.id === delta.id ? null : x))}>
+            {delta.d > 0 ? `+${delta.d}` : `−${-delta.d}`}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </span>
   );
 }

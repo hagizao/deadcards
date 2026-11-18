@@ -5,6 +5,9 @@ import soulsIcon from "../assets/game/souls.png";
 import { setAudio, useAudio } from "../lib/game/sfx";
 
 /** Posição pseudoaleatória estável para as partículas (sem Math.random no render). */
+/** Faíscas sempre subindo da orbe (enquanto há almas). */
+const SPARKS = 7;
+
 const rnd = (seed: number) => {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
   return x - Math.floor(x);
@@ -25,16 +28,31 @@ export function SoulOrb({ n, label, big }: { n: number; label: string; /** Na la
   const count = burst ? Math.min(8, Math.abs(burst.d) * 2 + 1) : 0;
   return (
     <div role="status" aria-label={label} className={`relative grid shrink-0 place-items-center ${big ? "size-28" : "size-16 sm:size-20"}`}>
-      {/* brilho que respira enquanto há almas */}
+      {/* luz que a orbe joga na mesa: um halo largo que respira enquanto há almas */}
+      <motion.span aria-hidden="true" className="absolute -inset-5 rounded-full bg-game-soul/25 blur-2xl"
+        animate={empty ? { opacity: 0 } : { opacity: [0.5, 1, 0.5], scale: [0.95, 1.08, 0.95] }} transition={empty ? { duration: 0.3 } : { duration: 3.2, repeat: Infinity, ease: "easeInOut" }} />
       <motion.span aria-hidden="true" className="absolute inset-0 rounded-full bg-game-soul/35 blur-lg"
         animate={empty ? { opacity: 0 } : { opacity: [0.45, 0.9, 0.45] }} transition={empty ? { duration: 0.3 } : { duration: 2.6, repeat: Infinity, ease: "easeInOut" }} />
       <span aria-hidden="true" className={`absolute inset-1 overflow-hidden rounded-full bg-radial-[at_50%_35%] from-teal-700 via-teal-950 to-zinc-950 shadow-[inset_0_-0.5rem_1rem_rgb(0_0_0/0.7),0_0_0_2px_var(--color-game-soul)] transition-[filter] duration-300 ${empty ? "brightness-50 grayscale" : ""}`}>
-        <img src={soulsIcon} alt="" className="absolute inset-0 m-auto h-3/4 opacity-30" draggable={false} />
+        {/* redemoinho de luz girando por dentro */}
+        <motion.span className="absolute -inset-1/4 bg-conic from-game-soul/0 via-game-soul/35 to-game-soul/0 mix-blend-screen"
+          animate={empty ? { opacity: 0 } : { rotate: 360, opacity: 1 }} transition={empty ? { duration: 0.3 } : { rotate: { duration: 7, repeat: Infinity, ease: "linear" } }} />
+        {/* a chama: balança, estica e tremula */}
+        <motion.img src={soulsIcon} alt="" draggable={false} className="absolute inset-0 m-auto h-3/4 origin-bottom"
+          animate={empty ? { opacity: 0.2, rotate: 0, scaleY: 1, y: 0 } : { opacity: [0.35, 0.6, 0.4, 0.55, 0.35], rotate: [-4, 3, -2, 4, -4], scaleY: [1, 1.1, 0.95, 1.06, 1], y: [0, -2, 1, -1, 0] }}
+          transition={empty ? { duration: 0.3 } : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }} />
       </span>
+      {/* faíscas de alma subindo da orbe */}
+      {!empty && Array.from({ length: SPARKS }, (_, i) => (
+        <motion.span key={`spark-${i}`} aria-hidden="true" className="pointer-events-none absolute top-1/2 left-1/2 size-1.5 rounded-full bg-game-soul shadow-[0_0_6px_2px_var(--color-game-soul)]"
+          initial={{ x: 0, y: 0, opacity: 0 }}
+          animate={{ x: [(rnd(i) - 0.5) * 30, (rnd(i + 7) - 0.5) * 50], y: [0, -50 - rnd(i + 3) * 40], opacity: [0, 0.9, 0], scale: [0.6, 1, 0.3] }}
+          transition={{ duration: 2.2 + rnd(i + 11) * 1.4, repeat: Infinity, delay: rnd(i + 5) * 2.5, ease: "easeOut" }} />
+      ))}
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.b key={n} aria-hidden="true" initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }}
           transition={{ type: "spring", stiffness: 500, damping: 20 }}
-          className={`relative font-display leading-none font-extrabold drop-shadow-[0_0_6px_var(--color-game-soul)] ${big ? "text-5xl" : "text-3xl sm:text-4xl"} ${empty ? "text-zinc-400" : "text-white"}`}>
+          className={`relative leading-none font-extrabold drop-shadow-[0_0_6px_var(--color-game-soul)] ${big ? "text-5xl" : "text-3xl sm:text-4xl"} ${empty ? "text-zinc-400" : "text-white"}`}>
           {n}
         </motion.b>
       </AnimatePresence>
@@ -84,7 +102,7 @@ export function EndTurnButton({ label, turn, total, busy, busyLabel, ready, disa
           animate={{ opacity: [0.2, 0.9, 0.2], scale: [1, 1.04, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }} />
       )}
       <span className={`leading-tight font-extrabold tracking-widest uppercase ${big ? "text-sm" : "text-[10px] sm:text-xs"}`}>{busy ? busyLabel : label}</span>
-      <span className={`relative flex items-center overflow-hidden font-display leading-none font-extrabold perspective-[20rem] ${big ? "h-12 text-5xl" : "h-8 text-2xl sm:h-9 sm:text-3xl"}`}>
+      <span className={`relative flex items-center overflow-hidden leading-none font-extrabold perspective-[20rem] ${big ? "h-12 text-5xl" : "h-8 text-2xl sm:h-9 sm:text-3xl"}`}>
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span key={turn} initial={{ rotateX: -90, opacity: 0 }} animate={{ rotateX: 0, opacity: 1 }} exit={{ rotateX: 90, opacity: 0 }} transition={{ duration: 0.28 }}>
             {Math.min(turn, total)}
