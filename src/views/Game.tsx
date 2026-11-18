@@ -248,10 +248,11 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const land = (c: GCard) => {
     const w = weight(c);
     later(() => {
-      // 9 ou mais de poder: cai com um estrondo grave, a tela treme e a mesa do lado solta um "oh!" de susto
+      // 9 ou mais de poder: cai com um estrondo grave, a tela treme e a plateia solta um "ooooh" de susto
       if (m.pow(c) >= 9) {
         sfx("slam");
         sfx("impact");
+        later(() => sfx("gasp", 1.4), 120);
         if (!still && arena.current) shake(arena.current, { x: [0, -8, 7, -5, 3, 0], y: [0, 4, -3, 2, 0, 0] }, { duration: 0.4 });
         return;
       }
@@ -396,6 +397,13 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     <MotionConfig reducedMotion="user">
     <div className={full ? "fixed inset-0 z-50 overflow-hidden px-3 sm:px-6" : "contents"}>
     <BarTable />
+    {/* borda a pincel das caixas de item (loja e destaque da comanda): o fundo e a moldura tremem nas bordas como tinta */}
+    <svg aria-hidden="true" className="absolute size-0">
+      <filter id="shop-rough" x="-8%" y="-8%" width="116%" height="116%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves={2} seed={5} result="wave" />
+        <feDisplacementMap in="SourceGraphic" in2="wave" scale={11} xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
     <div className={wide ? `flex gap-4 ${height}` : "contents"}>
     {/* tela larga: à esquerda a comanda da IA (vinda de cima), suas almas no meio e a sua comanda (vinda de baixo) */}
     {wide && (
@@ -447,13 +455,6 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
           {shopOpen && m.offer && !aim && (
             <motion.section key="shop" aria-labelledby="game-shop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
               className="pointer-events-none absolute inset-0 z-30 flex flex-col justify-center gap-3">
-              {/* borda das caixas a pincel: o fundo e a moldura tremem nas bordas como tinta */}
-              <svg aria-hidden="true" className="absolute size-0">
-                <filter id="shop-rough" x="-8%" y="-8%" width="116%" height="116%">
-                  <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves={2} seed={5} result="wave" />
-                  <feDisplacementMap in="SourceGraphic" in2="wave" scale={11} xChannelSelector="R" yChannelSelector="G" />
-                </filter>
-              </svg>
               {/* oculta: título e caixas somem, mas continuam ocupando o espaço, então o Exibir fica onde estava o Ocultar */}
               <motion.div initial={false} animate={shopFade(shopHidden)} transition={{ duration: still ? 0 : 0.25, ease: "easeOut" }}
                 className="flex flex-col items-center gap-1 px-2 text-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)]">
@@ -917,28 +918,42 @@ const focusIn = "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-v
  * Item da loja na região de um local: caixa escura na cor da categoria do item (arma laranja, vitalidade verde, espírito
  * roxo), com a arte do local ao fundo, moldura a pincel e o nome numa etiqueta que dá o tique. Na tela larga é 50% maior.
  */
+/** Layout da caixa de item (loja e destaque da comanda); na tela larga é 50% maior. */
+const ITEM_BOX = "relative isolate flex flex-col items-center gap-1.5 p-2.5 text-center sm:gap-2 sm:p-3.5 2xl:gap-3 2xl:p-6";
+
+/** Corpo da caixa de item: fundo na cor da categoria com a arte do local, moldura a pincel, nome na etiqueta, ícone, tier e texto. */
+function ItemBody({ k, l, m, t, icon }: { k: ItemKey; l?: Loc | null; m: Match; t: T; icon?: string }) {
+  const it = ITEMS[k];
+  const box = SLOT_BOX[it.slot];
+  const art = l?.rev && l.L.art;
+  return (
+    <>
+      <span aria-hidden="true" className={`absolute inset-0 -z-10 overflow-hidden bg-zinc-950 ring-4 filter-[url(#shop-rough)] ring-inset ${SLOT_RING[it.slot]}`}>
+        {art && <img src={locArtUrl(art)} alt="" draggable={false} className="absolute inset-0 size-full object-cover opacity-25" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />}
+        <span className={`absolute inset-0 bg-linear-to-b to-zinc-950/75 to-70% ${box.tint}`} />
+      </span>
+      <TickTag tone={box.tag} className="max-w-full px-2 py-0.5 text-sm font-extrabold tracking-wide text-zinc-950 [font-variant-caps:small-caps] sm:px-3 sm:text-lg 2xl:px-5 2xl:py-1 2xl:text-3xl">{k}</TickTag>
+      <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 2xl:gap-x-3">
+        <ItemIconBox k={k} icon={icon} size="size-9 sm:size-12 2xl:size-18" />
+        <span className={`text-[10px] font-bold tracking-wider uppercase sm:text-xs 2xl:text-lg ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
+      </span>
+      <span className="text-xs text-zinc-100 sm:text-sm 2xl:text-xl">{t.items[k](m.itemV(k))}</span>
+    </>
+  );
+}
+
 function ShopBox({ k, i, l, m, t, icon, picked, disabled, onPick }: { k: ItemKey; i: number; l: Loc; m: Match; t: T; icon?: string; picked: boolean; disabled: boolean; onPick: () => void }) {
   const it = ITEMS[k];
   const fit = m.itemFit("p", k);
   const box = SLOT_BOX[it.slot];
-  const art = l.rev && l.L.art;
   // já comprou outro: este fica apagado como a carta da mão sem jogada (mas ainda dá para trocar a compra por ele)
   const dim = !picked && !!m.buying.p;
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }} transition={{ duration: 0.22, delay: i * 0.06 }}
       className={`pointer-events-auto flex w-full max-w-72 2xl:max-w-108 ${disabled || dim ? "" : box.glow}`}>
       <button type="button" onClick={onPick} disabled={disabled} aria-pressed={picked} aria-label={`${t.shop.label(k, it.tier)}: ${t.items[k](m.itemV(k))}`}
-        className={`relative isolate flex w-full cursor-pointer flex-col items-center gap-1.5 p-2.5 text-center transition enabled:hover:-translate-y-0.5 enabled:hover:brightness-125 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:brightness-50 disabled:saturate-50 sm:gap-2 sm:p-3.5 2xl:gap-3 2xl:p-6 ${picked ? "outline-2 -outline-offset-8 outline-game-brass" : ""} ${dim ? "brightness-50 saturate-50" : ""} ${focusIn}`}>
-        <span aria-hidden="true" className={`absolute inset-0 -z-10 overflow-hidden bg-zinc-950 ring-4 filter-[url(#shop-rough)] ring-inset ${SLOT_RING[it.slot]}`}>
-          {art && <img src={locArtUrl(art)} alt="" draggable={false} className="absolute inset-0 size-full object-cover opacity-25" style={{ objectPosition: `${l.L.fx ?? 50}% 50%` }} />}
-          <span className={`absolute inset-0 bg-linear-to-b to-zinc-950/75 to-70% ${box.tint}`} />
-        </span>
-        <TickTag tone={box.tag} className="max-w-full px-2 py-0.5 text-sm font-extrabold tracking-wide text-zinc-950 [font-variant-caps:small-caps] sm:px-3 sm:text-lg 2xl:px-5 2xl:py-1 2xl:text-3xl">{k}</TickTag>
-        <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 2xl:gap-x-3">
-          <ItemIconBox k={k} icon={icon} size="size-9 sm:size-12 2xl:size-18" />
-          <span className={`text-[10px] font-bold tracking-wider uppercase sm:text-xs 2xl:text-lg ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
-        </span>
-        <span className="text-xs text-zinc-100 sm:text-sm 2xl:text-xl">{t.items[k](m.itemV(k))}</span>
+        className={`${ITEM_BOX} w-full cursor-pointer transition enabled:hover:-translate-y-0.5 enabled:hover:brightness-125 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:brightness-50 disabled:saturate-50 ${picked ? "outline-2 -outline-offset-8 outline-game-brass" : ""} ${dim ? "brightness-50 saturate-50" : ""} ${focusIn}`}>
+        <ItemBody k={k} l={l} m={m} t={t} icon={icon} />
         <span className="text-[11px] font-bold text-game-brass sm:text-xs 2xl:text-lg">{t.shop.price(m.itemPrice("p", k))}{!picked && !m.canBuy(k) && ` · ${m.itemTargets("p", k).length ? t.shop.noSouls : t.shop.noTarget}`}</span>
         {(fit.cards > 0 || fit.loc) && (
           <span className="flex flex-wrap justify-center gap-1">
@@ -996,23 +1011,19 @@ const COMANDA_ROWS = 12;
  */
 function ItemPeek({ b, r, m, t, icon, on }: { b: Bought; r: DOMRect; m: Match; t: T; icon?: string; on: (b: Bought) => string }) {
   const it = ITEMS[b.k];
-  const box = SLOT_BOX[it.slot];
-  const w = Math.min(PEEK_W, window.innerWidth - 24);
+  // mesma largura da caixa da loja (50% maior na tela larga)
+  const w = Math.min(window.innerWidth >= 1536 ? 432 : 288, window.innerWidth - 24);
   const right = r.right + 12 + w <= window.innerWidth;
   const left = Math.max(8, right ? r.right + 12 : r.left - 12 - w);
-  const top = Math.max(8, Math.min(window.innerHeight - 340, r.top + r.height / 2 - 150));
+  const top = Math.max(8, Math.min(window.innerHeight - 420, r.top + r.height / 2 - 160));
+  // arte do local onde está a carta que recebeu o item
+  const l = m.loc.find((x) => [...x.s.p, ...x.s.a].some((c) => c.id === b.target));
   return createPortal(
     <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.12 }}
-      className={`pointer-events-none fixed z-90 ${box.glow}`} style={{ left, top, width: w }} aria-hidden="true">
-      <div className="relative isolate flex flex-col items-center gap-3 p-5 text-center">
-        <span className={`absolute inset-0 -z-10 overflow-hidden bg-zinc-950 ring-4 [clip-path:polygon(1%_2%,100%_0,99%_99%,0_100%)] ring-inset ${SLOT_RING[it.slot]}`}>
-          <span className={`absolute inset-0 bg-linear-to-b to-zinc-950/75 to-70% ${box.tint}`} />
-        </span>
-        <TickTag tone={box.tag} className="max-w-full px-3 py-0.5 text-xl font-extrabold tracking-wide text-zinc-950 [font-variant-caps:small-caps]">{b.k}</TickTag>
-        <ItemIconBox k={b.k} icon={icon} size="size-20" />
-        <span className={`text-xs font-bold tracking-wider uppercase ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
-        <span className="text-sm text-zinc-100">{t.items[b.k](m.itemV(b.k))}</span>
-        <span className="text-xs font-bold text-game-brass">{t.shop.on(on(b))} · {t.shop.price(itemCost(it.tier))}</span>
+      className={`pointer-events-none fixed z-90 ${SLOT_BOX[it.slot].glow}`} style={{ left, top, width: w }} aria-hidden="true">
+      <div className={ITEM_BOX}>
+        <ItemBody k={b.k} l={l} m={m} t={t} icon={icon} />
+        <span className="text-[11px] font-bold text-game-brass sm:text-xs 2xl:text-lg">{t.shop.on(on(b))} · {t.shop.price(itemCost(it.tier))}</span>
       </div>
     </motion.div>,
     document.body,
