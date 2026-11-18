@@ -77,7 +77,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     const ts = [
       ...m.loc.map((_, i) => at(INTRO.lane(i), () => sfx("place", 0.7))),
       at(INTRO.comanda, () => sfx("paper")),
-      at(INTRO.comanda + 0.15, () => sfx("paper")),
+      at(INTRO.comanda2, () => sfx("paper")),
       at(INTRO.side, () => sfx("shuffle", 0.6)),
       at(INTRO.orb, () => sfx("soul", 0.6)),
       ...m.hand.map((_, i) => at(INTRO.hand + i * INTRO.handStep, () => sfx("hover"))),
@@ -251,7 +251,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
           if (r.outcome !== "draw") sfx(r.outcome === "win" ? "win" : "loss");
         } else {
           m.nextTurn();
-          // loja nova (rounds 3 e 6): abre sempre à vista, mesmo que a anterior tenha ficado oculta, e o sino do balcão toca
+          // loja nova (rounds 4 e 7): abre sempre à vista, mesmo que a anterior tenha ficado oculta, e o sino do balcão toca
           if (m.offer) { setShopHidden(false); later(() => sfx("bell"), 300); }
           say(t.ui.toast.turn(m.t));
           sfx("draw");
@@ -430,7 +430,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       <aside aria-label={t.ui.players} className="grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] items-center justify-items-center gap-4 text-dl-text">
         <Comanda key={`a${game}`} s="a" m={m} t={t} icons={icons} on={boughtOn} deal={deal("left", INTRO.comanda)} />
         <div key={`o${game}`} className={deal("pop", INTRO.orb).cls} style={deal("pop", INTRO.orb).style}><SoulOrb n={m.E} label={t.ui.souls(m.E)} big /></div>
-        <Comanda key={`p${game}`} s="p" m={m} t={t} icons={icons} on={boughtOn} deal={deal("left", INTRO.comanda + 0.15)} />
+        <Comanda key={`p${game}`} s="p" m={m} t={t} icons={icons} on={boughtOn} deal={deal("left", INTRO.comanda2)} />
       </aside>
     )}
     <div className={`relative mx-auto flex flex-col gap-1.5 text-dl-text ${wide ? "h-full min-w-0 flex-[0_1_80rem]" : `${height} max-w-7xl`}`}>
@@ -613,7 +613,7 @@ type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
 /** Cores das três faixas (amarela, azul e verde, como as lanes do mapa), em classes inteiras. */
 /** Abertura da mesa (segundos): os locais pousam um a um, entram as comandas e os baralhos, a orbe acende e a mão é dada carta a carta. */
-const INTRO = { lane: (i: number) => 0.15 + i * 0.15, comanda: 0.75, side: 0.95, orb: 1.1, hand: 1.3, handStep: 0.13, reveal: 2.1, done: 3.4 };
+const INTRO = { lane: (i: number) => 0.3 + i * 0.4, comanda: 1.6, comanda2: 1.95, side: 2.3, orb: 2.7, hand: 3.1, handStep: 0.3, reveal: 4.8, done: 6.6 };
 const INTRO_CLS = { drop: "intro-drop", up: "intro-up", left: "intro-left", right: "intro-right", pop: "intro-pop" } as const;
 
 /** Local durante o arrasto: fora, dá para soltar, sob a carta, ou escurecido (a carta está sobre outro). */

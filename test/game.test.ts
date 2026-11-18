@@ -3,7 +3,7 @@ import {
   ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, SHOPS, ALT_MALUS, ALT_POL, cardStats, powerParts, defaultCard, itemCost, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
   type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type LocType, type PoolCard,
 } from "../src/lib/game/config";
-import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Side } from "../src/lib/game/engine";
+import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Loc, type Side } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
 import { MAX_DECKS, fillDeck, heroHolder, resolveDeck, sanitizeBook, swapHero, versionPlayer } from "../src/lib/game/deck";
 
@@ -230,8 +230,8 @@ describe("itens: lojas e alvo", () => {
     }
   };
 
-  it("lojas abrem nos rounds 3 e 6, com 3 itens dos tiers da fase e os mesmos tiers para os dois lados", () => {
-    expect(SHOPS).toEqual({ 3: [1, 2], 6: [3, 4] });
+  it("lojas abrem nos rounds 4 e 7, com 3 itens dos tiers da fase e os mesmos tiers para os dois lados", () => {
+    expect(SHOPS).toEqual({ 4: [1, 2], 7: [3, 4] });
     expect([1, 2, 3, 4].map((t) => itemCost(t as 1 | 2 | 3 | 4))).toEqual([1, 2, 4, 6]);
     for (let seed = 1; seed <= 20; seed++) {
       const m = new Match(cfgWith(all), pool, seeded(seed));
@@ -249,7 +249,7 @@ describe("itens: lojas e alvo", () => {
 
   it("comprar mira uma carta sua, cobra na hora e age só nela no fim do turno; desfazer devolve", () => {
     const m = new Match(cfgWith(["Extra Health"]), pool, seeded(7));
-    playTo(m, 3);
+    playTo(m, 4);
     const mine = m.loc.flatMap((l) => l.s.p);
     expect(mine.length).toBeGreaterThan(0);
     const [target] = mine;
@@ -270,7 +270,7 @@ describe("itens: lojas e alvo", () => {
 
   it("item de ataque mira uma inimiga; sem alvo ou sem almas, não compra", () => {
     const m = new Match(cfgWith(["Slowing Hex", "Toxic Bullets", "Ricochet"]), pool, seeded(9));
-    playTo(m, 3);
+    playTo(m, 4);
     const k = m.offer!.p.find((x) => ITEMS[x].tier === 2)!;
     expect(k).toBe("Slowing Hex");
     expect(m.itemTargets("p", k).every((c) => c.side === "a")).toBe(true);
@@ -282,10 +282,10 @@ describe("itens: lojas e alvo", () => {
 
   it("a loja é opcional: o turno fecha sem comprar", () => {
     const m = new Match(cfgWith(all), pool, seeded(4));
-    playTo(m, 3);
+    playTo(m, 4);
     expect(m.offer).not.toBeNull();
     m.runEndTurn();
-    expect(m.t).toBe(4);
+    expect(m.t).toBe(5);
     expect(m.owned.p).toEqual([]);
   });
 
@@ -299,7 +299,7 @@ describe("itens: lojas e alvo", () => {
 
   it("sem itens ligados não há loja", () => {
     const m = new Match(cfgWith([]), pool, seeded(4));
-    playTo(m, 3);
+    playTo(m, 4);
     expect(m.offer).toBeNull();
   });
 
@@ -1176,5 +1176,38 @@ describe("locais novos", () => {
     const g = sanitizeGameConfig({ locs: [{ name: "F", type: "rift", v: 100, n: 1, art: "locs/f.webp", fx: 150 }, { name: "B", type: "none", art: "../x.png" }, ...base] })!;
     expect(g.locs[0]).toMatchObject({ v: 100, art: "locs/f.webp", fx: 100 });
     expect(g.locs[1].art).toBeUndefined();
+  });
+});
+
+describe("Kelvin e Metrô", () => {
+  type Priv2 = { locEnd: (l: Loc, lead: Side | null) => void; movable: (c: GCard, from: Loc, to: Loc, self: boolean) => boolean };
+  const dummy = (put: ReturnType<typeof arena>["put"], side: Side, li: number, power: number, id: string) => {
+    const c = put(pc(id, "Herói Novo", flat(70)), side, li);
+    c.ab = "none"; c.base = power; c.bonus = 0;
+    return c;
+  };
+
+  it("Kelvin ao revelar cura as aliadas daqui ao poder original e mantém os ganhos", () => {
+    const { m, put } = arena();
+    const hurt = dummy(put, "p", 0, 5, "hurt"), buffed = dummy(put, "p", 0, 5, "buffed"), far = dummy(put, "p", 1, 5, "far");
+    hurt.bonus = -3; hurt.st.tmp.push({ v: -2, u: m.t + 1 }); hurt.st.burn = 1;
+    buffed.bonus = 2;
+    far.bonus = -3;
+    put(pc("k", "Kelvin", flat(70)), "p", 0);
+    expect([m.pow(hurt), hurt.st.burn]).toEqual([5, 0]);
+    expect(m.pow(buffed)).toBe(7);
+    expect(m.pow(far)).toBe(2);
+  });
+
+  it("o Rato do Metrô aparece no Metrô e não sai de lá", () => {
+    const { m, put } = arena();
+    const metro = m.loc[0];
+    metro.L = { ...metro.L, type: "rats", v: 1 };
+    dummy(put, "a", 0, 3, "x");
+    (m as unknown as Priv2).locEnd(metro, "a");
+    const rat = metro.s.p.find((c) => c.tok);
+    expect(rat).toBeTruthy();
+    expect(m.loc.slice(1).every((l) => !l.s.p.some((c) => c.tok))).toBe(true);
+    expect((m as unknown as Priv2).movable(rat!, metro, m.loc[1], true)).toBe(false);
   });
 });

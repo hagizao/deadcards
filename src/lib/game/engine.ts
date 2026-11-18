@@ -29,6 +29,8 @@ type Status = {
   tmp: { v: number; u: number }[];
   burrow?: boolean; stun?: number; immune?: boolean; immU?: number; rip?: number; ripV?: number; chained?: boolean; silenced?: boolean; silU?: number;
   burn?: number; tburn?: { v: number; u: number }[]; vuln?: number; sleep?: number; root?: number; petri?: boolean; unstop?: boolean;
+  /** Rato do Metrô: fica preso no Metrô (não se move nem troca de local). */
+  home?: boolean;
   chan?: { u: number }; drainU?: number; grown?: number; cd?: boolean; wolf?: boolean; wolfAt?: number; exec?: { u: number; target?: number }; duel?: boolean; mvT?: number; grow?: number;
   /** Almas pagas ao jogar (devolvidas se a carta voltar para a mão neste turno). */
   paid?: number;
@@ -392,7 +394,7 @@ export class Match {
   }
   /** Pode ser movida de `from` para `to`? `self` = a própria carta escolhendo sair (a Paige Mestre impede). */
   private movable(c: GCard, from: Loc, to: Loc, self: boolean) {
-    if (from === to || !this.room(to, c.side) || this.ty(to, "nomove")) return false;
+    if (from === to || !this.room(to, c.side) || this.ty(to, "nomove") || c.st.home) return false;
     if (c.st.chained || c.st.petri || c.st.unstop || (c.st.root ?? 0) >= this.t) return false;
     if (self && from.s[opp(c.side)].some((o) => o.rev && this.abilityOf(o) === "Paige" && this.master(o))) return false;
     return true;
@@ -655,8 +657,14 @@ export class Match {
       if (this.master(c)) { a.st.immU = this.t + 1; c.st.immU = this.t + 1; }
       this.say({ k: "ivy", c: this.N(c), t: this.N(a) });
     } },
+    // cura as aliadas daqui ao poder original: tira perdas de poder (fixas e temporárias) e queimaduras; os ganhos ficam
     "Kelvin": { r: (c, l) => {
-      l.shield[c.side] = this.t + 1;
+      l.s[c.side].filter((x) => x.rev).forEach((x) => {
+        x.bonus = Math.max(0, x.bonus);
+        x.st.tmp = x.st.tmp.filter((m) => m.v >= 0);
+        x.st.burn = 0;
+        x.st.tburn = [];
+      });
       if (this.master(c)) this.foes(c, l).filter((t) => t.main === "MIR").forEach((t) => this.hurt(t, 2, c));
       this.say({ k: "kelvin", loc: l.L.name });
     } },
@@ -701,7 +709,7 @@ export class Match {
     "Paradox": { r: (c, l) => {
       if (c.st.chained || c.st.petri || c.st.unstop || (c.st.root ?? 0) >= this.t || !this.room(l, opp(c.side))) return;
       const opts = this.loc.filter((L) => L !== l && this.room(L, c.side))
-        .flatMap((L) => this.tg(L.s[opp(c.side)].filter((x) => x.rev && !x.st.burrow && !x.st.chained && !x.st.petri)).map((t) => [t, L] as const));
+        .flatMap((L) => this.tg(L.s[opp(c.side)].filter((x) => x.rev && !x.st.burrow && !x.st.chained && !x.st.petri && !x.st.home)).map((t) => [t, L] as const));
       const p = this.best(this.sh(opts), (x) => this.pow(x[0]));
       if (!p) return;
       const [t, L] = p;
@@ -1255,7 +1263,7 @@ export class Match {
     if (this.ty(l, "rats")) {
       const p = rev("p").length, a = rev("a").length;
       const few: Side | null = p < a ? "p" : a < p ? "a" : null;
-      if (few && this.room(l, few)) { const k = this.token(few, "rat", l.L.v); k.rev = true; l.s[few].push(k); this.say({ k: "ratLoc", loc: l.L.name }); }
+      if (few && this.room(l, few)) { const k = this.token(few, "rat", l.L.v); k.rev = true; k.st.home = true; l.s[few].push(k); this.say({ k: "ratLoc", loc: l.L.name }); }
     }
     if (this.ty(l, "bull") && this.t === l.L.n && lead) rev(opp(lead)).forEach((c) => { if (this.destroy(c)) this.say({ k: "gone", c: this.N(c), loc: l.L.name }); });
   }
