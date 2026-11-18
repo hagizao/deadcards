@@ -15,7 +15,7 @@ import { DeckPile } from "../components/DeckPile";
 import { versionPlayer, type DeckLook } from "../lib/game/deck";
 import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type PowPart, type Result, type Side, type Token } from "../lib/game/engine";
 import { abilitySfx, slashSfx, startSfx } from "../lib/game/heroSfx";
-import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
+import { cardSfx, duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
 import tableArt from "../assets/game/table.webp";
@@ -294,10 +294,19 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     step();
   };
 
-  /** Toca os sons das habilidades que funcionaram desde a última vez (cada habilidade uma vez, em sequência). */
+  /**
+   * Toca os sons das habilidades que funcionaram desde a última vez (cada som uma vez, em sequência). A carta com
+   * efeito sonoro próprio (enviado no editor) toca o dela no lugar do som da habilidade.
+   */
   const playHeard = (wait: number) => {
-    const abs = [...new Set(m.heard.splice(0).map((h) => h.ab))].slice(0, 4);
-    abs.forEach((ab, i) => later(() => abilitySfx(ab), wait + i * 260));
+    const sounds = new Map<string, () => void>();
+    for (const h of m.heard.splice(0)) {
+      const id = m.byId(h.id)?.p.id;
+      const own = id ? byId.get(id)?.sound : undefined;
+      if (own) sounds.set(own, () => cardSfx(own));
+      else sounds.set(h.ab, () => abilitySfx(h.ab));
+    }
+    [...sounds.values()].slice(0, 4).forEach((play, i) => later(play, wait + i * 260));
   };
   /** Som (e tremor, nas pesadas) quando a carta revelada toca a mesa. */
   const land = (c: GCard) => {

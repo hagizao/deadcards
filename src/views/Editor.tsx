@@ -65,6 +65,41 @@ function ImagePick({ folder, onUrl, label = "Enviar imagem" }: { folder: Paramet
   );
 }
 
+const MAX_SOUND_MB = 1;
+const ring = "has-focus-visible:ring-2 has-focus-visible:ring-zinc-100 focus-visible:ring-2 focus-visible:ring-zinc-100 focus-visible:outline-none active:scale-95";
+
+/** Efeito sonoro próprio da carta: enviar (mp3, ogg, wav ou webm de até 1 MB), ouvir e voltar ao som da habilidade. */
+function SoundPick({ url, onUrl }: { url?: string; onUrl: (url: string | undefined) => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <label className={`${ghost} ${ring} inline-flex items-center gap-2 ${busy ? "cursor-wait opacity-50" : ""}`}>
+        {busy ? "Enviando…" : url ? "Trocar som" : "Enviar som"}
+        <input
+          type="file"
+          accept="audio/mpeg,audio/ogg,audio/wav,audio/x-wav,audio/webm,.mp3,.ogg,.wav,.webm"
+          className="sr-only"
+          disabled={busy}
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            if (f.size > MAX_SOUND_MB * 1024 * 1024) return alert(`O som precisa ter até ${MAX_SOUND_MB} MB.`);
+            setBusy(true);
+            try { onUrl(await api.upload("sounds", f)); } catch (err) { alert((err as Error).message); } finally { setBusy(false); }
+          }}
+        />
+      </label>
+      {url && (
+        <>
+          <button type="button" className={`${ghost} ${ring}`} onClick={() => { new Audio(url).play().catch(() => {}); }}>▶ Ouvir</button>
+          <button type="button" className={`${ghost} ${ring}`} onClick={() => onUrl(undefined)}>Usar som da habilidade</button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function useSaver(reload: () => Promise<void>) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -287,6 +322,18 @@ function PlayerForm({ editId, onEditId }: { editId: string | null; onEditId: (id
               </Field>
             </div>
           )}
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Efeito sonoro da carta</span>
+            <SoundPick url={d.sound} onUrl={(sound) => set({ sound })} />
+          </div>
+          <p className="text-xs text-zinc-400">
+            {d.sound
+              ? "No Cardslock Game, este som toca no lugar do som da habilidade quando a carta age."
+              : "Sem som próprio: a carta usa o som da habilidade do herói. Envie um mp3, ogg, wav ou webm curto, de até 1 MB."}
+          </p>
         </div>
 
         <div className="space-y-3 rounded-2xl border border-amber-200/15 p-4">

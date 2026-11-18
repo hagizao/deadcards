@@ -22,9 +22,13 @@ export interface Env {
 }
 
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
+// efeito sonoro próprio de uma carta: arquivo curto, na pasta "sounds"
+const AUDIO_TYPES: Record<string, string> = { "audio/mpeg": "mp3", "audio/ogg": "ogg", "audio/wav": "wav", "audio/x-wav": "wav", "audio/webm": "webm" };
 const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art", "heroPool"];
+const MAX_SOUND_BYTES = 1024 * 1024;
+const SOUND_URL = /^\/img\/sounds\/[\w-]+\.(mp3|ogg|wav|webm)$/;
+const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art", "heroPool", "sound"];
 const ID_RE = /^[\w-]{1,64}$/;
 
 const keyOf = (url: unknown) => (typeof url === "string" && url.startsWith("/img/") ? url.slice(5) : null);
@@ -126,6 +130,7 @@ async function serveImage(env: Env, key: string): Promise<Response> {
 }
 
 async function upload(env: Env, request: Request, folder: string): Promise<Response> {
+  if (folder === "sounds") return uploadSound(env, request);
   const ext = IMAGE_TYPES[request.headers.get("content-type") ?? ""];
   if (!ext) return bad("tipo de imagem não suportado");
   if (!UPLOAD_FOLDERS.includes(folder)) return bad("pasta inválida");
@@ -133,6 +138,17 @@ async function upload(env: Env, request: Request, folder: string): Promise<Respo
   if (!body.byteLength || body.byteLength > MAX_UPLOAD_BYTES) return bad("imagem vazia ou maior que 8 MB");
   const key = `${folder}/${crypto.randomUUID()}.${ext}`;
   await env.ASSETS_BUCKET.put(key, body, { httpMetadata: { contentType: request.headers.get("content-type")! } });
+  return Response.json({ url: `/img/${key}` });
+}
+
+async function uploadSound(env: Env, request: Request): Promise<Response> {
+  const type = request.headers.get("content-type") ?? "";
+  const ext = AUDIO_TYPES[type];
+  if (!ext) return bad("tipo de áudio não suportado: use mp3, ogg, wav ou webm");
+  const body = await request.arrayBuffer();
+  if (!body.byteLength || body.byteLength > MAX_SOUND_BYTES) return bad("áudio vazio ou maior que 1 MB");
+  const key = `sounds/${crypto.randomUUID()}.${ext}`;
+  await env.ASSETS_BUCKET.put(key, body, { httpMetadata: { contentType: type } });
   return Response.json({ url: `/img/${key}` });
 }
 
@@ -158,6 +174,7 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
         if (credit === null) return bad("crédito da arte inválido: nome até 60 caracteres e link http(s)");
         b.art = { ...b.art, credit };
       }
+      if (b.sound !== undefined && b.sound !== null && (typeof b.sound !== "string" || !SOUND_URL.test(b.sound))) return bad("efeito sonoro inválido");
       const extra = Object.fromEntries(PLAYER_EXTRA.filter((k) => b[k] !== undefined && b[k] !== null).map((k) => [k, b[k]]));
       await db.prepare(
         "INSERT INTO players (id, team_id, name, position, hero, stats_json, ovr, c1, c2, history_json, extra_json) VALUES (?,?,?,?,?,?,?,?,?,?,?) " +

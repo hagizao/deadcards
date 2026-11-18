@@ -49,7 +49,7 @@ function load(): AudioPrefs {
 
 let prefs = load();
 const subs = new Set<() => void>();
-const cache = new Map<keyof typeof FILES, HTMLAudioElement>();
+const cache = new Map<string, HTMLAudioElement>();
 let ctx: AudioContext | null = null;
 
 const sfxLevel = () => (prefs.sfxOn ? prefs.sfx : 0);
@@ -78,15 +78,22 @@ export function sfx(name: Sfx, volume = 1) {
   if (name === "paper") return paperRustle(volume);
   if (name === "impact") return bigImpact(volume);
   if (name === "bell") return deskBell(volume);
+  playFile(FILES[name as keyof typeof FILES], volume);
+}
+
+/** Toca um arquivo de áudio no canal de efeitos (o mesmo elemento fica em cache e é clonado a cada toque). */
+function playFile(src: string, volume: number) {
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
-  const file = name as keyof typeof FILES;
-  let base = cache.get(file);
-  if (!base) { base = new Audio(FILES[file]); base.preload = "auto"; cache.set(file, base); }
+  let base = cache.get(src);
+  if (!base) { base = new Audio(src); base.preload = "auto"; cache.set(src, base); }
   const a = base.cloneNode() as HTMLAudioElement;
   a.volume = Math.min(1, SFX_BASE * volume * lv);
   a.play().catch(() => {});
 }
+
+/** Efeito sonoro enviado para uma carta no editor. */
+export const cardSfx = (url: string, volume = 1) => playFile(url, volume * 1.6);
 
 /** Baque grave para a carta pesada caindo na mesa. */
 export function thump(strength = 1) {

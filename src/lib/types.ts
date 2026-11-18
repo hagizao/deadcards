@@ -46,6 +46,8 @@ export type Player = {
   inactive?: boolean;
   /** Heróis de afinidade: outras versões que o jogador pode usar no deck do jogo. */
   heroPool?: string[];
+  /** Efeito sonoro próprio da carta (`/img/sounds/...`), tocado no jogo no lugar do som da habilidade. */
+  sound?: string;
   art?: { url: string; zoom?: number; x?: number; y?: number; credit?: ArtCredit };
 };
 
