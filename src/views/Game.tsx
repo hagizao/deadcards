@@ -248,6 +248,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     const err = m.play(c, l);
     if (err) { sfx("error"); return say(errText[err]); }
     sfx("place");
+    thump(0.35);
     const spec = m.choiceOf(c);
     if (spec?.card && m.choiceCards(c).length) setMode({ k: "card", c });
     else if (spec?.loc) setMode({ k: "loc", c });
@@ -319,33 +320,40 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       </abbr>
     </div>
   );
-  const aiItems = <ItemSlot s="a" m={m} t={t} icons={icons} on={boughtOn} big={wide} />;
-  const myItems = <ItemSlot s="p" m={m} t={t} icons={icons} on={boughtOn} big={wide} />;
-  const aiDeck = <DeckPile n={m.adeck.length} tone="ai" label={t.deck.aiLeft(m.adeck.length)} tipSide="left" out={{ x: -80, y: -10 }} className={wide ? "w-full max-w-40" : "w-8 sm:w-11"} />;
+    const aiDeck = <DeckPile n={m.adeck.length} tone="ai" label={t.deck.aiLeft(m.adeck.length)} tipSide="left" out={{ x: -80, y: -10 }} className={wide ? "w-full max-w-40" : "w-8 sm:w-11"} />;
   const myDeck = <DeckPile n={m.deck.length} look={deckLook} label={t.deck.left(m.deck.length)} tipSide={wide ? "left" : "top"} out={{ x: -120, y: 0 }} className={wide ? "w-full max-w-40" : "w-10 sm:w-14"} />;
   const endBtn = result && !showEnd
     ? <button type="button" className={primaryBtn} onClick={restart}>{t.ui.newMatch}</button>
     : <EndTurnButton label={t.ui.endTurn} turn={m.t} total={TURNS} busy={m.busy} busyLabel={t.ui.revealing} ready={handReady} big={wide}
         disabled={m.busy || !!result} onClick={endTurn} />;
+  const prio = <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr>;
+  const controls = (
+    <span className="flex">
+      <AudioMenu t={t.ui.audio} />
+      <button type="button" onClick={toggleFull} aria-label={t.ui.fullscreen(full)} aria-pressed={full} title={t.ui.fullscreen(full)}
+        className={`grid size-11 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
+        <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden="true">
+          <path d={full ? "M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+    </span>
+  );
 
   return (
     <MotionConfig reducedMotion="user">
     <div className={full ? "fixed inset-0 z-50 overflow-hidden px-3 sm:px-6" : "contents"}>
     <BarTable />
     <div className={wide ? `flex gap-4 ${height}` : "contents"}>
-    {/* tela larga: à esquerda o título e, de cada jogador, as almas e os itens (IA em cima, você embaixo) */}
+    {/* tela larga: à esquerda o título, os itens da IA em cima, suas almas no meio e seus itens embaixo */}
     {wide && (
-      <aside aria-label={t.ui.players} className="flex min-w-36 flex-[1_0_9rem] flex-col justify-between gap-4 py-3 text-dl-text">
-        <div className="flex flex-col gap-8">
+      <aside aria-label={t.ui.players} className="grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] justify-items-center gap-4 py-3 text-dl-text">
+        <div className="flex min-h-0 w-full flex-col items-start gap-4">
           {title}
-          <div className="flex flex-col items-center gap-3">
-            <SoulOrb n={m.AE} label={t.ui.aiSouls(m.AE)} big />
-            {aiItems}
-          </div>
+          <ItemBox s="a" m={m} t={t} icons={icons} on={boughtOn} />
         </div>
-        <div className="flex flex-col items-center gap-3">
-          {myItems}
-          <SoulOrb n={m.E} label={t.ui.souls(m.E)} big />
+        <SoulOrb n={m.E} label={t.ui.souls(m.E)} big />
+        <div className="flex min-h-0 w-full flex-col justify-end">
+          <ItemBox s="p" m={m} t={t} icons={icons} on={boughtOn} />
         </div>
       </aside>
     )}
@@ -357,27 +365,21 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       <div className="grid w-full grid-cols-[1fr_auto] items-start gap-x-2 sm:grid-cols-[1fr_auto_1fr]">
         {wide ? <div /> : title}
         <div className="order-last col-span-2 flex items-start justify-center gap-2 sm:order-0 sm:col-span-1">
-          {!wide && aiItems}
+          {!wide && <ItemSlot s="a" m={m} t={t} icons={icons} on={boughtOn} />}
           <AiHand n={m.ahand.length} t={t} />
         </div>
-        <div className="flex items-start justify-end gap-2">
-        <div className="flex flex-wrap items-center justify-end gap-x-2 text-xs text-zinc-300">
-          <abbr title={t.ui.prioHint} className={`no-underline ${m.prio === "p" ? "text-game-me" : "text-game-ai"}`}>{t.ui.prio(m.prio === "p")}</abbr>
-          <span aria-hidden="true">·</span>
-          <span>{t.ui.record(record.w, record.l)}</span>
-          <span className="flex">
-            <AudioMenu t={t.ui.audio} />
-            <button type="button" onClick={toggleFull} aria-label={t.ui.fullscreen(full)} aria-pressed={full} title={t.ui.fullscreen(full)}
-              className={`grid size-11 cursor-pointer place-items-center rounded-full text-base transition-colors hover:bg-white/10 active:bg-white/20 sm:size-8 ${focus}`}>
-              <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden="true">
-                <path d={full ? "M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"} strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </span>
-        </div>
-        {!wide && next.a && <NextCard name={name(next.a)} t={t} />}
-        {!wide && aiDeck}
-        </div>
+        {wide ? <div /> : (
+          <div className="flex items-start justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-x-2 text-xs text-zinc-300">
+              {prio}
+              <span aria-hidden="true">·</span>
+              <span>{t.ui.record(record.w, record.l)}</span>
+              {controls}
+            </div>
+            {next.a && <NextCard name={name(next.a)} t={t} />}
+            {aiDeck}
+          </div>
+        )}
       </div>
 
       <div ref={arena} className="relative flex min-h-0 w-full flex-1 flex-col">
@@ -434,7 +436,7 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
       <div className="flex w-full flex-wrap items-end justify-between gap-x-2 sm:flex-nowrap">
         {!wide && (
           <div className="flex shrink-0 flex-col items-center gap-1 pb-1">
-            {myItems}
+            <ItemSlot s="p" m={m} t={t} icons={icons} on={boughtOn} />
             <SoulOrb n={m.E} label={t.ui.souls(m.E)} />
           </div>
         )}
@@ -489,13 +491,20 @@ function Board({ newMatch, deckLook, onDeck }: { newMatch: () => Match; deckLook
     </div>
     {/* tela larga: à direita os dois baralhos (IA em cima, o seu embaixo) e o fim do turno entre eles */}
     {wide && (
-      <aside aria-label={t.ui.decks} className="flex min-w-36 flex-[1_0_9rem] flex-col items-center justify-between gap-3 py-3">
+      <aside aria-label={t.ui.decks} className="grid min-w-36 flex-[1_0_9rem] grid-rows-[1fr_auto_1fr] justify-items-center gap-3 pb-3">
         <div className="flex w-full flex-col items-center gap-1">
+          <div className="flex items-center gap-1 self-end text-xs text-zinc-400 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
+            <span>{t.ui.record(record.w, record.l)}</span>
+            {controls}
+          </div>
           {aiDeck}
           {next.a && <NextCard name={name(next.a)} t={t} />}
         </div>
-        {endBtn}
-        <div className="flex w-full flex-col items-center gap-1">
+        <div className="flex flex-col items-center gap-2 text-sm font-bold">
+          {endBtn}
+          {prio}
+        </div>
+        <div className="flex w-full flex-col items-center justify-end gap-1">
           {next.p && <NextCard name={name(next.p)} t={t} />}
           {myDeck}
         </div>
@@ -701,7 +710,7 @@ function BoardCard({ c, m, t, name, face, looking, target, acts, onClick, onPeek
   onClick: (r: DOMRect | null) => void; onPeek: (r: DOMRect | null) => void;
 }) {
   const touch = useRef(false);
-  if (c.side === "a" && !c.rev) return <div role="img" aria-label={t.ui.facedown} className={slot}><CardBack className="w-gc" /></div>;
+  if (c.side === "a" && !c.rev) return <div role="img" aria-label={t.ui.facedown} className={slot}><CardBack className={`w-gc ${REST}`} /></div>;
   const pw = c.rev ? m.pow(c) : c.base;
   const icons = statusIcons(c, m, t);
   const w = weight(c);
@@ -711,13 +720,13 @@ function BoardCard({ c, m, t, name, face, looking, target, acts, onClick, onPeek
       onPointerDown={(e) => { touch.current = e.pointerType !== "mouse"; }}
       aria-label={`${target ? `${t.ui.act.target(name)}: ` : ""}${t.ui.cardLabel(name, c.cost, pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}
       onPointerEnter={(e) => { if (e.pointerType === "mouse") onPeek(e.currentTarget.getBoundingClientRect()); }} onPointerLeave={() => onPeek(null)} onBlur={() => onPeek(null)}
-      initial={c.rev ? { ...FALL[w], opacity: 0, rotateY: c.side === "a" ? 100 : 0 } : { y: 24, scale: 1.08, opacity: 0 }}
-      animate={{ scale: 1, y: 0, rotate: 0, rotateY: 0, opacity: 1 }}
-      transition={c.rev ? { duration: FALL_MS[w] / 1000, ease: "easeIn", opacity: { duration: 0.1 } } : { type: "spring", stiffness: 420, damping: 26 }}
+      initial={c.rev ? { ...FALL[w], opacity: 0, rotateY: c.side === "a" ? 100 : 0, filter: LIFTED } : { y: -16, scale: 1.12, opacity: 0, filter: LIFTED }}
+      animate={{ scale: 1, y: 0, rotate: 0, rotateY: 0, opacity: 1, filter: RESTING }}
+      transition={c.rev ? { duration: FALL_MS[w] / 1000, ease: "easeIn", opacity: { duration: 0.1 } } : { type: "spring", stiffness: 520, damping: 17, opacity: { duration: 0.08 } }}
       className={`relative block w-gc cursor-pointer rounded-lg ${c.staged || c.st.wait ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
       {face}
     </motion.button>
-    {c.rev && <Impact w={w} />}
+    {c.rev ? <Impact w={w} /> : c.side === "p" && <Impact w={1} />}
     {acts.length > 0 && (
       <div className="absolute inset-x-0 bottom-1 z-20 flex flex-col items-center gap-1">
         {acts.map((x) => (
@@ -731,6 +740,12 @@ function BoardCard({ c, m, t, name, face, looking, target, acts, onClick, onPeek
     </div>
   );
 }
+
+/** Sombra da carta no ar (longe e difusa) e apoiada na mesa (curta e escura): a troca entre as duas dá o peso da queda. */
+const LIFTED = "drop-shadow(0px 28px 14px rgb(0 0 0 / 0.3))";
+const RESTING = "drop-shadow(0px 5px 4px rgb(0 0 0 / 0.8))";
+/** A mesma sombra de apoio, para o verso da carta da IA. */
+const REST = "drop-shadow-[0_5px_4px_rgb(0_0_0/0.8)]";
 
 /** De onde a carta cai, por peso. */
 const FALL = {
@@ -842,17 +857,17 @@ function ItemOption({ k, m, t, icon, picked, disabled, onPick }: { k: ItemKey; m
 }
 
 /** Itens comprados (seus ou da IA): ícones pequenos, com o texto e o alvo numa caixa no hover/foco/toque. A compra da IA só aparece no fim do turno. */
-function ItemSlot({ s, m, t, icons, on, big }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string; big?: boolean }) {
+function ItemSlot({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string }) {
   const [open, setOpen] = useState(false);
   const list = [...m.owned[s], ...(s === "p" && m.buying.p ? [m.buying.p] : [])];
   const who = s === "p" ? t.shop.mine : t.shop.ai;
   if (!list.length) {
     return (
       <span data-item-slot={s} title={`${who}: ${t.shop.hidden}`}
-        className={`flex shrink-0 items-center justify-center rounded-md bg-zinc-950/70 font-display text-zinc-500 ${big ? "size-14 text-xl" : "size-9 text-sm"}`}>?</span>
+        className="flex size-9 shrink-0 items-center justify-center rounded-md bg-zinc-950/70 font-display text-sm text-zinc-500">?</span>
     );
   }
-  const size = big ? (list.length > 1 ? "size-12" : "size-14") : list.length > 1 ? "size-7" : "size-9";
+  const size = list.length > 1 ? "size-7" : "size-9";
   return (
     <span className="relative shrink-0" data-item-slot={s}>
       <button type="button" onClick={() => setOpen((x) => !x)} onPointerEnter={(e) => { if (e.pointerType === "mouse") setOpen(true); }}
@@ -868,6 +883,33 @@ function ItemSlot({ s, m, t, icons, on, big }: { s: Side; m: Match; t: T; icons:
           tips={list.map((b) => ({ title: `${b.k} · ${t.slots[ITEMS[b.k].slot]} ${t.shop.tier(ITEMS[b.k].tier)}`, text: `${t.items[b.k](m.itemV(b.k))} (${t.shop.on(on(b))})` }))} />
       )}
     </span>
+  );
+}
+
+/** Tela larga: caixa grande com os itens comprados de um jogador, legível de longe. A compra da IA só aparece no fim do turno. */
+function ItemBox({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string }) {
+  const list = [...m.owned[s], ...(s === "p" && m.buying.p ? [m.buying.p] : [])];
+  const who = s === "p" ? t.shop.mine : t.shop.ai;
+  return (
+    <section data-item-slot={s} aria-label={who}
+      className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto rounded-xl bg-black/55 p-3 shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_0.5rem_1.5rem_rgb(0_0_0/0.5)]">
+      <h2 className={`font-display text-sm font-extrabold tracking-widest uppercase ${s === "p" ? "text-game-me" : "text-game-ai"}`}>{who}</h2>
+      {list.length ? (
+        <ul className="flex flex-col gap-3">
+          {list.map((b, i) => (
+            <li key={`${b.k}-${b.t}-${i}`} title={`${t.items[b.k](m.itemV(b.k))} (${t.shop.on(on(b))})`}
+              className={`flex items-center gap-3 ${b === m.buying.p ? "animate-pulse" : ""}`}>
+              <ItemIconBox k={b.k} icon={icons[b.k]} size="size-14" />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <b className="font-display text-lg/tight">{b.k}</b>
+                <span className={`text-xs font-bold tracking-wider uppercase ${SLOT_TEXT[ITEMS[b.k].slot]}`}>{t.slots[ITEMS[b.k].slot]} · {t.shop.tier(ITEMS[b.k].tier)}</span>
+                <span className="line-clamp-2 text-sm text-zinc-300">{t.shop.on(on(b))}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-base text-zinc-500">{t.shop.hidden}</p>}
+    </section>
   );
 }
 
