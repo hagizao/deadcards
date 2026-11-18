@@ -13,7 +13,8 @@ import {
   ITEMS, ITEM_KEYS, SHOP_ROUNDS, SHOPS, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, HERO_CARD, HERO_POOL_MAX, ALT_POL, ALT_MALUS, BASE_RANGE, HABILITY_AT, heroCard, MASTERY_AT, STAT_KEYS as GAME_STATS,
   cardStats, gameConfig, itemCost, itemStats, locArtUrl, nRange, vRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey, type HeroOverride, type Profile,
 } from "../lib/game/config";
-import { cardPool } from "../lib/game/engine";
+import { cardPool, type HeardEv } from "../lib/game/engine";
+import { CHOREO, Rig } from "../lib/game/choreo";
 import { GAME_TEXT } from "../lib/game/text";
 import { abilitySfx } from "../lib/game/heroSfx";
 import { createPortal } from "react-dom";
@@ -127,45 +128,121 @@ function Fold({ title }: { title: string }) {
   );
 }
 
-/** Quem a habilidade mexe na prévia: inimigas, um aliado, os dois ou ninguém (age em si mesma ou no local). */
-const PREVIEW_ALLY = new Set<AbilityKey>(["Ivy", "Kelvin", "Viscous", "Paige", "McGinnis", "The Doorman", "team", "aura"]);
-const PREVIEW_BOTH = new Set<AbilityKey>(["Nurse Harrow", "Graves", "Holliday"]);
-const PREVIEW_NONE = new Set<AbilityKey>(["Mirage", "Mo & Krill", "Silver", "Sinclair", "Solomon", "Warden", "Yamato", "Rat King", "Violet", "Venator", "self", "draw"]);
+/** Lugares da mesa de mentira da prévia: o herói, duas inimigas, uma aliada e as vagas do outro local. */
+type Spot = "src" | "f1" | "f2" | "ally" | "awayA" | "awayP";
+const SPOT_ID: Partial<Record<Spot, number>> = { src: -1, f1: -2, f2: -3, ally: -4 };
+/**
+ * Um momento da habilidade na prévia: quem age (`src`), quem ela mexe (`dst`), de onde e para onde as cartas vão e o
+ * momento especial (`ev`). Herói sem passos mexe na primeira inimiga.
+ */
+type Step = { ev?: HeardEv; src?: Spot; dst?: Spot[]; from?: Partial<Record<Spot, Spot>>; to?: Partial<Record<Spot, Spot>>; self?: boolean };
+const PREVIEW: Partial<Record<AbilityKey, Step[]>> = {
+  "Abrams": [{ dst: ["f1"], to: { f1: "awayA" } }],
+  "Apollo": [{}, { ev: "parry", dst: ["f1"] }],
+  "Bebop": [{}, { ev: "pull", dst: ["f2"], from: { f2: "awayA" } }],
+  "Calico": [{}, { ev: "late", dst: ["f1", "f2"] }],
+  "Celeste": [{ dst: ["f1", "f2"] }],
+  "Deadman Danny": [{ dst: ["f1", "f2"] }],
+  "Drifter": [{ dst: ["f1"], self: true }],
+  "Dynamo": [{ dst: ["f1"], from: { f1: "awayA" } }],
+  "Graves": [{ ev: "end", dst: ["ally", "f2"] }],
+  "Grey Talon": [{ dst: ["f1"], self: true }],
+  "Haze": [{ dst: ["f1"] }, { ev: "late", dst: ["f1"] }],
+  "Holliday": [{ dst: ["f1"], to: { src: "awayP", f1: "awayA" } }],
+  "Ivy": [{ dst: ["ally"] }],
+  "Kelvin": [{ dst: ["ally"] }],
+  "Lash": [{ dst: ["f1", "f2"], to: { f1: "awayA", f2: "awayA" } }],
+  "McGinnis": [{ dst: ["ally"] }],
+  "Mina": [{}, { ev: "end", dst: ["f1"] }],
+  "Mirage": [{ dst: [] }], "Mo & Krill": [{ dst: [] }], "Rat King": [{ dst: [] }], "Sinclair": [{ dst: [] }], "Yamato": [{ dst: [] }], "The Doorman": [{ dst: [] }],
+  "Nurse Harrow": [{ dst: ["f1", "ally"] }],
+  "Paige": [{ dst: ["ally"] }],
+  "Paradox": [{ dst: ["f1"], from: { f1: "awayA" }, to: { src: "awayP" } }],
+  "Pocket": [{ dst: ["f1", "f2"] }],
+  "Rem": [{ dst: ["f1", "f2"] }],
+  "Seven": [{}, { ev: "end", dst: ["f1", "f2"] }],
+  "Silver": [{ ev: "late", dst: ["f1"] }],
+  "Solomon": [{ dst: ["ally"] }],
+  "Venator": [{ dst: [] }, { ev: "trap", src: "f1", dst: ["f1"] }],
+  "Victor": [{ dst: ["f1", "f2", "ally"] }],
+  "Vindicta": [{ dst: ["f1"], self: true }],
+  "Violet": [{ ev: "end", dst: [] }],
+  "Viscous": [{ dst: ["ally"] }],
+  "Vyper": [{ dst: [] }, { ev: "petri", src: "f1", dst: ["f1"] }],
+  "Warden": [{ dst: ["f1", "f2"] }],
+  "Wraith": [{ dst: ["f1"] }, { ev: "late", dst: [], to: { src: "awayP" } }],
+};
+/** Habilidades genéricas (sem herói) seguem com o efeito por cima da mesa. */
+const PREVIEW_ALLY = new Set<AbilityKey>(["team", "aura"]);
+const PREVIEW_NONE = new Set<AbilityKey>(["self", "draw"]);
 const boxOf = (el: Element | null): Box | null => {
   const r = el?.getBoundingClientRect();
   return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height } : null;
 };
 
 /**
- * Prévia da animação de um herói numa mesa de mentira: a carta do herói e um aliado embaixo, duas inimigas em cima.
- * Toca junto o som (o enviado nesta edição ou o padrão).
+ * Prévia da animação de um herói numa mesa de mentira: a carta do herói e uma aliada embaixo, duas inimigas em cima
+ * e as vagas de outro local ao lado, com as mesmas coreografias da partida. Toca junto o som (o enviado nesta edição ou o padrão).
  */
 function FxPreview({ hero, icon, sound }: { hero: AbilityKey; icon?: string; sound?: string }) {
   const stage = useRef<HTMLDivElement>(null);
   const [run, setRun] = useState<{ k: number; scene: FxScene } | null>(null);
-  const play = () => {
-    const q = (s: string) => boxOf(stage.current?.querySelector(`[data-fx="${s}"]`) ?? null);
-    const src = q("src"), f1 = q("f1"), f2 = q("f2"), ally = q("ally");
-    if (!src || !f1 || !f2 || !ally) return;
-    const foes = [{ box: f1, foe: true }, { box: f2, foe: true }];
-    const dst = PREVIEW_NONE.has(hero) ? [] : PREVIEW_ALLY.has(hero) ? [{ box: ally, foe: false }] : PREVIEW_BOTH.has(hero) ? [foes[0], { box: ally, foe: false }] : foes;
-    setRun({ k: (run?.k ?? 0) + 1, scene: { src, dst, loc: boxOf(stage.current), me: true } });
-    hear(sound, hero);
+  const [busy, setBusy] = useState(false);
+  const q = (s: Spot) => boxOf(stage.current?.querySelector(`[data-fx="${s}"]`) ?? null);
+  const quake = (p: 1 | 2 | 3) => { stage.current?.animate([0, -1, 1, -0.6, 0].map((k) => ({ transform: `translate(${k * p * 3}px, ${-k * p * 1.5}px)` })), { duration: 260 }); };
+  /** Roda os momentos da coreografia em sequência, um depois do outro. */
+  const choreo = (steps: Step[]) => {
+    const recipe = CHOREO[hero];
+    if (!recipe) return;
+    setBusy(true);
+    let t = 0;
+    steps.forEach((st) => {
+      const src = st.src ?? "src", dst = st.dst ?? ["f1"];
+      const ms = recipe.ms(dst.length, !!st.self, st.ev);
+      setTimeout(() => {
+        const rig = new Rig();
+        // cartas que trocam de lugar: o dublê sai da vaga de origem e termina na de destino
+        [src, ...dst].forEach((k) => {
+          const id = SPOT_ID[k], from = st.from?.[k], to = st.to?.[k];
+          if (id !== undefined && (from || to)) rig.hold(id, q(from ?? k), k !== "src" && k !== "ally", q(to ?? k) ?? undefined);
+        });
+        rig.start(hero, { id: SPOT_ID[src] ?? -1, box: null }, dst.map((k) => ({ id: SPOT_ID[k] ?? -1, foe: k === "f1" || k === "f2" })),
+          { self: !!st.self, ev: st.ev, lane: boxOf(stage.current?.querySelector("[data-lane]") ?? null), alt: q("awayP"), shake: quake });
+      }, t);
+      t += ms + 350;
+    });
+    setTimeout(() => setBusy(false), t);
   };
-  const card = "flex aspect-295/430 w-16 items-center justify-center overflow-hidden rounded-lg text-[10px] font-bold uppercase shadow-lg sm:w-20";
+  const play = () => {
+    hear(sound, hero);
+    if (CHOREO[hero]) return choreo(PREVIEW[hero] ?? [{}]);
+    const src = q("src"), f1 = q("f1"), ally = q("ally");
+    if (!src || !f1 || !ally) return;
+    const dst = PREVIEW_NONE.has(hero) ? [] : PREVIEW_ALLY.has(hero) ? [{ box: ally, foe: false }] : [{ box: f1, foe: true }];
+    setRun({ k: (run?.k ?? 0) + 1, scene: { src, dst, loc: boxOf(stage.current), me: true } });
+  };
+  const card = "aspect-295/430 w-16 shrink-0 rounded-lg shadow-lg sm:w-20";
+  const face = "flex size-full items-center justify-center overflow-hidden rounded-lg text-[10px] font-bold uppercase";
+  const slot = `${card} border-2 border-dashed border-zinc-700 shadow-none`;
   return (
     <div className="flex flex-col gap-3">
-      <div ref={stage} className="flex flex-col items-center justify-between gap-8 rounded-2xl bg-zinc-950/70 bg-radial-[at_50%_40%] from-zinc-800/60 to-transparent px-4 py-5">
-        <div className="flex gap-3">
-          <span data-fx="f1" className={`${card} bg-game-ai/30 text-game-ai`}>Inimiga</span>
-          <span data-fx="f2" className={`${card} bg-game-ai/30 text-game-ai`}>Inimiga</span>
+      <div ref={stage} className="flex justify-center gap-4 rounded-2xl bg-zinc-950/70 bg-radial-[at_50%_40%] from-zinc-800/60 to-transparent px-4 py-5">
+        <div data-lane className="flex flex-col items-center justify-between gap-8">
+          <div className="flex gap-3">
+            <div data-fx="f1" data-card={-2} className={card}><div className={`${face} bg-game-ai/30 text-game-ai`}>Inimiga</div></div>
+            <div data-fx="f2" data-card={-3} className={card}><div className={`${face} bg-game-ai/30 text-game-ai`}>Inimiga</div></div>
+          </div>
+          <div className="flex gap-3">
+            <div data-fx="src" data-card={-1} className={`${card} ring-2 ring-game-brass`}><div className={`${face} bg-zinc-800`}>{icon ? <img src={icon} alt={hero} className="size-full object-cover" /> : hero}</div></div>
+            <div data-fx="ally" data-card={-4} className={card}><div className={`${face} bg-game-me/30 text-game-me`}>Aliada</div></div>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <span data-fx="src" className={`${card} bg-zinc-800 ring-2 ring-game-brass`}>{icon ? <img src={icon} alt={hero} className="size-full object-cover" /> : hero}</span>
-          <span data-fx="ally" className={`${card} bg-game-me/30 text-game-me`}>Aliada</span>
+        <div className="flex flex-col items-center justify-between gap-8 border-l border-zinc-800 pl-4">
+          <div data-fx="awayA" className={slot} />
+          <div data-fx="awayP" className={slot} />
         </div>
       </div>
-      <button type="button" className={`${primary} ${ring} self-start`} onClick={play}>▶ Ver animação</button>
+      <button type="button" disabled={busy} className={`${primary} ${ring} self-start disabled:cursor-wait disabled:opacity-60`} onClick={play}>▶ Ver animação</button>
       {run && createPortal(
         <FxLayer><AbilityFx key={run.k} ab={hero} scene={run.scene} onDone={() => setRun(null)} /></FxLayer>,
         document.body,
