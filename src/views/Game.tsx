@@ -1078,11 +1078,12 @@ function BoardCard({ c, m, t, name, face, looking, target, mark = false, acts, s
       onPointerDown={(e) => { touch.current = e.pointerType !== "mouse"; }}
       aria-label={`${target ? `${t.ui.act.target(name)}: ` : ""}${t.ui.cardLabel(name, c.cost, pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}
       onPointerEnter={(e) => { if (e.pointerType === "mouse") onPeek(e.currentTarget.getBoundingClientRect()); }} onPointerLeave={() => onPeek(null)} onBlur={() => onPeek(null)}
-      initial={c.rev ? { ...FALL[w], opacity: 0, rotateY: c.side === "a" ? 100 : 0, filter: LIFTED } : { y: -16, scale: 1.12, opacity: 0, filter: LIFTED }}
+      initial={c.rev ? { ...FALL[w], opacity: 0, rotateY: 100, filter: LIFTED } : { y: -16, scale: 1.12, opacity: 0, filter: LIFTED }}
       animate={{ scale: 1, y: 0, rotate: 0, rotateY: 0, opacity: 1, filter: RESTING }}
       transition={c.rev ? { duration: FALL_MS[w] / 1000, ease: "easeIn", opacity: { duration: 0.1 } } : { type: "spring", stiffness: 520, damping: 17, opacity: { duration: 0.08 } }}
-      className={`relative block w-gc rounded-lg ${shift ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${c.staged || c.st.wait ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
-      {m.faceDown(c) ? <CardBack tone="me" className={`w-gc ${REST}`} /> : (
+      className={`relative block w-gc rounded-lg ${shift ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${c.st.wait ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
+      {/* a sua carta jogada fica virada até revelar, como a do adversário (passar o mouse ainda mostra a face) */}
+      {!c.rev ? <CardBack tone="me" className={`w-gc ${REST}`} /> : (
         // na mira da Vindicta, a carta fica em preto e branco e o X vermelho é o destaque
         <div className={mark ? "transition-[filter] duration-100 group-hover:brightness-75 group-hover:grayscale group-has-focus-visible:brightness-75 group-has-focus-visible:grayscale" : ""}>{face}</div>
       )}
