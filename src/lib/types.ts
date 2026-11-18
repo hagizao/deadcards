@@ -46,8 +46,10 @@ export type Player = {
   inactive?: boolean;
   /** Carta exclusiva: nunca sai em pack (só por código ou outro meio). */
   exclusive?: boolean;
-  art?: { url: string; zoom?: number; x?: number; y?: number; credit?: ArtCredit };
+  art?: ArtLayer & { credit?: ArtCredit; fg?: ArtLayer };
 };
+
+export type ArtLayer = { url: string; zoom?: number; x?: number; y?: number };
 
 export type ArtCredit = { name: string; url?: string };
 

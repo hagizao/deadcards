@@ -371,6 +371,22 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
             </div>
           )}
           {d.art && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Camada da frente (PNG transparente, opcional)</span>
+              <div className="flex gap-2">
+                <ImagePick folder="players" label={d.art.fg ? "Trocar camada" : "Enviar camada"} onUrl={(url) => set({ art: { ...d.art!, fg: { url, zoom: 100, x: 50, y: 50 } } })} />
+                {d.art.fg && <button type="button" className={ghost} onClick={() => set({ art: { ...d.art!, fg: undefined } })}>Remover camada</button>}
+              </div>
+            </div>
+          )}
+          {d.art?.fg && (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Range label="Zoom da frente" value={d.art.fg.zoom ?? 100} min={50} max={300} onChange={(v) => set({ art: { ...d.art!, fg: { ...d.art!.fg!, zoom: v } } })} />
+              <Range label="X da frente" value={d.art.fg.x ?? 50} min={0} max={100} onChange={(v) => set({ art: { ...d.art!, fg: { ...d.art!.fg!, x: v } } })} />
+              <Range label="Y da frente" value={d.art.fg.y ?? 50} min={0} max={100} onChange={(v) => set({ art: { ...d.art!, fg: { ...d.art!.fg!, y: v } } })} />
+            </div>
+          )}
+          {d.art && (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Artista (crédito)">
                 <input className={input} maxLength={60} placeholder="@artista" value={d.art.credit?.name ?? ""}

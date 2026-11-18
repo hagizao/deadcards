@@ -179,6 +179,8 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
       if (b.art && typeof b.art === "object") {
         const credit = artCredit((b.art as { credit?: unknown }).credit);
         if (credit === null) return bad("crédito da arte inválido: nome até 60 caracteres e link http(s)");
+        const fg = (b.art as { fg?: { url?: unknown } }).fg;
+        if (fg != null && (typeof fg !== "object" || typeof fg.url !== "string" || !fg.url.startsWith("/img/"))) return bad("camada da frente inválida");
         b.art = { ...b.art, credit };
       }
       const extra = Object.fromEntries(PLAYER_EXTRA.filter((k) => b[k] !== undefined && b[k] !== null).map((k) => [k, b[k]]));

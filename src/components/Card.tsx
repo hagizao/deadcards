@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
 import type { CSSProperties, PointerEvent } from "react";
 import type { Player } from "../lib/types";
 import { getPlayerOvr, getPlayerTrend, hexToRgba, teamOf, useLabel } from "../lib/cards";
@@ -28,7 +28,8 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
   const rk = getCardTier(player, settings.tierConfig!);
   const medium = variant === "medium";
   const editor = variant === "editor";
-  const art = player.art?.url ? { url: player.art.url, zoom: player.art.zoom ?? 100, x: player.art.x ?? 50, y: player.art.y ?? 50 } : heroArt(player.hero);
+  const art = player.art?.url ? layer(player.art) : heroArt(player.hero);
+  const fg = player.art?.url && player.art.fg?.url ? layer(player.art.fg) : null;
 
   const rx = useMotionValue(0);
   const ry = useMotionValue(0);
@@ -40,6 +41,9 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
     ry.set((e.clientY - r.top) / r.height - 0.5);
   };
   const onLeave = () => { rx.set(0); ry.set(0); };
+  const still = useReducedMotion();
+  const fgX = useSpring(useTransform(rx, [-0.5, 0.5], still ? [0, 0] : [-8, 8]), { stiffness: 220, damping: 18 });
+  const fgY = useSpring(useTransform(ry, [-0.5, 0.5], still ? [0, 0] : [-6, 6]), { stiffness: 220, damping: 18 });
 
   const sizeClass = editor ? "card-size-editor" : medium ? "card-size-team-medium" : "card-size-team";
   const topPad = rk.custom ? rk.topPad || undefined : rk.lvl >= 3 ? 26 : undefined;
@@ -58,16 +62,8 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
         <div className="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5" style={topPad ? { paddingTop: topPad } : undefined}>
           {art ? (
             <div className="hero-bg-wrap pointer-events-none absolute inset-0 overflow-hidden">
-              <img
-                src={art.url}
-                alt={player.hero}
-                draggable={false}
-                style={{
-                  position: "absolute", inset: 0, width: "100%", height: "100%", maxWidth: "none", objectFit: "cover",
-                  objectPosition: `${art.x}% ${art.y}%`, transform: `scale(${art.zoom / 100})`, transformOrigin: `${art.x}% ${art.y}%`,
-                  filter: "contrast(1.08) saturate(1.12)", userSelect: "none",
-                }}
-              />
+              <img src={art.url} alt={player.hero} draggable={false} style={{ ...layerStyle(art), transform: `scale(${art.zoom / 100})` }} />
+              {fg && <motion.img src={fg.url} alt="" draggable={false} style={{ ...layerStyle(fg), x: fgX, y: fgY, scale: fg.zoom / 100 }} />}
             </div>
           ) : (
             <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)" }} />
@@ -143,6 +139,13 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
     </motion.div>
   );
 }
+
+const layer = (l: { url: string; zoom?: number; x?: number; y?: number }) => ({ url: l.url, zoom: l.zoom ?? 100, x: l.x ?? 50, y: l.y ?? 50 });
+
+const layerStyle = (l: ReturnType<typeof layer>): CSSProperties => ({
+  position: "absolute", inset: 0, width: "100%", height: "100%", maxWidth: "none", objectFit: "cover",
+  objectPosition: `${l.x}% ${l.y}%`, transformOrigin: `${l.x}% ${l.y}%`, filter: "contrast(1.08) saturate(1.12)", userSelect: "none",
+});
 
 function Particles({ tierKey }: { tierKey: ReturnType<typeof getCardTier> }) {
   const specs = particleSpecs(tierKey);
