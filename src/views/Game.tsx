@@ -14,15 +14,21 @@ import { DeckBuilder } from "../components/DeckBuilder";
 import { DeckPile } from "../components/DeckPile";
 import { versionPlayer, type DeckLook } from "../lib/game/deck";
 import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type PowPart, type Result, type Side, type Token } from "../lib/game/engine";
-import { abilitySfx } from "../lib/game/heroSfx";
+import { abilitySfx, slashSfx, startSfx } from "../lib/game/heroSfx";
 import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
 import tableArt from "../assets/game/table.webp";
 
 const REVEAL_MS = 1000;
+/** Quanto a caixa de "Começou!" fica na tela antes de sumir (ms). */
+const START_MS = 1500;
+/** Quanto a carta eliminada fica na mesa com o X antes de sumir (s). */
+const SLAIN_S = 1.5;
 const END_MS = 750;
 const TOAST_MS = 1300;
+/** Todas as cartas na mesa, dos dois lados. */
+const boardCards = (m: Match) => m.loc.flatMap((l) => [...l.s.p, ...l.s.a]);
 /** Peso da carta pelo custo: 1 cai perto, 2 cai do alto, 3 vem do céu e treme a mesa. */
 const weight = (c: GCard) => (c.cost >= 6 ? 3 : c.cost >= 3 ? 2 : 1);
 /** Quanto a queda leva até tocar a mesa, por peso (ms). */
@@ -73,6 +79,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const [game, setGame] = useState(0);
   // abertura da mesa: só no começo de uma partida (ao voltar para a aba no meio dela, a mesa já está posta)
   const [intro, setIntro] = useState(() => m.t === 1 && m.loc.every((l) => !l.s.p.length && !l.s.a.length));
+  // caixa de "Começou!" logo depois da abertura
+  const [start, setStart] = useState(false);
   useEffect(() => {
     if (!intro) return;
     const at = (sec: number, fn: () => void) => setTimeout(fn, sec * 1000);
@@ -83,10 +91,15 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       at(INTRO.side, () => sfx("shuffle", 0.6)),
       at(INTRO.orb, () => sfx("soul", 0.6)),
       ...m.hand.map((_, i) => at(INTRO.hand + i * INTRO.handStep, () => sfx("hover"))),
-      at(INTRO.done, () => setIntro(false)),
+      at(INTRO.done, () => { setIntro(false); setStart(true); startSfx(); }),
     ];
     return () => ts.forEach(clearTimeout);
   }, [intro, game, m]);
+  useEffect(() => {
+    if (!start) return;
+    const id = setTimeout(() => setStart(false), START_MS);
+    return () => clearTimeout(id);
+  }, [start]);
   /** Peça da mesa entrando na abertura: classe da entrada e o atraso dela. */
   const deal = (k: keyof typeof INTRO_CLS, sec: number) => (intro ? { cls: INTRO_CLS[k], style: { "--d": `${sec.toFixed(2)}s` } as CSSProperties } : { cls: "", style: undefined });
   // tela cheia: a partida cobre o site (e pede tela cheia ao navegador quando dá)
@@ -135,6 +148,18 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   // cartas queimadas (mão cheia) que já terminaram de queimar na tela
   const [ashes, setAshes] = useState<Set<number>>(() => new Set());
+  // cartas eliminadas na mesa, no lugar onde estavam, enquanto o X corta e elas somem
+  const [slain, setSlain] = useState<{ c: GCard; r: DOMRect }[]>([]);
+  /** Roda um passo da partida e mostra o X nas cartas que saíram da mesa sem voltar para a mão. */
+  const watch = (f: () => void) => {
+    const was = boardCards(m).filter((c) => c.rev).map((c) => ({ c, r: document.querySelector(`[data-card="${c.id}"]`)?.getBoundingClientRect() }));
+    f();
+    const on = new Set([...boardCards(m), ...m.hand, ...m.ahand, ...m.deck, ...m.adeck]);
+    const gone = was.filter((x): x is { c: GCard; r: DOMRect } => !!x.r && !on.has(x.c));
+    if (!gone.length) return;
+    setSlain((s) => [...s, ...gone]);
+    slashSfx();
+  };
   const burns = m.burned.length;
   const heard = useRef(burns);
   useEffect(() => {
@@ -207,6 +232,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const restart = () => {
     timers.current.forEach(clearTimeout);
     setAshes(new Set());
+    setSlain([]);
+    setStart(false);
     timers.current = [];
     setM(newMatch());
     setGame((x) => x + 1);
@@ -235,14 +262,14 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     const step = () => {
       if (i < queue.length) {
         const a = queue[i++];
-        m.act(a);
+        watch(() => m.act(a));
         bump();
         if (!a.exec) land(a.c);
         // som da habilidade: logo depois de a carta tocar a mesa (ou na hora, na execução marcada da Shiv)
         playHeard(a.exec ? 0 : FALL_MS[weight(a.c)] + 120);
         return later(step, REVEAL_MS);
       }
-      m.endOfTurn();
+      watch(() => m.endOfTurn());
       bump();
       playHeard(0);
       later(() => {
@@ -580,7 +607,27 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {start && (
+          <motion.div key="start" role="status" className="pointer-events-none fixed inset-0 z-50 grid place-items-center"
+            initial={{ opacity: 0, scale: 1.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, transition: { duration: 0.35 } }}
+            transition={{ type: "spring", stiffness: 420, damping: 22 }}>
+            <TickTag tone="bg-game-brass" className="px-3 py-2 sm:px-5 sm:py-3">
+              <span className="block bg-zinc-950 px-5 py-1.5 text-3xl font-black tracking-widest text-zinc-50 uppercase [clip-path:polygon(1%_0,100%_6%,99%_100%,0_94%)] sm:px-10 sm:py-3 sm:text-6xl">
+                {t.ui.toast.start}
+              </span>
+            </TickTag>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* no body: fica acima do cabeçalho do site e de qualquer camada do jogo */}
+      {createPortal(
+        <AnimatePresence>
+          {slain.map(({ c, r }) => <Slain key={c.id} r={r} card={face(c, false)} still={!!still} onDone={() => setSlain((s) => s.filter((x) => x.c !== c))} />)}
+        </AnimatePresence>,
+        document.body,
+      )}
       {createPortal(
         <AnimatePresence>
           {result && showEnd && (
@@ -1259,6 +1306,31 @@ function Score({ v, lead, side }: { v: number; lead: boolean; side: Side }) {
  * Carta comprada com a mão cheia: aparece sobre o baralho em preto e branco, pega fogo de baixo para cima e some.
  * A carta está perdida (saiu da partida).
  */
+/** Carta eliminada: dois cortes vermelhos em X atravessam a carta e ela some em 1,5 s. */
+function Slain({ r, card, still, onDone }: { r: DOMRect; card: ReactNode; still: boolean; onDone: () => void }) {
+  const cut = (d: string, delay: number) => (
+    <>
+      <motion.path d={d} className="stroke-red-600" strokeWidth={14} strokeLinecap="round" vectorEffect="non-scaling-stroke" fill="none"
+        initial={{ pathLength: still ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.14, delay, ease: "easeIn" }} />
+      <motion.path d={d} className="stroke-red-100" strokeWidth={3} strokeLinecap="round" vectorEffect="non-scaling-stroke" fill="none"
+        initial={{ pathLength: still ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.14, delay, ease: "easeIn" }} />
+    </>
+  );
+  return (
+    <motion.div aria-hidden="true" className="pointer-events-none fixed z-60" style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
+      initial={{ opacity: 1, scale: 1 }} animate={{ opacity: [1, 1, 0], scale: still ? 1 : [1, 1.06, 0.92] }} exit={{ opacity: 0 }}
+      transition={{ duration: SLAIN_S, times: [0, 0.55, 1], ease: "easeIn" }} onAnimationComplete={onDone}>
+      <motion.div className="size-full" initial={{ filter: "grayscale(0) brightness(1)" }} animate={{ filter: "grayscale(0.8) brightness(0.6)" }} transition={{ duration: 0.3, delay: 0.25 }}>
+        {card}
+      </motion.div>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible drop-shadow-[0_0_8px_var(--color-red-600)]">
+        {cut("M 4 6 L 96 94", 0)}
+        {cut("M 96 6 L 4 94", 0.22)}
+      </svg>
+    </motion.div>
+  );
+}
+
 function Burning({ card, onDone }: { card: ReactNode; onDone: () => void }) {
   return (
     <motion.div aria-hidden="true" className="pointer-events-none absolute bottom-0 left-1/2 z-30 w-full max-w-40 min-w-24 -translate-x-1/2"

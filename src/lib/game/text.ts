@@ -50,7 +50,7 @@ export type GameText = {
     endTurn: string; closeTab: string; newMatch: string; again: string; viewBoard: string; hint: string; hiddenLoc: string; revealsOn: (t: number) => string; next: (name: string) => string;
     cost: string; power: string; silenced: string; noAbility: string; tokenDesc: string; hand: string; arena: string;
     win: string; loss: string; draw: string; summary: (w: number, l: number, me: number, ai: number) => string; patron: string;
-    toast: { souls: string; frozen: string; full: string; closed: string; minCost: string; turn: (t: number) => string };
+    toast: { souls: string; frozen: string; full: string; closed: string; minCost: string; turn: (t: number) => string; start: string };
     chips: { frozenMe: string; frozenAi: string; hookMe: string; hookAi: string; trapMe: string; trapAi: string; shieldMe: string; shieldAi: string; petriMe: string; petriAi: string; portal: string };
     status: { burn: string; stun: string; immune: string; chained: string; burrow: string; sleep: string; riposte: string; wolf: string; vuln: string; petri: string; unstop: string; chan: string; root: string; exec: string };
     act: {
@@ -367,7 +367,7 @@ export const GAME_TEXT = strings<GameText>({
       hand: "Sua mão", arena: "Locais",
       win: "Vitória!", loss: "Derrota", draw: "Empate",
       summary: (w, l, me, ai) => `Locais: ${w} x ${l} · Poder total: ${me} x ${ai}`, patron: "desempate no Patrono",
-      toast: { souls: "Almas insuficientes", frozen: "Local congelado", full: "Local cheio", closed: "Não dá para jogar aqui", minCost: "Custo baixo demais para este local", turn: (t) => `Turno ${t}` },
+      toast: { souls: "Almas insuficientes", frozen: "Local congelado", full: "Local cheio", closed: "Não dá para jogar aqui", minCost: "Custo baixo demais para este local", turn: (t) => `Turno ${t}`, start: "Começou!" },
       status: { burn: "queimando", stun: "erguida", immune: "imune", chained: "acorrentada", burrow: "entocada", sleep: "dormindo", riposte: "riposta pronta", wolf: "lobisomem", vuln: "vulnerável", petri: "petrificada", unstop: "imparável", chan: "canalizando", root: "presa", exec: "execução pronta" },
       chips: { frozenMe: "Congelado p/ você", frozenAi: "Congelado p/ IA", hookMe: "Sua próxima carta vem pra cá", hookAi: "Gancho armado", trapMe: "Armadilha inimiga", trapAi: "Sua armadilha", shieldMe: "Seu abrigo", shieldAi: "Abrigo da IA", petriMe: "Petrificação inimiga", petriAi: "Sua petrificação", portal: "Portal" },
       act: {
@@ -688,7 +688,7 @@ export const GAME_TEXT = strings<GameText>({
       hand: "Your hand", arena: "Locations",
       win: "Victory!", loss: "Defeat", draw: "Draw",
       summary: (w, l, me, ai) => `Locations: ${w} x ${l} · Total power: ${me} x ${ai}`, patron: "Patron tiebreaker",
-      toast: { souls: "Not enough souls", frozen: "Location frozen", full: "Location full", closed: "Can’t play here", minCost: "Cost too low for this location", turn: (t) => `Turn ${t}` },
+      toast: { souls: "Not enough souls", frozen: "Location frozen", full: "Location full", closed: "Can’t play here", minCost: "Cost too low for this location", turn: (t) => `Turn ${t}`, start: "Fight!" },
       status: { burn: "burning", stun: "lifted", immune: "immune", chained: "chained", burrow: "burrowed", sleep: "asleep", riposte: "riposte ready", wolf: "werewolf", vuln: "vulnerable", petri: "petrified", unstop: "unstoppable", chan: "channeling", root: "rooted", exec: "execution ready" },
       chips: { frozenMe: "Frozen for you", frozenAi: "Frozen for AI", hookMe: "Your next card comes here", hookAi: "Hook set", trapMe: "Enemy trap", trapAi: "Your trap", shieldMe: "Your shelter", shieldAi: "AI shelter", petriMe: "Enemy petrify", petriAi: "Your petrify", portal: "Portal" },
       act: {
@@ -1009,7 +1009,7 @@ export const GAME_TEXT = strings<GameText>({
       hand: "Tu mano", arena: "Lugares",
       win: "¡Victoria!", loss: "Derrota", draw: "Empate",
       summary: (w, l, me, ai) => `Lugares: ${w} x ${l} · Poder total: ${me} x ${ai}`, patron: "desempate en el Patrono",
-      toast: { souls: "Almas insuficientes", frozen: "Lugar congelado", full: "Lugar lleno", closed: "No se puede jugar aquí", minCost: "Coste demasiado bajo para este lugar", turn: (t) => `Turno ${t}` },
+      toast: { souls: "Almas insuficientes", frozen: "Lugar congelado", full: "Lugar lleno", closed: "No se puede jugar aquí", minCost: "Coste demasiado bajo para este lugar", turn: (t) => `Turno ${t}`, start: "¡Empezó!" },
       status: { burn: "ardiendo", stun: "levantada", immune: "inmune", chained: "encadenada", burrow: "enterrada", sleep: "dormida", riposte: "riposte lista", wolf: "loba", vuln: "vulnerable", petri: "petrificada", unstop: "imparable", chan: "canalizando", root: "inmovilizada", exec: "ejecución lista" },
       chips: { frozenMe: "Congelado para ti", frozenAi: "Congelado para la IA", hookMe: "Tu próxima carta viene aquí", hookAi: "Gancho listo", trapMe: "Trampa enemiga", trapAi: "Tu trampa", shieldMe: "Tu refugio", shieldAi: "Refugio de la IA", petriMe: "Petrificación enemiga", petriAi: "Tu petrificación", portal: "Portal" },
       act: {
