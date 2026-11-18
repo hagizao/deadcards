@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, useVelocity } from "motion/react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { GCard } from "../lib/game/engine";
-import { slideSpeed, slideStart, slideStop } from "../lib/game/sfx";
+import { sfx, slideSpeed, slideStart, slideStop } from "../lib/game/sfx";
 import { TipBoxes } from "./GameCard";
 
 type Tip = { title: string; text: string };
@@ -136,11 +136,11 @@ function HandCard({ c, p, zoomed, dragging, onHover, onDragState }: {
       onDrag={(e, info) => { const pt = pointOf(e); p.onDrag(c, dropAt(pt.x, pt.y)); slideSpeed(Math.hypot(info.velocity.x, info.velocity.y)); }}
       onDragEnd={(e) => { slideStop(); end(e); }}
       onClick={() => { if (moved) { setMoved(false); return; } p.onSelect(c); }}
-      onPointerEnter={(e) => { if (e.pointerType === "mouse") onHover(true); }}
+      onPointerEnter={(e) => { if (e.pointerType === "mouse") { onHover(true); if (!dragging) sfx("hover"); } }}
       onPointerLeave={(e) => { if (e.pointerType === "mouse") onHover(false); }}
       onFocus={() => onHover(true)} onBlur={() => onHover(false)}
       className={`block w-full cursor-grab touch-none rounded-lg transition-[filter] duration-150 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-dl-text active:cursor-grabbing disabled:cursor-not-allowed ${
-        can ? "drop-shadow-[0_0_10px_var(--color-game-me)]" : "brightness-75"} ${dragging ? "cursor-grabbing" : ""}`}>
+        can ? "drop-shadow-[0_0_10px_var(--color-game-me)]" : "brightness-50 saturate-50"} ${dragging ? "cursor-grabbing" : ""}`}>
       {p.render(c, zoomed)}
     </motion.button>
   );

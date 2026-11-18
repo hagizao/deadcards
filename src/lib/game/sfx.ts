@@ -16,7 +16,7 @@ import win from "../../assets/sfx/win.ogg";
 const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, win };
 /** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
 const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
-export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal";
+export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover";
 
 /** Volume e mudo de cada canal (0 a 1). */
 export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
@@ -64,6 +64,7 @@ function audioCtx() {
 export function sfx(name: Sfx, volume = 1) {
   if (name in WOOD) return woodHit(WOOD[name as keyof typeof WOOD] * volume);
   if (name === "reveal") return revealSwell(volume);
+  if (name === "hover") return cardFlick(volume);
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
   const file = name as keyof typeof FILES;
@@ -110,6 +111,29 @@ function noise(c: AudioContext, sec: number, brown = false) {
   return b;
 }
 let burst: AudioBuffer | null = null;
+
+let lastFlick = 0;
+/** Passar o mouse pelas cartas da mão: o roçar curto de uma carta grossa na outra (no máximo um a cada 60 ms). */
+function cardFlick(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  if (t - lastFlick < 0.06) return;
+  lastFlick = t;
+  burst ??= noise(c, 0.3);
+  const src = c.createBufferSource();
+  src.buffer = burst;
+  const band = c.createBiquadFilter();
+  band.type = "bandpass"; band.frequency.value = 900 + Math.random() * 300; band.Q.value = 1.1;
+  const gain = c.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.35 * SFX_BASE * lv * strength, t + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  src.connect(band).connect(gain).connect(c.destination);
+  src.start(t, Math.random() * 0.2);
+  src.stop(t + 0.08);
+}
 
 /** Local se revelando: a névoa se abre num sopro que sobe e o tampo ressoa grave por baixo. */
 function revealSwell(strength = 1) {
