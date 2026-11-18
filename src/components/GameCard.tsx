@@ -31,7 +31,7 @@ type Props = {
   className?: string;
 };
 
-const gem = "absolute top-[3cqw] flex size-[21cqw] items-center justify-center rounded-full border-[1.2cqw] border-white font-display text-[12cqw] leading-none font-extrabold shadow-[0_0.8cqw_2cqw_rgb(0_0_0/0.7)]";
+const gem = "absolute top-[3cqw] flex size-[21cqw] items-center justify-center rounded-full border-[1.2cqw] border-white text-[12cqw] leading-none font-extrabold shadow-[0_0.8cqw_2cqw_rgb(0_0_0/0.7)]";
 
 /** Carta com a largura do container (`@container`); todas as medidas internas são em cqw, então ela escala inteira. */
 export function GameCard({ player, name, cost, power, base, glyph, master, text, status, fx = false, className = "" }: Props) {
@@ -100,7 +100,7 @@ function PowerGem({ power, base }: { power: number; base: number }) {
         {pop && (
           <motion.span key={pop.id} initial={{ opacity: 1, y: 0 }} animate={{ opacity: 0, y: "-14cqw" }} transition={{ duration: 0.9, ease: "easeOut" }}
             onAnimationComplete={() => setPop((p) => (p?.id === pop.id ? null : p))}
-            className={`pointer-events-none absolute top-[24cqw] right-[4cqw] font-display text-[14cqw] font-extrabold drop-shadow-[0_0.5cqw_1cqw_rgb(0_0_0)] ${pop.d > 0 ? "text-emerald-300" : "text-red-400"}`} aria-hidden="true">
+            className={`pointer-events-none absolute top-[24cqw] right-[4cqw] text-[14cqw] font-extrabold drop-shadow-[0_0.5cqw_1cqw_rgb(0_0_0)] ${pop.d > 0 ? "text-emerald-300" : "text-red-400"}`} aria-hidden="true">
             {pop.d > 0 ? "+" : "−"}{Math.abs(pop.d)}
           </motion.span>
         )}
@@ -141,7 +141,7 @@ export function CardBack({ className = "", tone = "ai", look }: { className?: st
     <div className={`@container aspect-295/430 ${className}`}>
       <div className="deadlock-card-shell size-full">
         <div className="deadlock-card-inner flex items-center justify-center game-card-back">
-          <span className={`font-display text-[40cqw] ${tone === "me" ? "text-game-me/50" : "text-game-ai/50"}`} aria-hidden="true">◆</span>
+          <span className={`text-[40cqw] ${tone === "me" ? "text-game-me/50" : "text-game-ai/50"}`} aria-hidden="true">◆</span>
         </div>
       </div>
     </div>
@@ -155,7 +155,7 @@ export function TipBoxes({ tips, className = "" }: { tips: { title: string; text
     <div className={`flex w-48 flex-col gap-1.5 ${className}`}>
       {tips.map((x) => (
         <div key={x.title} className="rounded-lg bg-zinc-950/95 px-2.5 py-1.5 text-xs/snug text-zinc-200 shadow-lg ring-1 ring-white/10">
-          <b className="block font-display tracking-wide text-game-brass">{x.title}</b>
+          <b className="block tracking-wide text-game-brass">{x.title}</b>
           {x.text}
         </div>
       ))}

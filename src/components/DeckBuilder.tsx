@@ -125,7 +125,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 text-dl-text">
       <header className="flex flex-col gap-1">
-        <h1 className="font-display text-xl font-extrabold tracking-[0.11em] uppercase sm:text-2xl">{t.deck.title}</h1>
+        <h1 className="text-xl font-extrabold tracking-[0.11em] uppercase sm:text-2xl">{t.deck.title}</h1>
         <p className="text-sm text-zinc-300">{t.deck.hint} {t.deck.aiNote}</p>
       </header>
 
@@ -160,7 +160,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
           <li className="flex w-28 shrink-0 snap-start sm:w-36">
             <button type="button" onClick={() => addDeck()} disabled={book.decks.length >= MAX_DECKS} title={book.decks.length >= MAX_DECKS ? t.deck.maxDecks(MAX_DECKS) : undefined}
               className={`flex w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-black/30 text-zinc-300 transition hover:bg-white/8 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${focus}`}>
-              <span className="font-display text-3xl leading-none" aria-hidden="true">+</span>
+              <span className="text-3xl leading-none" aria-hidden="true">+</span>
               <span className="text-center text-xs font-bold">{t.deck.newDeck}</span>
             </button>
           </li>
@@ -173,7 +173,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
           <div className="flex items-center gap-3">
             <DeckPile ref={pile} n={deck.length} look={look} label={t.deck.left(DECK_SIZE - deck.length)} tipSide="bottom" className="w-16 sm:w-20 lg:w-24" out={{ x: 0, y: -40 }} />
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate font-display text-base font-extrabold">{cur.name}</span>
+              <span className="truncate text-base font-extrabold">{cur.name}</span>
               <span className="text-xs text-zinc-400" aria-live="polite">{t.deck.count(deck.length, DECK_SIZE)}{deck.length ? ` · ${t.deck.avg(avg)}` : ""}</span>
             </div>
             <div className="lg:hidden">{playBar}</div>
@@ -219,10 +219,10 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
                       className="flex items-center gap-1 rounded-lg bg-black/30">
                       <button type="button" onClick={() => openFocus(c.key)} aria-label={t.deck.open(c.name)}
                         className={`flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm transition hover:bg-white/8 active:bg-white/12 sm:min-h-9 ${focus}`}>
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 font-display text-xs font-extrabold text-white">{s.cost}</span>
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-extrabold text-white">{s.cost}</span>
                         <span className="min-w-0 flex-1 truncate font-bold">{c.name}</span>
                         <span className="truncate text-[10px] text-zinc-400">{c.hero}{c.id === cover?.id ? " ★" : ""}</span>
-                        <span className="w-5 text-right font-display text-xs font-extrabold text-amber-200">{s.power}</span>
+                        <span className="w-5 text-right text-xs font-extrabold text-amber-200">{s.power}</span>
                       </button>
                       <button type="button" onClick={() => toggle(c)} aria-label={t.deck.take(c.name)}
                         className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-lg text-zinc-400 transition hover:bg-white/8 hover:text-rose-300 active:bg-white/12 sm:size-9 ${focus}`}>×</button>
@@ -271,7 +271,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
                       </motion.button>
                       <button type="button" onClick={() => (taken ? openFocus(c.key) : toggle(c))} aria-pressed={on} aria-label={on ? t.deck.take(c.name) : t.deck.add(t.deck.version(c.name, c.hero))}
                         disabled={!on && full && !taken} title={taken ? t.deck.dupHero(c.hero) : !on && full ? t.deck.full(DECK_SIZE) : undefined}
-                        className={`absolute -right-2 -bottom-2 z-10 grid size-11 cursor-pointer place-items-center rounded-full font-display text-lg font-black shadow-lg transition hover:brightness-110 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 sm:size-8 sm:text-base ${focus} ${on ? "bg-game-me text-dl-black" : "bg-dl-text text-dl-black"}`}>
+                        className={`absolute -right-2 -bottom-2 z-10 grid size-11 cursor-pointer place-items-center rounded-full text-lg font-black shadow-lg transition hover:brightness-110 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 sm:size-8 sm:text-base ${focus} ${on ? "bg-game-me text-dl-black" : "bg-dl-text text-dl-black"}`}>
                         {on ? "✓" : "+"}
                       </button>
                     </div>

@@ -51,7 +51,7 @@ export const DeckPile = forwardRef<HTMLButtonElement, Props>(function DeckPile({
         ))}
       </AnimatePresence>
       <span aria-hidden="true" style={{ zIndex: MAX_LAYERS + 2 }}
-        className={`absolute -right-1.5 -bottom-1.5 flex size-6 items-center justify-center rounded-full font-display text-xs font-extrabold text-dl-black shadow-sm ${tone === "me" ? "bg-game-me" : "bg-game-ai"}`}>
+        className={`absolute -right-1.5 -bottom-1.5 flex size-6 items-center justify-center rounded-full text-xs font-extrabold text-dl-black shadow-sm ${tone === "me" ? "bg-game-me" : "bg-game-ai"}`}>
         {n}
       </span>
       <AnimatePresence>
