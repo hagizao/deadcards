@@ -6,6 +6,8 @@ import type { DeckLook } from "../lib/game/deck";
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text";
 /** Mais que isso de camadas não muda a leitura da pilha. */
 const MAX_LAYERS = 14;
+/** Desalinho estável de cada carta da pilha (sem Math.random no render). */
+const jitter = (i: number) => { const x = Math.sin((i + 1) * 12.9898) * 43758.5453; return x - Math.floor(x) - 0.5; };
 
 type Props = {
   /** Cartas no baralho. */
@@ -25,7 +27,7 @@ type Props = {
 };
 
 /**
- * Baralho físico: versos empilhados, um por carta, com a espessura caindo a cada compra. A carta de cima sai voando ao ser
+ * Baralho físico: versos empilhados meio desalinhados, um por carta (dá para ver quantas sobram), com a espessura caindo a cada compra. A carta de cima sai voando ao ser
  * comprada e uma nova cai na pilha ao entrar. Hover, foco ou toque mostram quantas cartas faltam.
  */
 export const DeckPile = forwardRef<HTMLButtonElement, Props>(function DeckPile({ n, label, tone = "me", look, out = { x: -60, y: 0 }, className = "w-14", tipSide = "left", cover }, ref) {
@@ -36,17 +38,17 @@ export const DeckPile = forwardRef<HTMLButtonElement, Props>(function DeckPile({
     <button ref={ref} type="button" aria-label={label} onClick={() => setOpen((x) => !x)} onBlur={() => setOpen(false)}
       onPointerEnter={(e) => { if (e.pointerType === "mouse") setOpen(true); }} onPointerLeave={(e) => { if (e.pointerType === "mouse") setOpen(false); }}
       className={`relative shrink-0 cursor-pointer rounded-lg transition hover:brightness-110 active:scale-95 ${focus} ${className}`}>
-      {/* a base fica sempre lá, mesmo vazia: marca o lugar do baralho */}
-      <div className="aspect-295/430 w-full rounded-lg bg-black/30 shadow-[inset_0_0_0_2px_rgb(255_255_255/0.06)]" />
+      {/* reserva o lugar do baralho, mesmo vazio */}
+      <div className="aspect-295/430 w-full" />
       <AnimatePresence initial={false}>
         {Array.from({ length: layers }, (_, i) => (
           <motion.div key={i} className="absolute inset-x-0 top-0" style={{ zIndex: i + 1 }}
             initial={{ y: -28, x: 0, opacity: 0, rotate: -6 }}
-            animate={{ y: -i * 1.6, x: -i * 0.6, opacity: 1, rotate: 0, transition: { duration: 0.22, ease: "easeOut" } }}
+            animate={{ y: -i * 2, x: -i * 0.6 + jitter(i) * 7, opacity: 1, rotate: jitter(i + 40) * (i === layers - 1 ? 3 : 9), transition: { duration: 0.22, ease: "easeOut" } }}
             exit={{ x: out.x, y: out.y, opacity: 0, rotate: out.x < 0 ? -12 : 12, transition: { duration: 0.28, ease: "easeIn" } }}>
             {i === layers - 1 && cover
               ? <div className="drop-shadow-[0_0.3rem_0.5rem_rgb(0_0_0/0.6)]">{cover}</div>
-              : <CardBack tone={tone} look={look} className={i === layers - 1 ? "drop-shadow-[0_0.3rem_0.5rem_rgb(0_0_0/0.6)]" : ""} />}
+              : <CardBack tone={tone} look={look} className={i === layers - 1 ? "drop-shadow-[0_0.3rem_0.5rem_rgb(0_0_0/0.6)]" : "drop-shadow-[0_1px_1px_rgb(0_0_0/0.7)]"} />}
           </motion.div>
         ))}
       </AnimatePresence>
