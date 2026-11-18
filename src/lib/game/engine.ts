@@ -91,7 +91,7 @@ export type LogKey =
   | "haze" | "dance" | "holliday" | "infernus" | "ivy" | "kelvin" | "geist" | "lash" | "turret" | "move" | "burrow" | "harrow" | "paige"
   | "paradox" | "pocket" | "rats" | "rem" | "storm" | "shiv" | "mark" | "wolf" | "illusion" | "portal" | "trap" | "vindicta" | "fall"
   | "cube" | "petrify" | "wraith" | "liftEnd" | "yamato" | "chanEnd" | "extraSouls" | "hookPull" | "trapHit" | "urn" | "boss" | "zipline"
-  | "item" | "itemLost" | "shop" | "prio" | "phase" | "comeback" | "bounty" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves"
+  | "item" | "itemLost" | "shop" | "prio" | "phase" | "bounty" | "duel" | "duelTie" | "mentor" | "lastStand" | "emerge" | "graves"
   | "back" | "burnt" | "gone" | "hoop" | "copy" | "ratLoc" | "bell" | "bet" | "smoke" | "stock" | "zero";
 
 export type Result = { outcome: "win" | "loss" | "draw"; won: number; lost: number; myPower: number; aiPower: number; patron: boolean };
@@ -1354,8 +1354,6 @@ export class Match {
     const sc = this.score();
     const lead: Side | null = sc.p > sc.a ? "p" : sc.a > sc.p ? "a" : null;
     if (lead && lead !== this.prio) { this.prio = lead; this.say({ k: "prio", side: lead }); }
-    // comeback: quem está perdendo em mais locais ganha +1 alma no próximo round
-    if (lead && !this.over) { this.extra[opp(lead)] += 1; this.say({ k: "comeback", side: opp(lead) }); }
   }
 
   /** Efeitos de fim de turno dos locais novos (depois das cartas, com o vencedor do local já calculado). */

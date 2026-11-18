@@ -381,15 +381,16 @@ describe("itens novos", () => {
   });
 });
 
-describe("comeback e recompensa", () => {
-  it("quem perde em mais locais ganha +1 alma no próximo round", () => {
+describe("almas extras e recompensa", () => {
+  it("estar perdendo em mais locais não dá alma extra", () => {
     const { m, put } = arena();
     const c = put(pc("a", "Herói Novo", flat(70)), "a", 0);
     c.ab = "none"; c.base = 5;
     m.endOfTurn();
     m.nextTurn();
-    expect(m.E).toBe(m.t + 1);
+    expect(m.E).toBe(m.t);
     expect(m.AE).toBe(m.t);
+    expect(m.log.some((e) => (e.k as string) === "comeback")).toBe(false);
   });
 
   it("virar um local que o outro segurava há 2 rounds dá +1 alma", () => {
@@ -1121,8 +1122,8 @@ describe("locais novos", () => {
     card("p", 5);
     m.extra = { p: 0, a: 0 };
     m.endOfTurn();
-    // o perdedor paga 1 e ganha 1 do comeback
-    expect(m.extra).toEqual({ p: 1, a: 0 });
+    // quem vence ganha 1 e quem perde paga 1
+    expect(m.extra).toEqual({ p: 1, a: -1 });
   });
 
   it("Chinatown: o sino dá almas a quem vence no turno n", () => {
