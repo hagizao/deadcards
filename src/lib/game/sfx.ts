@@ -16,7 +16,7 @@ import win from "../../assets/sfx/win.ogg";
 const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, win };
 /** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
 const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
-export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn" | "paper" | "impact";
+export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn" | "paper" | "impact" | "knife" | "bell";
 
 /** Volume e mudo de cada canal (0 a 1). */
 export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
@@ -68,6 +68,8 @@ export function sfx(name: Sfx, volume = 1) {
   if (name === "burn") return cardBurn(volume);
   if (name === "paper") return paperRustle(volume);
   if (name === "impact") return bigImpact(volume);
+  if (name === "knife") return knifeSlash(volume);
+  if (name === "bell") return deskBell(volume);
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
   const file = name as keyof typeof FILES;
@@ -250,6 +252,82 @@ function bigImpact(strength = 1) {
   br.connect(bb).connect(bbg).connect(mix);
   br.start(g0 + 0.2);
   br.stop(g0 + 0.85);
+}
+
+/** Parciais de metal soando juntos (frequências em Hz e peso de cada um), com ataque seco e cauda longa. */
+function ring(c: AudioContext, at: number, parts: readonly (readonly [number, number, number])[], vol: number) {
+  for (const [fq, g, dur] of parts) {
+    const o = c.createOscillator();
+    o.type = "sine";
+    o.frequency.value = fq;
+    const gn = c.createGain();
+    gn.gain.setValueAtTime(0.0001, at);
+    gn.gain.exponentialRampToValueAtTime(g * vol, at + 0.003);
+    gn.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(gn).connect(c.destination);
+    o.start(at);
+    o.stop(at + dur + 0.02);
+  }
+}
+
+/** Faca da Shiv: a lâmina corta o ar num silvo que sobe, crava com um golpe surdo e a lâmina fica vibrando. */
+function knifeSlash(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  // silvo: ruído agudo que sobe e corta
+  const sw = c.createBufferSource();
+  sw.buffer = noise(c, 0.25);
+  const hp = c.createBiquadFilter();
+  hp.type = "bandpass"; hp.Q.value = 2;
+  hp.frequency.setValueAtTime(1800, t);
+  hp.frequency.exponentialRampToValueAtTime(7000, t + 0.14);
+  const sg = c.createGain();
+  sg.gain.setValueAtTime(0.0001, t);
+  sg.gain.exponentialRampToValueAtTime(0.9 * vol, t + 0.1);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+  sw.connect(hp).connect(sg).connect(c.destination);
+  sw.start(t);
+  sw.stop(t + 0.2);
+  // golpe: estalo grave e curto na madeira
+  const hit = t + 0.15;
+  const th = c.createBufferSource();
+  th.buffer = noise(c, 0.12, true);
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass"; lp.frequency.value = 900;
+  const tg = c.createGain();
+  tg.gain.setValueAtTime(0.0001, hit);
+  tg.gain.exponentialRampToValueAtTime(1.6 * vol, hit + 0.004);
+  tg.gain.exponentialRampToValueAtTime(0.0001, hit + 0.1);
+  th.connect(lp).connect(tg).connect(c.destination);
+  th.start(hit);
+  th.stop(hit + 0.12);
+  // a lâmina vibrando: parciais metálicos inarmônicos
+  ring(c, hit, [[2950, 0.12, 0.45], [4410, 0.08, 0.35], [6230, 0.05, 0.25], [8770, 0.03, 0.18]], vol);
+}
+
+/** Sino de balcão (a loja abriu): um "ding" claro com parciais de sino e cauda longa. */
+function deskBell(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  // o martelinho batendo
+  const k = c.createBufferSource();
+  k.buffer = noise(c, 0.02);
+  const kb = c.createBiquadFilter();
+  kb.type = "highpass"; kb.frequency.value = 3000;
+  const kg = c.createGain();
+  kg.gain.setValueAtTime(0.4 * vol, t);
+  kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
+  k.connect(kb).connect(kg).connect(c.destination);
+  k.start(t);
+  k.stop(t + 0.02);
+  // parciais de sino de mesa (fundamental perto de 1,9 kHz)
+  ring(c, t, [[1880, 0.35, 1.8], [1893, 0.2, 1.6], [4360, 0.12, 0.9], [7990, 0.05, 0.5], [12470, 0.02, 0.25]], vol);
 }
 
 let lastPaper = 0;

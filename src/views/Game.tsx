@@ -1,5 +1,6 @@
 import { AnimatePresence, MotionConfig, motion, useAnimate, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { CardBack, GameCard, TipBoxes, type Tip } from "../components/GameCard";
 import { GameHand } from "../components/GameHand";
 import { TargetArrow } from "../components/TargetArrow";
@@ -210,9 +211,13 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     const step = () => {
       if (i < queue.length) {
         const a = queue[i++];
+        const seen = m.log[0];
         m.act(a);
         bump();
         if (!a.exec) land(a.c);
+        // a faca da Shiv: logo depois de a carta tocar a mesa (ou na hora, na execução marcada)
+        const fresh = m.log.indexOf(seen) < 0 ? m.log : m.log.slice(0, m.log.indexOf(seen));
+        if (fresh.some((e) => e.k === "shiv")) later(() => sfx("knife"), a.exec ? 0 : FALL_MS[weight(a.c)] + 120);
         return later(step, REVEAL_MS);
       }
       m.endOfTurn();
@@ -227,6 +232,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
           if (r.outcome !== "draw") sfx(r.outcome === "win" ? "win" : "loss");
         } else {
           m.nextTurn();
+          // loja nova (rounds 3 e 6): abre sempre à vista, mesmo que a anterior tenha ficado oculta, e o sino do balcão toca
+          if (m.offer) { setShopHidden(false); later(() => sfx("bell"), 300); }
           say(t.ui.toast.turn(m.t));
           sfx("draw");
           later(() => sfx("soul", 0.8), 180);
@@ -975,12 +982,43 @@ const COMANDA_ROWS = 12;
  * na mesa (o resto é cortado de propósito pela borda). A do adversário é espelhada: o cabeçalho fica perto das almas e as
  * linhas seguem para o topo. A compra da IA só aparece no fim do turno.
  */
+/**
+ * Item da comanda em destaque, como a carta ampliada: caixa grande na cor da categoria, com nome, ícone, tier, o que faz e
+ * em quem foi usado. Vai num portal porque a comanda é girada (o fixed ficaria preso a ela).
+ */
+function ItemPeek({ b, r, m, t, icon, on }: { b: Bought; r: DOMRect; m: Match; t: T; icon?: string; on: (b: Bought) => string }) {
+  const it = ITEMS[b.k];
+  const box = SLOT_BOX[it.slot];
+  const w = Math.min(PEEK_W, window.innerWidth - 24);
+  const right = r.right + 12 + w <= window.innerWidth;
+  const left = Math.max(8, right ? r.right + 12 : r.left - 12 - w);
+  const top = Math.max(8, Math.min(window.innerHeight - 340, r.top + r.height / 2 - 150));
+  return createPortal(
+    <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.12 }}
+      className={`pointer-events-none fixed z-90 ${box.glow}`} style={{ left, top, width: w }} aria-hidden="true">
+      <div className="relative isolate flex flex-col items-center gap-3 p-5 text-center">
+        <span className={`absolute inset-0 -z-10 overflow-hidden bg-zinc-950 ring-4 [clip-path:polygon(1%_2%,100%_0,99%_99%,0_100%)] ring-inset ${SLOT_RING[it.slot]}`}>
+          <span className={`absolute inset-0 bg-linear-to-b to-zinc-950/75 to-70% ${box.tint}`} />
+        </span>
+        <TickTag tone={box.tag} className="max-w-full px-3 py-0.5 text-xl font-extrabold tracking-wide text-zinc-950 [font-variant-caps:small-caps]">{b.k}</TickTag>
+        <ItemIconBox k={b.k} icon={icon} size="size-20" />
+        <span className={`text-xs font-bold tracking-wider uppercase ${SLOT_TEXT[it.slot]}`}>{t.slots[it.slot]} · {t.shop.tier(it.tier)}</span>
+        <span className="text-sm text-zinc-100">{t.items[b.k](m.itemV(b.k))}</span>
+        <span className="text-xs font-bold text-game-brass">{t.shop.on(on(b))} · {t.shop.price(itemCost(it.tier))}</span>
+      </div>
+    </motion.div>,
+    document.body,
+  );
+}
+
 function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Record<string, string>; on: (b: Bought) => string }) {
   const list = [...m.owned[s], ...(s === "p" && m.buying.p ? [m.buying.p] : [])];
   const who = s === "p" ? t.shop.mine : t.shop.ai;
   const ai = s === "a";
   const rows = Array.from({ length: Math.max(COMANDA_ROWS, list.length) }, (_, i) => list[i]);
   const flip = ai ? "flex-col-reverse" : "flex-col";
+  // item em destaque ao lado da linha (hover, foco ou toque)
+  const [peek, setPeek] = useState<{ b: Bought; r: DOMRect } | null>(null);
   return (
     // a borda da tela corta o bloco: é o papel saindo para fora da mesa
     <div className="@container relative size-full min-h-0 overflow-hidden">
@@ -1003,17 +1041,22 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
             </div>
             <ul className={`flex ${flip}`}>
               {rows.map((b, i) => (
-                <li key={b ? `${b.k}-${b.t}-${i}` : i} data-item-from={!ai && (m.buying.p ? b === m.buying.p : i === list.length) ? "p" : undefined} title={b ? `${t.items[b.k](m.itemV(b.k))} (${t.shop.on(on(b))})` : undefined}
-                  className={`grid min-h-14 grid-cols-[1fr_3rem] border-comanda-ink/35 ${ai ? "border-t" : "border-b"} ${b && b === m.buying.p ? "animate-pulse" : ""}`}>
+                <li key={b ? `${b.k}-${b.t}-${i}` : i} data-item-from={!ai && (m.buying.p ? b === m.buying.p : i === list.length) ? "p" : undefined}
+                  onPointerEnter={(e) => { if (b && e.pointerType === "mouse") setPeek({ b, r: e.currentTarget.getBoundingClientRect() }); }}
+                  onPointerLeave={(e) => { if (e.pointerType === "mouse") setPeek(null); }}
+                  className={`grid min-h-14 grid-cols-[1fr_3rem] border-comanda-ink/35 ${ai ? "border-t" : "border-b"} ${b && b === m.buying.p ? "animate-pulse" : ""} ${b && peek?.b === b ? "bg-comanda-ink/10" : ""}`}>
                   <span className="flex min-w-0 items-center gap-2 px-2 py-1.5">
                     {b ? (
-                      <>
+                      <button type="button" aria-label={`${b.k}: ${t.items[b.k](m.itemV(b.k))} (${t.shop.on(on(b))})`}
+                        onClick={(e) => { const r = e.currentTarget.closest("li")!.getBoundingClientRect(); setPeek((p) => (p?.b === b ? null : { b, r })); }}
+                        onFocus={(e) => setPeek({ b, r: e.currentTarget.closest("li")!.getBoundingClientRect() })} onBlur={() => setPeek(null)}
+                        className={`flex min-w-0 flex-1 cursor-help items-center gap-2 rounded-sm text-left transition hover:brightness-110 active:scale-[0.98] ${focusIn}`}>
                         <ItemIconBox k={b.k} icon={icons[b.k]} size="size-10" />
                         <span className="flex min-w-0 flex-col">
                           <b className="text-base/tight">{b.k}</b>
                           <span className="truncate text-xs text-comanda-ink/70">{t.shop.on(on(b))}</span>
                         </span>
-                      </>
+                      </button>
                     ) : i === 0 && <span className="text-sm text-comanda-ink/50 italic">{t.shop.hidden}</span>}
                   </span>
                   <span className="grid place-items-center border-l border-comanda-ink/35 text-lg">{b ? itemCost(ITEMS[b.k].tier) : ""}</span>
@@ -1023,6 +1066,7 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
           </div>
         </div>
       </section>
+      {peek && list.includes(peek.b) && <ItemPeek b={peek.b} r={peek.r} m={m} t={t} icon={icons[peek.b.k]} on={on} />}
     </div>
   );
 }
@@ -1182,6 +1226,8 @@ function EndBackdrop({ tone }: { tone: (typeof END_TONE)[keyof typeof END_TONE] 
   return (
     <div ref={ref} aria-hidden="true" className="absolute inset-0">
       <div className="absolute inset-0 bg-black/40" />
+      {/* fora da faixa: a mesma cor, no tom mais escuro, até a borda da tela (nenhuma zona sem cor) */}
+      <div className="absolute inset-0 opacity-50" style={{ background: `radial-gradient(ellipse at center, ${tone.stops[1]}, ${tone.stops[2]} 70%)` }} />
       {w > 0 && (
         <svg className={`absolute inset-0 size-full overflow-visible fill-none ${tone.stroke}`}>
           <defs>
