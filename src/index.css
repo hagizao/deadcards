@@ -227,14 +227,25 @@
   100% { transform: translate(5%, 3%); opacity: 0.95; }
 }
 
-/* Cardslock Game: carta da mesa que pode ser movida treme de leve, convidando a arrastar. */
+/*
+ * Cardslock Game: carta da mesa que pode ser movida chama como a conta do "Fechar a conta": balança (0,6 s), descansa
+ * (1,6 s) e repete, com a luz da sua cor pulsando por trás.
+ */
 @utility card-jiggle {
-  animation: card-jiggle 0.55s ease-in-out infinite;
+  animation: card-jiggle 2.2s ease-in-out infinite;
   @media (prefers-reduced-motion: reduce) { animation: none; }
 }
 @keyframes card-jiggle {
-  0%, 100% { transform: rotate(-1.4deg); }
-  25% { transform: rotate(1.2deg) translateY(-1px); }
-  50% { transform: rotate(-0.9deg); }
-  75% { transform: rotate(1.4deg) translateY(-1px); }
+  0%, 27.3%, 100% { transform: rotate(0deg); }
+  6.8% { transform: rotate(-3deg); }
+  13.6% { transform: rotate(3deg); }
+  20.4% { transform: rotate(-2deg); }
+}
+@utility card-call-glow {
+  animation: card-call-glow 1.3s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) { animation: none; opacity: 0.7; }
+}
+@keyframes card-call-glow {
+  0%, 100% { opacity: 0.55; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.08); }
 }

@@ -2,6 +2,7 @@ import { AnimatePresence, MotionConfig, motion, useAnimate, useReducedMotion } f
 import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CardBack, GameCard, TipBoxes, type Tip } from "../components/GameCard";
+import { AbilityFx, FxLayer, type Box, type FxScene } from "../components/AbilityFx";
 import { GameHand } from "../components/GameHand";
 import { dropUnder, pointOf } from "../lib/game/drop";
 import { TargetArrow } from "../components/TargetArrow";
@@ -9,7 +10,7 @@ import { AudioMenu, EndTurnButton, SoulOrb } from "../components/GameHud";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { pill, primaryBtn } from "../lib/ui";
-import { ABILITIES, ITEMS, gameConfig, itemCost, locArtUrl, phaseOf, type ItemKey, type ItemSlot, type PoolCard } from "../lib/game/config";
+import { ABILITIES, ITEMS, gameConfig, itemCost, locArtUrl, phaseOf, type AbilityKey, type ItemKey, type ItemSlot, type PoolCard } from "../lib/game/config";
 import { DeckBuilder } from "../components/DeckBuilder";
 import { DeckPile } from "../components/DeckPile";
 import { versionPlayer, type DeckLook } from "../lib/game/deck";
@@ -29,6 +30,7 @@ const END_MS = 750;
 const TOAST_MS = 1300;
 /** Todas as cartas na mesa, dos dois lados. */
 const boardCards = (m: Match) => m.loc.flatMap((l) => [...l.s.p, ...l.s.a]);
+const boxOf = (r: DOMRect): Box => ({ x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height });
 /** Peso da carta pelo custo: 1 cai perto, 2 cai do alto, 3 vem do céu e treme a mesa. */
 const weight = (c: GCard) => (c.cost >= 6 ? 3 : c.cost >= 3 ? 2 : 1);
 /** Quanto a queda leva até tocar a mesa, por peso (ms). */
@@ -152,9 +154,14 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const [ashes, setAshes] = useState<Set<number>>(() => new Set());
   // cartas eliminadas na mesa, no lugar onde estavam, enquanto o X corta e elas somem
   const [slain, setSlain] = useState<{ c: GCard; r: DOMRect }[]>([]);
+  // animações das habilidades na tela; `seen` guarda onde cada carta estava (e de que lado), para a que sumiu da mesa
+  const [fxs, setFxs] = useState<{ k: number; ab: AbilityKey; scene: FxScene }[]>([]);
+  const fxKey = useRef(0);
+  const seen = useRef(new Map<number, { r: DOMRect; side: Side }>());
   /** Roda um passo da partida e mostra o X nas cartas que saíram da mesa sem voltar para a mão. */
   const watch = (f: () => void) => {
     const was = boardCards(m).filter((c) => c.rev).map((c) => ({ c, r: document.querySelector(`[data-card="${c.id}"]`)?.getBoundingClientRect() }));
+    was.forEach(({ c, r }) => { if (r) seen.current.set(c.id, { r, side: c.side }); });
     f();
     const on = new Set([...boardCards(m), ...m.hand, ...m.ahand, ...m.deck, ...m.adeck]);
     const gone = was.filter((x): x is { c: GCard; r: DOMRect } => !!x.r && !on.has(x.c));
@@ -301,11 +308,29 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
    * habilidade de um herói com efeito sonoro enviado no editor toca o arquivo no lugar do som sintetizado.
    */
   const playHeard = (wait: number) => {
-    const abs = [...new Set(m.heard.splice(0).map((h) => h.ab))].slice(0, 4);
+    const heard = m.heard.splice(0);
+    const abs = [...new Set(heard.map((h) => h.ab))].slice(0, 4);
     abs.forEach((ab, i) => {
       const own = tuned[ab]?.sound;
       later(() => (own ? cardSfx(own) : abilitySfx(ab)), wait + i * 260);
     });
+    // a animação de cada habilidade, da carta que agiu até as cartas que ela mexeu (a sua e a do inimigo)
+    heard.slice(0, 6).forEach((h, i) => later(() => {
+      const on = new Map(boardCards(m).map((c) => [c.id, c.side]));
+      const at = (id: number) => {
+        const r = document.querySelector(`[data-card="${id}"]`)?.getBoundingClientRect() ?? seen.current.get(id)?.r;
+        return r && r.width ? boxOf(r) : null;
+      };
+      const src = at(h.id);
+      if (!src) return;
+      const dst = h.to.flatMap((id) => {
+        const box = at(id);
+        return box ? [{ box, foe: (on.get(id) ?? seen.current.get(id)?.side) !== h.side }] : [];
+      });
+      const lane = document.querySelector(`[data-drop="${h.at}"]`)?.getBoundingClientRect();
+      const k = ++fxKey.current;
+      setFxs((s) => [...s, { k, ab: h.ab, scene: { src, dst, loc: lane ? boxOf(lane) : null, me: h.side === "p" } }]);
+    }, wait + i * 220));
   };
   /** Som (e tremor, nas pesadas) quando a carta revelada toca a mesa. */
   const land = (c: GCard) => {
@@ -517,7 +542,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
             <Location key={`${game}-${l.L.id}${i}`} dealAt={intro ? INTRO.lane(i) + 0.08 : undefined} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
               drop={dropAt(l, i)}
               card={(c) => (
-                <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false)} looking={look === c} target={targets.includes(c)} mark={mode?.k === "card" && m.abilityOf(mode.c) === "Vindicta" && targets.includes(c)} acts={actsOf(c)}
+                <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false, true)} looking={look === c} target={targets.includes(c)} mark={mode?.k === "card" && m.abilityOf(mode.c) === "Vindicta" && targets.includes(c)} acts={actsOf(c)}
                   shift={canShift(c) ? { on: (over) => { if (!shift) { sfx("grab", 0.7); setPeek(null); } setShift({ c, over }); }, drop: (i) => shiftTo(c, i) } : undefined}
                   onClick={(r) => { pickBoard(c); setPeek(r && look !== c ? { c, r } : null); }}
                   onPeek={(r) => setPeek(r && !drag && !shift ? { c, r } : null)} />
@@ -588,7 +613,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
         <section aria-label={t.ui.hand} className="relative z-10 order-last w-full min-w-0 sm:order-0 sm:w-auto sm:flex-1">
           <GameHand deal={intro ? { at: INTRO.hand, step: INTRO.handStep } : undefined} cards={m.hand} selected={sel} disabled={m.busy || !!result}
             playable={(c) => !m.busy && !result && m.loc.some((l) => !m.canPlay(c, l))}
-            label={(c) => t.ui.cardLabel(name(c), c.cost, c.base)} tips={tipsOf} render={(c, zoomed) => face(c, true, zoomed)}
+            label={(c) => t.ui.cardLabel(name(c), c.cost, c.base)} tips={tipsOf} render={(c) => face(c, true, true)}
             onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => { if (c && !drag) sfx("grab", 0.7); setDrag(c ? { c, over } : null); }} />
         </section>
         {!wide && (
@@ -631,6 +656,12 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       </AnimatePresence>
 
       {/* no body: fica acima do cabeçalho do site e de qualquer camada do jogo */}
+      {createPortal(
+        <FxLayer>
+          {fxs.map((x) => <AbilityFx key={x.k} ab={x.ab} scene={x.scene} onDone={() => setFxs((s) => s.filter((y) => y.k !== x.k))} />)}
+        </FxLayer>,
+        document.body,
+      )}
       {createPortal(
         <AnimatePresence>
           {slain.map(({ c, r }) => <Slain key={c.id} r={r} card={face(c, false)} still={!!still} onDone={() => setSlain((s) => s.filter((x) => x.c !== c))} />)}
@@ -982,8 +1013,9 @@ function BoardCard({ c, m, t, name, face, looking, target, mark = false, acts, s
       onDragStart={() => { moved.current = true; setHeld(true); onPeek(null); }}
       onDrag={(e) => { const pt = pointOf(e); shift?.on(dropUnder(pt.x, pt.y)); }}
       onDragEnd={(e) => { const pt = pointOf(e); setHeld(false); shift?.drop(dropUnder(pt.x, pt.y)); }}>
-    {/* treme enquanto pode ser movida (parada enquanto arrasta); o atraso varia para as cartas não tremerem juntas */}
-    <div className={shift && !held ? "card-jiggle" : ""} style={shift ? { animationDelay: `${-(c.id % 7) * 0.11}s` } : undefined}>
+    {/* pode ser movida: balança e brilha como a conta do "Fechar a conta" (parada enquanto arrasta); o atraso varia para as cartas não balançarem juntas */}
+    {shift && !held && <span aria-hidden="true" className="pointer-events-none absolute -inset-2 card-call-glow rounded-2xl bg-radial from-game-me/60 via-game-me/20 to-transparent to-70% blur-md" />}
+    <div className={shift && !held ? "card-jiggle" : ""} style={shift ? { animationDelay: `${-(c.id % 7) * 0.31}s` } : undefined}>
     <motion.button type="button" onClick={(e) => { if (moved.current) { moved.current = false; return; } onClick(touch.current ? e.currentTarget.getBoundingClientRect() : null); }} aria-pressed={looking}
       onPointerDown={(e) => { touch.current = e.pointerType !== "mouse"; }}
       aria-label={`${target ? `${t.ui.act.target(name)}: ` : ""}${t.ui.cardLabel(name, c.cost, pw)}${icons.length ? ` (${icons.map((x) => x[1]).join(", ")})` : ""}`}
