@@ -268,6 +268,22 @@ describe("itens: lojas e alvo", () => {
     expect(m.offer).toBeNull();
   });
 
+  it("Golden Goose Egg: o aliado mirado perde 1 e você ganha 2 almas a mais no próximo turno", () => {
+    const go = (buy: boolean) => {
+      const m = new Match(cfgWith(["Golden Goose Egg"]), pool, seeded(7));
+      playTo(m, 4);
+      const target = m.loc.flatMap((l) => l.s.p).find((c) => m.pow(c) > 1)!;
+      const before = m.pow(target);
+      if (buy) expect(m.buy("Golden Goose Egg", target)).toBe(true);
+      m.runEndTurn();
+      return { m, target, before };
+    };
+    const a = go(true), b = go(false);
+    expect(a.m.itemTargets("p", "Golden Goose Egg").every((c) => c.side === "p")).toBe(true);
+    expect(a.target.st.fx?.some((x) => x.k === "item" && x.v === -1)).toBe(true);
+    expect(a.m.E - b.m.E).toBe(2);
+  });
+
   it("item de ataque mira uma inimiga; sem alvo ou sem almas, não compra", () => {
     const m = new Match(cfgWith(["Slowing Hex", "Toxic Bullets", "Ricochet"]), pool, seeded(9));
     playTo(m, 4);
@@ -1033,7 +1049,10 @@ describe("locais novos", () => {
     const early = at("late", 0, 7, 3);
     early.m.ahand = [];
     const p = early.card("p", 3, { reveal: false }); p.staged = true;
+    // jogada aqui antes da hora: virada para baixo, também para quem jogou
+    expect(early.m.faceDown(p)).toBe(true);
     const q = early.m.endTurn();
+    expect(early.m.faceDown(p)).toBe(true);
     expect(q.some((x) => x.c === p)).toBe(false);
     expect(p).toMatchObject({ staged: false, rev: false });
     expect(p.st.wait).toBe(true);
@@ -1259,6 +1278,26 @@ describe("poder zerado e origem dos efeitos", () => {
     m.endOfTurn();
     expect([m.pow(one), m.pow(three), m.pow(big)]).toEqual([1, 1, 2]);
     expect(m.locOf(one) && m.locOf(three)).toBeTruthy();
+  });
+
+  it("o que a Aflição não tira vira dívida: o próximo ganho paga a dívida antes de contar", () => {
+    const { m, put, mk } = arena();
+    const o = dummy(put, "a", 0, 4, "o");
+    const p = mk(pc("p", "Pocket", flat(70)), "p");
+    p.v = 5;
+    m.loc[0].s.p.push(p);
+    m.act({ c: p, l: m.loc[0] });
+    expect(m.pow(o)).toBe(1);
+    expect(o.st.debt?.v).toBe(2);
+    const as = (m as unknown as { as: (c: { k: "item"; item: string }, f: () => void) => void }).as.bind(m);
+    as({ k: "item", item: "Extra Spirit" }, () => { o.bonus += 1; });
+    expect(m.pow(o)).toBe(1);
+    expect(o.st.debt?.v).toBe(1);
+    as({ k: "item", item: "Extra Spirit" }, () => { o.bonus += 3; });
+    expect(m.pow(o)).toBe(3);
+    expect(o.st.debt).toBeUndefined();
+    // a caixa "de onde vem" mostra o Pocket com tudo o que ele tirou
+    expect(m.powParts(o).reduce((a, x) => a + x.v, 0)).toBe(3);
   });
 
   it("entocada, erguida ou com 0 impresso não é eliminada", () => {

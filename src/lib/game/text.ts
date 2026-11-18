@@ -52,7 +52,7 @@ export type GameText = {
     win: string; loss: string; draw: string; summary: (w: number, l: number, me: number, ai: number) => string; patron: string;
     toast: { souls: string; frozen: string; full: string; closed: string; minCost: string; turn: (t: number) => string; start: string };
     chips: { frozenMe: string; frozenAi: string; hookMe: string; hookAi: string; trapMe: string; trapAi: string; shieldMe: string; shieldAi: string; petriMe: string; petriAi: string; portal: string };
-    status: { burn: string; stun: string; immune: string; chained: string; burrow: string; sleep: string; riposte: string; wolf: string; vuln: string; petri: string; unstop: string; chan: string; root: string; exec: string };
+    status: { burn: string; stun: string; immune: string; chained: string; burrow: string; sleep: string; riposte: string; wolf: string; vuln: string; petri: string; unstop: string; chan: string; root: string; exec: string; debt: string };
     act: {
       pickFoe: (c: string) => string; pickLoc: (c: string) => string; auto: string; undo: string; cancel: string;
       move: string; moveHint: (c: string) => string; mark: string; markHint: (c: string) => string; target: (c: string) => string; dest: (l: string) => string;
@@ -100,7 +100,7 @@ export const GAME_TEXT = strings<GameText>({
       "Nurse Harrow": { name: "Terapia de Sanguessuga", text: (v) => `A carta inimiga mais forte daqui tem −${v} e o seu aliado mais fraco aqui tem +${v}.`, master: () => "Amedrontado: o inimigo não pode jogar cartas aqui no próximo turno." },
       "Paige": { name: "Carga dos Cavaleiros", text: (v) => `Seus aliados neste local têm +${v}.`, master: () => "As inimigas daqui não podem sair por conta própria." },
       "Paradox": { name: "Troca Paradoxal", text: () => "Troca de lugar com a carta inimiga mais forte de outro local.", master: () => "A inimiga trocada perde 2." },
-      "Pocket": { name: "Aflição", text: (v) => `As cartas inimigas daqui perdem ${v}, sem cair abaixo de 1.`, master: () => "E perdem 1 no fim de cada turno (também sem cair abaixo de 1)." },
+      "Pocket": { name: "Aflição", text: (v) => `As cartas inimigas daqui perdem ${v}, sem cair abaixo de 1. O que faltar vira dívida: os próximos ganhos dela pagam a dívida primeiro.`, master: () => "E perdem 1 no fim de cada turno (também sem cair abaixo de 1)." },
       "Rat King": { name: "Enxame", text: () => "Põe 1 Rato (custo 1, poder 1) na sua mão. Ele ganha +1 por turno na mão (até +3).", master: () => "O Rato custa 0." },
       "Rem": { name: "Hora da Soneca", text: (v) => `As cartas inimigas aqui adormecem: −${v} até o fim do próximo turno.`, master: () => "Enquanto elas dormem, suas cartas aqui têm +1." },
       "Seven": { name: "Nuvem de Tempestade", text: (v) => `Canalizada: no fim deste turno e do próximo, cada carta inimiga aqui perde ${v}. Acaba se o Seven for movido, atordoado, perder a habilidade ou sofrer dano.`, master: () => "Imparável: a tempestade não é interrompida e o Seven não sofre debuff." },
@@ -199,7 +199,7 @@ export const GAME_TEXT = strings<GameText>({
       "Extra Health": (v) => `A carta ganha +${v}.`,
       "Healing Rite": (v) => `Limpa a carta (queimadura, petrificação, atordoamento, sono, vulnerável, perda de habilidade e enfraquecimentos) e ela ganha +${v}.`,
       "Extra Spirit": (v) => `A habilidade da carta ganha +${v} no valor, e ela ganha +1.`,
-      "Golden Goose Egg": (v) => `A carta ganha +1 e você ganha +${v} ${pl(v, "alma", "almas")} no próximo round (+1 se estiver vencendo uma Urna de Almas).`,
+      "Golden Goose Egg": (v) => `Mire em um aliado: ele recebe −1, mas você recebe ${v} ${pl(v, "alma adicional", "almas adicionais")} no próximo turno.`,
       "Swift Striker": (v) => `A carta ganha +${v} se custar 3 ou menos; senão, +2.`,
       "Long Range": (v) => `A carta ganha +${v} se você estiver perdendo no local dela; senão, +2.`,
       "Battle Vest": (v) => `A carta ganha +${v} se for Frontline; senão, +2.`,
@@ -368,7 +368,7 @@ export const GAME_TEXT = strings<GameText>({
       win: "Vitória!", loss: "Derrota", draw: "Empate",
       summary: (w, l, me, ai) => `Locais: ${w} x ${l} · Poder total: ${me} x ${ai}`, patron: "desempate no Patrono",
       toast: { souls: "Almas insuficientes", frozen: "Local congelado", full: "Local cheio", closed: "Não dá para jogar aqui", minCost: "Custo baixo demais para este local", turn: (t) => `Turno ${t}`, start: "Começou!" },
-      status: { burn: "queimando", stun: "erguida", immune: "imune", chained: "acorrentada", burrow: "entocada", sleep: "dormindo", riposte: "riposta pronta", wolf: "lobisomem", vuln: "vulnerável", petri: "petrificada", unstop: "imparável", chan: "canalizando", root: "presa", exec: "execução pronta" },
+      status: { burn: "queimando", stun: "erguida", immune: "imune", chained: "acorrentada", burrow: "entocada", sleep: "dormindo", riposte: "riposta pronta", wolf: "lobisomem", vuln: "vulnerável", petri: "petrificada", unstop: "imparável", chan: "canalizando", root: "presa", exec: "execução pronta", debt: "em dívida" },
       chips: { frozenMe: "Congelado p/ você", frozenAi: "Congelado p/ IA", hookMe: "Sua próxima carta vem pra cá", hookAi: "Gancho armado", trapMe: "Armadilha inimiga", trapAi: "Sua armadilha", shieldMe: "Seu abrigo", shieldAi: "Abrigo da IA", petriMe: "Petrificação inimiga", petriAi: "Sua petrificação", portal: "Portal" },
       act: {
         pickFoe: (c) => `${c}: escolha uma carta inimiga.`, pickLoc: (c) => `${c}: escolha um local.`, auto: "Automático", undo: "Desfazer", cancel: "Cancelar",
@@ -379,6 +379,7 @@ export const GAME_TEXT = strings<GameText>({
       yourSide: (l) => `Seu lado em ${l}`, aiSide: (l) => `Lado da IA em ${l}`, facedown: "Carta virada", playHere: (l) => `Jogar em ${l}`,
       cardLabel: (name, cost, power) => `${name}, custo ${cost}, poder ${power}`,
       statusTip: {
+        debt: "Deve poder ao Pocket: os próximos ganhos pagam a dívida antes de contar.",
         burn: "Perde poder no fim do turno.", stun: "Erguida pela Wraith: o poder conta como 0.", immune: "Não sofre efeitos inimigos.",
         chained: "Não pode ser movida.", burrow: "Debaixo da terra: não soma poder até o fim da partida.", sleep: "Dormindo: poder reduzido até acordar.",
         riposte: "Anula o próximo efeito inimigo e devolve o golpe.", wolf: "Lobisomem: poder extra permanente.", vuln: "O próximo dano que sofrer é dobrado.",
@@ -421,7 +422,7 @@ export const GAME_TEXT = strings<GameText>({
       "Nurse Harrow": { name: "Leech Therapy", text: (v) => `The strongest enemy card here has −${v} and your weakest ally here has +${v}.`, master: () => "Frightened: your opponent can't play cards here next turn." },
       "Paige": { name: "Knights' Charge", text: (v) => `Your allies at this location have +${v}.`, master: () => "Enemies here can't leave on their own." },
       "Paradox": { name: "Paradoxical Swap", text: () => "Swaps places with the strongest enemy card at another location.", master: () => "The swapped enemy loses 2." },
-      "Pocket": { name: "Affliction", text: (v) => `Enemy cards here lose ${v}, never going below 1.`, master: () => "And they lose 1 at the end of each turn (also never below 1)." },
+      "Pocket": { name: "Affliction", text: (v) => `Enemy cards here lose ${v}, never going below 1. The rest becomes debt: their next gains pay it off first.`, master: () => "And they lose 1 at the end of each turn (also never below 1)." },
       "Rat King": { name: "Swarm", text: () => "Puts 1 Rat (cost 1, power 1) in your hand. It gains +1 per turn in hand (up to +3).", master: () => "The Rat costs 0." },
       "Rem": { name: "Nap Time", text: (v) => `Enemy cards here fall asleep: −${v} until the end of next turn.`, master: () => "While they sleep, your cards here have +1." },
       "Seven": { name: "Storm Cloud", text: (v) => `Channeled: at the end of this turn and the next, each enemy card here loses ${v}. Ends if Seven is moved, stunned, loses his ability or takes damage.`, master: () => "Unstoppable: the storm isn't interrupted and Seven takes no debuffs." },
@@ -520,7 +521,7 @@ export const GAME_TEXT = strings<GameText>({
       "Extra Health": (v) => `The card gains +${v}.`,
       "Healing Rite": (v) => `Cleanses the card (burn, petrify, stun, sleep, vulnerable, lost ability and weakening) and it gains +${v}.`,
       "Extra Spirit": (v) => `The card's ability gains +${v} value, and the card gains +1.`,
-      "Golden Goose Egg": (v) => `The card gains +1 and you get +${v} ${pl(v, "soul", "souls")} next round (+1 if you're winning a Soul Urn).`,
+      "Golden Goose Egg": (v) => `Target an ally: it gets −1, but you get ${v} extra ${pl(v, "soul", "souls")} next turn.`,
       "Swift Striker": (v) => `The card gains +${v} if it costs 3 or less; otherwise +2.`,
       "Long Range": (v) => `The card gains +${v} if you're losing at its location; otherwise +2.`,
       "Battle Vest": (v) => `The card gains +${v} if it's a Frontline; otherwise +2.`,
@@ -689,7 +690,7 @@ export const GAME_TEXT = strings<GameText>({
       win: "Victory!", loss: "Defeat", draw: "Draw",
       summary: (w, l, me, ai) => `Locations: ${w} x ${l} · Total power: ${me} x ${ai}`, patron: "Patron tiebreaker",
       toast: { souls: "Not enough souls", frozen: "Location frozen", full: "Location full", closed: "Can’t play here", minCost: "Cost too low for this location", turn: (t) => `Turn ${t}`, start: "Fight!" },
-      status: { burn: "burning", stun: "lifted", immune: "immune", chained: "chained", burrow: "burrowed", sleep: "asleep", riposte: "riposte ready", wolf: "werewolf", vuln: "vulnerable", petri: "petrified", unstop: "unstoppable", chan: "channeling", root: "rooted", exec: "execution ready" },
+      status: { burn: "burning", stun: "lifted", immune: "immune", chained: "chained", burrow: "burrowed", sleep: "asleep", riposte: "riposte ready", wolf: "werewolf", vuln: "vulnerable", petri: "petrified", unstop: "unstoppable", chan: "channeling", root: "rooted", exec: "execution ready", debt: "in debt" },
       chips: { frozenMe: "Frozen for you", frozenAi: "Frozen for AI", hookMe: "Your next card comes here", hookAi: "Hook set", trapMe: "Enemy trap", trapAi: "Your trap", shieldMe: "Your shelter", shieldAi: "AI shelter", petriMe: "Enemy petrify", petriAi: "Your petrify", portal: "Portal" },
       act: {
         pickFoe: (c) => `${c}: choose an enemy card.`, pickLoc: (c) => `${c}: choose a location.`, auto: "Automatic", undo: "Undo", cancel: "Cancel",
@@ -700,6 +701,7 @@ export const GAME_TEXT = strings<GameText>({
       yourSide: (l) => `Your side at ${l}`, aiSide: (l) => `AI side at ${l}`, facedown: "Face-down card", playHere: (l) => `Play at ${l}`,
       cardLabel: (name, cost, power) => `${name}, cost ${cost}, power ${power}`,
       statusTip: {
+        debt: "Owes power to Pocket: its next gains pay off the debt before they count.",
         burn: "Loses power at the end of the turn.", stun: "Lifted by Wraith: its power counts as 0.", immune: "Unaffected by enemy effects.",
         chained: "Can't be moved.", burrow: "Underground: adds no power until the end of the match.", sleep: "Asleep: reduced power until it wakes up.",
         riposte: "Cancels the next enemy effect and strikes back.", wolf: "Werewolf: permanent extra power.", vuln: "The next damage it takes is doubled.",
@@ -742,7 +744,7 @@ export const GAME_TEXT = strings<GameText>({
       "Nurse Harrow": { name: "Terapia de Sanguijuela", text: (v) => `La carta enemiga más fuerte de aquí tiene −${v} y tu aliado más débil de aquí tiene +${v}.`, master: () => "Atemorizado: el rival no puede jugar cartas aquí el próximo turno." },
       "Paige": { name: "Carga de los Caballeros", text: (v) => `Tus aliados en este lugar tienen +${v}.`, master: () => "Las enemigas de aquí no pueden irse por su cuenta." },
       "Paradox": { name: "Intercambio Paradójico", text: () => "Intercambia su lugar con la carta enemiga más fuerte de otro lugar.", master: () => "La enemiga intercambiada pierde 2." },
-      "Pocket": { name: "Aflicción", text: (v) => `Las cartas enemigas de aquí pierden ${v}, sin bajar de 1.`, master: () => "Y pierden 1 al final de cada turno (tampoco bajan de 1)." },
+      "Pocket": { name: "Aflicción", text: (v) => `Las cartas enemigas de aquí pierden ${v}, sin bajar de 1. Lo que falte queda como deuda: sus próximas ganancias la pagan primero.`, master: () => "Y pierden 1 al final de cada turno (tampoco bajan de 1)." },
       "Rat King": { name: "Enjambre", text: () => "Pone 1 Rata (coste 1, poder 1) en tu mano. Gana +1 por turno en la mano (hasta +3).", master: () => "La Rata cuesta 0." },
       "Rem": { name: "Hora de la Siesta", text: (v) => `Las cartas enemigas de aquí se duermen: −${v} hasta el final del próximo turno.`, master: () => "Mientras duermen, tus cartas de aquí tienen +1." },
       "Seven": { name: "Nube de Tormenta", text: (v) => `Canalizada: al final de este turno y del próximo, cada carta enemiga de aquí pierde ${v}. Termina si Seven es movido, aturdido, pierde su habilidad o recibe daño.`, master: () => "Imparable: la tormenta no se interrumpe y Seven no recibe debuffs." },
@@ -841,7 +843,7 @@ export const GAME_TEXT = strings<GameText>({
       "Extra Health": (v) => `La carta gana +${v}.`,
       "Healing Rite": (v) => `Limpia la carta (quemadura, petrificación, aturdimiento, sueño, vulnerable, pérdida de habilidad y debilitamientos) y gana +${v}.`,
       "Extra Spirit": (v) => `La habilidad de la carta gana +${v} de valor, y la carta gana +1.`,
-      "Golden Goose Egg": (v) => `La carta gana +1 y ganas +${v} ${pl(v, "alma", "almas")} la próxima ronda (+1 si vas ganando una Urna de Almas).`,
+      "Golden Goose Egg": (v) => `Apunta a un aliado: recibe −1, pero recibes ${v} ${pl(v, "alma adicional", "almas adicionales")} el próximo turno.`,
       "Swift Striker": (v) => `La carta gana +${v} si cuesta 3 o menos; si no, +2.`,
       "Long Range": (v) => `La carta gana +${v} si vas perdiendo en su lugar; si no, +2.`,
       "Battle Vest": (v) => `La carta gana +${v} si es Frontline; si no, +2.`,
@@ -1010,7 +1012,7 @@ export const GAME_TEXT = strings<GameText>({
       win: "¡Victoria!", loss: "Derrota", draw: "Empate",
       summary: (w, l, me, ai) => `Lugares: ${w} x ${l} · Poder total: ${me} x ${ai}`, patron: "desempate en el Patrono",
       toast: { souls: "Almas insuficientes", frozen: "Lugar congelado", full: "Lugar lleno", closed: "No se puede jugar aquí", minCost: "Coste demasiado bajo para este lugar", turn: (t) => `Turno ${t}`, start: "¡Empezó!" },
-      status: { burn: "ardiendo", stun: "levantada", immune: "inmune", chained: "encadenada", burrow: "enterrada", sleep: "dormida", riposte: "riposte lista", wolf: "loba", vuln: "vulnerable", petri: "petrificada", unstop: "imparable", chan: "canalizando", root: "inmovilizada", exec: "ejecución lista" },
+      status: { burn: "ardiendo", stun: "levantada", immune: "inmune", chained: "encadenada", burrow: "enterrada", sleep: "dormida", riposte: "riposte lista", wolf: "loba", vuln: "vulnerable", petri: "petrificada", unstop: "imparable", chan: "canalizando", root: "inmovilizada", exec: "ejecución lista", debt: "endeudada" },
       chips: { frozenMe: "Congelado para ti", frozenAi: "Congelado para la IA", hookMe: "Tu próxima carta viene aquí", hookAi: "Gancho listo", trapMe: "Trampa enemiga", trapAi: "Tu trampa", shieldMe: "Tu refugio", shieldAi: "Refugio de la IA", petriMe: "Petrificación enemiga", petriAi: "Tu petrificación", portal: "Portal" },
       act: {
         pickFoe: (c) => `${c}: elige una carta enemiga.`, pickLoc: (c) => `${c}: elige un lugar.`, auto: "Automático", undo: "Deshacer", cancel: "Cancelar",
@@ -1021,6 +1023,7 @@ export const GAME_TEXT = strings<GameText>({
       yourSide: (l) => `Tu lado en ${l}`, aiSide: (l) => `Lado de la IA en ${l}`, facedown: "Carta boca abajo", playHere: (l) => `Jugar en ${l}`,
       cardLabel: (name, cost, power) => `${name}, coste ${cost}, poder ${power}`,
       statusTip: {
+        debt: "Le debe poder a Pocket: sus próximas ganancias pagan la deuda antes de contar.",
         burn: "Pierde poder al final del turno.", stun: "Levantada por Wraith: su poder cuenta como 0.", immune: "No le afectan los efectos enemigos.",
         chained: "No se puede mover.", burrow: "Bajo tierra: no suma poder hasta el final de la partida.", sleep: "Dormida: poder reducido hasta despertar.",
         riposte: "Anula el próximo efecto enemigo y devuelve el golpe.", wolf: "Loba: poder extra permanente.", vuln: "El próximo daño que reciba se duplica.",

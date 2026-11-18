@@ -944,9 +944,9 @@ function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
     [!!s.chained, "⛓️", "chained"], [!!s.burrow && !m.final, "⛏️", "burrow"], [now(s.sleep), "💤", "sleep"],
     [(s.rip ?? 0) > 0, "⚔️", "riposte"], [!!s.wolf, "🐺", "wolf"], [now(s.vuln), "🎯", "vuln"],
     [!!s.petri, "🗿", "petri"], [!!s.unstop, "⚡", "unstop"], [now(s.chan?.u), "🌩️", "chan"],
-    [now(s.root), "📌", "root"], [s.exec?.u === m.t, "🗡️", "exec"],
+    [now(s.root), "📌", "root"], [s.exec?.u === m.t, "🗡️", "exec"], [!!s.debt, "💸", "debt"],
   ];
-  return list.filter((x) => x[0]).map((x) => [x[1], t.ui.status[x[2]], x[2]]);
+  return list.filter((x) => x[0]).map((x) => [x[1], x[2] === "debt" ? `${t.ui.status.debt} (${s.debt?.v})` : t.ui.status[x[2]], x[2]]);
 }
 
 /** Vaga da carta na fileira do local: encolhe quando não cabe (a carta transborda e fica por baixo da seguinte). */
@@ -983,7 +983,10 @@ function BoardCard({ c, m, t, name, face, looking, target, mark = false, acts, s
       animate={{ scale: 1, y: 0, rotate: 0, rotateY: 0, opacity: 1, filter: RESTING }}
       transition={c.rev ? { duration: FALL_MS[w] / 1000, ease: "easeIn", opacity: { duration: 0.1 } } : { type: "spring", stiffness: 520, damping: 17, opacity: { duration: 0.08 } }}
       className={`relative block w-gc rounded-lg ${shift ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${c.staged || c.st.wait ? "opacity-60" : ""} ${looking ? "outline-2 outline-offset-2 outline-dl-text" : ""} ${target ? "outline-2 outline-offset-2 outline-game-me" : ""} ${focus}`}>
-      {face}
+      {m.faceDown(c) ? <CardBack tone="me" className={`w-gc ${REST}`} /> : (
+        // na mira da Vindicta, a carta fica em preto e branco e o X vermelho é o destaque
+        <div className={mark ? "transition-[filter] duration-100 group-hover:brightness-75 group-hover:grayscale group-has-focus-visible:brightness-75 group-has-focus-visible:grayscale" : ""}>{face}</div>
+      )}
     </motion.button>
     {mark && <AimX id={`aim-${c.id}`} />}
     </div>
@@ -1378,7 +1381,7 @@ function Slain({ r, card, still, onDone }: { r: DOMRect; card: ReactNode; still:
     <motion.div aria-hidden="true" className="pointer-events-none fixed z-60" style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
       initial={{ opacity: 1, scale: 1 }} animate={{ opacity: [1, 1, 0], scale: still ? 1 : [1, 1.06, 0.92] }} exit={{ opacity: 0 }}
       transition={{ duration: SLAIN_S, times: [0, 0.55, 1], ease: "easeIn" }} onAnimationComplete={onDone}>
-      <motion.div className="size-full" initial={{ filter: "grayscale(0) brightness(1)" }} animate={{ filter: "grayscale(0.8) brightness(0.6)" }} transition={{ duration: 0.3, delay: 0.25 }}>
+      <motion.div className="size-full" initial={{ filter: "grayscale(0) brightness(1)" }} animate={{ filter: "grayscale(1) brightness(0.7)" }} transition={{ duration: 0.12 }}>
         {card}
       </motion.div>
       <BrushX id={`slain-${Math.round(r.left)}-${Math.round(r.top)}`} w={r.width} h={r.height} draw={!still} />

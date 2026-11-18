@@ -38,6 +38,8 @@ type Status = {
   burn?: number; tburn?: { v: number; u: number }[];
   /** Aflição do Pocket Mestre: perde `v` no fim de cada turno, sem nunca passar de 1. */
   ail?: { v: number; src: Cause };
+  /** Dívida do Pocket: o que a Aflição não conseguiu tirar (a carta parou em 1). Os próximos ganhos pagam a dívida antes de contar. */
+  debt?: { v: number; src: Cause };
   vuln?: number; sleep?: number; root?: number; petri?: boolean; unstop?: boolean;
   /** Rato do Metrô: fica preso no Metrô (não se move nem troca de local). */
   home?: boolean;
@@ -184,7 +186,6 @@ const onReveal = (c: GCard) => ABILITIES[c.ab].kind === "r";
 const ITEM_FIT: Partial<Record<ItemKey, { card?: (c: GCard) => boolean; loc?: LocType }>> = {
   "High-Velocity Rounds": { card: isGun },
   "Extra Spirit": { card: (c) => ABILITIES[c.ab].hero && ABILITIES[c.ab].usesV },
-  "Golden Goose Egg": { loc: "urn" },
   "Swift Striker": { card: (c) => c.cost <= 3 },
   "Battle Vest": { card: isFront },
   "Healing Booster": { card: (c) => SUPPORT.has(c.ab) },
@@ -317,8 +318,19 @@ export class Match {
         // carta que virou outra (Pombo) ou voltou para a mão recomeça o histórico
         if (!d || c.st !== s.st) return;
         (c.st.fx ??= []).push({ ...cause, v: d });
+        // ganho com dívida do Pocket: paga a dívida primeiro
+        let net = d;
+        const debt = c.st.debt;
+        if (d > 0 && debt && debt.v > 0) {
+          const pay = Math.min(d, debt.v);
+          c.bonus -= pay;
+          debt.v -= pay;
+          net -= pay;
+          c.st.fx.push({ ...debt.src, v: -pay });
+          if (!debt.v) c.st.debt = undefined;
+        }
         // o que já foi atribuído aqui dentro não conta de novo para as origens de fora
-        this.snaps.forEach((o) => { const x = o.get(c); if (x) x.b += d; });
+        this.snaps.forEach((o) => { const x = o.get(c); if (x) x.b += net; });
       });
     }
   }
@@ -434,12 +446,11 @@ export class Match {
   };
 
   /** Dano: perder poder por efeito. Respeita imunidade, Santuário, escudo do Kelvin, Riposta e vulnerabilidade. */
-  /** Tira poder de `t`. Com `floor`, a perda para em `floor` de poder (a Aflição do Pocket nunca zera ninguém). */
+  /** Tira poder de `t`. Com `floor`, a perda para em `floor` de poder e o resto vira dívida (a Aflição do Pocket nunca zera ninguém). */
   private hurt(t: GCard | null | undefined, amt: number, src: GCard | null, until?: number, floor = 0): boolean {
     const l = t && this.locOf(t);
     if (!t || !l || amt <= 0) return false;
     if (this.immune(t) || t.st.unstop || this.ty(l, "shrine") || l.shield[t.side] >= this.t) return false;
-    if (floor && this.pow(t, l) <= floor) return false;
     if ((t.st.rip ?? 0) > 0 && src && src.side !== t.side) {
       t.st.rip = (t.st.rip ?? 1) - 1;
       this.say({ k: "riposte", c: this.N(t), t: this.N(src) });
@@ -447,7 +458,12 @@ export class Match {
       return false;
     }
     if ((t.st.vuln ?? 0) >= this.t) { amt *= 2; t.st.vuln = 0; }
-    if (floor) amt = Math.min(amt, this.pow(t, l) - floor);
+    if (floor) {
+      const got = Math.max(0, Math.min(amt, this.pow(t, l) - floor));
+      if (amt > got) t.st.debt = { v: (t.st.debt?.v ?? 0) + amt - got, src: this.causes.at(-1) ?? (src ? this.by(src) : { k: "burn" }) };
+      amt = got;
+      if (!amt) return true;
+    }
     if (until) t.st.tmp.push({ v: -amt, u: until, src: this.causes.at(-1) });
     else t.bonus -= amt;
     this.interrupt(t);
@@ -497,6 +513,11 @@ export class Match {
     const h = this.handOf(c.side);
     if (h.length < HAND_MAX) h.push(c);
   }
+  /** Carta jogada no Jardim antes da hora: fica virada para baixo para os dois jogadores. */
+  faceDown = (c: GCard) => {
+    const l = this.locOf(c);
+    return !c.rev && (!!c.st.wait || (!!l && this.ty(l, "late") && this.t < l.L.n));
+  };
   /** Sua próxima carta do baralho, se The New York Oracle estiver revelado (a do adversário continua escondida). */
   peek(): GCard | null {
     if (!this.loc.some((l) => this.ty(l, "oracle"))) return null;
@@ -738,6 +759,7 @@ export class Match {
         x.st.burn = 0;
         x.st.tburn = [];
         x.st.ail = undefined;
+        x.st.debt = undefined;
         // o gelo também solta quem a Wraith ergueu
         if ((x.st.stun ?? 0) >= this.t) { x.st.stun = 0; this.say({ k: "liftEnd", c: this.N(x) }); }
       });
@@ -912,8 +934,8 @@ export class Match {
   }
   private cleanse(c: GCard) {
     const st = c.st;
-    const bad = !!st.burn || !!st.tburn?.length || !!st.ail || !!st.petri || !!st.silenced || (st.stun ?? 0) >= this.t || (st.vuln ?? 0) >= this.t || st.tmp.some((m) => m.v < 0 && this.t <= m.u);
-    st.burn = 0; st.tburn = []; st.ail = undefined; st.petri = false; st.silenced = false; st.stun = 0; st.vuln = 0; st.sleep = 0; st.tmp = st.tmp.filter((m) => m.v >= 0);
+    const bad = !!st.burn || !!st.tburn?.length || !!st.ail || !!st.debt || !!st.petri || !!st.silenced || (st.stun ?? 0) >= this.t || (st.vuln ?? 0) >= this.t || st.tmp.some((m) => m.v < 0 && this.t <= m.u);
+    st.burn = 0; st.tburn = []; st.ail = undefined; st.debt = undefined; st.petri = false; st.silenced = false; st.stun = 0; st.vuln = 0; st.sleep = 0; st.tmp = st.tmp.filter((m) => m.v >= 0);
     return bad;
   }
 
@@ -924,7 +946,7 @@ export class Match {
     "Extra Health": (c, _s, v) => { c.bonus += v; },
     "Healing Rite": (c, _s, v) => { this.cleanse(c); c.bonus += v; },
     "Extra Spirit": (c, _s, v) => { if (ABILITIES[c.ab].usesV) c.v += v; c.bonus += 1; },
-    "Golden Goose Egg": (c, s, v) => { c.bonus += 1; this.extra[s] += v + (this.loc.some((l) => this.ty(l, "urn") && this.leading(s, l)) ? 1 : 0); },
+    "Golden Goose Egg": (c, s, v) => { c.bonus -= 1; this.extra[s] += v; },
     "Swift Striker": (c, _s, v) => { c.bonus += c.cost <= 3 ? v : 2; },
     "Long Range": (c, s, v) => { const l = this.locOf(c); c.bonus += l && this.leading(opp(s), l) ? v : 2; },
     "Battle Vest": (c, _s, v) => { c.bonus += isFront(c) ? v : 2; },

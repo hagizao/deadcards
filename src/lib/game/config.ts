@@ -232,7 +232,7 @@ const I = (tier: ItemTier, slot: ItemSlot, v: number, foe = false): ItemDef => (
 export const ITEMS = {
   "High-Velocity Rounds": I(1, "weapon", 3), "Close Quarters": I(1, "weapon", 3),
   "Extra Health": I(1, "vitality", 2), "Healing Rite": I(1, "vitality", 2),
-  "Extra Spirit": I(1, "spirit", 1), "Golden Goose Egg": I(1, "spirit", 1),
+  "Extra Spirit": I(1, "spirit", 1), "Golden Goose Egg": I(1, "spirit", 2),
   "Swift Striker": I(2, "weapon", 4), "Long Range": I(2, "weapon", 4),
   "Battle Vest": I(2, "vitality", 4), "Healing Booster": I(2, "vitality", 3),
   "Arcane Surge": I(2, "spirit", 1), "Slowing Hex": I(2, "spirit", 2, true),
