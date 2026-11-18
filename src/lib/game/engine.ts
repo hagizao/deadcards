@@ -508,8 +508,9 @@ export class Match {
     c.st.exec = { u: this.t, target: t.id };
     this.say({ k: "mark", c: this.N(c), t: this.N(t) });
   }
+  /** O Shiv alcança também quem está entocado (o Mo & Krill fica com 0 de poder embaixo da terra, e 0 sempre é executável). */
   private shivKill(c: GCard, l: Loc, v: number, t?: GCard | null): boolean {
-    t = t ?? this.weakest(this.tg(this.foes(c, l)));
+    t = t ?? this.weakest(this.tg(l.s[opp(c.side)].filter((x) => x.rev)));
     if (!t || this.locOf(t) !== l || this.pow(t, l) > v || !this.destroy(t)) return false;
     this.say({ k: "shiv", c: this.N(c), t: this.N(t) });
     return true;

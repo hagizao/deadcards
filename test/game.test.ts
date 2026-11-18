@@ -615,6 +615,22 @@ describe("balanceamento das habilidades", () => {
     put(pc("s", "Shiv", flat(70)), "p", 0);
     expect(m.locOf(t)).toBeUndefined();
   });
+
+  it("Shiv executa inimigas com 0 de poder (de base, por dano, atordoadas ou entocadas)", () => {
+    const { m, put } = arena();
+    const zero = dummy(put, "a", 0, 0);
+    const hurt = dummy(put, "a", 1, 4);
+    hurt.bonus = -6;
+    const stun = dummy(put, "a", 2, 9);
+    stun.st.stun = m.t;
+    const deep = dummy(put, "a", 2, 7, "deep");
+    deep.st.burrow = true;
+    put(pc("s0", "Shiv", flat(70)), "p", 0);
+    put(pc("s1", "Shiv", flat(70)), "p", 1);
+    put(pc("s2", "Shiv", flat(70)), "p", 2);
+    put(pc("s3", "Shiv", flat(70)), "p", 2);
+    expect([m.locOf(zero), m.locOf(hurt), m.locOf(stun), m.locOf(deep)]).toEqual([undefined, undefined, undefined, undefined]);
+  });
 });
 
 describe("versões e heróis de afinidade", () => {
