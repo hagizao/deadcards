@@ -16,6 +16,8 @@ import {
 import { cardPool } from "../lib/game/engine";
 import { GAME_TEXT } from "../lib/game/text";
 import { abilitySfx } from "../lib/game/heroSfx";
+import { createPortal } from "react-dom";
+import { AbilityFx, FxLayer, type Box, type FxScene } from "../components/AbilityFx";
 
 const SECTIONS = [
   { id: "card", label: "Carta" },
@@ -122,6 +124,53 @@ function Fold({ title }: { title: string }) {
         <span aria-hidden className="transition-transform group-open/fold:rotate-180 motion-reduce:transition-none">▾</span>
       </span>
     </summary>
+  );
+}
+
+/** Quem a habilidade mexe na prévia: inimigas, um aliado, os dois ou ninguém (age em si mesma ou no local). */
+const PREVIEW_ALLY = new Set<AbilityKey>(["Ivy", "Kelvin", "Viscous", "Paige", "McGinnis", "The Doorman", "team", "aura"]);
+const PREVIEW_BOTH = new Set<AbilityKey>(["Nurse Harrow", "Graves", "Holliday"]);
+const PREVIEW_NONE = new Set<AbilityKey>(["Mirage", "Mo & Krill", "Silver", "Sinclair", "Solomon", "Warden", "Yamato", "Rat King", "Violet", "Venator", "self", "draw"]);
+const boxOf = (el: Element | null): Box | null => {
+  const r = el?.getBoundingClientRect();
+  return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height } : null;
+};
+
+/**
+ * Prévia da animação de um herói numa mesa de mentira: a carta do herói e um aliado embaixo, duas inimigas em cima.
+ * Toca junto o som (o enviado nesta edição ou o padrão).
+ */
+function FxPreview({ hero, icon, sound }: { hero: AbilityKey; icon?: string; sound?: string }) {
+  const stage = useRef<HTMLDivElement>(null);
+  const [run, setRun] = useState<{ k: number; scene: FxScene } | null>(null);
+  const play = () => {
+    const q = (s: string) => boxOf(stage.current?.querySelector(`[data-fx="${s}"]`) ?? null);
+    const src = q("src"), f1 = q("f1"), f2 = q("f2"), ally = q("ally");
+    if (!src || !f1 || !f2 || !ally) return;
+    const foes = [{ box: f1, foe: true }, { box: f2, foe: true }];
+    const dst = PREVIEW_NONE.has(hero) ? [] : PREVIEW_ALLY.has(hero) ? [{ box: ally, foe: false }] : PREVIEW_BOTH.has(hero) ? [foes[0], { box: ally, foe: false }] : foes;
+    setRun({ k: (run?.k ?? 0) + 1, scene: { src, dst, loc: boxOf(stage.current), me: true } });
+    hear(sound, hero);
+  };
+  const card = "flex aspect-295/430 w-16 items-center justify-center overflow-hidden rounded-lg text-[10px] font-bold uppercase shadow-lg sm:w-20";
+  return (
+    <div className="flex flex-col gap-3">
+      <div ref={stage} className="flex flex-col items-center justify-between gap-8 rounded-2xl bg-zinc-950/70 bg-radial-[at_50%_40%] from-zinc-800/60 to-transparent px-4 py-5">
+        <div className="flex gap-3">
+          <span data-fx="f1" className={`${card} bg-game-ai/30 text-game-ai`}>Inimiga</span>
+          <span data-fx="f2" className={`${card} bg-game-ai/30 text-game-ai`}>Inimiga</span>
+        </div>
+        <div className="flex gap-3">
+          <span data-fx="src" className={`${card} bg-zinc-800 ring-2 ring-game-brass`}>{icon ? <img src={icon} alt={hero} className="size-full object-cover" /> : hero}</span>
+          <span data-fx="ally" className={`${card} bg-game-me/30 text-game-me`}>Aliada</span>
+        </div>
+      </div>
+      <button type="button" className={`${primary} ${ring} self-start`} onClick={play}>▶ Ver animação</button>
+      {run && createPortal(
+        <FxLayer><AbilityFx key={run.k} ab={hero} scene={run.scene} onDone={() => setRun(null)} /></FxLayer>,
+        document.body,
+      )}
+    </div>
   );
 }
 
@@ -968,9 +1017,9 @@ function GameForm() {
       </section>
 
       <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
-        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Efeitos sonoros</h2>
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Sons e animações</h2>
         <p className="text-xs text-zinc-400">
-          Escolha o herói e envie um mp3, ogg, wav ou webm curto, de até 1 MB: ele toca no lugar do som da habilidade sempre que uma carta com a habilidade desse herói age, em todas as versões.
+          Escolha o herói para ver a animação da habilidade e trocar o som. O som é um mp3, ogg, wav ou webm curto, de até 1 MB: ele toca no lugar do som da habilidade sempre que uma carta com a habilidade desse herói age, em todas as versões.
         </p>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2">
           {HERO_KEYS.map((k) => {
@@ -990,7 +1039,9 @@ function GameForm() {
             );
           })}
         </div>
-        <div className="flex flex-col gap-2 rounded-2xl bg-zinc-950/40 p-4">
+        <div className="grid items-start gap-4 rounded-2xl bg-zinc-950/40 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <FxPreview key={soundHero} hero={soundHero} icon={heroIcon(soundHero) ?? heroArt(soundHero)?.url} sound={cfg.heroes[soundHero]?.sound} />
+          <div className="flex flex-col gap-2">
           <span className="text-sm font-bold text-zinc-100">{soundHero} <span className="text-xs font-normal text-zinc-400">· {GT.abilities[soundHero].name}</span></span>
           <SoundPick url={cfg.heroes[soundHero]?.sound} saved={savedHeroes[soundHero]?.sound} ab={soundHero} applying={busy}
             onUrl={(sound) => setHero(soundHero, { sound })} onApply={() => applySound(soundHero)} />
@@ -998,6 +1049,7 @@ function GameForm() {
             {cfg.heroes[soundHero]?.sound ? "Som próprio enviado." : "Sem som próprio: usa o som padrão da habilidade."}
             {cfg.heroes[soundHero]?.sound !== savedHeroes[soundHero]?.sound && <b className="text-game-brass"> Som novo ainda não vale no jogo: clique em Aplicar no jogo.</b>}
           </p>
+          </div>
         </div>
       </section>
 
