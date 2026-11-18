@@ -1,9 +1,10 @@
-// Áudio do Cardslock Game: efeitos (Kenney, CC0; ver src/assets/sfx/LICENSE.txt), baque sintetizado para cartas pesadas
+// Áudio do Cardslock Game: efeitos (Kenney e a plateia do Freesound, CC0; ver src/assets/sfx/LICENSE.txt), baque sintetizado para cartas pesadas
 // música de fundo ("Midnight on Miller Street", tcarisland, CC BY 4.0) e conversa do bar (SSE Library, CC0); ver src/assets/music/LICENSE.txt.
 // O arrasto e a batida das cartas na madeira são sintetizados. Volume e mudo de efeitos, música e conversa ficam separados e salvos no navegador.
 import { useSyncExternalStore } from "react";
 import walla from "../../assets/music/bar-walla.mp3";
 import music from "../../assets/music/midnight-on-miller-street.mp3";
+import gasp from "../../assets/sfx/crowd-gasp.ogg";
 import draw from "../../assets/sfx/draw.ogg";
 import endTurn from "../../assets/sfx/end-turn.ogg";
 import error from "../../assets/sfx/error.ogg";
@@ -13,7 +14,7 @@ import shuffle from "../../assets/sfx/shuffle.ogg";
 import soul from "../../assets/sfx/soul.ogg";
 import win from "../../assets/sfx/win.ogg";
 
-const FILES = { draw, endTurn, error, grab, loss, shuffle, soul, win };
+const FILES = { draw, endTurn, error, gasp, grab, loss, shuffle, soul, win };
 /** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
 const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
 export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn" | "paper" | "impact" | "knife" | "bell";
@@ -159,10 +160,7 @@ function cardBurn(strength = 1) {
   }
 }
 
-/**
- * Carta enorme (9 ou mais de poder) caindo: um estrondo grave e longo com o tremor da madeira por baixo e, logo depois,
- * a mesa ao lado puxando o ar de susto e soltando um "oh!" curto (poucas vozes, perto, cada uma no seu tempo).
- */
+/** Carta enorme (9 ou mais de poder) caindo: um estrondo grave e longo com o tremor da madeira por baixo (a plateia é o efeito "gasp"). */
 function bigImpact(strength = 1) {
   const lv = sfxLevel();
   if (!lv || !hasCtx()) return;
@@ -193,65 +191,6 @@ function bigImpact(strength = 1) {
   rum.connect(rl).connect(rg).connect(c.destination);
   rum.start(t);
   rum.stop(t + 1);
-  // susto: o ar puxado entre os dentes, curto e agudo
-  const g0 = t + 0.1;
-  const inh = c.createBufferSource();
-  inh.buffer = noise(c, 0.4);
-  const ib = c.createBiquadFilter();
-  ib.type = "bandpass"; ib.Q.value = 1.2;
-  ib.frequency.setValueAtTime(1600, g0);
-  ib.frequency.linearRampToValueAtTime(2600, g0 + 0.18);
-  const ig = c.createGain();
-  ig.gain.setValueAtTime(0.0001, g0);
-  ig.gain.exponentialRampToValueAtTime(0.5 * vol, g0 + 0.1);
-  ig.gain.exponentialRampToValueAtTime(0.0001, g0 + 0.24);
-  inh.connect(ib).connect(ig).connect(c.destination);
-  inh.start(g0);
-  inh.stop(g0 + 0.3);
-  // "oh!": vozes graves e agudas misturadas, passando pelos formantes do "o"
-  const mix = c.createGain();
-  ([[450, 1.4, 6], [820, 0.9, 7], [2500, 0.18, 4]] as const).forEach(([fq, g, q]) => {
-    const bp = c.createBiquadFilter();
-    bp.type = "bandpass"; bp.frequency.value = fq; bp.Q.value = q;
-    const fg = c.createGain();
-    fg.gain.value = g * vol;
-    mix.connect(bp).connect(fg).connect(c.destination);
-  });
-  for (let i = 0; i < 7; i++) {
-    const f0 = (i % 3 ? 120 : 230) * (0.9 + Math.random() * 0.25);
-    const at = g0 + 0.2 + Math.random() * 0.12;
-    const len = 0.45 + Math.random() * 0.3;
-    const o = c.createOscillator();
-    o.type = "sawtooth";
-    // susto sobe rápido e cai devagar
-    o.frequency.setValueAtTime(f0 * 1.05, at);
-    o.frequency.linearRampToValueAtTime(f0 * 1.25, at + 0.07);
-    o.frequency.exponentialRampToValueAtTime(f0 * 0.85, at + len);
-    const vib = c.createOscillator();
-    vib.frequency.value = 5 + Math.random() * 2;
-    const vg = c.createGain();
-    vg.gain.value = f0 * 0.015;
-    vib.connect(vg).connect(o.frequency);
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(0.09 + Math.random() * 0.06, at + 0.04);
-    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
-    o.connect(g).connect(mix);
-    o.start(at); vib.start(at);
-    o.stop(at + len + 0.02); vib.stop(at + len + 0.02);
-  }
-  // respiração no "oh"
-  const br = c.createBufferSource();
-  br.buffer = noise(c, 0.8);
-  const bb = c.createBiquadFilter();
-  bb.type = "bandpass"; bb.frequency.value = 1100; bb.Q.value = 0.7;
-  const bbg = c.createGain();
-  bbg.gain.setValueAtTime(0.0001, g0 + 0.2);
-  bbg.gain.exponentialRampToValueAtTime(0.12, g0 + 0.26);
-  bbg.gain.exponentialRampToValueAtTime(0.0001, g0 + 0.8);
-  br.connect(bb).connect(bbg).connect(mix);
-  br.start(g0 + 0.2);
-  br.stop(g0 + 0.85);
 }
 
 /** Parciais de metal soando juntos (frequências em Hz e peso de cada um), com ataque seco e cauda longa. */
