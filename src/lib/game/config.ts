@@ -241,7 +241,7 @@ export const ITEMS = {
   "Surge of Power": I(3, "spirit", 6), "Superior Cooldown": I(3, "spirit", 2),
   "Glass Cannon": I(4, "weapon", 10), "Ricochet": I(4, "weapon", 5, true),
   "Colossus": I(4, "vitality", 7), "Unstoppable": I(4, "vitality", 6),
-  "Echo Shard": I(4, "spirit", 3), "Refresher": I(4, "spirit", 4),
+  "Echo Shard": I(4, "spirit", 3), "Refresher": I(4, "spirit", 6),
   // tier 1
   "Monster Rounds": I(1, "weapon", 2), "Rapid Rounds": I(1, "weapon", 2),
   "Extra Regen": I(1, "vitality", 1), "Grit": I(1, "vitality", 2), "Rebuttal": I(1, "vitality", 1),
