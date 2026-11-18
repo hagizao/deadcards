@@ -65,6 +65,9 @@ export type GCard = {
   mv: MoveCharge[];
 };
 
+/** Retrato da mesa antes de um movimento (para desfazer). */
+type Snap = { rows: { p: GCard[]; a: GCard[] }[]; cards: (readonly [GCard, GCard])[]; portals: Match["portals"]; log: LogEntry[]; said: number };
+
 export type Loc = {
   L: GameLoc; rev: boolean; s: Record<Side, GCard[]>; lock: Record<Side, number>; trap: Record<Side, number>;
   /** Kelvin: até que turno cada lado não sofre dano aqui. Vyper: petrificação armada contra cada lado. */
@@ -289,8 +292,15 @@ export class Match {
   private N = (c: GCard): Name => (c.p.token ? { token: c.p.token } : c.p.name);
   private say(e: LogEntry) { this.said++; this.log.unshift(e); this.log.length = Math.min(this.log.length, 3); }
   private said = 0;
-  /** Habilidades que funcionaram (mudaram algo na partida), em ordem, para a tela tocar o som de cada uma. A tela esvazia a lista. */
-  heard: { ab: AbilityKey; id: number; side: Side }[] = [];
+  /**
+   * Habilidades que funcionaram (mudaram algo na partida), em ordem, para a tela tocar o som e a animação de cada uma.
+   * `to`: cartas que ela mexeu (poder, status, lugar, criadas ou destruídas), sem a própria; `at`: local da carta. A tela esvazia a lista.
+   */
+  heard: { ab: AbilityKey; id: number; side: Side; to: number[]; at: number }[] = [];
+  /** Retrato de cada carta da mesa, para saber quais a habilidade mexeu. */
+  private cardSigs() {
+    return new Map(this.loc.flatMap((l, i) => [...l.s.p, ...l.s.a].map((c) => [c.id, JSON.stringify([i, c.base, c.bonus, c.v, c.p.token, c.st, c.mv, c.rev])] as const)));
+  }
   /** Retrato do que uma habilidade pode mudar: cartas, status, mãos, locais, efeitos marcados e o log. */
   private sig() {
     const cards = this.loc.map((l) => [l.s.p, l.s.a].map((a) => a.map((c) => [c.id, c.base, c.bonus, c.v, c.p.token, c.st, c.mv])));
@@ -299,8 +309,13 @@ export class Match {
   /** Roda a habilidade da carta e, se ela mudou alguma coisa, registra para o som. */
   private fire(c: GCard, f: () => void) {
     const before = this.sig();
+    const was = this.cardSigs();
+    const at = this.idx(this.locOf(c)!);
     f();
-    if (this.sig() !== before) this.heard.push({ ab: c.ab, id: c.id, side: c.side });
+    if (this.sig() === before) return;
+    const now = this.cardSigs();
+    const to = [...new Set([...was.keys(), ...now.keys()])].filter((id) => id !== c.id && was.get(id) !== now.get(id));
+    this.heard.push({ ab: c.ab, id: c.id, side: c.side, to, at });
   }
   private handOf = (s: Side) => (s === "p" ? this.hand : this.ahand);
   private later(f: () => void, t = this.t + 1) { this.pend.push({ t, f, cause: this.causes.at(-1) }); }
@@ -587,19 +602,48 @@ export class Match {
     const i = this.idx(from), j = this.idx(to);
     return this.portals.find((p) => p.side === c.side && p.t === this.t && p.n > 0 && ((p.a === i && p.b === j) || (p.a === j && p.b === i)));
   }
-  /** Para onde a carta pode se mover agora (cargas de movimento ou portal do Doorman). Uma vez por turno. */
+  /**
+   * Movimentos que você fez neste turno, com o retrato da mesa de antes de cada um: até o fim do turno, a carta movida
+   * pode ser arrastada de novo para onde podia ir (inclusive de volta), desfazendo o movimento.
+   */
+  private moves: { id: number; from: number; to: number; opts: number[]; snap: Snap }[] = [];
+  /** Retrato do que um movimento muda: a fileira de cada local, os dados das cartas da mesa, portais e o log. */
+  private snap(): Snap {
+    return {
+      rows: this.loc.map((l) => ({ p: [...l.s.p], a: [...l.s.a] })),
+      cards: this.all().map((c) => [c, structuredClone(c)] as const),
+      portals: structuredClone(this.portals), log: [...this.log], said: this.said,
+    };
+  }
+  /** Volta ao retrato, mantendo os mesmos objetos de carta (a tela e os efeitos pendentes apontam para eles). */
+  private restore(s: Snap) {
+    s.cards.forEach(([c, data]) => {
+      for (const k of Object.keys(c)) if (!(k in data)) delete (c as Record<string, unknown>)[k];
+      Object.assign(c, structuredClone(data));
+    });
+    this.loc.forEach((l, i) => { l.s.p = [...s.rows[i].p]; l.s.a = [...s.rows[i].a]; });
+    this.portals = structuredClone(s.portals);
+    this.log = [...s.log];
+    this.said = s.said;
+  }
+  /** Para onde a carta pode se mover agora (cargas de movimento ou portal do Doorman). Uma vez por turno; a sua carta já movida pode refazer o movimento. */
   moveOptions(c: GCard): Loc[] {
     const from = this.locOf(c);
+    const done = c.side === "p" && !this.busy ? this.moves.find((r) => r.id === c.id) : undefined;
+    if (done) return done.opts.map((i) => this.loc[i]).filter((l) => l !== from);
     if (!from || !c.rev || c.staged || c.st.mvT === this.t) return [];
     return this.loc.filter((to) => to !== from && (this.portal(c, from, to) || this.charge(c, to)) && this.movable(c, from, to, true));
   }
   moveCard(c: GCard, to: Loc): boolean {
     if ((c.side === "p" && this.busy) || !this.moveOptions(c).includes(to)) return false;
+    const k = c.side === "p" ? this.moves.findIndex((r) => r.id === c.id) : -1;
+    if (k >= 0) return this.redoMove(k, this.idx(to));
     const from = this.locOf(c)!;
+    if (c.side === "p") this.moves.push({ id: c.id, from: this.idx(from), to: this.idx(to), opts: [this.idx(from), ...this.moveOptions(c).map(this.idx)], snap: this.snap() });
     const portal = this.portal(c, from, to);
     const charge = portal ? undefined : this.charge(c, to);
     const pw = this.pow(c, from);
-    if (!this.move(c, from, to, true)) return false;
+    if (!this.move(c, from, to, true)) { if (c.side === "p") this.moves.pop(); return false; }
     c.st.mvT = this.t;
     this.say({ k: "move", c: this.N(c), loc: to.L.name });
     if (portal) { portal.n--; this.as({ k: "move" }, () => { c.bonus += portal.bonus; }); return true; }
@@ -612,6 +656,21 @@ export class Match {
       from.s[c.side].push(k);
       this.say({ k: "illusion", c: this.N(c), loc: from.L.name });
     }
+    return true;
+  }
+
+  /**
+   * Refaz o movimento `k`: volta a mesa para antes dele, move a carta para `to` (ou a deixa onde estava) e repete os
+   * movimentos feitos depois dele (o que não couber mais fica sem efeito).
+   */
+  private redoMove(k: number, to: number): boolean {
+    const r = this.moves[k];
+    const after = this.moves.slice(k + 1).map((x) => ({ id: x.id, to: x.to }));
+    this.restore(r.snap);
+    this.moves.length = k;
+    const c = this.byId(r.id);
+    if (c && to !== r.from) this.moveCard(c, this.loc[to]);
+    for (const x of after) { const y = this.byId(x.id); if (y) this.moveCard(y, this.loc[x.to]); }
     return true;
   }
 
@@ -1219,6 +1278,7 @@ export class Match {
   endTurn(): Act[] {
     if (this.busy) return [];
     this.busy = true;
+    this.moves = [];
     this.aiShop();
     this.aiPlay();
     this.aiMoves();
@@ -1292,7 +1352,7 @@ export class Match {
     const impl = this.IMPL[this.abilityOf(c)];
     if (impl?.r) for (let i = 0, n = this.ty(l, "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) this.fire(c, () => this.as(this.by(c), () => impl.r?.(c, at, c.v))); }
     // constante: toca só ao entrar em jogo, com a habilidade ativa
-    else if (ABILITIES[c.ab].kind === "c" && this.abilityOf(c) === c.ab && this.locOf(c)) this.heard.push({ ab: c.ab, id: c.id, side: s });
+    else if (ABILITIES[c.ab].kind === "c" && this.abilityOf(c) === c.ab && this.locOf(c)) this.heard.push({ ab: c.ab, id: c.id, side: s, to: [], at: this.idx(this.locOf(c)!) });
     // Teatro: uma cópia com o mesmo poder, sem habilidade
     const at = this.locOf(c);
     if (at && this.ty(at, "copy") && !c.tok && this.room(at, s)) {

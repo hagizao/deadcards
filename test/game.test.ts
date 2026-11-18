@@ -537,6 +537,17 @@ describe("escolhas, movimento e execução", () => {
     expect(m.pow(b)).toBeLessThan(9);
   });
 
+  it("a habilidade registra quem ela mexeu e onde agiu, para a animação", () => {
+    const { m, put, stage } = arena();
+    const a = put(pc("a", "Herói Novo", flat(70)), "a", 2);
+    put(pc("b", "Herói Novo", flat(70)), "a", 1);
+    m.heard.length = 0;
+    const gt = stage(pc("g", "Grey Talon", flat(70)), 0);
+    m.choose(gt, { card: a });
+    m.reveal(gt, m.loc[0]);
+    expect(m.heard).toEqual([{ ab: "Grey Talon", id: gt.id, side: "p", to: [a.id], at: 0 }]);
+  });
+
   it("Holliday leva a inimiga escolhida para o local escolhido", () => {
     const { m, put, stage } = arena();
     const a = put(pc("a", "Herói Novo", flat(70)), "a", 0);
@@ -556,6 +567,42 @@ describe("escolhas, movimento e execução", () => {
     const si = put(pc("s", "Sinclair", flat(70)), "p", 0);
     expect(m.moveCard(si, m.loc[2])).toBe(true);
     expect(m.loc[0].s.p.some((x) => x.p.token === "illusion")).toBe(true);
+  });
+
+  it("carta movida neste turno pode voltar ou ir para outro lugar, desfazendo o movimento", () => {
+    const { m, put } = arena();
+    const mi = put(pc("m", "Mirage", flat(70)), "p", 0);
+    const si = put(pc("s", "Sinclair", flat(70)), "p", 0);
+    const before = m.pow(mi);
+    expect(m.moveCard(mi, m.loc[1])).toBe(true);
+    expect(m.moveCard(si, m.loc[2])).toBe(true);
+    expect(m.loc[0].s.p.some((x) => x.p.token === "illusion")).toBe(true);
+    // a Mirage pode ir de volta ou para o outro local
+    expect(m.moveOptions(mi)).toEqual([m.loc[0], m.loc[2]]);
+    expect(m.moveCard(mi, m.loc[2])).toBe(true);
+    expect(m.locOf(mi)).toBe(m.loc[2]);
+    expect(m.pow(mi)).toBe(before + mi.v);
+    // o movimento do Sinclair, feito depois, continua valendo
+    expect(m.locOf(si)).toBe(m.loc[2]);
+    // desfazer o do Sinclair: volta para o local de origem e a ilusão some
+    expect(m.moveCard(si, m.loc[0])).toBe(true);
+    expect(m.locOf(si)).toBe(m.loc[0]);
+    expect(m.loc[0].s.p.some((x) => x.p.token === "illusion")).toBe(false);
+    // desfazer o da Mirage: sem o bônus da viagem
+    expect(m.moveCard(mi, m.loc[0])).toBe(true);
+    expect(m.locOf(mi)).toBe(m.loc[0]);
+    expect(m.pow(mi)).toBe(before);
+    expect(m.moveOptions(mi)).toEqual([m.loc[1], m.loc[2]]);
+  });
+
+  it("depois do fim do turno o movimento não pode mais ser desfeito", () => {
+    const { m, put } = arena();
+    const mi = put(pc("m", "Mirage", flat(70)), "p", 0);
+    expect(m.moveCard(mi, m.loc[1])).toBe(true);
+    m.endTurn();
+    m.busy = false;
+    expect(m.moveOptions(mi)).toEqual([]);
+    expect(m.moveCard(mi, m.loc[0])).toBe(false);
   });
 
   it("carta acorrentada não se move", () => {
