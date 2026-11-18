@@ -1,6 +1,6 @@
 // Textos do Cardslock Game em pt/en/es: habilidades, efeitos de local, mensagens do log e da tela.
 import { strings } from "../i18n";
-import type { AbilityKey, AbilityKind, ItemKey, ItemSlot, LocType, StatKey } from "./config";
+import { REMOVAL_CAP, type AbilityKey, type AbilityKind, type ItemKey, type ItemSlot, type LocType, type StatKey } from "./config";
 import type { LogEntry, LogKey, Token } from "./engine";
 import type { DeckLook } from "./deck";
 
@@ -76,7 +76,7 @@ export const GAME_TEXT = strings<GameText>({
     abilities: {
       "Abrams": { name: "Investida", text: (v) => `Empurra a carta inimiga mais forte daqui para outro local. Se não houver espaço, ela bate na parede e perde ${v}.`, master: () => "Se ela bater na parede, o Abrams ganha +2." },
       "Apollo": { name: "Riposta", text: (v) => `O primeiro efeito inimigo que tiraria poder dele é anulado, e a carta que o causou perde ${v}.`, master: () => "Anula os dois primeiros efeitos." },
-      "Baba": { name: "Revoada", text: (v) => `Transforma a carta inimiga mais cara daqui em um Pombo com ${v} de poder e sem habilidade.`, master: () => "Se ela custava 6 ou mais, a Baba ganha +3." },
+      "Baba": { name: "Revoada", text: (v) => `Transforma a inimiga mais cara daqui com até ${REMOVAL_CAP.Baba} de poder em um Pombo com ${v} de poder e sem habilidade.`, master: () => "Se ela custava 6 ou mais, a Baba ganha +3." },
       "Bebop": { name: "Gancho", text: () => "A próxima carta que o inimigo revelar é puxada para este local.", master: () => "Ela perde 2 ao chegar e não pode sair daqui." },
       "Billy": { name: "Gangue da Corrente", text: (v) => `Acorrenta a carta inimiga mais forte daqui: ela perde ${v} e não pode mais ser movida.`, master: () => "Ela também perde a habilidade." },
       "Calico": { name: "Retorno às Sombras", text: (v) => `No fim do próximo turno, ulta: as cartas inimigas daqui perdem ${v} e a Calico fica imune.`, master: () => "Depois da ulti, ela pode se mover uma vez até o fim do turno seguinte." },
@@ -91,7 +91,7 @@ export const GAME_TEXT = strings<GameText>({
       "Infernus": { name: "Pós-combustão", text: (v) => `A carta inimiga mais forte daqui queima −${v} no fim deste turno e do próximo.`, master: () => "Combustão Concussiva: ela também perde a habilidade e não pode ser movida até o fim do próximo turno." },
       "Ivy": { name: "Pacto do Vigia", text: (v) => `Liga-se ao seu aliado mais forte em outro local: os dois ganham +${v}.`, master: () => "Os dois ficam imunes até o fim do próximo turno." },
       "Kelvin": { name: "Abrigo Congelado", text: () => "Cura todas as cartas aliadas aqui ao poder original.", master: () => "As inimigas daqui com Mira como atributo principal perdem 2." },
-      "Lady Geist": { name: "Troca de Almas", text: (v) => `Troca poder com a carta inimiga mais forte daqui (se for maior): ela passa até ${v} de poder da inimiga para si.`, master: () => "Depois da troca, a inimiga perde mais 2." },
+      "Lady Geist": { name: "Troca de Almas", text: (v) => `Troca poder com a inimiga mais forte daqui com até ${REMOVAL_CAP["Lady Geist"]} de poder (se for maior): passa até ${v} dela para si.`, master: () => "Depois da troca, a inimiga perde mais 2." },
       "Lash": { name: "Queda Mortal", text: (v) => `Arremessa até 2 cartas inimigas daqui para outro local; elas perdem ${v}.`, master: () => "Escolha para qual local elas vão." },
       "McGinnis": { name: "Mini Torreta", text: (v) => `Monta uma Torreta com ${v} de poder em outro local seu.`, master: () => "A Torreta tem pelo menos 4 de poder." },
       "Mina": { name: "Mordidas de Amor", text: (v) => `No fim deste turno e dos 2 seguintes, drena ${v} de uma carta inimiga daqui para a Mina.`, master: () => "Depois de revelar, pode se mover uma vez até o fim do próximo turno." },
@@ -105,7 +105,7 @@ export const GAME_TEXT = strings<GameText>({
       "Rem": { name: "Hora da Soneca", text: (v) => `As cartas inimigas aqui adormecem: −${v} até o fim do próximo turno.`, master: () => "Enquanto elas dormem, suas cartas aqui têm +1." },
       "Seven": { name: "Nuvem de Tempestade", text: (v) => `Canalizada: no fim deste turno e do próximo, cada carta inimiga aqui perde ${v}. Acaba se o Seven for movido, atordoado, perder a habilidade ou sofrer dano.`, master: () => "Imparável: a tempestade não é interrompida e o Seven não sofre debuff." },
       "Shiv": { name: "Golpe Mortal", text: (v) => `Destrói a carta inimiga mais fraca daqui se ela tiver ${v} ou menos de poder.`, master: () => "Se destruir, usa de novo (uma vez)." },
-      "Silver": { name: "Maldição Licana", text: (v) => `Se sofrer dano, no fim do próximo turno vira lobisomem: +${v} permanente.`, master: () => "Ao virar lobisomem, destrói a carta inimiga mais fraca daqui." },
+      "Silver": { name: "Maldição Licana", text: (v) => `Se sofrer dano, no fim do próximo turno vira lobisomem: +${v} permanente.`, master: () => `Ao virar lobisomem, destrói a inimiga mais fraca daqui com até ${REMOVAL_CAP.Silver} de poder.` },
       "Sinclair": { name: "Ilusionismo", text: () => "Uma vez por partida, pode se mover deixando uma ilusão no local de origem (metade do poder, sem habilidade).", master: () => "A ilusão tem o poder inteiro." },
       "Solomon": { name: "Xeque-mate", text: (v) => `Se o seu lado deste local estiver cheio, ganha +${v}.`, master: () => "Funciona com 1 carta a menos." },
       "The Doorman": { name: "Portas do Hotel", text: () => "Escolha outro local: no próximo turno, até 2 cartas suas daqui e de lá podem viajar entre os dois.", master: () => "Elas ganham +1 ao viajar." },
@@ -116,7 +116,7 @@ export const GAME_TEXT = strings<GameText>({
       "Viscous": { name: "O Cubo", text: (v) => `Seu aliado mais fraco aqui (ou o próprio Viscous) fica imune a efeitos inimigos e ganha +${v}.`, master: () => "Protege também um segundo aliado daqui." },
       "Vyper": { name: "Olhar Petrificante", text: () => "Petrifica a próxima carta inimiga revelada aqui: ela perde a habilidade e não pode ser movida.", master: () => "Ela também perde 2." },
       "Warden": { name: "Força de Vontade", text: (v) => `Ganha +${v} para cada carta inimiga aqui.`, master: () => "Última Resistência: no fim da partida, cada inimiga daqui perde 1." },
-      "Wraith": { name: "Telecinese", text: () => "Ergue a carta inimiga mais forte daqui: o poder dela conta como 0 até o fim do próximo turno, ou até um Suporte inimigo ser revelado aqui.", master: () => "Se você estiver perdendo aqui no fim do próximo turno, a Wraith vai para outro local aleatório." },
+      "Wraith": { name: "Telecinese", text: () => `Ergue a inimiga mais forte daqui com até ${REMOVAL_CAP.Wraith} de poder: ela conta como 0 até o fim do próximo turno.`, master: () => "Se você estiver perdendo aqui no fim do próximo turno, a Wraith vai para outro local aleatório." },
       "Yamato": { name: "Transformação Sombria", text: (v) => `Se você estiver perdendo aqui, ganha +${v} e fica imune a efeitos inimigos.`, master: () => "Se ainda estiver perdendo no fim do próximo turno, pode ir para outro local com inimigas." },
       self: { name: "Fortalecer a si", text: (v) => `Ganha +${v} de poder.`, master: () => "" },
       hit: { name: "Enfraquecer inimigo", text: (v) => `Uma carta inimiga aleatória daqui perde ${v}.`, master: () => "" },
@@ -397,7 +397,7 @@ export const GAME_TEXT = strings<GameText>({
     abilities: {
       "Abrams": { name: "Shoulder Charge", text: (v) => `Pushes the strongest enemy card here to another location. If there's no room, it hits the wall and loses ${v}.`, master: () => "If it hits the wall, Abrams gains +2." },
       "Apollo": { name: "Riposte", text: (v) => `The first enemy effect that would lower his power is canceled, and the card that caused it loses ${v}.`, master: () => "Cancels the first two effects." },
-      "Baba": { name: "Flock", text: (v) => `Turns the most expensive enemy card here into a Pigeon with ${v} power and no ability.`, master: () => "If it cost 6 or more, Baba gains +3." },
+      "Baba": { name: "Flock", text: (v) => `Turns the most expensive enemy here with up to ${REMOVAL_CAP.Baba} power into a Pigeon with ${v} power and no ability.`, master: () => "If it cost 6 or more, Baba gains +3." },
       "Bebop": { name: "Hook", text: () => "The next card your opponent reveals is pulled to this location.", master: () => "It loses 2 on arrival and can't leave." },
       "Billy": { name: "Chain Gang", text: (v) => `Chains the strongest enemy card here: it loses ${v} and can no longer be moved.`, master: () => "It also loses its ability." },
       "Calico": { name: "Return to Shadows", text: (v) => `At the end of next turn, she ults: enemy cards here lose ${v} and Calico becomes immune.`, master: () => "After the ult, she can move once until the end of the following turn." },
@@ -412,7 +412,7 @@ export const GAME_TEXT = strings<GameText>({
       "Infernus": { name: "Afterburn", text: (v) => `The strongest enemy card here burns −${v} at the end of this turn and the next.`, master: () => "Concussive Combustion: it also loses its ability and can't be moved until the end of next turn." },
       "Ivy": { name: "Watcher's Covenant", text: (v) => `Links to your strongest ally at another location: both gain +${v}.`, master: () => "Both become immune until the end of next turn." },
       "Kelvin": { name: "Frozen Shelter", text: () => "Heals every allied card here back to its original power.", master: () => "Enemies here whose main attribute is Aim lose 2." },
-      "Lady Geist": { name: "Soul Exchange", text: (v) => `Swaps power with the strongest enemy card here (if it's higher): she takes up to ${v} power from it.`, master: () => "After the swap, the enemy loses 2 more." },
+      "Lady Geist": { name: "Soul Exchange", text: (v) => `Swaps power with the strongest enemy here with up to ${REMOVAL_CAP["Lady Geist"]} power (if it's higher): she takes up to ${v} from it.`, master: () => "After the swap, the enemy loses 2 more." },
       "Lash": { name: "Death Slam", text: (v) => `Throws up to 2 enemy cards from here to another location; they lose ${v}.`, master: () => "Choose which location they go to." },
       "McGinnis": { name: "Mini Turret", text: (v) => `Builds a Turret with ${v} power at another of your locations.`, master: () => "The Turret has at least 4 power." },
       "Mina": { name: "Love Bites", text: (v) => `At the end of this turn and the next 2, drains ${v} from an enemy card here into Mina.`, master: () => "After revealing, she can move once until the end of next turn." },
@@ -426,7 +426,7 @@ export const GAME_TEXT = strings<GameText>({
       "Rem": { name: "Nap Time", text: (v) => `Enemy cards here fall asleep: −${v} until the end of next turn.`, master: () => "While they sleep, your cards here have +1." },
       "Seven": { name: "Storm Cloud", text: (v) => `Channeled: at the end of this turn and the next, each enemy card here loses ${v}. Ends if Seven is moved, stunned, loses his ability or takes damage.`, master: () => "Unstoppable: the storm isn't interrupted and Seven takes no debuffs." },
       "Shiv": { name: "Killing Blow", text: (v) => `Destroys the weakest enemy card here if it has ${v} or less power.`, master: () => "If he destroys one, he strikes again (once)." },
-      "Silver": { name: "Lycan Curse", text: (v) => `If she takes damage, at the end of next turn she becomes a werewolf: +${v} permanently.`, master: () => "On turning, destroys the weakest enemy card here." },
+      "Silver": { name: "Lycan Curse", text: (v) => `If she takes damage, at the end of next turn she becomes a werewolf: +${v} permanently.`, master: () => `On turning, destroys the weakest enemy here with up to ${REMOVAL_CAP.Silver} power.` },
       "Sinclair": { name: "Illusionism", text: () => "Once per match, he can move and leave an illusion behind (half his power, no ability).", master: () => "The illusion has his full power." },
       "Solomon": { name: "Checkmate", text: (v) => `If your side of this location is full, gains +${v}.`, master: () => "Works with 1 card fewer." },
       "The Doorman": { name: "Hotel Doors", text: () => "Choose another location: next turn, up to 2 of your cards here and there can travel between the two.", master: () => "They gain +1 when they travel." },
@@ -437,7 +437,7 @@ export const GAME_TEXT = strings<GameText>({
       "Viscous": { name: "The Cube", text: (v) => `Your weakest ally here (or Viscous himself) becomes immune to enemy effects and gains +${v}.`, master: () => "Also protects a second ally here." },
       "Vyper": { name: "Petrifying Gaze", text: () => "Petrifies the next enemy card revealed here: it loses its ability and can't be moved.", master: () => "It also loses 2." },
       "Warden": { name: "Willpower", text: (v) => `Gains +${v} for each enemy card here.`, master: () => "Last Stand: at the end of the match, each enemy here loses 1." },
-      "Wraith": { name: "Telekinesis", text: () => "Lifts the strongest enemy card here: its power counts as 0 until the end of next turn, or until an enemy Support is revealed here.", master: () => "If you're losing here at the end of next turn, Wraith moves to a random location." },
+      "Wraith": { name: "Telekinesis", text: () => `Lifts the strongest enemy here with up to ${REMOVAL_CAP.Wraith} power: it counts as 0 until the end of next turn.`, master: () => "If you're losing here at the end of next turn, Wraith moves to a random location." },
       "Yamato": { name: "Shadow Transformation", text: (v) => `If you're losing here, gains +${v} and becomes immune to enemy effects.`, master: () => "If you're still losing at the end of next turn, she can move to another location with enemies." },
       self: { name: "Empower self", text: (v) => `Gains +${v} power.`, master: () => "" },
       hit: { name: "Weaken enemy", text: (v) => `A random enemy card here loses ${v}.`, master: () => "" },
@@ -718,7 +718,7 @@ export const GAME_TEXT = strings<GameText>({
     abilities: {
       "Abrams": { name: "Embestida", text: (v) => `Empuja la carta enemiga más fuerte de aquí a otro lugar. Si no hay espacio, choca contra la pared y pierde ${v}.`, master: () => "Si choca contra la pared, Abrams gana +2." },
       "Apollo": { name: "Riposte", text: (v) => `El primer efecto enemigo que le quitaría poder se anula, y la carta que lo causó pierde ${v}.`, master: () => "Anula los dos primeros efectos." },
-      "Baba": { name: "Bandada", text: (v) => `Convierte la carta enemiga más cara de aquí en una Paloma con ${v} de poder y sin habilidad.`, master: () => "Si costaba 6 o más, Baba gana +3." },
+      "Baba": { name: "Bandada", text: (v) => `Convierte a la enemiga más cara de aquí con hasta ${REMOVAL_CAP.Baba} de poder en una Paloma con ${v} de poder y sin habilidad.`, master: () => "Si costaba 6 o más, Baba gana +3." },
       "Bebop": { name: "Gancho", text: () => "La próxima carta que revele el rival es arrastrada a este lugar.", master: () => "Pierde 2 al llegar y no puede salir de aquí." },
       "Billy": { name: "Banda de la Cadena", text: (v) => `Encadena la carta enemiga más fuerte de aquí: pierde ${v} y ya no se puede mover.`, master: () => "También pierde su habilidad." },
       "Calico": { name: "Regreso a las Sombras", text: (v) => `Al final del próximo turno, usa su definitiva: las cartas enemigas de aquí pierden ${v} y Calico queda inmune.`, master: () => "Después de la definitiva, puede moverse una vez hasta el final del turno siguiente." },
@@ -733,7 +733,7 @@ export const GAME_TEXT = strings<GameText>({
       "Infernus": { name: "Postcombustión", text: (v) => `La carta enemiga más fuerte de aquí arde −${v} al final de este turno y del próximo.`, master: () => "Combustión Contundente: también pierde su habilidad y no se puede mover hasta el final del próximo turno." },
       "Ivy": { name: "Pacto del Vigía", text: (v) => `Se une a tu aliado más fuerte en otro lugar: los dos ganan +${v}.`, master: () => "Los dos quedan inmunes hasta el final del próximo turno." },
       "Kelvin": { name: "Refugio Helado", text: () => "Cura todas las cartas aliadas de aquí a su poder original.", master: () => "Las enemigas de aquí con Puntería como atributo principal pierden 2." },
-      "Lady Geist": { name: "Intercambio de Almas", text: (v) => `Intercambia poder con la carta enemiga más fuerte de aquí (si es mayor): le quita hasta ${v} de poder.`, master: () => "Después del intercambio, la enemiga pierde 2 más." },
+      "Lady Geist": { name: "Intercambio de Almas", text: (v) => `Intercambia poder con la enemiga más fuerte de aquí con hasta ${REMOVAL_CAP["Lady Geist"]} de poder (si es mayor): le quita hasta ${v}.`, master: () => "Después del intercambio, la enemiga pierde 2 más." },
       "Lash": { name: "Golpe Mortal", text: (v) => `Lanza hasta 2 cartas enemigas de aquí a otro lugar; pierden ${v}.`, master: () => "Elige a qué lugar van." },
       "McGinnis": { name: "Mini Torreta", text: (v) => `Monta una Torreta con ${v} de poder en otro de tus lugares.`, master: () => "La Torreta tiene al menos 4 de poder." },
       "Mina": { name: "Mordiscos de Amor", text: (v) => `Al final de este turno y de los 2 siguientes, drena ${v} de una carta enemiga de aquí para Mina.`, master: () => "Después de revelarse, puede moverse una vez hasta el final del próximo turno." },
@@ -747,7 +747,7 @@ export const GAME_TEXT = strings<GameText>({
       "Rem": { name: "Hora de la Siesta", text: (v) => `Las cartas enemigas de aquí se duermen: −${v} hasta el final del próximo turno.`, master: () => "Mientras duermen, tus cartas de aquí tienen +1." },
       "Seven": { name: "Nube de Tormenta", text: (v) => `Canalizada: al final de este turno y del próximo, cada carta enemiga de aquí pierde ${v}. Termina si Seven es movido, aturdido, pierde su habilidad o recibe daño.`, master: () => "Imparable: la tormenta no se interrumpe y Seven no recibe debuffs." },
       "Shiv": { name: "Golpe Letal", text: (v) => `Destruye la carta enemiga más débil de aquí si tiene ${v} o menos de poder.`, master: () => "Si destruye, ataca de nuevo (una vez)." },
-      "Silver": { name: "Maldición Licántropa", text: (v) => `Si recibe daño, al final del próximo turno se convierte en loba: +${v} permanente.`, master: () => "Al transformarse, destruye la carta enemiga más débil de aquí." },
+      "Silver": { name: "Maldición Licántropa", text: (v) => `Si recibe daño, al final del próximo turno se convierte en loba: +${v} permanente.`, master: () => `Al transformarse, destruye a la enemiga más débil de aquí con hasta ${REMOVAL_CAP.Silver} de poder.` },
       "Sinclair": { name: "Ilusionismo", text: () => "Una vez por partida, puede moverse dejando una ilusión en el lugar de origen (mitad del poder, sin habilidad).", master: () => "La ilusión tiene todo su poder." },
       "Solomon": { name: "Jaque Mate", text: (v) => `Si tu lado de este lugar está lleno, gana +${v}.`, master: () => "Funciona con 1 carta menos." },
       "The Doorman": { name: "Puertas del Hotel", text: () => "Elige otro lugar: el próximo turno, hasta 2 cartas tuyas de aquí y de allí pueden viajar entre los dos.", master: () => "Ganan +1 al viajar." },
@@ -758,7 +758,7 @@ export const GAME_TEXT = strings<GameText>({
       "Viscous": { name: "El Cubo", text: (v) => `Tu aliado más débil de aquí (o el propio Viscous) queda inmune a efectos enemigos y gana +${v}.`, master: () => "También protege a un segundo aliado de aquí." },
       "Vyper": { name: "Mirada Petrificante", text: () => "Petrifica la próxima carta enemiga revelada aquí: pierde su habilidad y no se puede mover.", master: () => "También pierde 2." },
       "Warden": { name: "Fuerza de Voluntad", text: (v) => `Gana +${v} por cada carta enemiga aquí.`, master: () => "Última Resistencia: al final de la partida, cada enemiga de aquí pierde 1." },
-      "Wraith": { name: "Telequinesis", text: () => "Levanta la carta enemiga más fuerte de aquí: su poder cuenta como 0 hasta el final del próximo turno, o hasta que se revele aquí un Soporte enemigo.", master: () => "Si vas perdiendo aquí al final del próximo turno, Wraith va a otro lugar al azar." },
+      "Wraith": { name: "Telequinesis", text: () => `Levanta a la enemiga más fuerte de aquí con hasta ${REMOVAL_CAP.Wraith} de poder: cuenta como 0 hasta el final del próximo turno.`, master: () => "Si vas perdiendo aquí al final del próximo turno, Wraith va a otro lugar al azar." },
       "Yamato": { name: "Transformación Sombría", text: (v) => `Si vas perdiendo aquí, gana +${v} y queda inmune a efectos enemigos.`, master: () => "Si sigues perdiendo al final del próximo turno, puede ir a otro lugar con enemigas." },
       self: { name: "Reforzarse", text: (v) => `Gana +${v} de poder.`, master: () => "" },
       hit: { name: "Debilitar enemigo", text: (v) => `Una carta enemiga al azar de aquí pierde ${v}.`, master: () => "" },

@@ -3,7 +3,7 @@
 import { getPlayerOvr } from "../cards";
 import type { Player } from "../types";
 import {
-  ABILITIES, ITEMS, ITEM_KEYS, SHOPS, MASTERY_BONUS, PRO_ON_POWER, phaseOf, CAP_PER_COST, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
+  ABILITIES, ITEMS, ITEM_KEYS, SHOPS, MASTERY_BONUS, PRO_ON_POWER, phaseOf, REMOVAL_CAP, DOOR_MAX, MINA_TURNS, VIOLET_MAX, ROLE_ABILITY, cardStats, heroStat, itemCost, itemStats, mastery,
   sanitizeHeroPool, type AbilityKey, type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type ItemTier, type LocType, type Mastery, type PoolCard, type StatKey,
 } from "./config";
 
@@ -333,8 +333,8 @@ export class Match {
   private pickFoe = (a: GCard[]) => this.sh(a)[0] ?? null;
   private pickLoc = (from: Loc, s: Side) => this.sh(this.loc.filter((L) => L !== from && this.room(L, s)))[0];
   private losing = (s: Side, l: Loc) => this.total(l, s) < this.total(l, opp(s));
-  /** Alvos dentro do teto de remoção da carta (poder até CAP_PER_COST × custo). */
-  private capped = (src: GCard, a: GCard[]) => a.filter((x) => this.pow(x) <= CAP_PER_COST * Math.max(1, src.cost));
+  /** Alvos dentro do teto de remoção da habilidade (o número vem escrito na carta). */
+  private capped = (k: keyof typeof REMOVAL_CAP, a: GCard[]) => a.filter((x) => this.pow(x) <= REMOVAL_CAP[k]);
   private raw = (c: GCard) => c.base + c.bonus;
   /** Alvos da Nurse Harrow (constante): a inimiga mais forte e o aliado mais fraco daqui, pelo poder sem auras (evita recursão). */
   private harrow(o: GCard, l: Loc) {
@@ -398,13 +398,17 @@ export class Match {
   }
   /** Zerada por efeitos (com algum poder impresso, sem estar entocada nem erguida): sai da partida. */
   private zeroed = (c: GCard, l: Loc) => c.rev && c.base > 0 && !c.st.burrow && !((c.st.stun ?? 0) >= this.t) && this.pow(c, l) <= 0;
-  /** Elimina as cartas zeradas. No Cemitério, voltam para a mão em vez disso. */
+  /** Elimina as cartas zeradas. No Cemitério, voltam para a mão em vez disso. Repete enquanto alguém sair, porque as auras
+   *  (Nurse Harrow, Victor, Paige...) mudam de alvo e podem zerar outra carta. */
   private sweep() {
-    this.loc.forEach((l) => (["p", "a"] as Side[]).forEach((s) => [...l.s[s]].forEach((c) => {
-      if (!this.zeroed(c, l)) return;
-      if (this.ty(l, "grave")) return this.toHand(c, l);
-      if (this.destroy(c)) this.say({ k: "zero", c: this.N(c), loc: l.L.name });
-    })));
+    for (let gone = true; gone;) {
+      gone = false;
+      this.loc.forEach((l) => (["p", "a"] as Side[]).forEach((s) => [...l.s[s]].forEach((c) => {
+        if (!this.zeroed(c, l)) return;
+        if (this.ty(l, "grave")) { this.toHand(c, l); gone = true; return; }
+        if (this.destroy(c)) { this.say({ k: "zero", c: this.N(c), loc: l.L.name }); gone = true; }
+      })));
+    }
   }
   total = (l: Loc, s: Side) => {
     const mine = l.s[s].filter((c) => c.rev);
@@ -453,7 +457,7 @@ export class Match {
     from.s[c.side].splice(from.s[c.side].indexOf(c), 1);
     to.s[c.side].push(c);
     this.interrupt(c);
-    if (this.ty(to, "arrive")) c.bonus += to.L.v;
+    if (this.ty(to, "arrive")) this.as({ k: "loc", loc: to.L.name }, () => { c.bonus += to.L.v; });
     return true;
   }
   private destroy(c: GCard): boolean {
@@ -494,7 +498,7 @@ export class Match {
       if (!l || c.st.wolf) return;
       c.st.wolf = true;
       c.bonus += c.v;
-      const t = this.master(c) ? this.weakest(this.capped(c, this.tg(this.foes(c, l)))) : null;
+      const t = this.master(c) ? this.weakest(this.capped("Silver", this.tg(this.foes(c, l)))) : null;
       this.say({ k: "wolf", c: this.N(c), t: t && this.destroy(t) ? this.N(t) : undefined });
     }), c.st.wolfAt);
   }
@@ -608,7 +612,7 @@ export class Match {
     } },
     "Apollo": { r: (c, _l, v) => { c.st.rip = this.master(c) ? 2 : 1; c.st.ripV = v; } },
     "Baba": { r: (c, l, v) => {
-      const t = this.best(this.sh(this.capped(c, this.tg(this.foes(c, l)))), (x) => x.cost);
+      const t = this.best(this.sh(this.capped("Baba", this.tg(this.foes(c, l)))), (x) => x.cost);
       if (!t) return;
       this.say({ k: "pigeon", t: this.N(t) });
       if (this.master(c) && t.cost >= 6) c.bonus += 3;
@@ -618,7 +622,8 @@ export class Match {
     "Bebop": { r: (c, l) => { this.hook[opp(c.side)] = { i: this.idx(l), m: this.master(c) }; this.say({ k: "hook", c: this.N(c), loc: l.L.name }); } },
     "Billy": { r: (c, l, v) => {
       const t = this.strongest(this.tg(this.foes(c, l)));
-      if (!t || !(this.hurt(t, v, c) || v === 0)) return;
+      // no Santuário ela não perde poder, mas a corrente prende mesmo assim
+      if (!t || !(this.hurt(t, v, c) || v === 0 || this.ty(l, "shrine"))) return;
       t.st.chained = true;
       if (this.master(c)) this.silence(t);
       this.say({ k: "chain", c: this.N(c), t: this.N(t) });
@@ -718,7 +723,7 @@ export class Match {
       this.say({ k: "kelvin", loc: l.L.name });
     } },
     "Lady Geist": { r: (c, l, v) => {
-      const t = this.strongest(this.capped(c, this.tg(this.foes(c, l))));
+      const t = this.strongest(this.capped("Lady Geist", this.tg(this.foes(c, l))));
       if (!t) return;
       const d = Math.min(v, this.pow(t, l) - this.pow(c, l));
       if (d <= 0 || !this.hurt(t, d, c)) return;
@@ -822,7 +827,7 @@ export class Match {
     } },
     "Vyper": { r: (c, l) => { l.petri[opp(c.side)] = { m: this.master(c) }; this.say({ k: "trap", c: this.N(c), loc: l.L.name }); } },
     "Wraith": { r: (c, l) => {
-      const t = this.strongest(this.tg(this.foes(c, l)));
+      const t = this.strongest(this.capped("Wraith", this.tg(this.foes(c, l))));
       if (t) { t.st.stun = this.t + 1; this.interrupt(t); this.say({ k: "wraith", c: this.N(c), t: this.N(t) }); }
       if (!this.master(c)) return;
       this.later(() => {

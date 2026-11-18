@@ -597,16 +597,17 @@ describe("balanceamento das habilidades", () => {
     return c;
   };
 
-  it("a Wraith ergue a inimiga mais forte daqui, sem teto de remoção", () => {
+  it("a Wraith ergue a inimiga mais forte daqui com até 8 de poder", () => {
     const { m, put } = arena();
     const big = dummy(put, "a", 0, 20);
-    const mid = dummy(put, "a", 0, 9);
-    const w = put(pc("w", "Wraith", flat(70)), "p", 0);
-    expect(w.cost).toBe(7);
-    expect(m.pow(big)).toBe(0);
-    expect(m.pow(mid)).toBe(9);
+    const mid = dummy(put, "a", 0, 8);
+    const low = dummy(put, "a", 0, 5);
+    put(pc("w", "Wraith", flat(70)), "p", 0);
+    expect(m.pow(big)).toBe(20);
+    expect(m.pow(mid)).toBe(0);
+    expect(m.pow(low)).toBe(5);
     // erguida conta como 0, mas não é eliminada
-    expect(m.locOf(big)).toBeTruthy();
+    expect(m.locOf(mid)).toBeTruthy();
   });
 
   it("Lady Geist troca no máximo o valor da habilidade", () => {
@@ -1240,6 +1241,36 @@ describe("poder zerado e origem dos efeitos", () => {
     m.endOfTurn();
     expect(m.locOf(zero)).toBeTruthy();
     expect(m.locOf(mk)).toBeTruthy();
+  });
+
+  it("a eliminação se repete quando uma aura muda de alvo e zera outra carta", () => {
+    const { m, put } = arena();
+    const a = dummy(put, "p", 0, 3, "a"), b = dummy(put, "p", 0, 2, "b");
+    const n = put(pc("n", "Nurse Harrow", flat(70)), "a", 0);
+    n.v = 2;
+    expect([m.pow(a), m.pow(b)]).toEqual([1, 2]);
+    a.bonus = -1;
+    m.endOfTurn();
+    expect(m.locOf(a)).toBeUndefined();
+    expect(m.locOf(b)).toBeUndefined();
+  });
+
+  it("Billy acorrenta no Santuário mesmo sem tirar poder", () => {
+    const { m, put } = arena();
+    m.loc[0].L = { ...m.loc[0].L, type: "shrine" };
+    const t = dummy(put, "a", 0, 5, "t");
+    put(pc("b", "Billy", flat(70)), "p", 0);
+    expect(m.pow(t)).toBe(5);
+    expect(t.st.chained).toBe(true);
+  });
+
+  it("Baba só transforma inimigas até o teto escrito na carta", () => {
+    const { put } = arena();
+    const big = dummy(put, "a", 0, 17, "big"), ok = dummy(put, "a", 0, 16, "ok");
+    big.cost = 9; ok.cost = 2;
+    put(pc("b", "Baba", flat(70)), "p", 0);
+    expect(big.p.token).toBeUndefined();
+    expect(ok.p.token).toBe("pigeon");
   });
 
   it("a caixa do poder mostra cada efeito com a origem", () => {

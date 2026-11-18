@@ -181,8 +181,8 @@ export function heroCard(hero: AbilityKey, heroes: GameConfig["heroes"] = {}): H
   return { cost: o.cost ?? d.cost, prof: o.prof ?? d.prof, base: o.base ?? d.base };
 }
 
-/** Teto de remoção: zerar, transformar, destruir ou trocar poder só pega alvos com até CAP_PER_COST × o custo da carta. */
-export const CAP_PER_COST = 2;
+/** Teto de remoção, escrito na carta: zerar, transformar, destruir ou trocar poder só pega inimigas com até este poder. */
+export const REMOVAL_CAP = { "Baba": 16, "Lady Geist": 10, "Silver": 12, "Wraith": 8 } as const satisfies Partial<Record<AbilityKey, number>>;
 /** Mina drena nos N turnos a partir do que revela; Violet ganha no máximo VIOLET_MAX; o portal do Doorman leva DOOR_MAX cartas. */
 export const MINA_TURNS = 3;
 export const VIOLET_MAX = 4;
