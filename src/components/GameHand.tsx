@@ -19,8 +19,11 @@ type Props = {
   onDrop: (c: GCard, i: number) => void;
   /** Carta sendo arrastada e o local sob o cursor, para acender os locais. */
   onDrag: (c: GCard | null, over: number | null) => void;
-  /** Abertura da mesa: as cartas sobem da borda de baixo uma a uma, a partir de `at` segundos, a cada `step`. */
-  deal?: { at: number; step: number };
+  /**
+   * Abertura da mesa: as `keep` primeiras (a mão inicial) sobem da borda de baixo uma a uma, a partir de `at` segundos,
+   * a cada `step`; as que chegam depois (a compra do primeiro turno) vêm do baralho como nos outros turnos.
+   */
+  deal?: { at: number; step: number; keep: number };
 };
 
 const RATIO = 430 / 295;
@@ -82,9 +85,9 @@ export function GameHand(p: Props) {
         <AnimatePresence initial={!!p.deal}>
           {p.cards.map((c, i) => (
             <motion.div key={c.id} className="absolute origin-bottom" style={{ top: TOP, left: cw / 2 - W / 2, width: W, zIndex: c.id === drag ? 60 : i === li ? 50 : i + 1 }}
-              initial={p.deal ? { x: pose(i).x, y: boxH + H, rotate: 0, opacity: 0 } : { x: cw / 2, y: -H, rotate: 25, opacity: 0 }}
+              initial={p.deal && i < p.deal.keep ? { x: pose(i).x, y: boxH + H, rotate: 0, opacity: 0 } : { x: cw / 2, y: -H, rotate: 25, opacity: 0 }}
               animate={{ ...pose(i), opacity: 1 }} exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.18 } }}
-              transition={p.deal ? { type: "spring", stiffness: 190, damping: 22, delay: p.deal.at + i * p.deal.step } : { type: "spring", stiffness: 380, damping: 30 }}>
+              transition={p.deal ? { type: "spring", stiffness: i < p.deal.keep ? 190 : 380, damping: i < p.deal.keep ? 22 : 30, delay: i < p.deal.keep ? p.deal.at + i * p.deal.step : 0 } : { type: "spring", stiffness: 380, damping: 30 }}>
               <HandCard c={c} p={p} zoomed={i === li} dragging={c.id === drag}
                 onHover={(on) => setHover((h) => (on ? c.id : h === c.id ? null : h))}
                 onDragState={(on) => { setDrag(on ? c.id : null); if (on) setHover(null); }} />

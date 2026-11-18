@@ -19,7 +19,7 @@ export const opp = (s: Side): Side => (s === "p" ? "a" : "p");
 export const TURNS = 8;
 export const HAND_MAX = 7;
 export const DECK_SIZE = 12;
-const START_HAND = 3;
+export const START_HAND = 3;
 const LOC_COUNT = 3;
 export const MIN_POOL = DECK_SIZE;
 /** Pool de heróis a partir deste valor: nunca perde a habilidade num duelo de espelho. */

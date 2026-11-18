@@ -15,7 +15,7 @@ import { ABILITIES, ITEMS, gameConfig, itemCost, locArtUrl, phaseOf, type Abilit
 import { DeckBuilder } from "../components/DeckBuilder";
 import { DeckPile } from "../components/DeckPile";
 import { versionPlayer, type DeckLook } from "../lib/game/deck";
-import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type PowPart, type Result, type Side, type Token } from "../lib/game/engine";
+import { MIN_POOL, Match, START_HAND, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type PowPart, type Result, type Side, type Token } from "../lib/game/engine";
 import { abilitySfx, slashSfx, startSfx } from "../lib/game/heroSfx";
 import { cardSfx, duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
@@ -84,6 +84,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const [game, setGame] = useState(0);
   // abertura da mesa: só no começo de uma partida (ao voltar para a aba no meio dela, a mesa já está posta)
   const [intro, setIntro] = useState(() => m.t === 1 && m.loc.every((l) => !l.s.p.length && !l.s.a.length));
+  // na abertura, a mão inicial chega primeiro e a compra do primeiro turno logo depois
+  const [drew, setDrew] = useState(!intro);
   // caixa de "Começou!" logo depois da abertura
   const [start, setStart] = useState(false);
   useEffect(() => {
@@ -95,7 +97,9 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       at(INTRO.comanda2, () => sfx("paper")),
       at(INTRO.side, () => sfx("shuffle", 0.6)),
       at(INTRO.orb, () => sfx("soul", 0.6)),
-      ...m.hand.map((_, i) => at(INTRO.hand + i * INTRO.handStep, () => sfx("hover"))),
+      ...m.hand.slice(0, START_HAND).map((_, i) => at(INTRO.hand + i * INTRO.handStep, () => sfx("hover"))),
+      // a compra do primeiro turno vem depois das três da mão inicial, como nos outros turnos
+      at(INTRO.draw, () => { setDrew(true); sfx("draw"); }),
       at(INTRO.done, () => { setIntro(false); setStart(true); startSfx(); }),
     ];
     return () => ts.forEach(clearTimeout);
@@ -264,6 +268,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     setM(newMatch());
     setGame((x) => x + 1);
     setIntro(true);
+    setDrew(false);
     sfx("shuffle");
     setSel(null);
     setLook(null);
@@ -664,7 +669,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
           </div>
         )}
         <section aria-label={t.ui.hand} className="relative z-10 order-last w-full min-w-0 sm:order-0 sm:w-auto sm:flex-1">
-          <GameHand deal={intro ? { at: INTRO.hand, step: INTRO.handStep } : undefined} cards={m.hand} selected={sel} disabled={m.busy || !!result}
+          <GameHand deal={intro ? { at: INTRO.hand, step: INTRO.handStep, keep: START_HAND } : undefined} cards={drew ? m.hand : m.hand.slice(0, START_HAND)} selected={sel} disabled={m.busy || !!result}
             playable={(c) => !m.busy && !result && m.loc.some((l) => !m.canPlay(c, l))}
             label={(c) => t.ui.cardLabel(name(c), c.cost, c.base)} tips={tipsOf} render={(c) => face(c, true, true)}
             onSelect={pickHand} onDrop={(c, i) => playCard(c, m.loc[i])} onDrag={(c, over) => { if (c && !drag) sfx("grab", 0.7); setDrag(c ? { c, over } : null); }} />
@@ -773,7 +778,7 @@ type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
 /** Cores das três faixas (amarela, azul e verde, como as lanes do mapa), em classes inteiras. */
 /** Abertura da mesa (segundos): os locais pousam um a um, entram as comandas e os baralhos, a orbe acende e a mão é dada carta a carta. */
-const INTRO = { lane: (i: number) => 0.2 + i * 0.27, comanda: 1.05, comanda2: 1.27, side: 1.5, orb: 1.75, hand: 2.0, handStep: 0.2, reveal: 3.1, done: 4.3 };
+const INTRO = { lane: (i: number) => 0.2 + i * 0.27, comanda: 1.05, comanda2: 1.27, side: 1.5, orb: 1.75, hand: 2.0, handStep: 0.2, draw: 2.95, reveal: 3.4, done: 4.5 };
 const INTRO_CLS = { drop: "intro-drop", up: "intro-up", left: "intro-left", right: "intro-right", pop: "intro-pop" } as const;
 
 /** Local durante o arrasto: fora, dá para soltar, sob a carta, ou escurecido (a carta está sobre outro). */
