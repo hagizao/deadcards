@@ -1,7 +1,8 @@
 // Áudio do Cardslock Game: efeitos (Kenney, CC0; ver src/assets/sfx/LICENSE.txt), baque sintetizado para cartas pesadas
-// e música de fundo ("Midnight on Miller Street", tcarisland, CC BY 4.0; ver src/assets/music/LICENSE.txt).
-// Volume e mudo de efeitos e música ficam separados e salvos no navegador.
+// música de fundo ("Midnight on Miller Street", tcarisland, CC BY 4.0) e conversa do bar (SSE Library, CC0); ver src/assets/music/LICENSE.txt.
+// O copo arrastando na madeira é sintetizado. Volume e mudo de efeitos, música e conversa ficam separados e salvos no navegador.
 import { useSyncExternalStore } from "react";
+import walla from "../../assets/music/bar-walla.mp3";
 import music from "../../assets/music/midnight-on-miller-street.mp3";
 import draw from "../../assets/sfx/draw.ogg";
 import endTurn from "../../assets/sfx/end-turn.ogg";
@@ -20,14 +21,15 @@ const FILES = { draw, endTurn, error, grab, land, loss, place, shuffle, slam, so
 export type Sfx = keyof typeof FILES;
 
 /** Volume e mudo de cada canal (0 a 1). */
-export type AudioPrefs = { sfx: number; music: number; sfxOn: boolean; musicOn: boolean };
+export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
 
 const KEY = "cardslock-audio";
 const SFX_BASE = 0.45;
 const MUSIC_BASE = 0.35;
+const AMB_BASE = 0.5;
 /** Quanto a música abaixa por baixo do resultado da partida. */
 const DUCK = 0.35;
-const DEFAULTS: AudioPrefs = { sfx: 0.8, music: 0.6, sfxOn: true, musicOn: true };
+const DEFAULTS: AudioPrefs = { sfx: 0.8, music: 0.6, amb: 0.5, sfxOn: true, musicOn: true, ambOn: true };
 
 function load(): AudioPrefs {
   if (typeof localStorage === "undefined") return DEFAULTS;
@@ -37,8 +39,9 @@ function load(): AudioPrefs {
     const old = localStorage.getItem("cardslock-mute") === "1";
     const n = (x: unknown, d: number) => (typeof x === "number" && x >= 0 && x <= 1 ? x : d);
     return {
-      sfx: n(v?.sfx, DEFAULTS.sfx), music: n(v?.music, DEFAULTS.music),
+      sfx: n(v?.sfx, DEFAULTS.sfx), music: n(v?.music, DEFAULTS.music), amb: n(v?.amb, DEFAULTS.amb),
       sfxOn: typeof v?.sfxOn === "boolean" ? v.sfxOn : !old, musicOn: typeof v?.musicOn === "boolean" ? v.musicOn : true,
+      ambOn: typeof v?.ambOn === "boolean" ? v.ambOn : true,
     };
   } catch {
     return DEFAULTS;
@@ -51,6 +54,13 @@ const cache = new Map<Sfx, HTMLAudioElement>();
 let ctx: AudioContext | null = null;
 
 const sfxLevel = () => (prefs.sfxOn ? prefs.sfx : 0);
+const hasCtx = () => typeof window !== "undefined" && "AudioContext" in window;
+/** Contexto de áudio único (criado no primeiro gesto do jogador). */
+function audioCtx() {
+  ctx ??= new AudioContext();
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  return ctx;
+}
 
 /** Toca um efeito (sem efeito com o canal mudo ou se o navegador bloquear). */
 export function sfx(name: Sfx, volume = 1) {
@@ -66,20 +76,135 @@ export function sfx(name: Sfx, volume = 1) {
 /** Baque grave para a carta pesada caindo na mesa. */
 export function thump(strength = 1) {
   const lv = sfxLevel();
-  if (!lv || typeof window === "undefined" || !("AudioContext" in window)) return;
-  ctx ??= new AudioContext();
-  const t = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const osc = c.createOscillator();
+  const gain = c.createGain();
   osc.type = "sine";
   osc.frequency.setValueAtTime(110, t);
   osc.frequency.exponentialRampToValueAtTime(38, t + 0.28);
   gain.gain.setValueAtTime(0.0001, t);
   gain.gain.exponentialRampToValueAtTime(0.5 * SFX_BASE * strength * lv, t + 0.015);
   gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
-  osc.connect(gain).connect(ctx.destination);
+  osc.connect(gain).connect(c.destination);
   osc.start(t);
   osc.stop(t + 0.42);
+}
+
+/* ---------- copo arrastando na madeira ---------- */
+let slide: { gain: GainNode; band: BiquadFilterNode; stop: () => void } | null = null;
+let slideIdle: ReturnType<typeof setTimeout> | null = null;
+
+function noise(c: AudioContext, sec: number) {
+  const b = c.createBuffer(1, Math.floor(c.sampleRate * sec), c.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return b;
+}
+
+/** Começa o arrasto: o som fica pronto e só aparece quando a carta anda (ver slideSpeed). */
+export function slideStart() {
+  if (slide || !sfxLevel() || !hasCtx()) return;
+  const c = audioCtx();
+  const src = c.createBufferSource();
+  src.buffer = noise(c, 2);
+  src.loop = true;
+  // fricção: ruído estreitado numa faixa grave-média, como vidro grosso raspando
+  const band = c.createBiquadFilter();
+  band.type = "bandpass"; band.frequency.value = 380; band.Q.value = 1.2;
+  const low = c.createBiquadFilter();
+  low.type = "lowpass"; low.frequency.value = 1800;
+  // veios da madeira: um ruído lento faz o volume tremer, como o fundo do copo pulando nas emendas
+  const grain = c.createBufferSource();
+  grain.buffer = noise(c, 2);
+  grain.loop = true;
+  const grainLow = c.createBiquadFilter();
+  grainLow.type = "lowpass"; grainLow.frequency.value = 25;
+  const grainAmt = c.createGain();
+  grainAmt.gain.value = 3;
+  const body = c.createGain();
+  body.gain.value = 0.7;
+  grain.connect(grainLow).connect(grainAmt).connect(body.gain);
+  const gain = c.createGain();
+  gain.gain.value = 0;
+  src.connect(band).connect(low).connect(body).connect(gain).connect(c.destination);
+  src.start();
+  grain.start();
+  slide = { gain, band, stop: () => { src.stop(); grain.stop(); } };
+}
+
+/** Velocidade do arrasto (px/s): mais rápido, mais alto e mais agudo. Parado, some. */
+export function slideSpeed(v: number) {
+  if (!slide || !ctx) return;
+  const k = Math.min(1, v / 1400);
+  const t = ctx.currentTime;
+  slide.gain.gain.setTargetAtTime(k * 2.5 * SFX_BASE * sfxLevel(), t, 0.04);
+  slide.band.frequency.setTargetAtTime(300 + k * 500, t, 0.05);
+  // sem movimento por um instante, o copo para
+  if (slideIdle) clearTimeout(slideIdle);
+  slideIdle = v > 0 ? setTimeout(() => slideSpeed(0), 90) : null;
+}
+
+/** Fim do arrasto: o som some rápido. */
+export function slideStop() {
+  if (slideIdle) { clearTimeout(slideIdle); slideIdle = null; }
+  if (!slide || !ctx) return;
+  const s = slide;
+  slide = null;
+  s.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.03);
+  setTimeout(s.stop, 250);
+}
+
+/* ---------- conversa do bar ---------- */
+let amb: { gain: GainNode; src: AudioBufferSourceNode } | null = null;
+let ambLoading = false;
+let ambOff: ReturnType<typeof setTimeout> | null = null;
+
+const ambGoal = () => (wanted && prefs.ambOn ? AMB_BASE * prefs.amb * duck : 0);
+
+/** Leva o volume da conversa até o alvo; sem ninguém ouvindo, desliga a fonte depois do fade. */
+function ambGlide(sec = 0.6) {
+  if (ambOff) { clearTimeout(ambOff); ambOff = null; }
+  if (!amb || !ctx) return;
+  const g = amb.gain.gain, t = ctx.currentTime, goal = ambGoal();
+  g.cancelScheduledValues(t);
+  g.setValueAtTime(g.value, t);
+  g.linearRampToValueAtTime(goal, t + sec);
+  if (goal === 0) {
+    ambOff = setTimeout(() => {
+      if (ambGoal() > 0 || !amb) return;
+      amb.src.stop();
+      amb = null;
+    }, sec * 1000 + 100);
+  }
+}
+
+/** Liga a conversa em loop pelo Web Audio (sem a emenda que o <audio> deixa no loop). */
+async function startAmb() {
+  if (amb) return ambGlide(1.2);
+  if (ambLoading || !hasCtx() || !ambGoal()) return;
+  ambLoading = true;
+  try {
+    const c = audioCtx();
+    const buf = await c.decodeAudioData(await (await fetch(walla)).arrayBuffer());
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    // corta as pontas (silêncio do MP3) para o loop não ter buraco
+    src.loopStart = 0.15;
+    src.loopEnd = buf.duration - 0.15;
+    const gain = c.createGain();
+    gain.gain.value = 0;
+    src.connect(gain).connect(c.destination);
+    src.start(0, 0.15);
+    amb = { gain, src };
+  } catch {
+    // sem conversa se o navegador não decodificar; o resto do áudio segue
+  } finally {
+    ambLoading = false;
+  }
+  ambGlide(1.2);
 }
 
 /* ---------- música ---------- */
@@ -116,22 +241,27 @@ export function startMusic() {
   wanted = true;
   if (!track) { track = new Audio(music); track.loop = true; track.volume = 0; fade = 0; }
   glide(1200);
+  startAmb();
 }
 /** Para a música com um fade curto (ao sair da tela do jogo). */
 export function stopMusic() {
   wanted = false;
   glide(400);
+  ambGlide(0.4);
 }
 /** Abaixa a música por baixo de um momento importante (resultado da partida). */
 export function duckMusic(on: boolean) {
   duck = on ? DUCK : 1;
   glide(500);
+  ambGlide(0.5);
 }
 
 export function setAudio(patch: Partial<AudioPrefs>) {
   prefs = { ...prefs, ...patch };
   localStorage.setItem(KEY, JSON.stringify(prefs));
   if ("music" in patch || "musicOn" in patch) glide(200);
+  if ("amb" in patch || "ambOn" in patch) { if (amb) ambGlide(0.2); else if (wanted) startAmb(); }
+  if (slide && !sfxLevel()) slideStop();
   subs.forEach((f) => f());
 }
 
