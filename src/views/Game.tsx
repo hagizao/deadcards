@@ -3,7 +3,7 @@ import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore,
 import { createPortal, flushSync } from "react-dom";
 import { CardBack, GameCard, TipBoxes, type Tip } from "../components/GameCard";
 import { AbilityFx, FxLayer, type Box, type FxScene } from "../components/AbilityFx";
-import { CHOREO, Rig } from "../lib/game/choreo";
+import { CHOREO, Rig, faceOf } from "../lib/game/choreo";
 import { GameHand } from "../components/GameHand";
 import { dropUnder, pointOf } from "../lib/game/drop";
 import { TargetArrow } from "../components/TargetArrow";
@@ -159,7 +159,9 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const [fxs, setFxs] = useState<{ k: number; ab: AbilityKey; scene: FxScene }[]>([]);
   const fxKey = useRef(0);
   const seen = useRef(new Map<number, { r: DOMRect; side: Side }>());
-  /** Roda um passo da partida e mostra o X nas cartas que saíram da mesa sem voltar para a mão. */
+  // a face de cada carta virada antes do passo, para a coreografia mostrar a carta como era
+  const faces = useRef(new Map<number, Element>());
+  /** Roda um passo da partida; volta as cartas que saíram da mesa sem voltar para a mão (para o X). */
   const watch = (f: () => void) => {
     const was = boardCards(m).filter((c) => c.rev).map((c) => ({ c, r: document.querySelector(`[data-card="${c.id}"]`)?.getBoundingClientRect() }));
     // todas as cartas da mesa (as viradas também, para o puxão do gancho saber de onde a carta saiu)
@@ -167,12 +169,22 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       const r = document.querySelector(`[data-card="${c.id}"]`)?.getBoundingClientRect();
       if (r) seen.current.set(c.id, { r, side: c.side });
     });
+    faces.current = new Map(was.flatMap(({ c }) => {
+      const face = faceOf(document.querySelector(`[data-card="${c.id}"]`));
+      return face ? [[c.id, face.cloneNode(true) as Element] as const] : [];
+    }));
     f();
     const on = new Set([...boardCards(m), ...m.hand, ...m.ahand, ...m.deck, ...m.adeck]);
-    const gone = was.filter((x): x is { c: GCard; r: DOMRect } => !!x.r && !on.has(x.c));
-    if (!gone.length) return;
-    setSlain((s) => [...s, ...gone]);
-    slashSfx();
+    return was.filter((x): x is { c: GCard; r: DOMRect } => !!x.r && !on.has(x.c));
+  };
+  /** O X nas cartas que saíram da mesa: na hora, ou no golpe da coreografia (`at`, em ms; negativo = a cena mostra). */
+  const bury = (gone: { c: GCard; r: DOMRect }[], at: Map<number, number> = new Map()) => {
+    const now = gone.filter((x) => !at.has(x.c.id));
+    if (now.length) { setSlain((s) => [...s, ...now]); slashSfx(); }
+    gone.forEach((x) => {
+      const ms = at.get(x.c.id);
+      if (ms !== undefined && ms >= 0) later(() => { setSlain((s) => [...s, x]); slashSfx(); }, ms);
+    });
   };
   const burns = m.burned.length;
   const heard = useRef(burns);
@@ -276,15 +288,15 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     const step = () => {
       if (i < queue.length) {
         const a = queue[i++];
-        watch(() => m.act(a));
+        const gone = watch(() => m.act(a));
         // já na tela: as coreografias precisam das cartas nos lugares novos
         flushSync(bump);
         if (!a.exec) land(a.c);
         // som da habilidade: logo depois de a carta tocar a mesa (ou na hora, na execução marcada da Shiv); a próxima
         // carta espera a coreografia acabar
-        return later(step, Math.max(REVEAL_MS, playHeard(a.exec ? 0 : FALL_MS[weight(a.c)] + 120)));
+        return later(step, Math.max(REVEAL_MS, playHeard(a.exec ? 0 : FALL_MS[weight(a.c)] + 120, gone)));
       }
-      watch(() => m.endOfTurn());
+      const gone = watch(() => m.endOfTurn());
       flushSync(bump);
       later(() => {
         if (m.over) {
@@ -303,7 +315,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
           later(() => sfx("soul", 0.8), 180);
         }
         bump();
-      }, Math.max(END_MS, playHeard(0)));
+      }, Math.max(END_MS, playHeard(0, gone)));
     };
     step();
   };
@@ -312,7 +324,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
    * Toca os sons das habilidades que funcionaram desde a última vez (cada habilidade uma vez, em sequência). A
    * habilidade de um herói com efeito sonoro enviado no editor toca o arquivo no lugar do som sintetizado.
    */
-  const playHeard = (wait: number) => {
+  const playHeard = (wait: number, gone: { c: GCard; r: DOMRect }[] = []) => {
     const heard = m.heard.splice(0);
     const abs = [...new Set(heard.map((h) => h.ab))].slice(0, 4);
     abs.forEach((ab, i) => {
@@ -323,25 +335,31 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     // outras, o efeito vai da carta que agiu até as cartas que ela mexeu (a sua e a do inimigo)
     let t = wait, end = 0;
     const taken = new Set<number>();
+    const doomed = new Map<number, number>();
+    const dead = new Set(gone.map((x) => x.c.id));
     const sideOf = new Map(boardCards(m).map((c) => [c.id, c.side]));
-    heard.slice(0, 6).forEach((h) => {
+    const old = (id: number) => { const r = seen.current.get(id)?.r; return r?.width ? boxOf(r) : null; };
+    const laneBox = (i: number | undefined) => { const r = i === undefined ? null : document.querySelector(`[data-drop="${i}"]`)?.getBoundingClientRect(); return r?.width ? boxOf(r) : null; };
+    heard.slice(0, 8).forEach((h) => {
       const recipe = still ? undefined : CHOREO[h.ab];
       if (!recipe) { playFx(h, t); t += 220; return; }
-      const rig = new Rig();
-      const dst = h.to.map((id) => ({ id, foe: (sideOf.get(id) ?? seen.current.get(id)?.side) !== h.side }));
-      // quem trocou de local fica parado onde estava até a cena levar a carta
-      dst.forEach((d) => {
-        const r = seen.current.get(d.id)?.r;
-        if (!taken.has(d.id) && r?.width) rig.hold(d.id, boxOf(r), d.foe);
+      const rig = new Rig(faces.current);
+      const dst = h.to.map((id) => ({ id, foe: (sideOf.get(id) ?? seen.current.get(id)?.side) !== h.side, from: dead.has(id) ? old(id) : null }));
+      // quem trocou de local (a que agiu também) fica parado onde estava até a cena levar a carta
+      [{ id: h.id, foe: false }, ...dst].forEach((d) => {
+        const was = old(d.id), now = document.querySelector(`[data-card="${d.id}"]`)?.getBoundingClientRect();
+        if (!taken.has(d.id) && was && now?.width && Math.hypot(now.left + now.width / 2 - was.x, now.top + now.height / 2 - was.y) > 4) rig.hold(d.id, was, d.foe);
         taken.add(d.id);
       });
-      const self = h.self, pull = h.ev === "pull";
-      const ms = recipe.ms(dst.length, self, pull);
-      const was = seen.current.get(h.id)?.r;
-      later(() => rig.start(h.ab, { id: h.id, box: was?.width ? boxOf(was) : null }, dst, self, pull, quake), t);
+      const ms = recipe.ms(dst.length, h.self, h.ev);
+      const hit = t + (recipe.hit?.(dst.length, h.self, h.ev) ?? ms / 2);
+      dst.forEach((d) => { if (dead.has(d.id) && !doomed.has(d.id)) doomed.set(d.id, recipe.kills ? -1 : hit); });
+      const alt = h.ab === "The Doorman" ? laneBox(m.portals.at(-1)?.b) : null;
+      later(() => rig.start(h.ab, { id: h.id, box: old(h.id) }, dst, { self: h.self, ev: h.ev, lane: laneBox(h.at), alt, shake: quake }), t);
       t += ms;
       end = Math.max(end, t + 150);
     });
+    bury(gone, doomed);
     return end;
   };
   /** Tremor da mesa nas coreografias, de 1 (leve) a 3 (forte). */
