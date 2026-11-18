@@ -153,3 +153,14 @@ describe("partidas aleatórias", () => {
     expect(issues).toEqual([]);
   });
 });
+
+describe("sons das habilidades", () => {
+  it("toda habilidade de herói tem som, e a partida registra as que funcionam", async () => {
+    const { HAS_SOUND } = await import("../src/lib/game/heroSfx");
+    expect(HEROES.filter((h) => !HAS_SOUND.has(h))).toEqual([]);
+    const issues: string[] = [];
+    const m = runMatch(7, issues);
+    expect(m.heard.length).toBeGreaterThan(0);
+    expect(m.heard.every((h) => ABILITIES[h.ab].kind !== "-")).toBe(true);
+  });
+});

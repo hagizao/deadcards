@@ -1202,6 +1202,18 @@ describe("Kelvin e Metrô", () => {
     expect(m.pow(far)).toBe(2);
   });
 
+  it("Kelvin solta a aliada erguida pela Wraith; um Suporte não solta mais", () => {
+    const { m, put } = arena();
+    const lifted = dummy(put, "p", 0, 6, "lifted");
+    lifted.st.stun = m.t + 1;
+    const sup = put({ ...pc("s", "Herói Novo", flat(70)), position: "Suporte" }, "p", 0);
+    sup.ab = "none";
+    expect(m.pow(lifted)).toBe(0);
+    put(pc("k", "Kelvin", flat(70)), "p", 0);
+    expect(m.pow(lifted)).toBe(lifted.base + lifted.bonus);
+    expect(lifted.st.stun).toBe(0);
+  });
+
   it("o Rato do Metrô aparece no Metrô e não sai de lá", () => {
     const { m, put } = arena();
     const metro = m.loc[0];

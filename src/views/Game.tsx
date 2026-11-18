@@ -14,6 +14,7 @@ import { DeckBuilder } from "../components/DeckBuilder";
 import { DeckPile } from "../components/DeckPile";
 import { versionPlayer, type DeckLook } from "../lib/game/deck";
 import { MIN_POOL, Match, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type PowPart, type Result, type Side, type Token } from "../lib/game/engine";
+import { abilitySfx } from "../lib/game/heroSfx";
 import { duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 import { useItemIcons } from "../lib/game/useItemIcons";
@@ -234,17 +235,16 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     const step = () => {
       if (i < queue.length) {
         const a = queue[i++];
-        const seen = m.log[0];
         m.act(a);
         bump();
         if (!a.exec) land(a.c);
-        // a faca da Shiv: logo depois de a carta tocar a mesa (ou na hora, na execução marcada)
-        const fresh = m.log.indexOf(seen) < 0 ? m.log : m.log.slice(0, m.log.indexOf(seen));
-        if (fresh.some((e) => e.k === "shiv")) later(() => sfx("knife"), a.exec ? 0 : FALL_MS[weight(a.c)] + 120);
+        // som da habilidade: logo depois de a carta tocar a mesa (ou na hora, na execução marcada da Shiv)
+        playHeard(a.exec ? 0 : FALL_MS[weight(a.c)] + 120);
         return later(step, REVEAL_MS);
       }
       m.endOfTurn();
       bump();
+      playHeard(0);
       later(() => {
         if (m.over) {
           const r = m.finish();
@@ -267,6 +267,11 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     step();
   };
 
+  /** Toca os sons das habilidades que funcionaram desde a última vez (cada habilidade uma vez, em sequência). */
+  const playHeard = (wait: number) => {
+    const abs = [...new Set(m.heard.splice(0).map((h) => h.ab))].slice(0, 4);
+    abs.forEach((ab, i) => later(() => abilitySfx(ab), wait + i * 260));
+  };
   /** Som (e tremor, nas pesadas) quando a carta revelada toca a mesa. */
   const land = (c: GCard) => {
     const w = weight(c);

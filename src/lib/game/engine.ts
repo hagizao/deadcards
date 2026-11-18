@@ -283,7 +283,21 @@ export class Match {
     return { id: ++this.uid, p: { name: "", hero: null, c1: "#44403c", c2: "#1c1917", token }, cost: 1, base: power, ab: "none", v: 0, desc: "", bonus: 0, side, rev: false, staged: false, st: nst(), tok: true, main: null, lvl: 0, top: 0, mv: [] };
   }
   private N = (c: GCard): Name => (c.p.token ? { token: c.p.token } : c.p.name);
-  private say(e: LogEntry) { this.log.unshift(e); this.log.length = Math.min(this.log.length, 3); }
+  private say(e: LogEntry) { this.said++; this.log.unshift(e); this.log.length = Math.min(this.log.length, 3); }
+  private said = 0;
+  /** Habilidades que funcionaram (mudaram algo na partida), em ordem, para a tela tocar o som de cada uma. A tela esvazia a lista. */
+  heard: { ab: AbilityKey; id: number; side: Side }[] = [];
+  /** Retrato do que uma habilidade pode mudar: cartas, status, mãos, locais, efeitos marcados e o log. */
+  private sig() {
+    const cards = this.loc.map((l) => [l.s.p, l.s.a].map((a) => a.map((c) => [c.id, c.base, c.bonus, c.v, c.p.token, c.st, c.mv])));
+    return JSON.stringify([cards, this.loc.map((l) => [l.trap, l.petri, l.lock, l.shield]), this.hand.length, this.ahand.length, this.pend.length, this.portals.length, this.hook, this.said]);
+  }
+  /** Roda a habilidade da carta e, se ela mudou alguma coisa, registra para o som. */
+  private fire(c: GCard, f: () => void) {
+    const before = this.sig();
+    f();
+    if (this.sig() !== before) this.heard.push({ ab: c.ab, id: c.id, side: c.side });
+  }
   private handOf = (s: Side) => (s === "p" ? this.hand : this.ahand);
   private later(f: () => void, t = this.t + 1) { this.pend.push({ t, f, cause: this.causes.at(-1) }); }
   private by = (c: GCard): Cause => ({ k: "from", n: this.N(c) });
@@ -711,13 +725,15 @@ export class Match {
       if (this.master(c)) { a.st.immU = this.t + 1; c.st.immU = this.t + 1; }
       this.say({ k: "ivy", c: this.N(c), t: this.N(a) });
     } },
-    // cura as aliadas daqui ao poder original: tira perdas de poder (fixas e temporárias) e queimaduras; os ganhos ficam
+    // cura as aliadas daqui ao poder original: tira perdas de poder (fixas e temporárias), queimaduras e a Telecinese; os ganhos ficam
     "Kelvin": { r: (c, l) => {
       l.s[c.side].filter((x) => x.rev).forEach((x) => {
         x.bonus = Math.max(0, x.bonus);
         x.st.tmp = x.st.tmp.filter((m) => m.v >= 0);
         x.st.burn = 0;
         x.st.tburn = [];
+        // o gelo também solta quem a Wraith ergueu
+        if ((x.st.stun ?? 0) >= this.t) { x.st.stun = 0; this.say({ k: "liftEnd", c: this.N(x) }); }
       });
       if (this.master(c)) this.foes(c, l).filter((t) => t.main === "MIR").forEach((t) => this.hurt(t, 2, c));
       this.say({ k: "kelvin", loc: l.L.name });
@@ -884,7 +900,7 @@ export class Match {
   private reReveal(c: GCard, n = 1) {
     for (let k = 0; k < n; k++) {
       const impl = this.IMPL[this.abilityOf(c)];
-      for (let i = 0, m = this.ty(this.locOf(c), "ritual") ? 2 : 1; i < m; i++) { const at = this.locOf(c); if (at && impl?.r) this.as(this.by(c), () => impl.r?.(c, at, c.v)); }
+      for (let i = 0, m = this.ty(this.locOf(c), "ritual") ? 2 : 1; i < m; i++) { const at = this.locOf(c); if (at && impl?.r) this.fire(c, () => this.as(this.by(c), () => impl.r?.(c, at, c.v))); }
     }
   }
   private cleanse(c: GCard) {
@@ -1242,12 +1258,12 @@ export class Match {
       if (this.ty(l, "ambush") && this.t >= l.L.n) c.bonus += l.L.v;
       if (this.ty(l, "teleport")) c.mv.push({ n: 1, u: TURNS, bonus: 0 });
     });
-    // um Suporte revelado solta os aliados erguidos pela Wraith
-    if (c.p.role === "Suporte") l.s[s].forEach((x) => { if (x !== c && (x.st.stun ?? 0) >= this.t) { x.st.stun = 0; this.say({ k: "liftEnd", c: this.N(x) }); } });
     this.as({ k: "mentor" }, () => this.mentor(c));
     this.as({ k: "duel" }, () => this.duel(c, here));
     const impl = this.IMPL[this.abilityOf(c)];
-    if (impl?.r) for (let i = 0, n = this.ty(l, "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) this.as(this.by(c), () => impl.r?.(c, at, c.v)); }
+    if (impl?.r) for (let i = 0, n = this.ty(l, "ritual") ? 2 : 1; i < n; i++) { const at = this.locOf(c); if (at) this.fire(c, () => this.as(this.by(c), () => impl.r?.(c, at, c.v))); }
+    // constante: toca só ao entrar em jogo, com a habilidade ativa
+    else if (ABILITIES[c.ab].kind === "c" && this.abilityOf(c) === c.ab && this.locOf(c)) this.heard.push({ ab: c.ab, id: c.id, side: s });
     // Teatro: uma cópia com o mesmo poder, sem habilidade
     const at = this.locOf(c);
     if (at && this.ty(at, "copy") && !c.tok && this.room(at, s)) {
@@ -1265,7 +1281,7 @@ export class Match {
       for (let i = 0, n = (c.st.cd ? 2 : 1) * (this.ty(l, "clock") ? 2 : 1); i < n; i++) {
         const L = this.locOf(c);
         const f = this.IMPL[this.abilityOf(c)]?.f;
-        if (c.rev && L === l && f) this.as(this.by(c), () => f(c, L, c.v));
+        if (c.rev && L === l && f) this.fire(c, () => this.as(this.by(c), () => f(c, L, c.v)));
       }
     }));
     this.sweep();
