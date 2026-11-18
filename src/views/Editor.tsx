@@ -76,12 +76,19 @@ const hear = (url: string | undefined, ab: AbilityKey) => (url ? void new Audio(
  * Efeito sonoro do herói: enviar (mp3, ogg, wav ou webm de até 1 MB), ouvir o atual (o que está salvo) e o novo (o
  * desta edição, antes de salvar), e voltar ao som sintetizado da habilidade.
  */
-function SoundPick({ url, saved, ab, onUrl }: { url?: string; saved?: string; ab: AbilityKey; onUrl: (url: string | undefined) => void }) {
+function SoundPick({ url, saved, ab, applying, onUrl, onApply }: {
+  url?: string; saved?: string; ab: AbilityKey; applying: boolean; onUrl: (url: string | undefined) => void; onApply: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button type="button" className={`${ghost} ${ring}`} onClick={() => hear(saved, ab)}>▶ Ouvir atual</button>
-      {url !== saved && <button type="button" className={`${primary} ${ring}`} onClick={() => hear(url, ab)}>▶ Ouvir novo</button>}
+      {url !== saved && (
+        <>
+          <button type="button" className={`${ghost} ${ring}`} onClick={() => hear(url, ab)}>▶ Ouvir novo</button>
+          <button type="button" className={`${primary} ${ring}`} disabled={applying} onClick={onApply}>{applying ? "Aplicando…" : "Aplicar no jogo"}</button>
+        </>
+      )}
       <label className={`${ghost} ${ring} inline-flex items-center gap-2 ${busy ? "cursor-wait opacity-50" : ""}`}>
         {busy ? "Enviando…" : url ? "Trocar som" : "Enviar som"}
         <input
@@ -815,6 +822,19 @@ function GameForm() {
     if (!Object.keys(o).length) delete heroes[k];
     return { ...c, heroes };
   });
+  /**
+   * Salva só o som deste herói, em cima do que já está salvo: vale na hora no jogo, sem levar junto as outras
+   * edições desta tela que ainda não foram salvas.
+   */
+  const applySound = (k: AbilityKey) => {
+    const base = gameConfig(settings.game);
+    const h: HeroOverride = { ...base.heroes[k] };
+    const sound = cfg.heroes[k]?.sound;
+    if (sound) h.sound = sound; else delete h.sound;
+    const heroes = { ...base.heroes, [k]: h };
+    if (!Object.keys(h).length) delete heroes[k];
+    run(() => api.save("settings", "game", { game: { ...base, heroes } }), sound ? `Som de ${k} aplicado: já vale na próxima habilidade.` : `${k} voltou ao som padrão.`);
+  };
   const resetCard = () => {
     if (!card) return;
     setCfg((c) => { const cards = { ...c.cards }; delete cards[card.id]; return { ...c, cards }; });
@@ -972,10 +992,11 @@ function GameForm() {
         </div>
         <div className="flex flex-col gap-2 rounded-2xl bg-zinc-950/40 p-4">
           <span className="text-sm font-bold text-zinc-100">{soundHero} <span className="text-xs font-normal text-zinc-400">· {GT.abilities[soundHero].name}</span></span>
-          <SoundPick url={cfg.heroes[soundHero]?.sound} saved={savedHeroes[soundHero]?.sound} ab={soundHero} onUrl={(sound) => setHero(soundHero, { sound })} />
+          <SoundPick url={cfg.heroes[soundHero]?.sound} saved={savedHeroes[soundHero]?.sound} ab={soundHero} applying={busy}
+            onUrl={(sound) => setHero(soundHero, { sound })} onApply={() => applySound(soundHero)} />
           <p className="text-xs text-zinc-400">
             {cfg.heroes[soundHero]?.sound ? "Som próprio enviado." : "Sem som próprio: usa o som padrão da habilidade."}
-            {cfg.heroes[soundHero]?.sound !== savedHeroes[soundHero]?.sound && <b className="text-game-brass"> Som alterado: salve o Cardslock Game para valer.</b>}
+            {cfg.heroes[soundHero]?.sound !== savedHeroes[soundHero]?.sound && <b className="text-game-brass"> Som novo ainda não vale no jogo: clique em Aplicar no jogo.</b>}
           </p>
         </div>
       </section>
