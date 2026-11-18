@@ -17,13 +17,13 @@ type Tone = Out & Env & {
   fm?: [ratio: number, index: number, indexTo?: number];
   drive?: number;
 };
-type Hiss = Out & Env & { f: number; to?: number; q?: number; type?: BiquadFilterType; brown?: boolean };
+type Hiss = Out & Env & { f: number; to?: number; q?: number; type?: BiquadFilterType; brown?: boolean; drive?: number };
 type Pluck = Out & { f: number; at?: number; dur: number; gain: number; bright?: number; drive?: number; lp?: number };
 type Partial3 = readonly (readonly [freq: number, gain: number, dur: number])[];
 
 const rooms = new WeakMap<BaseAudioContext, ConvolverNode>();
 /** Sala compartilhada: um impulso de ruído que decai, criado uma vez por contexto. */
-function room(c: AudioContext) {
+function room(c: BaseAudioContext) {
   let r = rooms.get(c);
   if (r) return r;
   r = c.createConvolver();
@@ -52,14 +52,27 @@ const driveCurve = (k: number) => {
 };
 
 /** Peças para montar os sons, todas passando por um compressor (o som fica cheio sem estourar) e pela sala. */
-function kit(strength: number) {
-  const v = voice(strength);
+function kit(strength: number, offline?: BaseAudioContext) {
+  const v: { c: BaseAudioContext; t: number; vol: number } | null = offline ? { c: offline, t: 0, vol: 0.36 * strength } : voice(strength);
   if (!v) return null;
   const { c, t } = v;
   const vol = v.vol * 1.6;
   const bus = c.createDynamicsCompressor();
   bus.threshold.value = -16; bus.knee.value = 12; bus.ratio.value = 5; bus.attack.value = 0.003; bus.release.value = 0.2;
-  bus.connect(c.destination);
+  const filt = (type: BiquadFilterType, f: number, q = 0.7) => { const b = c.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; };
+  // limitador no fim: nenhum som estoura, por mais camadas que junte
+  const lim = c.createDynamicsCompressor();
+  lim.threshold.value = -4; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.1;
+  lim.connect(c.destination);
+  bus.connect(lim);
+  // caixinhas de notebook e celular quase não tocam abaixo de 250 Hz: os harmônicos do grave (saturado e sem o grave
+  // em si) entram por cima, e o ouvido "completa" o grave que falta
+  const low = filt("lowpass", 200);
+  const sat = c.createWaveShaper();
+  sat.curve = driveCurve(4);
+  const exc = c.createGain();
+  exc.gain.value = 0.3;
+  bus.connect(low).connect(sat).connect(filt("highpass", 300)).connect(filt("highpass", 300)).connect(filt("lowpass", 1800)).connect(exc).connect(lim);
   const rv = room(c);
 
   const out = (n: AudioNode, s: number, dur: number, o: Out) => {
@@ -95,7 +108,6 @@ function kit(strength: number) {
     m.connect(g);
     return { in: m as AudioNode, out: g };
   };
-  const filt = (type: BiquadFilterType, f: number, q = 0.7) => { const b = c.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; };
 
   const tone = (o: Tone) => {
     const s = t + (o.at ?? 0);
@@ -135,7 +147,9 @@ function kit(strength: number) {
     fl.frequency.setValueAtTime(o.f, s);
     if (o.to) fl.frequency.exponentialRampToValueAtTime(o.to, s + o.dur);
     const g = amp(s, o);
-    src.connect(fl).connect(g.in);
+    let n: AudioNode = src.connect(fl);
+    if (o.drive) { const ws = c.createWaveShaper(); ws.curve = driveCurve(o.drive); n = n.connect(ws); }
+    n.connect(g.in);
     out(g.out, s, o.dur, o);
     src.start(s);
     src.stop(s + o.dur + 0.05);
@@ -178,10 +192,12 @@ function kit(strength: number) {
       osc.stop(s + dur + 0.02);
     }
   };
-  /** Batida grave (corpo) com o estalo do contato. */
+  /** Batida: o corpo grave, o "toc" médio (o que se ouve numa caixinha de som) e o estalo do contato. */
   const thud = (at: number, gain: number, f = 120, o: Out = {}) => {
-    tone({ f, to: f * 0.35, at, dur: 0.4, gain: gain * 1.1, ...o });
-    hiss({ f: 600, at, dur: 0.1, gain: gain * 0.9, brown: true, type: "lowpass", attack: 0.002, ...o });
+    tone({ f, to: f * 0.35, at, dur: 0.4, gain: gain * 0.9, ...o });
+    tone({ f: f * 3, to: f * 1.4, at, dur: 0.12, gain: gain * 0.3, type: "triangle", drive: 3, ...o });
+    hiss({ f: 700, at, dur: 0.1, gain: gain * 0.9, brown: true, type: "lowpass", attack: 0.002, ...o });
+    hiss({ f: 550, at, dur: 0.07, gain: gain * 0.7, q: 1.1, attack: 0.001, drive: 3, ...o });
   };
   const click = (at: number, gain: number, f = 3500, o: Out = {}) => hiss({ f, at, dur: 0.025, gain, q: 2, attack: 0.001, ...o });
   return { tone, hiss, pluck, bell, thud, click };
@@ -214,7 +230,19 @@ const ratchet = (k: Kit, at: number, n: number, gain: number, o: Out = {}) => {
 /** Explosão: o estouro, o corpo grave e a cauda na sala. */
 const boom = (k: Kit, at: number, gain: number, o: Out = {}) => {
   k.hiss({ f: 1200, to: 120, at, dur: 0.7, gain: gain * 1.6, brown: true, type: "lowpass", attack: 0.004, wet: 0.5, ...o });
+  k.hiss({ f: 700, to: 250, at, dur: 0.45, gain: gain * 0.9, q: 0.7, attack: 0.003, drive: 5, wet: 0.5, ...o });
   k.thud(at, gain * 1.2, 70, o);
+};
+/**
+ * Tiro de arma de fogo: o estalo seco do disparo, a explosão saturada nos médios (o "BAM" que a caixinha toca),
+ * o corpo grave e a cauda ecoando na sala. `wet` maior = tiro mais longe.
+ */
+const gunshot = (k: Kit, at: number, gain: number, o: Out = {}) => {
+  k.hiss({ f: 1800, at, dur: 0.012, gain: gain * 2.4, type: "highpass", attack: 0.0005, drive: 4, ...o });
+  k.hiss({ f: 900, to: 400, at, dur: 0.22, gain: gain * 2, q: 0.6, attack: 0.001, drive: 9, ...o });
+  k.tone({ f: 160, to: 55, at, dur: 0.22, gain: gain * 0.45, type: "sawtooth", lp: 2200, drive: 10, attack: 0.001, ...o });
+  k.thud(at, gain * 1.1, 90, o);
+  k.hiss({ f: 1600, to: 300, at: at + 0.01, dur: 1.1, gain: gain * 0.8, brown: true, type: "lowpass", attack: 0.01, wet: 0.9, ...o });
 };
 /** Cascalho caindo: pedrinhas em tempos e lados aleatórios. */
 const debris = (k: Kit, at: number, n: number, gain: number, spread = 0.4) => {
@@ -342,9 +370,7 @@ const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
   // Plataforma de Salto: um "yeehaw" assobiado, o tiro do revólver ecoando e as esporas tilintando
   "Holliday": (k) => {
     k.tone({ f: 1300, path: [[0, 1300], [0.18, 2300], [0.35, 1700], [0.55, 1100]], dur: 0.55, gain: 0.14, vib: [6, 25], attack: 0.04, hold: 0.2, wet: 0.4 });
-    k.hiss({ f: 2500, at: 0.65, dur: 0.06, gain: 1.8, type: "highpass", attack: 0.001 });
-    k.thud(0.65, 1.2, 110);
-    k.hiss({ f: 800, at: 0.65, dur: 0.8, gain: 0.6, brown: true, type: "lowpass", wet: 0.9 });
+    gunshot(k, 0.65, 0.9);
     ([[0.9, 0.4, -0.6], [1.15, 0.2, 0.6]] as const).forEach(([a, g, p]) => k.hiss({ f: 1800, at: a, dur: 0.06, gain: g, q: 0.6, pan: p, wet: 0.8 }));
     for (let i = 0; i < 6; i++) k.bell(1.05 + i * 0.05, [[rnd(4000, 5000), 0.1, 0.25], [rnd(6500, 7200), 0.05, 0.18]], 1, { pan: 0.3 });
   },
@@ -535,12 +561,9 @@ const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
     k.tone({ f: 120, at: 0.3, dur: 0.9, gain: 0.22, type: "sawtooth", fm: [3.3, 12, 2], lp: 3000, attack: 0.01, trem: [14, 0.5] });
     for (let i = 0; i < 8; i++) k.hiss({ f: 5000, at: rnd(0.3, 1.1), dur: 0.03, gain: 0.8, type: "highpass", attack: 0.001, pan: rnd(-0.7, 0.7) });
   },
-  // Assassinar: só o tiro, seco e alto
+  // Assassinar: o tiro do rifle de sniper, seco e alto, ecoando na sala
   "Vindicta": (k) => {
-    k.hiss({ f: 2500, dur: 0.07, gain: 2.2, type: "highpass", attack: 0.001, wet: 0.1 });
-    k.hiss({ f: 1200, dur: 0.12, gain: 1.4, q: 0.6, attack: 0.001, wet: 0.1 });
-    k.thud(0, 1.6, 100, { wet: 0.1 });
-    k.tone({ f: 70, to: 40, dur: 0.25, gain: 0.4, drive: 3 });
+    gunshot(k, 0, 1.2);
   },
   // Natureza-morta: o lápis rabisca rápido e um "plim"
   "Violet": (k) => {
@@ -598,10 +621,24 @@ const RECIPES: Partial<Record<AbilityKey, (k: Kit) => void>> = {
   aura: (k) => { [392, 494, 587].forEach((f) => k.tone({ f, dur: 0.7, gain: 0.07, type: "triangle", attack: 0.15, wet: 0.6 })); k.bell(0.1, GLASS(1175), 0.3, { wet: 0.6 }); },
 };
 
+/**
+ * Ajuste de volume de cada receita, em dB, para todas soarem com a mesma força numa caixinha de som (medido
+ * offline: energia acima de 250 Hz de cada uma, nivelada; o que falta aqui fica em 0).
+ */
+const TRIM: Partial<Record<AbilityKey, number>> = {
+  "Abrams": 1, "Apollo": -3, "Baba": 1.5, "Bebop": -4.5, "Billy": 1.5, "Calico": -1, "Celeste": 1, "Drifter": 2,
+  "Dynamo": 3, "Graves": -3, "Grey Talon": 8, "Haze": -1, "Infernus": 3.5, "Ivy": 2.5, "Kelvin": -4,
+  "Lady Geist": -4, "Lash": 13, "Mina": 9.5, "Mirage": 5, "Mo & Krill": 2, "Nurse Harrow": 15, "Paige": -7,
+  "Paradox": 2, "Pocket": 4, "Rat King": 11, "Rem": -2.5, "Shiv": 8, "Silver": -3, "Solomon": 1.5,
+  "The Doorman": 3, "Victor": -2, "Vindicta": 7, "Violet": 4, "Viscous": 2.5, "Vyper": -19, "Warden": -5,
+  "Wraith": 15, "Yamato": -9, self: 2, hit: 9, team: 4.5, draw: 9, aura: 7,
+};
+const trim = (ab: AbilityKey) => 10 ** ((TRIM[ab] ?? 0) / 20);
+
 /** Toca o som da habilidade (nada para cartas sem habilidade, canal mudo ou sem Web Audio). */
 export function abilitySfx(ab: AbilityKey, volume = 1) {
   const r = RECIPES[ab];
-  const k = r && kit(volume);
+  const k = r && kit(volume * trim(ab));
   if (k) r(k);
 }
 /** Habilidades com som próprio (para o teste conferir que nenhuma ficou de fora). */
@@ -619,19 +656,32 @@ const knife = (k: Kit, at: number, gain: number, o: Out) => {
   k.tone({ f: 4400, to: 3900, at: at + 0.08, dur: 0.35, gain: gain * 0.05, ...o });
 };
 /** Carta eliminada: duas facadas cruzadas, no tempo dos dois traços do X. */
-export function slashSfx(volume = 1) {
-  const k = kit(volume);
-  if (!k) return;
+const slashWith = (k: Kit) => {
   knife(k, 0, 1, { pan: -0.5, panTo: 0.4 });
   knife(k, 0.22, 1.1, { pan: 0.5, panTo: -0.4 });
+};
+export function slashSfx(volume = 1) {
+  const k = kit(volume);
+  if (k) slashWith(k);
 }
 
 /** "Começou": um sopro que entra macio, três sinos subindo e um acorde quente que fica no ar (nada de estrondo). */
-export function startSfx(volume = 1) {
-  const k = kit(volume * 0.8);
-  if (!k) return;
+const startWith = (k: Kit) => {
   k.hiss({ f: 500, to: 2500, dur: 0.5, gain: 0.35, q: 0.8, attack: 0.4, wet: 0.5 });
   [784, 988, 1175].forEach((f, i) => k.bell(0.35 + i * 0.11, GLASS(f), 0.45, { wet: 0.6, pan: -0.3 + i * 0.3 }));
   [392, 494, 587].forEach((f) => k.tone({ f, at: 0.35, dur: 1.4, gain: 0.06, type: "triangle", attack: 0.25, hold: 0.3, wet: 0.6 }));
   k.tone({ f: 196, at: 0.35, dur: 1.4, gain: 0.08, attack: 0.3, hold: 0.3 });
+};
+export function startSfx(volume = 1) {
+  const k = kit(volume * 0.8);
+  if (k) startWith(k);
+}
+
+/** Toca um som num contexto dado (offline), para medir e conferir as receitas fora do jogo. */
+export function renderSfx(name: AbilityKey | "start" | "slash", c: BaseAudioContext) {
+  const k = kit(name === "start" || name === "slash" ? 1 : trim(name), c);
+  if (!k) return;
+  if (name === "start") return startWith(k);
+  if (name === "slash") return slashWith(k);
+  RECIPES[name]?.(k);
 }

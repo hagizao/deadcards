@@ -112,7 +112,7 @@ let slide: { gain: GainNode; band: BiquadFilterNode; stop: () => void } | null =
 let slideIdle: ReturnType<typeof setTimeout> | null = null;
 
 /** Ruído branco (estalos) ou marrom (grave, como atrito pesado). */
-export function noise(c: AudioContext, sec: number, brown = false) {
+export function noise(c: BaseAudioContext, sec: number, brown = false) {
   const b = c.createBuffer(1, Math.floor(c.sampleRate * sec), c.sampleRate);
   const d = b.getChannelData(0);
   let last = 0;
