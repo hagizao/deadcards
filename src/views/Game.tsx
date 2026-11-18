@@ -527,9 +527,9 @@ type Mode = { k: "card" | "loc" | "move" | "mark"; c: GCard };
 
 /** Cores das três faixas (amarela, azul e verde, como as lanes do mapa), em classes inteiras. */
 const LANE = [
-  { stroke: "stroke-lane-yellow", tint: "from-lane-yellow/30", glow: "from-lane-yellow/30" },
-  { stroke: "stroke-lane-blue", tint: "from-lane-blue/30", glow: "from-lane-blue/30" },
-  { stroke: "stroke-lane-green", tint: "from-lane-green/30", glow: "from-lane-green/30" },
+  { stroke: "stroke-lane-yellow", tint: "from-lane-yellow/30", glow: "from-lane-yellow/30", tag: "bg-lane-yellow", ink: "text-lane-yellow" },
+  { stroke: "stroke-lane-blue", tint: "from-lane-blue/30", glow: "from-lane-blue/30", tag: "bg-lane-blue", ink: "text-lane-blue" },
+  { stroke: "stroke-lane-green", tint: "from-lane-green/30", glow: "from-lane-green/30", tag: "bg-lane-green", ink: "text-lane-green" },
 ] as const;
 
 /** Gerador determinístico, para cada faixa ter sempre a mesma borda. */
@@ -681,7 +681,7 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card }: {
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
       className="relative flex min-w-0 flex-1 flex-col items-center justify-between gap-1 px-2 py-1.5 sm:gap-2 sm:px-4 sm:py-3">
       <div className={`relative content-end ${side}`} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
-      <div className="relative w-full"><LocTile nm={nm} desc={desc} chips={chips} a={a} p={p} /></div>
+      <div className="relative w-full"><LocTile i={i} nm={nm} desc={desc} chips={chips} a={a} p={p} /></div>
       <div className={`relative content-start ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
         {l.s.p.map(card)}
         {canPlay && (
@@ -956,27 +956,47 @@ function Comanda({ s, m, t, icons, on }: { s: Side; m: Match; t: T; icons: Recor
   );
 }
 
-/** Placa do local entre os dois lados: placar da IA, nome e placar seu; o efeito embaixo (toque para ler inteiro). */
-function LocTile({ nm, desc, chips, a, p }: { nm: string; desc: string; chips: [boolean, string, string][]; a: number; p: number }) {
+/**
+ * Placa do local entre os dois lados, em etiquetas como as do jogo: o nome numa etiqueta grande na cor da faixa, o efeito
+ * numa etiqueta escura com a letra na cor da faixa (toque para ler inteiro) e o poder de cada lado nas pontas.
+ * As etiquetas dão um tique seco de um lado para o outro a cada segundo (tag-tick).
+ */
+function LocTile({ i, nm, desc, chips, a, p }: { i: number; nm: string; desc: string; chips: [boolean, string, string][]; a: number; p: number }) {
   const [full, setFull] = useState(false);
+  const lane = LANE[i % 3];
   return (
-    <div className="flex w-full flex-col items-center gap-0.5 rounded-lg bg-zinc-950/70 p-1 text-center leading-tight shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]">
+    <div className="flex w-full flex-col items-center gap-2 text-center leading-tight">
       <div className="flex w-full flex-wrap items-center justify-between gap-1 sm:flex-nowrap">
-        <Score v={a} lead={a > p} side="a" />
-        <motion.strong key={nm} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.9 }}
-          className="order-first line-clamp-2 w-full min-w-0 text-sm font-extrabold tracking-wide sm:order-0 sm:w-auto sm:flex-1 sm:text-lg">{nm}</motion.strong>
-        <Score v={p} lead={p > a} side="p" />
+        <ScoreTag v={a} lead={a > p} side="a" />
+        <div className="order-first flex w-full min-w-0 justify-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)] sm:order-0 sm:w-auto sm:flex-1">
+          <motion.h3 key={nm} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.9 }}
+            className={`line-clamp-2 min-w-0 tag-tick px-2 py-1 text-sm font-extrabold tracking-wide text-zinc-950 [clip-path:polygon(2%_6%,99%_0,100%_92%,0_100%)] [font-variant-caps:small-caps] sm:px-4 sm:text-2xl ${lane.tag}`}>
+            {nm}
+          </motion.h3>
+        </div>
+        <ScoreTag v={p} lead={p > a} side="p" />
       </div>
-      <button type="button" onClick={() => setFull((x) => !x)} aria-expanded={full} title={desc}
-        className={`w-full cursor-pointer rounded-sm text-[10px] text-zinc-400 hover:text-zinc-200 sm:text-[11px] ${full ? "" : "line-clamp-2"} ${focus}`}>
-        {desc}
-      </button>
+      <div className="flex w-full justify-center drop-shadow-[0_3px_0_rgb(0_0_0/0.6)]">
+        <button type="button" onClick={() => setFull((x) => !x)} aria-expanded={full} title={desc}
+          className={`max-w-full tag-tick cursor-pointer bg-zinc-950 px-2.5 py-1 text-[11px] font-bold transition-[filter] [clip-path:polygon(0_0,100%_5%,99%_100%,1%_94%)] hover:brightness-125 active:brightness-90 sm:text-xs ${lane.ink} ${full ? "" : "line-clamp-2"} ${focus}`}>
+          {desc}
+        </button>
+      </div>
       {chips.length > 0 && (
         <div className="flex flex-wrap justify-center gap-0.5 text-xs">
           {chips.map(([, icon, label]) => <span key={label} role="img" title={label} aria-label={label}>{icon}</span>)}
         </div>
       )}
     </div>
+  );
+}
+
+/** Poder de um lado numa etiqueta escura (sem recorte, para o halo e o +N/−N não serem cortados). */
+function ScoreTag({ v, lead, side }: { v: number; lead: boolean; side: Side }) {
+  return (
+    <span className="grid shrink-0 tag-tick place-items-center rounded-xs bg-zinc-950 px-0.5 py-1 shadow-[0_3px_0_rgb(0_0_0/0.6)] sm:px-1.5">
+      <Score v={v} lead={lead} side={side} />
+    </span>
   );
 }
 
@@ -993,7 +1013,7 @@ function Score({ v, lead, side }: { v: number; lead: boolean; side: Side }) {
   }
   const tone = side === "p" ? "text-game-me" : "text-game-ai";
   return (
-    <span className="relative grid min-w-10 shrink-0 place-items-center sm:min-w-14">
+    <span className="relative grid min-w-8 shrink-0 place-items-center sm:min-w-14">
       <AnimatePresence>
         {lead && (
           <motion.span key="halo" aria-hidden="true" className={`absolute inset-0 rounded-full blur-md ${side === "p" ? "bg-game-me" : "bg-game-ai"}`}

@@ -126,6 +126,19 @@
   }
 }
 
+/* Cardslock Game: etiquetas do local dão um tique seco a cada segundo, de 95° para 85° (±5° da horizontal), sem transição */
+@utility tag-tick {
+  animation: tag-tick 2s infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@keyframes tag-tick {
+  0% { rotate: 5deg; animation-timing-function: step-end; }
+  50% { rotate: -5deg; animation-timing-function: step-end; }
+  100% { rotate: -5deg; }
+}
+
 /* a mesma corrida da seta, no passo do tracejado de pincel (soma do BRUSH_DASH do TargetArrow) */
 @utility aim-brush {
   animation: aim-brush 1.1s linear infinite;
