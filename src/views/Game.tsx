@@ -4,6 +4,7 @@ import { createPortal, flushSync } from "react-dom";
 import { CardBack, GameCard, TipBoxes, type Tip } from "../components/GameCard";
 import { AbilityFx, FxLayer, type Box, type FxScene } from "../components/AbilityFx";
 import { CHOREO, Rig, faceOf } from "../lib/game/choreo";
+import { svgOf } from "../lib/game/choreoKit";
 import { GameHand } from "../components/GameHand";
 import { dropUnder, pointOf } from "../lib/game/drop";
 import { TargetArrow } from "../components/TargetArrow";
@@ -15,7 +16,7 @@ import { ABILITIES, ITEMS, gameConfig, itemCost, locArtUrl, phaseOf, type Abilit
 import { DeckBuilder } from "../components/DeckBuilder";
 import { DeckPile } from "../components/DeckPile";
 import { versionPlayer, type DeckLook } from "../lib/game/deck";
-import { MIN_POOL, Match, START_HAND, TURNS, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type PowPart, type Result, type Side, type Token } from "../lib/game/engine";
+import { MIN_POOL, Match, START_HAND, TURNS, opp, cardPool, cardVersions, type Bought, type GCard, type Loc, type LogEntry, type PlayError, type PowPart, type Result, type Side, type Token } from "../lib/game/engine";
 import { abilitySfx, slashSfx, startSfx } from "../lib/game/heroSfx";
 import { cardSfx, duckMusic, sfx, startMusic, stopMusic, thump } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
@@ -212,6 +213,17 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   }, [toast]);
 
   const later = (fn: () => void, ms: number) => { timers.current.push(setTimeout(fn, ms)); };
+  /**
+   * Marcas no chão dos locais durante as animações: `hide` esconde a marca que acabou de nascer até a cena chegar
+   * nela (a poça antes do jato da Vyper cair), `keep` segura a que acabou de sumir até a cena terminar com ela.
+   */
+  const [veil, setVeil] = useState<Record<string, "hide" | "keep">>({});
+  const veilFor = (k: string, v: "hide" | "keep", ms: number) => {
+    setVeil((s) => ({ ...s, [k]: v }));
+    later(() => setVeil((s) => { const n = { ...s }; delete n[k]; return n; }), ms);
+  };
+  /** Gelo do Kelvin: o lado do local fica azulado até o fim deste turno ou do próximo (chave: local e lado). */
+  const [frost, setFrost] = useState<Record<string, number>>({});
   const say = (text: string) => setToast({ id: ++toastSeq, text });
   const name = (c: GCard) => (c.p.token ? t.tokens[c.p.token] : c.p.name);
   const logName = (n: LogEntry["c"]) => (n === undefined ? "" : typeof n === "string" ? n : t.tokens[n.token]);
@@ -269,6 +281,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     setGame((x) => x + 1);
     setIntro(true);
     setDrew(false);
+    setVeil({});
+    setFrost({});
     sfx("shuffle");
     setSel(null);
     setLook(null);
@@ -359,6 +373,12 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       const ms = recipe.ms(dst.length, h.self, h.ev);
       const hit = t + (recipe.hit?.(dst.length, h.self, h.ev) ?? ms / 2);
       dst.forEach((d) => { if (dead.has(d.id) && !doomed.has(d.id)) doomed.set(d.id, recipe.kills ? -1 : hit); });
+      // as marcas da mesa entram e saem junto com a cena
+      const foe = opp(h.side);
+      if (h.ab === "Vyper") veilFor(`petri${h.at}${h.ev === "petri" ? opp(h.side) : foe}`, h.ev === "petri" ? "keep" : "hide", t + (h.ev === "petri" ? 1060 : 600));
+      if (h.ab === "Venator") veilFor(`trap${h.at}${h.ev === "trap" ? opp(h.side) : foe}`, h.ev === "trap" ? "keep" : "hide", t + (h.ev === "trap" ? 130 : 600));
+      if (h.ab === "Paige") veilFor(`paige${h.at}${h.side}`, "hide", t + 900);
+      if (h.ab === "Kelvin") { const k = `${h.at}${h.side}`, until = m.t + 1; later(() => setFrost((f) => ({ ...f, [k]: until })), t + 900); }
       const alt = h.ab === "The Doorman" ? laneBox(m.portals.at(-1)?.b) : null;
       later(() => rig.start(h.ab, { id: h.id, box: old(h.id) }, dst, { self: h.self, ev: h.ev, lane: laneBox(h.at), alt, shake: quake }), t);
       t += ms;
@@ -486,6 +506,18 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
     sfx("place");
     bump();
   };
+  /** O que fica no chão de cada lado do local: a poça da Vyper, a armadilha do Venator, o verde da Paige e o gelo do Kelvin. */
+  const marksOf = (l: Loc, i: number, s: Side): Marks => {
+    const v = (k: string, on: boolean) => (veil[`${k}${i}${s}`] === "hide" ? false : on || veil[`${k}${i}${s}`] === "keep");
+    return {
+      petri: v("petri", !!l.petri[s]),
+      trap: v("trap", l.trap[s] > 0),
+      paige: v("paige", l.s[s].some((c) => c.rev && m.abilityOf(c) === "Paige")),
+      frost: (frost[`${i}${s}`] ?? 0) >= m.t,
+    };
+  };
+  /** Tipos dos itens que melhoram a carta (os que pioram a inimiga não brilham). */
+  const auraOf = (c: GCard): ItemSlot[] => [...new Set(m.owned[c.side].filter((b) => b.target === c.id && !(ITEMS[b.k] as { foe?: boolean }).foe).map((b) => ITEMS[b.k].slot))];
   const undoPlay = () => { if (mode && mode.c.staged) m.unstage(mode.c); setMode(null); bump(); };
   const startMode = (k: "move" | "mark", c: GCard) => setMode({ k, c });
   const modeHint = !mode ? "" : mode.k === "card" ? t.ui.act.pickFoe(name(mode.c)) : mode.k === "loc" ? t.ui.act.pickLoc(name(mode.c))
@@ -597,10 +629,10 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       <div ref={arena} className="relative flex min-h-0 w-full flex-1 flex-col">
         <section aria-label={t.ui.arena} className="lane-board flex min-h-0 w-full flex-1 gap-0.5 sm:gap-1">
           {m.loc.map((l, i) => (
-            <Location key={`${game}-${l.L.id}${i}`} dealAt={intro ? INTRO.lane(i) + 0.08 : undefined} m={m} l={l} i={i} t={t} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
+            <Location key={`${game}-${l.L.id}${i}`} dealAt={intro ? INTRO.lane(i) + 0.08 : undefined} m={m} l={l} i={i} t={t} marks={(s) => marksOf(l, i, s)} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
               drop={dropAt(l, i)}
               card={(c) => (
-                <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false, true)} looking={look === c} target={targets.includes(c)} mark={mode?.k === "card" && m.abilityOf(mode.c) === "Vindicta" && targets.includes(c)} acts={actsOf(c)}
+                <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false, true)} aura={auraOf(c)} looking={look === c} target={targets.includes(c)} mark={mode?.k === "card" && m.abilityOf(mode.c) === "Vindicta" && targets.includes(c)} acts={actsOf(c)}
                   shift={canShift(c) ? { on: (over) => { if (!shift) { sfx("grab", 0.7); setPeek(null); } setShift({ c, over }); }, drop: (i) => shiftTo(c, i) } : undefined}
                   onClick={(r) => { pickBoard(c); setPeek(r && look !== c ? { c, r } : null); }}
                   onPeek={(r) => setPeek(r && !drag && !shift ? { c, r } : null)} />
@@ -990,8 +1022,8 @@ function LaneBackdrop({ l, i, drop, fresh, dealAt }: {
   );
 }
 
-function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card, dealAt }: {
-  m: Match; l: Loc; i: number; t: T; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: Drop; card: (c: GCard) => React.ReactNode;
+function Location({ m, l, i, t, marks, canPlay, onPlay, dest, onDest, drop, card, dealAt }: {
+  m: Match; l: Loc; i: number; t: T; marks: (s: Side) => Marks; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: Drop; card: (c: GCard) => React.ReactNode;
   /** Abertura da mesa: a placa e os lados entram junto com a faixa. */ dealAt?: number;
 }) {
   const a = m.total(l, "a"), p = m.total(l, "p");
@@ -1016,9 +1048,10 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card, dealA
     <div data-drop={i} aria-label={drop === "over" ? t.ui.dropHere(nm) : undefined}
       style={dealAt !== undefined ? ({ "--d": `${dealAt.toFixed(2)}s` } as CSSProperties) : undefined}
       className={`relative flex min-w-0 flex-1 flex-col items-center justify-between gap-1 px-2 py-1.5 transition-[filter] duration-150 sm:gap-2 sm:px-4 sm:py-3 ${drop === "dim" ? "brightness-50" : ""} ${dealAt !== undefined ? "intro-drop" : ""}`}>
-      <div className={`relative content-end ${side}`} aria-label={t.ui.aiSide(nm)} role="group">{l.s.a.map(card)}</div>
+      <div className={`relative content-end ${side}`} aria-label={t.ui.aiSide(nm)} role="group"><SideMarks {...marks("a")} />{l.s.a.map(card)}</div>
       <div className="relative w-full"><LocTile i={i} nm={nm} desc={desc} chips={chips} a={a} p={p} /></div>
       <div className={`relative content-start ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
+        <SideMarks {...marks("p")} />
         {l.s.p.map(card)}
         {canPlay && (
           <button type="button" onClick={onPlay} aria-label={t.ui.playHere(nm)}
@@ -1035,6 +1068,30 @@ function Location({ m, l, i, t, canPlay, onPlay, dest, onDest, drop, card, dealA
 
 type StatusKey = keyof T["ui"]["status"];
 
+type Marks = { petri: boolean; trap: boolean; paige: boolean; frost: boolean };
+/** As marcas no chão de um lado do local, por baixo das cartas (os chips da placa dizem o mesmo em texto). */
+function SideMarks({ petri, trap, paige, frost }: Marks) {
+  const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.5 } };
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute -inset-1">
+      <AnimatePresence>
+        {paige && <motion.div key="paige" {...fade} className="absolute inset-0 rounded-xl bg-radial from-emerald-400/35 via-emerald-500/15 to-transparent shadow-[inset_0_0_18px_var(--color-emerald-400)]" />}
+        {frost && <motion.div key="frost" {...fade} className="absolute inset-0 rounded-xl bg-linear-to-b from-cyan-200/30 to-sky-500/20 shadow-[inset_0_0_20px_var(--color-cyan-200)]" />}
+        {petri && (
+          <motion.div key="petri" initial={{ opacity: 0, scale: 0.3 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scaleY: 0.2 }} transition={{ duration: 0.45 }}
+            className="absolute inset-x-[2%] top-[38%] h-1/4">
+            <div className="size-full lane-puddle rounded-[50%] bg-radial from-lime-300/70 via-green-600/50 to-transparent to-70%" />
+          </motion.div>
+        )}
+        {/* desenho fixo do jogo (svgOf), nada vindo de fora */}
+        {trap && (
+          <motion.div key="trap" {...fade} className="absolute inset-x-[30%] top-[38%] aspect-square drop-shadow-[0_3px_3px_rgb(0_0_0/0.9)]" dangerouslySetInnerHTML={{ __html: svgOf("trapOpen") }} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
   const s = c.st, now = (u?: number) => (u ?? 0) >= m.t;
   const list: [boolean, string, StatusKey][] = [
@@ -1050,8 +1107,9 @@ function statusIcons(c: GCard, m: Match, t: T): [string, string, StatusKey][] {
 /** Vaga da carta na fileira do local: encolhe quando não cabe (a carta transborda e fica por baixo da seguinte). */
 const slot = "w-gc hover:z-10 focus-within:z-10";
 
-function BoardCard({ c, m, t, name, face, looking, target, mark = false, acts, shift, onClick, onPeek }: {
+function BoardCard({ c, m, t, name, face, looking, target, mark = false, aura = [], acts, shift, onClick, onPeek }: {
   c: GCard; m: Match; t: T; name: string; face: React.ReactNode; looking: boolean; target: boolean; acts: { label: string; run: () => void }[];
+  /** Itens que a carta recebeu: ela irradia a cor de cada um. */ aura?: ItemSlot[];
   /** Alvo de uma mira que mata (Vindicta): o X vermelho aparece no hover. */ mark?: boolean;
   /** Pode ser arrastada para outro local neste turno: treme na mesa e avisa o local sob o cursor e onde foi solta. */
   shift?: { on: (over: number | null) => void; drop: (i: number | null) => void };
@@ -1072,6 +1130,7 @@ function BoardCard({ c, m, t, name, face, looking, target, mark = false, acts, s
       onDrag={(e) => { const pt = pointOf(e); shift?.on(dropUnder(pt.x, pt.y)); }}
       onDragEnd={(e) => { const pt = pointOf(e); setHeld(false); shift?.drop(dropUnder(pt.x, pt.y)); }}>
     {/* pode ser movida: balança e brilha como a conta do "Fechar a conta" (parada enquanto arrasta); o atraso varia para as cartas não balançarem juntas */}
+    {c.rev && aura.map((k, j) => <span key={k} aria-hidden="true" className={`pointer-events-none absolute inset-0 item-aura rounded-lg ${AURA[k]}`} style={{ animationDelay: `${-j * 0.9}s` }} />)}
     {shift && !held && <span aria-hidden="true" className="pointer-events-none absolute -inset-2 card-call-glow rounded-2xl bg-radial from-game-me/60 via-game-me/20 to-transparent to-70% blur-md" />}
     <div className={shift && !held ? "card-jiggle" : ""} style={shift ? { animationDelay: `${-(c.id % 7) * 0.31}s` } : undefined}>
     <motion.button type="button" onClick={(e) => { if (moved.current) { moved.current = false; return; } onClick(touch.current ? e.currentTarget.getBoundingClientRect() : null); }} aria-pressed={looking}
@@ -1085,7 +1144,7 @@ function BoardCard({ c, m, t, name, face, looking, target, mark = false, acts, s
       {/* a sua carta jogada fica virada até revelar, como a do adversário (passar o mouse ainda mostra a face) */}
       {!c.rev ? <CardBack tone="me" className={`w-gc ${REST}`} /> : (
         // na mira da Vindicta, a carta fica em preto e branco e o X vermelho é o destaque
-        <div className={mark ? "transition-[filter] duration-100 group-hover:brightness-75 group-hover:grayscale group-has-focus-visible:brightness-75 group-has-focus-visible:grayscale" : ""}>{face}</div>
+        <div className={`relative ${c.st.petri ? "brightness-90 contrast-110 grayscale" : ""} ${mark ? "transition-[filter] duration-100 group-hover:brightness-75 group-hover:grayscale group-has-focus-visible:brightness-75 group-has-focus-visible:grayscale" : ""}`}>{face}<CardState c={c} m={m} /></div>
       )}
     </motion.button>
     {mark && <AimX id={`aim-${c.id}`} />}
@@ -1102,6 +1161,37 @@ function BoardCard({ c, m, t, name, face, looking, target, mark = false, acts, s
       </div>
     )}
     </motion.div>
+  );
+}
+
+/** Cor que a carta com item irradia, pelo tipo do item. */
+const AURA: Record<ItemSlot, string> = {
+  weapon: "shadow-[0_0_16px_5px_var(--color-item-weapon),0_0_36px_10px_var(--color-item-weapon)]",
+  vitality: "shadow-[0_0_16px_5px_var(--color-item-vitality),0_0_36px_10px_var(--color-item-vitality)]",
+  spirit: "shadow-[0_0_16px_5px_var(--color-item-spirit),0_0_36px_10px_var(--color-item-spirit)]",
+};
+/** Corrente da Billy, a mesma da animação. */
+const CHAIN = "bg-[repeating-linear-gradient(90deg,var(--color-zinc-300)_0_6px,var(--color-zinc-600)_6px_8px)] shadow-[0_0_4px_rgb(0_0_0/0.9)]";
+
+/**
+ * O que fica na carta depois da animação, enquanto o efeito dura: as rachaduras da pedra (Vyper), as correntes
+ * (Billy), a sombra do sono (Haze, Rem) e a brasa de quem está queimando.
+ */
+function CardState({ c, m }: { c: GCard; m: Match }) {
+  const s = c.st, now = (u?: number) => (u ?? 0) >= m.t;
+  const burn = !!s.burn || !!s.ail || !!s.tburn?.some((x) => x.u >= m.t);
+  return (
+    <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg">
+      {s.petri && <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_45%,rgb(41_37_36/0.9)_46%,transparent_48%),linear-gradient(60deg,transparent_60%,rgb(41_37_36/0.8)_61%,transparent_63%)]" />}
+      {now(s.sleep) && <span className="absolute inset-0 bg-indigo-950/45 mix-blend-multiply" />}
+      {burn && <span className="absolute inset-x-0 bottom-0 h-1/2 card-ember bg-linear-to-t from-orange-600/70 via-red-600/25 to-transparent mix-blend-screen" />}
+      {s.chained && (
+        <>
+          <span className={`absolute inset-x-[-8%] top-[45%] h-2 rotate-45 rounded-full ${CHAIN}`} />
+          <span className={`absolute inset-x-[-8%] top-[45%] h-2 -rotate-45 rounded-full ${CHAIN}`} />
+        </>
+      )}
+    </span>
   );
 }
 
