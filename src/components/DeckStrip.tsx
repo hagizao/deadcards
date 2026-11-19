@@ -8,6 +8,8 @@ export const deckFocus = "focus-visible:outline-2 focus-visible:outline-offset-2
 export type DeckKit = {
   stats: (c: PoolCard) => CardStats;
   face: (c: PoolCard) => ReactNode;
+  /** A carta com o texto da habilidade e as animações da moldura, para ler (hover do leque). */
+  full: (c: PoolCard) => ReactNode;
   art: (c: PoolCard) => { url: string; x: number; y: number } | null;
 };
 

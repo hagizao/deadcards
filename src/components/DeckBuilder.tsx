@@ -9,7 +9,7 @@ import { GameCard } from "./GameCard";
 import { playerArt } from "../lib/cards";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
-import { cardStats, type GameConfig, type PoolCard } from "../lib/game/config";
+import { ABILITIES, cardStats, type GameConfig, type PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
 import {
   DECK_NAME_MAX, MAX_DECKS, fillDeck, heroHolder, heroTaken, loadBook, newDeck, resolveDeck, saveBook, swapHero, versionPlayer, type DeckBook, type DeckLook, type SavedDeck,
@@ -53,12 +53,18 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
       const s = stats(c);
       return <GameCard player={versionPlayer(byId, c)} name={c.name} cost={s.cost} power={s.power} base={s.power} text={null} />;
     },
+    full: (c) => {
+      const s = stats(c);
+      const a = t.abilities[s.ab];
+      return <GameCard player={versionPlayer(byId, c)} name={c.name} cost={s.cost} power={s.power} base={s.power} fx
+        text={{ name: a.name, kind: t.kinds[ABILITIES[s.ab].kind], body: s.desc || a.text(s.v), masterLabel: t.ui.masterLine }} />;
+    },
     art: (c) => {
       const p = versionPlayer(byId, c);
       const a = p && playerArt(p, heroArt);
       return a ? { url: a.url, x: a.x, y: a.y } : null;
     },
-  }), [stats, byId, heroArt]);
+  }), [stats, byId, heroArt, t]);
 
   const inDeck = new Map(deck.map((c) => [c.key, c]));
   const full = deck.length >= DECK_SIZE;
