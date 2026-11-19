@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
-import { useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import { FullscreenButton, TagButton } from "./BarButton";
 import { CardBack } from "./GameCard";
 import { MiniSoul } from "./GameHud";
@@ -23,24 +23,6 @@ export function Label({ tone, ink, tilt = -1, big = false, className = "", child
     <span className={`relative isolate inline-flex items-center font-extrabold ${big ? "px-3.5 py-1.5 text-sm" : "px-2.5 py-1 text-[11px]"} tracking-widest uppercase drop-shadow-[0_2px_0_rgb(0_0_0/0.6)] ${ink} ${className}`}>
       <span aria-hidden="true" className={`absolute inset-0 -z-10 ${CLIP} ${tilt < 0 ? "-rotate-2" : "rotate-2"} ${tone}`} />
       {children}
-    </span>
-  );
-}
-
-/** As 12 vagas como almas da partida: acesas com a chama tremulando dentro (cada uma acende com um pulo); vazias, encaixes de latão. */
-function SoulPips({ n, still }: { n: number; still: boolean | null }) {
-  return (
-    <span className="flex items-center gap-3">
-      <span aria-hidden="true" className="flex items-center gap-1 sm:gap-1.5">
-        {Array.from({ length: DECK_SIZE }, (_, i) => (
-          <motion.span key={i} initial={false} animate={i < n && !still ? { scale: [0.5, 1.3, 1] } : { scale: 1 }} transition={{ duration: 0.3, delay: i * 0.025 }}>
-            <MiniSoul lit={i < n} i={i} className="size-5 sm:size-7" />
-          </motion.span>
-        ))}
-      </span>
-      <b className={`font-display text-xl leading-none font-extrabold tabular-nums sm:text-2xl ${n >= DECK_SIZE ? "text-game-soul [text-shadow:0_0_12px_var(--color-game-soul)]" : "text-zinc-300"}`}>
-        {n}<span className="text-sm text-zinc-500 sm:text-base">/{DECK_SIZE}</span>
-      </b>
     </span>
   );
 }
@@ -126,23 +108,16 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
   const t = useT(GAME_TEXT);
   const still = useReducedMotion();
   const [hot, setHot] = useState<number | null>(null);
-  // saída para a partida: para onde cada carta do leque voa (o seu monte na partida, embaixo à direita)
-  const [exit, setExit] = useState<{ x: number; y: number }[] | null>(null);
-  const slots = useRef<(HTMLLIElement | null)[]>([]);
+  // saída para a partida: a câmera desce para a mesa (o leque deita para trás e se fecha, o lampião sobe e some)
+  const [leaving, setLeaving] = useState(false);
   const leave = () => {
-    if (exit) return;
+    if (leaving) return;
     setHot(null);
-    if (!still) {
-      const to = { x: window.innerWidth - 90, y: window.innerHeight - 120 };
-      setExit(slots.current.map((el) => {
-        const r = el?.getBoundingClientRect();
-        return r ? { x: to.x - (r.left + r.width / 2), y: to.y - (r.top + r.height / 2) } : { x: 0, y: 0 };
-      }));
-    }
+    if (!still) setLeaving(true);
     onPlay();
   };
   /** Tudo que não é o leque some quando as cartas saem. */
-  const fade = exit ? "opacity-0 transition-opacity duration-300" : "transition-opacity duration-300";
+  const fade = leaving ? "opacity-0 transition-opacity duration-300" : "transition-opacity duration-300";
   const cur = book.decks.find((d) => d.id === book.current) ?? book.decks[0];
   const full = deck.length >= DECK_SIZE;
   const avg = deck.length ? Math.round(deck.reduce((a, c) => a + c.ovr, 0) / deck.length) : 0;
@@ -160,9 +135,12 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
 
       <div className="relative flex min-w-0 flex-1 flex-col items-center justify-between gap-3 lg:min-h-0">
         {/* luz do lampião sobre o leque */}
-        {/* ao jogar, o lampião falha e apaga */}
+        {/* ao jogar, a luz do lampião sobe e some (a câmera está descendo) */}
         <motion.span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-full bg-radial-[ellipse_60%_45%_at_50%_40%] from-amber-200/12 via-amber-500/5 to-transparent to-70%"
-          animate={exit ? { opacity: [1, 0.2, 0.9, 0.1, 0.6, 0] } : { opacity: 1 }} transition={{ duration: 0.7, times: [0, 0.15, 0.3, 0.5, 0.65, 1] }} />
+          animate={leaving ? { opacity: 0, y: "-35%" } : { opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeIn" }} />
+        {/* as bordas escurecem: a mesa vai sair desse escuro */}
+        {leaving && <motion.span aria-hidden="true" className="pointer-events-none fixed inset-0 z-40 bg-radial from-black/40 to-black"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.65, ease: "easeIn" }} />}
 
         <header className={`relative flex flex-col items-center gap-3 text-center ${fade}`}>
           <Label big tone="bg-lane-yellow" ink="text-zinc-950">{t.ui.title}</Label>
@@ -181,8 +159,12 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
         </header>
 
         {/* o leque: 12 posições em arco; vaga vazia é o verso do baralho apagado. A largura da carta vem da altura que sobra. */}
-        <ol aria-label={t.deck.list} onPointerLeave={() => setHot(null)}
-          className={`relative ${exit ? "pointer-events-none" : ""} h-[calc(var(--w)*1.46+3.5rem)] w-full max-w-4xl shrink-0 [--gap:min(4.4rem,6.5vw)] [--w:clamp(4.4rem,min(14vw,calc((100dvh-41rem)/1.46)),10rem)]`}>
+        {/* na saída, o leque deita para trás em perspectiva (como baixar as cartas na mesa) e as cartas se juntam */}
+        <motion.ol aria-label={t.deck.list} onPointerLeave={() => setHot(null)}
+          style={{ transformPerspective: 650, originY: 1 }}
+          animate={leaving ? { rotateX: 74, y: "30%", scale: 0.8, opacity: [1, 1, 0] } : { rotateX: 0, y: 0, scale: 1, opacity: 1 }}
+          transition={{ duration: 0.65, ease: [0.55, 0, 0.45, 1], opacity: { duration: 0.65, times: [0, 0.75, 1] } }}
+          className={`relative h-[calc(var(--w)*1.46+3.5rem)] w-full max-w-4xl shrink-0 ${leaving ? "pointer-events-none [--gap:min(2.2rem,3.5vw)]" : "[--gap:min(4.4rem,6.5vw)]"} [--w:clamp(4.4rem,min(14vw,calc((100dvh-41rem)/1.46)),10rem)]`}>
           {Array.from({ length: DECK_SIZE }, (_, i) => {
             const c = sorted[i];
             const k = i - mid;
@@ -191,16 +173,11 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
             const push = hot === null || on ? 0 : i > hot ? 1 : -1;
             const pos = { "--k": k, "--push": push, zIndex: on ? 50 : i + 1 } as CSSProperties;
             return (
-              <li key={c?.key ?? `gap${i}`} style={pos} ref={(el) => { slots.current[i] = el; }}
+              <li key={c?.key ?? `gap${i}`} style={pos}
                 className="absolute top-0 left-1/2 w-(--w) transform-[translateX(calc(-50%+var(--k)*var(--gap)+var(--push)*min(2.6rem,4vw)))_translateY(calc(var(--k)*var(--k)*0.11rem+0.4rem))_rotate(calc(var(--k)*3deg))] transition-transform duration-200 ease-out motion-reduce:transition-none">
-                <motion.div key={`${cur.id}-${c?.id ?? i}`} className="relative" initial={still ? false : { y: 90, opacity: 0, rotate: -8 }}
-                  animate={exit ? { scaleX: [1, 0, 1], x: exit[i].x, y: exit[i].y, rotate: 30, scale: 0.4, opacity: 0 } : { y: 0, opacity: 1, rotate: 0 }}
-                  transition={exit
-                    ? { scaleX: { duration: 0.18, delay: i * 0.035 }, x: { duration: 0.45, delay: 0.12 + i * 0.035, ease: "easeIn" }, y: { duration: 0.45, delay: 0.12 + i * 0.035, ease: [0.5, 0, 0.9, 0.6] },
-                      rotate: { duration: 0.45, delay: 0.12 + i * 0.035 }, scale: { duration: 0.45, delay: 0.12 + i * 0.035 }, opacity: { duration: 0.12, delay: 0.5 + i * 0.035 } }
-                    : { duration: 0.28, delay: still ? 0 : i * 0.03, ease: [0.23, 1, 0.32, 1] }}>
-                  {/* o verso aparece no meio da virada */}
-                  {exit && <motion.span aria-hidden="true" className="absolute inset-0 z-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0, delay: 0.09 + i * 0.035 }}><CardBack look={look} /></motion.span>}
+                <motion.div key={`${cur.id}-${c?.id ?? i}`} initial={still ? false : { y: 90, opacity: 0, rotate: -8 }}
+                  animate={{ y: 0, opacity: 1, rotate: 0 }}
+                  transition={{ duration: 0.28, delay: still ? 0 : i * 0.03, ease: [0.23, 1, 0.32, 1] }}>
                   {c ? (
                     <motion.button type="button" onClick={() => onOpen(c.key)} aria-label={t.deck.open(t.deck.version(c.name, c.hero))}
                       onHoverStart={() => setHot(i)} onPointerEnter={(e) => { if (e.pointerType === "mouse") sfx("hover"); }} onFocus={() => setHot(i)} onBlur={() => setHot((h) => (h === i ? null : h))}
@@ -216,11 +193,10 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
               </li>
             );
           })}
-        </ol>
+        </motion.ol>
 
         {/* números: as vagas em almas e a curva em fichas, lado a lado */}
         <div className={`relative flex flex-wrap items-end justify-center gap-x-10 gap-y-3 ${fade}`}>
-          <SoulPips n={deck.length} still={still} />
           {deck.length > 0 ? <ChipCurve key={cur.id} cards={deck} kit={kit} label={t.deck.curve} still={still} /> : <p className="max-w-xs text-center text-xs text-zinc-400">{t.deck.emptyHint}</p>}
         </div>
 

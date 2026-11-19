@@ -22,8 +22,8 @@ import { GAME_TEXT } from "../lib/game/text";
 const FLY_S = 0.3;
 /** Intervalo entre as cartas do aleatório. */
 const DEAL_MS = 170;
-/** Saída da tela de baralhos para a mesa: o lampião apaga e as cartas viram e voam para o monte. */
-const LEAVE_MS = 950;
+/** Saída da tela de baralhos para a mesa: a câmera desce, o leque deita na mesa e a tela escurece. */
+const LEAVE_MS = 650;
 type Flight = { id: number; from: DOMRect; to: DOMRect; card: ReactNode };
 let flightSeq = 0;
 type Mode = "lobby" | "forge" | "draft";
@@ -197,7 +197,7 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
   };
   /**
    * Jogar: pede a tela cheia ainda dentro do clique (o navegador só deixa assim) e, vindo da tela de baralhos, espera as
-   * cartas do leque virarem e voarem para o monte (LEAVE_MS) antes de abrir a mesa.
+   * o leque deitar na mesa (LEAVE_MS) antes de abrir a mesa.
    */
   const play = (cards = deck, wait = 0) => {
     document.documentElement.requestFullscreen?.()?.catch(() => {});

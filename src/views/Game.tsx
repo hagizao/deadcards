@@ -589,7 +589,8 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className={full ? "fixed inset-0 z-50 overflow-hidden px-3 sm:px-6" : "contents"}>
+    {/* vindo do Jogar, a mesa sai do escuro inclinada e assenta (continua a câmera descendo da tela de baralhos) */}
+    <div className={full ? `fixed inset-0 z-50 overflow-hidden px-3 sm:px-6 ${startFull && game === 0 ? "table-arrive" : ""}` : "contents"}>
     <BarTable />
     {/* borda a pincel das caixas de item (loja e destaque da comanda): o fundo e a moldura tremem nas bordas como tinta */}
     <svg aria-hidden="true" className="absolute size-0">

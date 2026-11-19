@@ -155,6 +155,21 @@
   50% { opacity: 0.9; transform: scale(1.1); }
 }
 
+/* Cardslock Game: a mesa chegando depois do Jogar, saindo do escuro inclinada para trás e assentando (a câmera desce até ela) */
+@utility table-arrive {
+  animation: table-arrive 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: table-fade 0.3s ease-out both;
+  }
+}
+@keyframes table-arrive {
+  from { opacity: 0; transform: perspective(1200px) rotateX(22deg) scale(0.9) translateY(4%); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes table-fade {
+  from { opacity: 0; }
+}
+
 /* Cardslock Game: etiquetas do local dão um tique seco a cada segundo, de 95° para 85° (±5° da horizontal), sem transição */
 @utility tag-tick {
   animation: tag-tick 2s infinite;
