@@ -45,7 +45,7 @@ export type GameText = {
     edit: string; draft: string; draftHint: string; missing: (n: number) => string; emptyHint: string; back: string;
     page: (n: number, total: number) => string; prev: string; next: string; costAll: string; costFilter: string; inDeckTag: string;
     round: (n: number, max: number) => string; pick: (name: string) => string; draftDone: string; save: string; playNow: string; leave: string;
-    draftName: (n: number) => string; ready: string; workshop: string;
+    draftName: (n: number) => string; ready: string; workshop: string; odds: (n: number) => string; oddsWait: string; oddsHint: (n: number) => string;
   };
   ui: {
     title: string; loading: string; loadFail: string; needCards: (n: number) => string; you: string; ai: string;
@@ -364,6 +364,7 @@ export const GAME_TEXT = strings<GameText>({
       page: (n, total) => `Página ${n} de ${total}`, prev: "Página anterior", next: "Próxima página", costAll: "Todos", costFilter: "Custo", inDeckTag: "No baralho",
       round: (n, max) => `Escolha ${n} de ${max}`, pick: (name) => `Escolher ${name}`, draftDone: "Baralho pronto", save: "Salvar baralho", playNow: "Jogar agora", leave: "Sair do draft",
       draftName: (n) => `Draft ${n}`, ready: "Pronto para jogar", workshop: "Oficina",
+      odds: (n) => `Vence ${n}% contra a IA`, oddsWait: "Testando contra a IA…", oddsHint: (n) => `${n} partidas simuladas contra a IA, os dois lados jogando do mesmo jeito.`,
     },
     ui: {
       title: "Cardslock Game", loading: "Carregando cartas…", loadFail: "Não consegui carregar as cartas.",
@@ -690,6 +691,7 @@ export const GAME_TEXT = strings<GameText>({
       page: (n, total) => `Page ${n} of ${total}`, prev: "Previous page", next: "Next page", costAll: "All", costFilter: "Cost", inDeckTag: "In deck",
       round: (n, max) => `Pick ${n} of ${max}`, pick: (name) => `Pick ${name}`, draftDone: "Deck ready", save: "Save deck", playNow: "Play now", leave: "Leave draft",
       draftName: (n) => `Draft ${n}`, ready: "Ready to play", workshop: "Workshop",
+      odds: (n) => `Wins ${n}% vs the AI`, oddsWait: "Testing against the AI…", oddsHint: (n) => `${n} simulated matches against the AI, both sides playing the same way.`,
     },
     ui: {
       title: "Cardslock Game", loading: "Loading cards…", loadFail: "Couldn't load the cards.",
@@ -1016,6 +1018,7 @@ export const GAME_TEXT = strings<GameText>({
       page: (n, total) => `Página ${n} de ${total}`, prev: "Página anterior", next: "Página siguiente", costAll: "Todos", costFilter: "Coste", inDeckTag: "En el mazo",
       round: (n, max) => `Elección ${n} de ${max}`, pick: (name) => `Elegir a ${name}`, draftDone: "Mazo listo", save: "Guardar mazo", playNow: "Jugar ahora", leave: "Salir del draft",
       draftName: (n) => `Draft ${n}`, ready: "Listo para jugar", workshop: "Taller",
+      odds: (n) => `Gana ${n}% contra la IA`, oddsWait: "Probando contra la IA…", oddsHint: (n) => `${n} partidas simuladas contra la IA, los dos lados jugando igual.`,
     },
     ui: {
       title: "Cardslock Game", loading: "Cargando cartas…", loadFail: "No pude cargar las cartas.",

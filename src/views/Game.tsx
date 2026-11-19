@@ -65,7 +65,7 @@ export function Game() {
   // deck escolhido na tela de deck; null = mostrar a tela
   const [deck, setDeck] = useState<{ cards: PoolCard[]; look?: DeckLook } | null>(null);
   if (pool.length < MIN_POOL) return <p className="text-sm text-zinc-300">{t.ui.needCards(MIN_POOL)}</p>;
-  if (!deck) return <DeckBuilder versions={versions} cfg={cfg} onPlay={(cards, look) => { document.documentElement.requestFullscreen?.().catch(() => {}); setDeck({ cards, look }); }} />;
+  if (!deck) return <DeckBuilder versions={versions} pool={pool} cfg={cfg} onPlay={(cards, look) => { document.documentElement.requestFullscreen?.().catch(() => {}); setDeck({ cards, look }); }} />;
   return <Board key={JSON.stringify(cfg)} newMatch={() => new Match(cfg, pool, Math.random, { p: deck.cards })} deckLook={deck.look} startFull onDeck={() => setDeck(null)} />;
 }
 

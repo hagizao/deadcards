@@ -14,12 +14,39 @@ import { DECK_SIZE } from "../lib/game/engine";
 import {
   DECK_NAME_MAX, MAX_DECKS, fillDeck, heroHolder, heroTaken, loadBook, newDeck, resolveDeck, saveBook, swapHero, versionPlayer, type DeckBook, type DeckLook, type SavedDeck,
 } from "../lib/game/deck";
+import { simulate, type SimResult } from "../lib/game/sim";
 import { GAME_TEXT } from "../lib/game/text";
 
 const FLY_S = 0.3;
 type Flight = { id: number; from: DOMRect; to: DOMRect; card: ReactNode };
 let flightSeq = 0;
 type Mode = "lobby" | "forge" | "draft";
+
+/** Partidas simuladas por baralho (em pedaços, para não travar a tela) e o tamanho de cada pedaço. */
+export const SIM_GAMES = 200;
+const SIM_STEP = 20;
+
+/**
+ * Chance de vitória do baralho completo contra a IA: simula SIM_GAMES partidas em pedaços, depois de uma pausa (para não
+ * rodar a cada carta trocada às pressas). Sementes fixas: o mesmo baralho sempre dá o mesmo número. null enquanto roda.
+ */
+function useOdds(cfg: GameConfig, pool: PoolCard[], deck: PoolCard[]): SimResult | null {
+  const key = deck.length >= DECK_SIZE ? deck.map((c) => c.id).join() : "";
+  const [res, setRes] = useState<{ key: string; r: SimResult } | null>(null);
+  useEffect(() => {
+    if (!key) return;
+    const acc: SimResult = { n: 0, win: 0, loss: 0, draw: 0 };
+    let id = 0;
+    const step = () => {
+      simulate(cfg, pool, deck, SIM_STEP, acc.n + 1, acc);
+      if (acc.n < SIM_GAMES) id = window.setTimeout(step, 0);
+      else setRes({ key, r: acc });
+    };
+    id = window.setTimeout(step, 300);
+    return () => window.clearTimeout(id);
+  }, [key, cfg, pool, deck]);
+  return res && res.key === key ? res.r : null;
+}
 
 /**
  * Antes da partida, três telas:
@@ -28,7 +55,7 @@ type Mode = "lobby" | "forge" | "draft";
  * - **draft**: doze rodadas de 1 entre 3.
  * A coleção inteira nunca fica na tela principal.
  */
-export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, PoolCard[]>; cfg: GameConfig; onPlay: (deck: PoolCard[], look: DeckLook) => void }) {
+export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<string, PoolCard[]>; pool: PoolCard[]; cfg: GameConfig; onPlay: (deck: PoolCard[], look: DeckLook) => void }) {
   const t = useT(GAME_TEXT);
   const { players, heroArt } = useData();
   const still = useReducedMotion();
@@ -39,6 +66,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
   const cur = book.decks.find((d) => d.id === book.current) ?? book.decks[0];
   const deck = useMemo(() => resolveDeck(cur.cards, versions), [cur.cards, versions]);
   const look: DeckLook = cur.look ?? "noir";
+  const odds = useOdds(cfg, pool, deck);
   // versão mostrada de quem ainda não está no baralho
   const [shown, setShown] = useState<Record<string, string>>({});
   const [focusKey, setFocusKey] = useState<string | null>(null);
@@ -146,7 +174,7 @@ export function DeckBuilder({ versions, cfg, onPlay }: { versions: Map<string, P
     <DeckDraft versions={versions} look={look} kit={kit} onLeave={() => setMode("lobby")} onSave={saveDraft}
       onPlay={(cards) => { saveDraft(cards); play(cards); }} />
   ) : (
-    <DeckLobby book={book} versions={versions} deck={deck} look={look} kit={kit} coverOf={coverOf}
+    <DeckLobby book={book} versions={versions} deck={deck} look={look} kit={kit} coverOf={coverOf} odds={odds}
       onPick={(id) => setBook((b) => ({ ...b, current: id }))} onNew={() => { if (addDeck()) setMode("forge"); }}
       onEdit={() => setMode("forge")} onDraft={() => setMode("draft")} onOpen={openFocus} onPlay={() => play()} />
   );

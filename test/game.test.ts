@@ -5,6 +5,7 @@ import {
 } from "../src/lib/game/config";
 import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Loc, type Side } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
+import { simulate, winRate } from "../src/lib/game/sim";
 import { MAX_DECKS, draftOffer, fillDeck, heroHolder, resolveDeck, sanitizeBook, swapHero, versionPlayer } from "../src/lib/game/deck";
 
 function player(id: string, ovr: number, extra: Partial<Player> = {}): Player {
@@ -1488,5 +1489,24 @@ describe("poder zerado e origem dos efeitos", () => {
     expect(parts).toContainEqual(expect.objectContaining({ k: "from", n: pocket.p.name, v: -pocket.v }));
     expect(parts.reduce((a, x) => a + x.v, 0)).toBe(m.pow(t));
     expect(parts.some((x) => x.k === "bonus")).toBe(false);
+  });
+});
+
+describe("simulação do baralho", () => {
+  const deck = pool.slice(0, 12);
+  it("dá o mesmo resultado com a mesma semente e soma as partidas", () => {
+    const a = simulate(gameConfig(undefined), pool, deck, 20, 7);
+    const b = simulate(gameConfig(undefined), pool, deck, 20, 7);
+    expect(a).toEqual(b);
+    expect(a.n).toBe(20);
+    expect(a.win + a.loss + a.draw).toBe(20);
+    expect(winRate(a)).toBeGreaterThanOrEqual(0);
+    expect(winRate(a)).toBeLessThanOrEqual(100);
+  });
+  it("baralho bem mais forte vence mais", () => {
+    const byOvr = [...pool].sort((x, y) => y.ovr - x.ovr);
+    const strong = simulate(gameConfig(undefined), byOvr.slice(-40), byOvr.slice(0, 12), 60);
+    const weak = simulate(gameConfig(undefined), byOvr.slice(0, 40), byOvr.slice(-12), 60);
+    expect(winRate(strong)).toBeGreaterThan(winRate(weak));
   });
 });
