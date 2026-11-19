@@ -1064,19 +1064,11 @@ function Location({ m, l, i, t, marks, canPlay, onPlay, dest, onDest, drop, card
       style={dealAt !== undefined ? ({ "--d": `${dealAt.toFixed(2)}s` } as CSSProperties) : undefined}
       className={`relative flex min-w-0 flex-1 flex-col items-center justify-between gap-1 px-2 py-1.5 transition-[filter] duration-150 sm:gap-2 sm:px-4 sm:py-3 ${drop === "dim" ? "brightness-50" : ""} ${dealAt !== undefined ? "intro-drop" : ""}`}>
       <div className={`relative content-end ${side}`} aria-label={t.ui.aiSide(nm)} role="group"><SideMarks {...marks("a")} />{l.s.a.map(card)}</div>
-      <div className="relative w-full"><LocTile i={i} nm={nm} desc={desc} chips={chips} a={a} p={p} /></div>
+      <div className="relative w-full"><LocTile i={i} nm={nm} desc={desc} chips={chips} a={a} p={p} next={forecast?.total} /></div>
       <div className={`relative content-start ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
         <SideMarks {...marks("p")} />
         {l.s.p.map(card)}
-        {/* previsão: quanto a carta soma e como fica o seu lado, na cor de quem venceria (verde, amarelo empate, vermelho) */}
-        {forecast && (
-          <span role="status" aria-label={t.ui.forecast(forecast.add, forecast.total, forecast.foe)}
-            className={`pointer-events-none absolute top-1 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full px-3 py-1 text-sm font-extrabold whitespace-nowrap shadow-[0_3px_10px_rgb(0_0_0/0.7)] sm:text-base ${forecast.total > forecast.foe ? "bg-game-me text-zinc-950" : forecast.total === forecast.foe ? "bg-lane-yellow text-zinc-950" : "bg-game-ai text-zinc-950"}`}>
-            <span aria-hidden="true">+{forecast.add}</span>
-            <span aria-hidden="true" className="opacity-60">→</span>
-            <span aria-hidden="true" className="tabular-nums">{forecast.total}</span>
-          </span>
-        )}
+        {forecast && <span role="status" className="sr-only">{t.ui.forecast(forecast.add, forecast.total, forecast.foe)}</span>}
         {canPlay && (
           <button type="button" onClick={onPlay} aria-label={t.ui.playHere(nm)}
             className={`absolute inset-0 cursor-pointer rounded-md outline-2 outline-offset-2 outline-game-me outline-dashed hover:bg-game-me/10 active:bg-game-me/20 ${focus}`} />
@@ -1530,13 +1522,16 @@ function TickTag({ tone, className = "", still = false, children }: { tone: stri
  * Placa do local entre os dois lados: o nome numa etiqueta grande na cor da faixa (a única que dá o tique), o efeito numa
  * caixa escura com a letra na cor da faixa (toque para ler inteiro) e o poder de cada lado nas pontas (o seu à esquerda).
  */
-function LocTile({ i, nm, desc, chips, a, p }: { i: number; nm: string; desc: string; chips: [boolean, string, string][]; a: number; p: number }) {
+function LocTile({ i, nm, desc, chips, a, p, next }: {
+  i: number; nm: string; desc: string; chips: [boolean, string, string][]; a: number; p: number;
+  /** Previsão do seu lado com a carta escolhida (aparece translúcida por cima do número). */ next?: number;
+}) {
   const [full, setFull] = useState(false);
   const lane = LANE[i % 3];
   return (
     <div className="@container flex w-full flex-col items-center gap-2 text-center leading-tight">
       <div className="flex w-full flex-wrap items-center justify-between gap-1 @sm:flex-nowrap">
-        <ScoreTag v={p} lead={p > a} side="p" />
+        <ScoreTag v={p} lead={p > a} side="p" ghost={next === undefined ? undefined : { v: next, vs: a }} />
         <motion.h3 key={nm} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.9 }}
           className="order-first flex w-full min-w-0 justify-center text-lg font-extrabold tracking-wide wrap-break-word hyphens-auto text-zinc-950 [font-variant-caps:small-caps] @3xs:text-2xl @sm:order-0 @sm:w-auto @sm:flex-1 @sm:text-2xl @[26rem]:text-3xl">
           <TickTag tone={lane.tag} className="line-clamp-2 max-w-full min-w-0 px-2 py-1 sm:px-4">{nm}</TickTag>
@@ -1559,10 +1554,18 @@ function LocTile({ i, nm, desc, chips, a, p }: { i: number; nm: string; desc: st
 }
 
 /** Poder de um lado numa caixa escura parada (sem recorte, para o halo e o +N/−N não serem cortados). */
-function ScoreTag({ v, lead, side }: { v: number; lead: boolean; side: Side }) {
+function ScoreTag({ v, lead, side, ghost }: { v: number; lead: boolean; side: Side; /** Previsão: o número que ficaria, contra `vs`. */ ghost?: { v: number; vs: number } }) {
   return (
-    <span className="grid shrink-0 place-items-center rounded-xs bg-zinc-950 px-0.5 py-1 shadow-[0_3px_0_rgb(0_0_0/0.6)] sm:px-1.5">
-      <Score v={v} lead={lead} side={side} />
+    <span className="relative grid shrink-0 place-items-center rounded-xs bg-zinc-950 px-0.5 py-1 shadow-[0_3px_0_rgb(0_0_0/0.6)] sm:px-1.5">
+      <span className={`grid place-items-center transition-opacity duration-150 motion-reduce:transition-none ${ghost ? "opacity-20" : ""}`}><Score v={v} lead={lead} side={side} /></span>
+      {/* previsão por cima do número atual, translúcida, na cor de quem venceria (verde, amarelo empate, vermelho) */}
+      {ghost && (
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 grid place-items-center">
+          <em className={`text-2xl leading-none font-extrabold not-italic tabular-nums opacity-75 [text-shadow:0_0_12px_currentColor,0_2px_0_rgb(0_0_0/0.85)] motion-safe:animate-pulse sm:text-4xl ${ghost.v > ghost.vs ? "text-game-me" : ghost.v === ghost.vs ? "text-lane-yellow" : "text-game-ai"}`}>
+            {ghost.v}
+          </em>
+        </span>
+      )}
     </span>
   );
 }
