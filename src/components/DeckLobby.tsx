@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useState, type CSSProperties, type ReactNode } from "react";
-import { ReceiptButton, TagButton } from "./BarButton";
+import { FullscreenButton, TagButton } from "./BarButton";
 import { CardBack } from "./GameCard";
 import { deckFocus, type DeckKit } from "./DeckStrip";
 import { useT } from "../lib/i18n";
@@ -10,12 +10,13 @@ import { MAX_DECKS, resolveDeck, type DeckBook, type DeckLook } from "../lib/gam
 import { GAME_TEXT } from "../lib/game/text";
 
 const COSTS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+const CLIP = "[clip-path:polygon(2%_8%,99%_0,100%_90%,0_100%)]";
 
 /** Etiqueta de papel colada torta, só para ler (o mesmo recorte das placas dos locais). */
-function Label({ tone, ink, tilt = -1, className = "", children }: { tone: string; ink: string; tilt?: 1 | -1; className?: string; children: ReactNode }) {
+export function Label({ tone, ink, tilt = -1, className = "", children }: { tone: string; ink: string; tilt?: 1 | -1; className?: string; children: ReactNode }) {
   return (
     <span className={`relative isolate inline-flex items-center px-2.5 py-1 text-[11px] font-extrabold tracking-widest uppercase drop-shadow-[0_2px_0_rgb(0_0_0/0.6)] ${ink} ${className}`}>
-      <span aria-hidden="true" className={`absolute inset-0 -z-10 [clip-path:polygon(2%_8%,99%_0,100%_90%,0_100%)] ${tilt < 0 ? "-rotate-2" : "rotate-2"} ${tone}`} />
+      <span aria-hidden="true" className={`absolute inset-0 -z-10 ${CLIP} ${tilt < 0 ? "-rotate-2" : "rotate-2"} ${tone}`} />
       {children}
     </span>
   );
@@ -39,9 +40,9 @@ function ChipCurve({ cards, kit, label }: { cards: PoolCard[]; kit: DeckKit; lab
   const curve = COSTS.map((n) => cards.filter((c) => Math.min(8, Math.max(1, kit.stats(c).cost)) === n).length);
   return (
     <figure className="flex flex-col items-center gap-1" aria-label={`${label}: ${COSTS.map((n, i) => `${n}: ${curve[i]}`).join(", ")}`}>
-      <div className="flex h-16 items-end gap-2" aria-hidden="true">
+      <div className="flex h-12 items-end gap-1.5" aria-hidden="true">
         {curve.map((n, i) => (
-          <span key={COSTS[i]} className="flex w-6 flex-col-reverse items-center gap-px">
+          <span key={COSTS[i]} className="flex w-5 flex-col-reverse items-center gap-px">
             {Array.from({ length: n }, (_, j) => (
               <span key={j} className="h-1.5 w-full rounded-full bg-linear-to-r from-amber-700 via-amber-200 to-amber-700 shadow-[0_1px_0_rgb(0_0_0/0.7)] even:from-teal-800 even:via-teal-200 even:to-teal-800" />
             ))}
@@ -49,18 +50,19 @@ function ChipCurve({ cards, kit, label }: { cards: PoolCard[]; kit: DeckKit; lab
           </span>
         ))}
       </div>
-      <figcaption className="flex gap-2 text-[10px] font-bold text-zinc-500" aria-hidden="true">
-        {COSTS.map((n) => <span key={n} className="w-6 text-center">{n === 8 ? "8+" : n}</span>)}
+      <figcaption className="flex gap-1.5 text-[10px] font-bold text-zinc-500" aria-hidden="true">
+        {COSTS.map((n) => <span key={n} className="w-5 text-center">{n === 8 ? "8+" : n}</span>)}
       </figcaption>
     </figure>
   );
 }
 
 /**
- * Tela de baralhos: o baralho escolhido aberto em leque sob a luz do bar (as vagas vazias aparecem viradas), os números dele,
- * Jogar (a conta do bar) e a prateleira dos baralhos salvos, de pé na mesa. A coleção não fica aqui: ela abre na oficina
- * (montar à mão) ou no draft (1 de 3). Passar o mouse numa carta do leque abre espaço, endireita e amplia a carta com o
- * texto da habilidade.
+ * Tela de baralhos, feita para caber na tela sem rolar: o baralho escolhido aberto em leque sob a luz do bar (o tamanho das
+ * cartas acompanha a altura da tela; as vagas vazias aparecem viradas), os números dele, as ações em etiquetas (Jogar no
+ * meio, o dobro das vizinhas) e os baralhos salvos numa coluna à direita (no celular, numa fileira embaixo). A coleção não
+ * fica aqui: ela abre na oficina (montar à mão) ou no draft (1 de 3). Passar o mouse numa carta do leque abre espaço,
+ * endireita e amplia a carta com o texto da habilidade.
  */
 export function DeckLobby({ book, versions, deck, look, kit, onPick, onNew, onEdit, onDraft, onOpen, onPlay, coverOf }: {
   book: DeckBook; versions: Map<string, PoolCard[]>; deck: PoolCard[]; look: DeckLook; kit: DeckKit;
@@ -80,104 +82,110 @@ export function DeckLobby({ book, versions, deck, look, kit, onPick, onNew, onEd
   const bookFull = book.decks.length >= MAX_DECKS;
 
   return (
-    <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-6 text-dl-text">
-      {/* luz do lampião sobre o leque */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-144 bg-radial-[ellipse_60%_55%_at_50%_45%] from-amber-200/12 via-amber-500/5 to-transparent to-70%" />
+    // altura da tela menos o menu do site e o respiro da página: tudo cabe sem rolar
+    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-5 text-dl-text lg:h-[calc(100dvh-10rem)] lg:min-h-128 lg:flex-row lg:gap-6">
+      <FullscreenButton label={t.ui.fullscreen} className="absolute top-0 right-0 z-30" />
 
-      <header className="relative flex flex-col items-center gap-3 text-center">
-        <Label tone="bg-linear-to-b from-amber-200 to-game-brass" ink="text-zinc-950">{t.ui.title}</Label>
-        <h1 className="font-display text-3xl font-extrabold tracking-[0.08em] text-balance uppercase drop-shadow-[0_4px_18px_rgb(0_0_0/0.8)] sm:text-5xl">{cur.name}</h1>
-        <p className="flex flex-wrap items-center justify-center gap-2" aria-live="polite">
-          <Label tone={full ? "bg-linear-to-b from-teal-100 to-game-soul" : "bg-linear-to-b from-rose-200 to-rose-400"} ink={full ? "text-zinc-950" : "text-rose-950"} tilt={1}>
-            {full ? t.deck.ready : t.deck.missing(DECK_SIZE - deck.length)}
-          </Label>
-          {deck.length > 0 && <Label tone="bg-comanda-paper" ink="text-comanda-ink">{t.deck.avg(avg)}</Label>}
-          <Label tone="bg-zinc-800" ink="text-zinc-200" tilt={1}>{t.deck.looks[look]}</Label>
-        </p>
-      </header>
+      <div className="relative flex min-w-0 flex-1 flex-col items-center justify-between gap-3 lg:min-h-0">
+        {/* luz do lampião sobre o leque */}
+        <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-full bg-radial-[ellipse_60%_45%_at_50%_40%] from-amber-200/12 via-amber-500/5 to-transparent to-70%" />
 
-      {/* o leque: 12 posições em arco; vaga vazia é o verso do baralho apagado */}
-      <ol aria-label={t.deck.list} onPointerLeave={() => setHot(null)}
-        className="relative h-[calc(var(--w)*1.46+4.5rem)] w-full max-w-4xl [--gap:min(4.4rem,6.5vw)] [--w:clamp(4.6rem,14vw,9.5rem)]">
-        {Array.from({ length: DECK_SIZE }, (_, i) => {
-          const c = sorted[i];
-          const k = i - mid;
-          const on = hot === i;
-          // as vizinhas abrem espaço para a carta em destaque
-          const push = hot === null || on ? 0 : i > hot ? 1 : -1;
-          const pos = { "--k": k, "--push": push, zIndex: on ? 50 : i + 1 } as CSSProperties;
-          return (
-            <li key={c?.key ?? `gap${i}`} style={pos}
-              className="absolute top-0 left-1/2 w-(--w) transform-[translateX(calc(-50%+var(--k)*var(--gap)+var(--push)*min(2.6rem,4vw)))_translateY(calc(var(--k)*var(--k)*0.13rem+0.6rem))_rotate(calc(var(--k)*3deg))] transition-transform duration-200 ease-out motion-reduce:transition-none">
-              <motion.div key={`${cur.id}-${c?.id ?? i}`} initial={still ? false : { y: 90, opacity: 0, rotate: -8 }} animate={{ y: 0, opacity: 1, rotate: 0 }}
-                transition={{ duration: 0.28, delay: still ? 0 : i * 0.03, ease: [0.23, 1, 0.32, 1] }}>
-                {c ? (
-                  <motion.button type="button" onClick={() => onOpen(c.key)} aria-label={t.deck.open(t.deck.version(c.name, c.hero))}
-                    onHoverStart={() => setHot(i)} onFocus={() => setHot(i)} onBlur={() => setHot((h) => (h === i ? null : h))}
-                    animate={on ? { y: "-18%", scale: 1.6, rotate: -k * 3 } : { y: 0, scale: 1, rotate: 0 }}
-                    transition={still ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32 }}
-                    className={`block w-full cursor-pointer rounded-xl ${on ? "drop-shadow-[0_18px_30px_rgb(0_0_0/0.85)]" : "drop-shadow-[0_10px_14px_rgb(0_0_0/0.6)]"} ${deckFocus}`}>
-                    {on ? kit.full(c) : kit.face(c)}
-                  </motion.button>
-                ) : (
-                  <CardBack look={look} className="opacity-25 grayscale" />
-                )}
-              </motion.div>
-            </li>
-          );
-        })}
-      </ol>
+        <header className="relative flex flex-col items-center gap-2 text-center">
+          <Label tone="bg-linear-to-b from-amber-200 to-game-brass" ink="text-zinc-950">{t.ui.title}</Label>
+          <h1 className="font-display text-3xl font-extrabold tracking-[0.08em] text-balance uppercase drop-shadow-[0_4px_18px_rgb(0_0_0/0.8)] sm:text-4xl xl:text-5xl">{cur.name}</h1>
+          <p className="flex flex-wrap items-center justify-center gap-2" aria-live="polite">
+            <Label tone={full ? "bg-linear-to-b from-teal-100 to-game-soul" : "bg-linear-to-b from-rose-200 to-rose-400"} ink={full ? "text-zinc-950" : "text-rose-950"} tilt={1}>
+              {full ? t.deck.ready : t.deck.missing(DECK_SIZE - deck.length)}
+            </Label>
+            {deck.length > 0 && <Label tone="bg-comanda-paper" ink="text-comanda-ink">{t.deck.avg(avg)}</Label>}
+            <Label tone="bg-zinc-800" ink="text-zinc-200" tilt={1}>{t.deck.looks[look]}</Label>
+          </p>
+        </header>
 
-      {/* números e ações */}
-      <div className="relative flex w-full max-w-xl flex-col items-center gap-5">
-        <SoulPips n={deck.length} />
-        {deck.length > 0 ? <ChipCurve cards={deck} kit={kit} label={t.deck.curve} /> : <p className="max-w-sm text-center text-sm text-zinc-400">{t.deck.emptyHint}</p>}
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
-          <TagButton tone="brass" onClick={onEdit}>{t.deck.edit}</TagButton>
-          <ReceiptButton label={t.deck.play} note={full ? t.deck.avg(avg) : t.deck.missing(DECK_SIZE - deck.length)} disabled={!full} onClick={onPlay} className="order-first sm:order-0" />
-          <TagButton tone="soul" tilt={1} onClick={onDraft} disabled={draftBlocked} title={draftBlocked ? t.deck.maxDecks(MAX_DECKS) : t.deck.draftHint}>{t.deck.draft}</TagButton>
+        {/* o leque: 12 posições em arco; vaga vazia é o verso do baralho apagado. A largura da carta vem da altura que sobra. */}
+        <ol aria-label={t.deck.list} onPointerLeave={() => setHot(null)}
+          className="relative h-[calc(var(--w)*1.46+3.5rem)] w-full max-w-4xl shrink-0 [--gap:min(4.4rem,6.5vw)] [--w:clamp(4.4rem,min(14vw,calc((100dvh-36rem)/1.46)),10rem)]">
+          {Array.from({ length: DECK_SIZE }, (_, i) => {
+            const c = sorted[i];
+            const k = i - mid;
+            const on = hot === i;
+            // as vizinhas abrem espaço para a carta em destaque
+            const push = hot === null || on ? 0 : i > hot ? 1 : -1;
+            const pos = { "--k": k, "--push": push, zIndex: on ? 50 : i + 1 } as CSSProperties;
+            return (
+              <li key={c?.key ?? `gap${i}`} style={pos}
+                className="absolute top-0 left-1/2 w-(--w) transform-[translateX(calc(-50%+var(--k)*var(--gap)+var(--push)*min(2.6rem,4vw)))_translateY(calc(var(--k)*var(--k)*0.11rem+0.4rem))_rotate(calc(var(--k)*3deg))] transition-transform duration-200 ease-out motion-reduce:transition-none">
+                <motion.div key={`${cur.id}-${c?.id ?? i}`} initial={still ? false : { y: 90, opacity: 0, rotate: -8 }} animate={{ y: 0, opacity: 1, rotate: 0 }}
+                  transition={{ duration: 0.28, delay: still ? 0 : i * 0.03, ease: [0.23, 1, 0.32, 1] }}>
+                  {c ? (
+                    <motion.button type="button" onClick={() => onOpen(c.key)} aria-label={t.deck.open(t.deck.version(c.name, c.hero))}
+                      onHoverStart={() => setHot(i)} onFocus={() => setHot(i)} onBlur={() => setHot((h) => (h === i ? null : h))}
+                      animate={on ? { y: "-14%", scale: 1.6, rotate: -k * 3 } : { y: 0, scale: 1, rotate: 0 }}
+                      transition={still ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32 }}
+                      className={`block w-full cursor-pointer rounded-xl ${on ? "drop-shadow-[0_18px_30px_rgb(0_0_0/0.85)]" : "drop-shadow-[0_10px_14px_rgb(0_0_0/0.6)]"} ${deckFocus}`}>
+                      {on ? kit.full(c) : kit.face(c)}
+                    </motion.button>
+                  ) : (
+                    <CardBack look={look} className="opacity-25 grayscale" />
+                  )}
+                </motion.div>
+              </li>
+            );
+          })}
+        </ol>
+
+        {/* números: as vagas em almas e a curva em fichas, lado a lado */}
+        <div className="relative flex flex-wrap items-end justify-center gap-x-8 gap-y-2">
+          <SoulPips n={deck.length} />
+          {deck.length > 0 ? <ChipCurve cards={deck} kit={kit} label={t.deck.curve} /> : <p className="max-w-xs text-center text-xs text-zinc-400">{t.deck.emptyHint}</p>}
+        </div>
+
+        {/* ações: Jogar no meio, o dobro das vizinhas; no celular ele fica sozinho na primeira linha */}
+        <div className="relative flex flex-wrap items-center justify-center gap-x-8 gap-y-4 pb-2">
+          <TagButton tone="paper" delay={0.1} onClick={onEdit}>{t.deck.edit}</TagButton>
+          <TagButton tone="brass" size="xl" tilt={1} delay={0} call={full} disabled={!full} title={full ? undefined : t.deck.missing(DECK_SIZE - deck.length)}
+            onClick={onPlay} className="order-first basis-full sm:order-0 sm:basis-auto">
+            {t.deck.play}
+          </TagButton>
+          <TagButton tone="soul" tilt={1} delay={0.2} onClick={onDraft} disabled={draftBlocked} title={draftBlocked ? t.deck.maxDecks(MAX_DECKS) : t.deck.draftHint}>{t.deck.draft}</TagButton>
         </div>
       </div>
 
-      {/* prateleira: os baralhos de pé na mesa, com o nome numa etiqueta; o escolhido fica sob a luz */}
-      <section aria-labelledby="deck-shelf" className="relative flex w-full flex-col items-center gap-3">
-        <h2 id="deck-shelf"><Label tone="bg-zinc-800" ink="text-zinc-300">{t.deck.decks}</Label></h2>
-        <ul className="flex w-full snap-x gap-4 overflow-x-auto px-2 pt-6 pb-3 sm:justify-center-safe">
-          {book.decks.map((d) => {
+      {/* baralhos salvos: coluna à direita (como a lista de decks do Hearthstone); no celular, uma fileira que rola de lado */}
+      <section aria-labelledby="deck-shelf" className="relative flex flex-col gap-3 lg:min-h-0 lg:w-60 lg:shrink-0 lg:pt-12">
+        <h2 id="deck-shelf" className="flex justify-center lg:justify-start"><Label tone="bg-zinc-800" ink="text-zinc-300">{t.deck.decks}</Label></h2>
+        <ul className="flex snap-x gap-2 overflow-x-auto pb-1 lg:min-h-0 lg:flex-1 lg:snap-none lg:flex-col lg:overflow-x-visible lg:overflow-y-auto lg:pr-1">
+          {book.decks.map((d, i) => {
             const cards = resolveDeck(d.cards, versions);
             const cv = coverOf(cards, d.cover);
             const on = d.id === book.current;
             return (
-              <li key={d.id} className="w-24 shrink-0 snap-start sm:w-28">
+              <motion.li key={d.id} className="w-44 shrink-0 snap-start lg:w-full" initial={still ? false : { opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: still ? 0 : 0.05 * i }}>
                 <button type="button" onClick={() => onPick(d.id)} aria-pressed={on} aria-label={`${d.name} · ${t.deck.cards(cards.length)}`}
-                  className={`group relative flex w-full cursor-pointer flex-col items-center gap-2 rounded-xl text-left transition active:scale-95 motion-reduce:transition-none ${deckFocus} ${on ? "" : "opacity-70 hover:opacity-100"}`}>
-                  {/* luz na mesa embaixo do baralho escolhido */}
-                  <span aria-hidden="true" className={`pointer-events-none absolute inset-x-[-25%] bottom-6 h-1/2 bg-radial from-game-brass/45 to-transparent to-70% blur-md transition-opacity duration-200 motion-reduce:transition-none ${on ? "opacity-100" : "opacity-0 group-hover:opacity-50"}`} />
-                  <span className={`relative block w-full pt-10 transition-transform duration-200 motion-reduce:transition-none sm:pt-12 ${on ? "-translate-y-1.5" : "group-hover:-translate-y-1"}`}>
-                    {cv && (
-                      // o brilho da moldura da carta vaza para baixo: corta só na capa
-                      <span className="absolute inset-x-3 top-0 block origin-bottom -rotate-6 overflow-clip rounded-lg transition-transform duration-200 group-hover:-translate-y-1.5 motion-reduce:transition-none">{kit.face(cv)}</span>
-                    )}
-                    <CardBack look={d.look ?? "noir"} className="absolute inset-x-0 bottom-0 origin-bottom rotate-3 brightness-50" />
-                    <CardBack look={d.look ?? "noir"} className={`relative drop-shadow-[0_0.4rem_0.6rem_rgb(0_0_0/0.6)] ${on ? "" : "brightness-75"}`} />
+                  className={`group relative isolate flex min-h-14 w-full cursor-pointer items-center gap-3 py-1.5 pr-3 pl-2 text-left transition active:scale-[0.97] motion-reduce:transition-none ${deckFocus} ${on ? "text-comanda-ink" : "text-zinc-200"}`}>
+                  {/* o escolhido vira uma etiqueta de papel; os outros só ganham papel no hover */}
+                  <span aria-hidden="true" className={`absolute inset-0 -z-10 ${CLIP} transition duration-200 motion-reduce:transition-none ${i % 2 ? "rotate-1" : "-rotate-1"} ${on ? "bg-comanda-paper drop-shadow-[0_3px_0_rgb(0_0_0/0.6)]" : "bg-zinc-800/0 group-hover:bg-zinc-800/80"}`} />
+                  <span className="relative w-9 shrink-0 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:-rotate-3 motion-reduce:transition-none">
+                    <CardBack look={d.look ?? "noir"} className="drop-shadow-[0_2px_3px_rgb(0_0_0/0.7)]" />
+                    {cv && <span className="absolute -top-1 -right-3 w-6 rotate-12 overflow-clip rounded-sm drop-shadow-[0_2px_3px_rgb(0_0_0/0.7)]">{kit.face(cv)}</span>}
                   </span>
-                  <Label tone={on ? "bg-comanda-paper" : "bg-zinc-800"} ink={on ? "text-comanda-ink" : "text-zinc-300"} tilt={on ? -1 : 1} className="max-w-full">
-                    <span className="line-clamp-2 text-center wrap-break-word">{d.name}</span>
-                  </Label>
-                  <span className={`text-[10px] font-bold ${cards.length === DECK_SIZE ? "text-game-me" : "text-zinc-500"}`}>{cards.length}/{DECK_SIZE}</span>
+                  <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                    <b className="truncate text-sm font-extrabold tracking-wide uppercase">{d.name}</b>
+                    <span className={`text-[11px] font-bold ${cards.length === DECK_SIZE ? (on ? "text-teal-800" : "text-game-me") : on ? "text-comanda-ink/60" : "text-zinc-500"}`}>{t.deck.cards(cards.length)} · {cards.length}/{DECK_SIZE}</span>
+                  </span>
                 </button>
-              </li>
+              </motion.li>
             );
           })}
-          {/* baralho novo: um verso fantasma esperando as cartas */}
-          <li className="w-24 shrink-0 snap-start sm:w-28">
+          <li className="w-44 shrink-0 snap-start lg:w-full">
             <button type="button" onClick={onNew} disabled={bookFull} title={bookFull ? t.deck.maxDecks(MAX_DECKS) : undefined}
-              className={`group flex w-full cursor-pointer flex-col items-center gap-2 rounded-xl transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none ${deckFocus}`}>
-              <span className="relative block w-full pt-10 transition-transform duration-200 group-enabled:group-hover:-translate-y-1 motion-reduce:transition-none sm:pt-12">
-                <CardBack look={look} className="opacity-20 grayscale transition-opacity duration-200 group-enabled:group-hover:opacity-40 motion-reduce:transition-none" />
-                <span aria-hidden="true" className="absolute inset-x-0 bottom-0 grid aspect-295/430 place-items-center text-4xl font-black text-zinc-300 drop-shadow-[0_2px_0_rgb(0_0_0/0.8)]">+</span>
+              className={`group relative isolate flex min-h-14 w-full cursor-pointer items-center gap-3 py-1.5 pr-3 pl-2 text-left text-zinc-300 transition hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none ${deckFocus}`}>
+              <span aria-hidden="true" className={`absolute inset-0 -z-10 ${CLIP} rotate-1 bg-zinc-800/0 transition duration-200 group-enabled:group-hover:bg-zinc-800/80 motion-reduce:transition-none`} />
+              <span className="relative grid w-9 shrink-0 place-items-center">
+                <CardBack look={look} className="opacity-25 grayscale" />
+                <span aria-hidden="true" className="absolute text-2xl font-black text-zinc-200 drop-shadow-[0_2px_0_rgb(0_0_0/0.8)]">+</span>
               </span>
-              <Label tone="bg-linear-to-b from-amber-200 to-game-brass" ink="text-zinc-950" tilt={1}>{t.deck.newDeck}</Label>
+              <b className="text-sm font-extrabold tracking-wide uppercase">{t.deck.newDeck}</b>
             </button>
           </li>
         </ul>

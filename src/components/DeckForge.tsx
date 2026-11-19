@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "motion/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { FullscreenButton } from "./BarButton";
 import { CardBack } from "./GameCard";
 import { DeckCurve, DeckPips, DeckStrip, deckFocus, type DeckKit } from "./DeckStrip";
 import { HoldButton } from "./HoldButton";
@@ -122,6 +123,7 @@ export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, cu
           <button type="button" className={`${pill(false)} disabled:cursor-not-allowed disabled:opacity-50`} disabled={deckCount >= MAX_DECKS} onClick={onDuplicate}>{t.deck.duplicate}</button>
           <HoldButton className={`${pill(false)} text-rose-300`} label={`${t.deck.remove}: ${cur.name}`} onConfirm={onRemove}>{t.deck.remove}</HoldButton>
         </div>
+        <FullscreenButton label={t.ui.fullscreen} className="ml-auto" />
       </header>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">

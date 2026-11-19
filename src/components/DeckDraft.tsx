@@ -1,10 +1,11 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { FullscreenButton, TagButton } from "./BarButton";
 import { CardBack } from "./GameCard";
 import { DeckCurve, DeckPips, DeckStrip, deckFocus, type DeckKit } from "./DeckStrip";
 import { Icon } from "./Icon";
 import { useT } from "../lib/i18n";
-import { pill, primaryBtn } from "../lib/ui";
+import { pill } from "../lib/ui";
 import type { PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
 import { draftOffer, type DeckLook } from "../lib/game/deck";
@@ -12,7 +13,9 @@ import { GAME_TEXT } from "../lib/game/text";
 
 /**
  * Draft (como a Arena do Hearthstone): doze rodadas, cada uma com 3 jogadores de OVR parecido saindo do baralho virados. Você
- * escolhe 1, ele vai para a lista ao lado e a próxima rodada vem. No fim, salva o baralho ou já joga.
+ * escolhe 1, ele vai para a lista ao lado e a próxima rodada vem. No fim, salva o baralho ou já joga. As cartas vêm com o
+ * texto da habilidade; no hover a carta cresce para ler, e o "i" abre ela grande (no celular, onde a carta é pequena).
+ * As teclas 1, 2 e 3 escolhem.
  */
 export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
   versions: Map<string, PoolCard[]>; look: DeckLook; kit: DeckKit;
@@ -23,6 +26,9 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
   const [picks, setPicks] = useState<PoolCard[]>([]);
   const [offer, setOffer] = useState<PoolCard[]>(() => draftOffer([], versions));
   const [chosen, setChosen] = useState<string | null>(null);
+  const [hot, setHot] = useState<string | null>(null);
+  // carta aberta grande para ler (com Escolher)
+  const [zoom, setZoom] = useState<PoolCard | null>(null);
   const done = picks.length >= DECK_SIZE || !offer.length;
   const sorted = [...picks].sort((a, b) => kit.stats(a).cost - kit.stats(b).cost || a.name.localeCompare(b.name));
 
@@ -37,6 +43,16 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
       setChosen(null);
     }, still ? 0 : 380);
   };
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (zoom) { if (e.key === "Escape") setZoom(null); return; }
+      if ((e.target as HTMLElement).closest("input, textarea")) return;
+      const c = offer[Number(e.key) - 1];
+      if (c && !done) pick(c);
+    };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  });
 
   return (
     <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 text-dl-text">
@@ -49,8 +65,8 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
             {done ? t.deck.draftDone : t.deck.round(picks.length + 1, DECK_SIZE)}
           </h1>
         </div>
-        {/* espaço do botão da esquerda, para o título ficar no centro */}
-        <span aria-hidden="true" className="hidden w-32 sm:block" />
+        {/* tela cheia no canto, do tamanho do botão da esquerda para o título ficar no centro */}
+        <span className="flex justify-end sm:w-32"><FullscreenButton label={t.ui.fullscreen} className="absolute top-0 right-0 sm:static" /></span>
       </header>
 
       <div className="relative flex flex-col gap-8 lg:flex-row lg:items-start">
@@ -65,23 +81,28 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
                     const s = kit.stats(c);
                     const me = chosen === c.id;
                     const gone = chosen !== null && !me;
+                    const on = hot === c.id && !chosen;
                     return (
-                      <motion.li key={`${picks.length}-${c.id}`} className="flex w-[clamp(6.2rem,28vw,13rem)] flex-col items-center gap-2"
+                      <motion.li key={`${picks.length}-${c.id}`} className={`relative flex w-[clamp(6.2rem,28vw,14rem)] flex-col items-center gap-2 ${on ? "z-20" : "z-0"}`}
                         initial={still ? { opacity: 0 } : { opacity: 0, y: 60, rotateY: 180 }}
-                        animate={still ? { opacity: gone ? 0.2 : 1 } : { opacity: gone ? 0 : 1, y: me ? -30 : gone ? 40 : 0, rotateY: 0, scale: me ? 1.06 : 1 }}
+                        animate={still ? { opacity: gone ? 0.2 : 1, scale: on ? 1.3 : 1 } : { opacity: gone ? 0 : 1, y: me ? -30 : gone ? 40 : on ? -24 : 0, rotateY: 0, scale: me ? 1.06 : on ? 1.3 : 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.34, delay: chosen || still ? 0 : 0.1 + i * 0.12, ease: [0.23, 1, 0.32, 1] }}>
-                        <button type="button" onClick={() => pick(c)} disabled={chosen !== null} aria-label={t.deck.pick(t.deck.version(c.name, c.hero))}
-                          className={`group relative block w-full cursor-pointer rounded-xl transition-transform duration-200 transform-3d hover:-translate-y-2 active:scale-95 disabled:cursor-default motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${deckFocus}`}>
+                        transition={{ duration: hot ? 0.18 : 0.34, delay: chosen || still || hot ? 0 : 0.1 + i * 0.12, ease: [0.23, 1, 0.32, 1] }}
+                        onHoverStart={() => setHot(c.id)} onHoverEnd={() => setHot((h) => (h === c.id ? null : h))}>
+                        <button type="button" onClick={() => pick(c)} disabled={chosen !== null} aria-label={`${i + 1}: ${t.deck.pick(t.deck.version(c.name, c.hero))}`}
+                          onFocus={() => setHot(c.id)} onBlur={() => setHot((h) => (h === c.id ? null : h))}
+                          className={`group relative block w-full cursor-pointer rounded-xl transform-3d active:scale-95 disabled:cursor-default ${deckFocus}`}>
                           {/* o verso por trás: aparece enquanto a carta gira */}
                           <span aria-hidden="true" className="absolute inset-0 transform-[rotateY(180deg)] backface-hidden"><CardBack look={look} /></span>
                           <span className={`block backface-hidden ${me ? "drop-shadow-[0_0_24px_var(--color-game-me)]" : "drop-shadow-[0_12px_18px_rgb(0_0_0/0.6)] group-hover:drop-shadow-[0_0_18px_rgb(255_239_215/0.35)]"}`}>
-                            {kit.face(c)}
+                            {kit.full(c)}
                           </span>
                         </button>
-                        <span className="flex flex-col items-center text-center leading-tight">
-                          <span className="text-[11px] text-zinc-400">{c.hero} · OVR {c.ovr} · {s.cost}/{s.power}</span>
-                        </span>
+                        <button type="button" onClick={() => setZoom(c)} aria-label={t.deck.open(t.deck.version(c.name, c.hero))}
+                          className={`flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[11px] text-zinc-400 transition hover:bg-white/8 hover:text-zinc-100 active:scale-95 motion-reduce:transition-none sm:min-h-8 ${deckFocus} ${on ? "opacity-0" : ""}`}>
+                          <Icon name="info" className="size-3.5 shrink-0" />
+                          <span>{c.hero} · OVR {c.ovr} · {s.cost}/{s.power}</span>
+                        </button>
                       </motion.li>
                     );
                   })}
@@ -91,9 +112,9 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
           ) : (
             <motion.div initial={still ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-4">
               <DeckCurve cards={picks} kit={kit} label={t.deck.curve} className="h-10 w-64" />
-              <div className="flex flex-wrap justify-center gap-3">
-                <button type="button" className={`${primaryBtn} min-h-14 px-10 text-base active:scale-95`} disabled={picks.length < DECK_SIZE} onClick={() => onPlay(picks)}>{t.deck.playNow}</button>
-                <button type="button" className={`${pill(false)} min-h-14 active:scale-95`} onClick={() => onSave(picks)}>{t.deck.save}</button>
+              <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
+                <TagButton tone="brass" size="xl" call disabled={picks.length < DECK_SIZE} onClick={() => onPlay(picks)}>{t.deck.playNow}</TagButton>
+                <TagButton tone="paper" tilt={1} delay={0.1} onClick={() => onSave(picks)}>{t.deck.save}</TagButton>
               </div>
             </motion.div>
           )}
@@ -112,6 +133,22 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
           </ul>
         </aside>
       </div>
+      <AnimatePresence>
+        {zoom && (
+          <motion.div key="zoom" className="fixed inset-0 z-80 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
+            onClick={(e) => { if (e.target === e.currentTarget) setZoom(null); }}>
+            <motion.div role="dialog" aria-modal="true" aria-label={t.deck.version(zoom.name, zoom.hero)} className="flex w-full max-w-xs flex-col items-center gap-5"
+              initial={still ? false : { scale: 0.85, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ duration: 0.2 }}>
+              <div className="w-full">{kit.full(zoom)}</div>
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+                <TagButton tone="paper" onClick={() => setZoom(null)}>{t.deck.close}</TagButton>
+                <TagButton tone="brass" tilt={1} call onClick={() => { const c = zoom; setZoom(null); pick(c); }}>{t.deck.pick(zoom.name)}</TagButton>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
