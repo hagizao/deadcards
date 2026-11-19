@@ -123,6 +123,11 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
   const avg = deck.length ? Math.round(deck.reduce((a, c) => a + c.ovr, 0) / deck.length) : 0;
   const sorted = [...deck].sort((a, b) => kit.stats(a).cost - kit.stats(b).cost || a.name.localeCompare(b.name));
   const mid = (DECK_SIZE - 1) / 2;
+  /** Queda de cada carta na saída: quando solta (fora de ordem, estável) e quanto gira caindo. */
+  const drop = Array.from({ length: DECK_SIZE }, (_, i) => {
+    const r = (n: number) => { const x = Math.sin((i + 1) * n) * 43758.5453; return x - Math.floor(x); };
+    return { at: r(12.9898) * 0.22, spin: (r(78.233) - 0.5) * 40 };
+  });
   const rate = odds ? winRate(odds) : 0;
   // o draft escreve no baralho atual se ele estiver vazio; senão abre um baralho novo
   const draftBlocked = deck.length > 0 && book.decks.length >= MAX_DECKS;
@@ -159,12 +164,9 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
         </header>
 
         {/* o leque: 12 posições em arco; vaga vazia é o verso do baralho apagado. A largura da carta vem da altura que sobra. */}
-        {/* na saída, o leque deita para trás em perspectiva (como baixar as cartas na mesa) e as cartas se juntam */}
-        <motion.ol aria-label={t.deck.list} onPointerLeave={() => setHot(null)}
-          style={{ transformPerspective: 650, originY: 1 }}
-          animate={leaving ? { rotateX: 74, y: "30%", scale: 0.8, opacity: [1, 1, 0] } : { rotateX: 0, y: 0, scale: 1, opacity: 1 }}
-          transition={{ duration: 0.65, ease: [0.55, 0, 0.45, 1], opacity: { duration: 0.65, times: [0, 0.75, 1] } }}
-          className={`relative h-[calc(var(--w)*1.46+3.5rem)] w-full max-w-4xl shrink-0 ${leaving ? "pointer-events-none [--gap:min(2.2rem,3.5vw)]" : "[--gap:min(4.4rem,6.5vw)]"} [--w:clamp(4.4rem,min(14vw,calc((100dvh-41rem)/1.46)),10rem)]`}>
+        {/* na saída, as cartas despencam em queda livre até a borda de baixo da tela, por cima do escuro */}
+        <ol aria-label={t.deck.list} onPointerLeave={() => setHot(null)}
+          className={`relative h-[calc(var(--w)*1.46+3.5rem)] w-full max-w-4xl shrink-0 [--gap:min(4.4rem,6.5vw)] ${leaving ? "pointer-events-none z-50" : ""} [--w:clamp(4.4rem,min(14vw,calc((100dvh-41rem)/1.46)),10rem)]`}>
           {Array.from({ length: DECK_SIZE }, (_, i) => {
             const c = sorted[i];
             const k = i - mid;
@@ -176,8 +178,11 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
               <li key={c?.key ?? `gap${i}`} style={pos}
                 className="absolute top-0 left-1/2 w-(--w) transform-[translateX(calc(-50%+var(--k)*var(--gap)+var(--push)*min(2.6rem,4vw)))_translateY(calc(var(--k)*var(--k)*0.11rem+0.4rem))_rotate(calc(var(--k)*3deg))] transition-transform duration-200 ease-out motion-reduce:transition-none">
                 <motion.div key={`${cur.id}-${c?.id ?? i}`} initial={still ? false : { y: 90, opacity: 0, rotate: -8 }}
-                  animate={{ y: 0, opacity: 1, rotate: 0 }}
-                  transition={{ duration: 0.28, delay: still ? 0 : i * 0.03, ease: [0.23, 1, 0.32, 1] }}>
+                  animate={leaving ? { y: "110vh", rotate: drop[i].spin } : { y: 0, opacity: 1, rotate: 0 }}
+                  transition={leaving
+                    // gravidade: começa parada e acelera (cada carta solta num instante, fora de ordem)
+                    ? { duration: 0.55, delay: drop[i].at, ease: [0.55, 0, 1, 0.45] }
+                    : { duration: 0.28, delay: still ? 0 : i * 0.03, ease: [0.23, 1, 0.32, 1] }}>
                   {c ? (
                     <motion.button type="button" onClick={() => onOpen(c.key)} aria-label={t.deck.open(t.deck.version(c.name, c.hero))}
                       onHoverStart={() => setHot(i)} onPointerEnter={(e) => { if (e.pointerType === "mouse") sfx("hover"); }} onFocus={() => setHot(i)} onBlur={() => setHot((h) => (h === i ? null : h))}
@@ -193,7 +198,7 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
               </li>
             );
           })}
-        </motion.ol>
+        </ol>
 
         {/* números: as vagas em almas e a curva em fichas, lado a lado */}
         <div className={`relative flex flex-wrap items-end justify-center gap-x-10 gap-y-3 ${fade}`}>
