@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "motion/
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { FullscreenButton, TAG_CLIP, TagButton } from "./BarButton";
 import { CardBack } from "./GameCard";
+import { MiniSoul } from "./GameHud";
 import { DeckCurve, DeckPips, DeckStrip, deckFocus, type DeckKit } from "./DeckStrip";
 import { HoldButton } from "./HoldButton";
 import { Icon } from "./Icon";
@@ -139,7 +140,7 @@ export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, cu
               <span className="sr-only">{t.deck.search}</span>
               <input type="search" className={`${field} w-full`} placeholder={t.deck.search} value={query} onChange={(e) => setQuery(e.target.value)} />
             </label>
-            {/* "Todos" numa etiqueta; cada custo na orbe de almas da carta, acesa quando escolhida */}
+            {/* "Todos" numa etiqueta; cada custo numa alma, acesa quando escolhida */}
             <div role="group" aria-label={t.deck.costFilter} className="flex max-w-full items-center gap-1.5 overflow-x-auto px-1 py-2">
               <TagButton tone="paper" size="sm" pressed={cost === null} onClick={() => setCost(null)} className="shrink-0">{t.deck.costAll}</TagButton>
               {COSTS.map((c) => {
@@ -147,10 +148,9 @@ export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, cu
                 return (
                   <motion.button key={c} type="button" onClick={() => { sfx("soul", 0.5); setCost((x) => (x === c ? null : c)); }} aria-pressed={on} aria-label={`${t.deck.costFilter} ${c === 8 ? "8+" : c}`}
                     animate={{ scale: on ? 1.12 : 1, y: on ? -2 : 0 }} whileHover={still ? undefined : { y: -3 }} whileTap={{ scale: 0.88 }} transition={{ type: "spring", stiffness: 600, damping: 24 }}
-                    className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-radial-[at_50%_35%] from-teal-400 via-teal-800 to-teal-950 text-sm font-extrabold text-white transition-[filter,box-shadow] duration-200 motion-reduce:transition-none sm:size-10 ${deckFocus} ${on
-                      ? "shadow-[0_0_0_2px_var(--color-game-soul),0_0_16px_var(--color-game-soul)]"
-                      : "shadow-[0_0_0_2px_rgb(255_255_255/0.1),0_3px_0_rgb(0_0_0/0.6)] brightness-[0.6] saturate-50 hover:brightness-100 hover:saturate-100"}`}>
-                    {c === 8 ? "8+" : c}
+                    className={`shrink-0 cursor-pointer rounded-full transition-opacity duration-200 motion-reduce:transition-none ${deckFocus} ${on ? "" : "opacity-75 hover:opacity-100"}`}>
+                    {/* a alma da carta: acesa (chama tremulando) quando o custo está escolhido */}
+                    <MiniSoul lit={on} i={c} className="size-11 text-sm sm:size-10">{c === 8 ? "8+" : c}</MiniSoul>
                   </motion.button>
                 );
               })}

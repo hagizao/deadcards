@@ -1,6 +1,6 @@
 // HUD do Cardslock Game: orbe de almas (como as almas que saem dos tropas no Deadlock) e o botão de fim do turno com o contador.
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import soulsIcon from "../assets/game/souls.png";
 import { setAudio, sfx, useAudio } from "../lib/game/sfx";
 
@@ -12,6 +12,28 @@ const rnd = (seed: number) => {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
   return x - Math.floor(x);
 };
+
+/**
+ * Alma pequena, a mesma da orbe da partida em miniatura: um vidro escuro com aro de alma e a chama tremulando dentro, com um
+ * halo que respira. Apagada, vira um encaixe vazio de latão com a chama quase sumida. `i` escalona a tremulação; o tamanho
+ * vem da className (size-*). O conteúdo (um número) fica por cima da chama.
+ */
+export function MiniSoul({ lit, i = 0, className = "size-6", children }: { lit: boolean; i?: number; className?: string; children?: ReactNode }) {
+  const d = { "--d": `${(-rnd(i + 1) * 2.2).toFixed(2)}s` } as CSSProperties;
+  return (
+    <span className={`relative grid shrink-0 place-items-center ${className}`} style={d}>
+      {lit && <span aria-hidden="true" className="absolute -inset-1.5 soul-breathe rounded-full bg-game-soul/45 blur-md" />}
+      <span aria-hidden="true" className={`absolute inset-0 overflow-hidden rounded-full transition duration-300 motion-reduce:transition-none ${lit
+        ? "bg-radial-[at_50%_35%] from-teal-600 via-teal-950 to-zinc-950 shadow-[inset_0_-0.2rem_0.4rem_rgb(0_0_0/0.7),0_0_0_1.5px_var(--color-game-soul),0_0_8px_var(--color-game-soul)]"
+        : "bg-zinc-950 shadow-[inset_0_0.15rem_0.35rem_rgb(0_0_0/0.95)] ring-[1.5px] ring-game-brass/40"}`}>
+        <img src={soulsIcon} alt="" draggable={false} className={`absolute inset-0 m-auto h-4/5 ${lit ? "soul-flicker" : "opacity-15 grayscale"}`} />
+      </span>
+      {children !== undefined && (
+        <b className={`relative leading-none font-extrabold [text-shadow:0_1px_0_rgb(0_0_0/0.9),0_0_6px_rgb(0_0_0/0.9)] ${lit ? "text-white" : "text-zinc-400"}`}>{children}</b>
+      )}
+    </span>
+  );
+}
 
 /**
  * Orbe de almas: as almas ganhas no começo do turno voam para dentro do orbe (como no Deadlock, quando você
