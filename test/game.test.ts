@@ -560,6 +560,21 @@ describe("escolhas, movimento e execução", () => {
     expect(m.heard[0]).toEqual({ ab: "Bebop", id: b.id, side: "p", to: [a.id], at: 0, self: false, ev: "pull" });
   });
 
+  it("Victor anima os dois lados; o Mestre só o lado inimigo", () => {
+    for (const lvl of [0, 2] as const) {
+      const { m, put, stage } = arena();
+      const ally = put(pc("al", "Herói Novo", flat(70)), "p", 0);
+      const foe = put(pc("fo", "Herói Novo", flat(70)), "a", 0);
+      m.heard.length = 0;
+      const v = stage(pc("v", "Victor", flat(70)), 0);
+      v.lvl = lvl;
+      m.reveal(v, m.loc[0]);
+      const to = m.heard.find((h) => h.id === v.id)?.to ?? [];
+      expect(to.includes(foe.id)).toBe(true);
+      expect(to.includes(ally.id)).toBe(lvl !== 2);
+    }
+  });
+
   it("armadilha do Venator e olhar da Vyper entram na lista quando a inimiga é revelada", () => {
     for (const [ab, ev] of [["Venator", "trap"], ["Vyper", "petri"]] as const) {
       const { m, mk, put } = arena();

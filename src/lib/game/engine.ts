@@ -333,14 +333,15 @@ export class Match {
     if (this.locOf(c)) this.fire(c, f, "late");
     else f();
   }
-  /** Em quem a constante age, para a animação: os alvos da Nurse Harrow, as inimigas do Warden, as aliadas da Paige e do Solomon, todas do Victor. */
+  /** Em quem a constante age, para a animação: os alvos da Nurse Harrow, as inimigas do Warden, as aliadas da Paige e do Solomon, todas do Victor (só as inimigas, se Mestre). */
   private constTargets(c: GCard, l: Loc): number[] {
     const foes = l.s[opp(c.side)].filter((x) => x.rev), mine = l.s[c.side].filter((x) => x.rev && x !== c);
     switch (c.ab) {
       case "Nurse Harrow": { const h = this.harrow(c, l); return [h.foe, h.ally].flatMap((x) => (x && x !== c ? [x.id] : [])); }
       case "Warden": return foes.map((x) => x.id);
       case "Paige": case "Solomon": case "aura": return mine.map((x) => x.id);
-      case "Victor": return [...mine, ...foes].map((x) => x.id);
+      // o Mestre poupa o próprio lado
+      case "Victor": return (this.master(c) ? foes : [...mine, ...foes]).map((x) => x.id);
       default: return [];
     }
   }

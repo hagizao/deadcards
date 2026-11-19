@@ -376,6 +376,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
       if (h.ab === "Venator") veilFor(`trap${h.at}${h.ev === "trap" ? opp(h.side) : foe}`, h.ev === "trap" ? "keep" : "hide", t + (h.ev === "trap" ? 130 : 600));
       // a névoa de quem age no local inteiro só aparece quando a cena dela chega na mesa
       if (h.ab in MIST) veilFor(`${h.ab}${h.at}${h.side}`, "hide", t + 700);
+      if (h.ab === "Victor") veilFor(`Victor${h.at}${foe}`, "hide", t + 700);
       const alt = h.ab === "The Doorman" ? laneBox(m.portals.at(-1)?.b) : null;
       later(() => rig.start(h.ab, { id: h.id, box: old(h.id) }, dst, { self: h.self, ev: h.ev, lane: laneBox(h.at), alt, shake: quake }), t);
       t += ms;
@@ -510,6 +511,10 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   const marksOf = (l: Loc, i: number, s: Side): Marks => {
     const v = (k: string, on: boolean) => (veil[`${k}${i}${s}`] === "hide" ? false : on || veil[`${k}${i}${s}`] === "keep");
     const here = new Set(l.s[s].filter((c) => c.rev).map((c) => m.abilityOf(c)));
+    // o Victor dói nos dois lados: a névoa dele cobre também o lado inimigo, e o Mestre poupa o próprio lado
+    const victor = (c: GCard) => c.rev && m.abilityOf(c) === "Victor";
+    here.delete("Victor");
+    if (l.s[s].some((c) => victor(c) && !m.master(c)) || l.s[opp(s)].some(victor)) here.add("Victor");
     return {
       petri: v("petri", !!l.petri[s]),
       trap: v("trap", l.trap[s] > 0),
