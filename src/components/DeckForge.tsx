@@ -1,15 +1,16 @@
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "motion/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { FullscreenButton } from "./BarButton";
+import { FullscreenButton, TagButton } from "./BarButton";
 import { CardBack } from "./GameCard";
 import { DeckCurve, DeckPips, DeckStrip, deckFocus, type DeckKit } from "./DeckStrip";
 import { HoldButton } from "./HoldButton";
 import { Icon } from "./Icon";
 import { useT } from "../lib/i18n";
-import { field, pill, primaryBtn } from "../lib/ui";
+import { field, pill } from "../lib/ui";
 import { ALT_MALUS, ALT_POL, type PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
 import { DECK_LOOKS, DECK_NAME_MAX, MAX_DECKS, heroTaken, type DeckLook, type SavedDeck } from "../lib/game/deck";
+import { sfx } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 
 const COSTS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
@@ -96,7 +97,7 @@ export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, cu
       <DeckPips n={deck.length} max={DECK_SIZE} />
     </div>
   );
-  const play = <button type="button" className={`${primaryBtn} min-h-12 px-8 text-sm active:scale-95`} disabled={!full} onClick={onPlay}>{t.deck.play}</button>;
+  const play = <TagButton tone="yellow" call={full} disabled={!full} onClick={onPlay}>{t.deck.play}</TagButton>;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 pb-28 text-dl-text lg:pb-0">
@@ -173,7 +174,7 @@ export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, cu
                           <motion.button type="button" onClick={() => (taken ? onOpen(c.key) : !blocked || on ? onToggle(c) : undefined)}
                             aria-pressed={on} aria-disabled={blocked && !taken} aria-label={on ? t.deck.take(c.name) : taken ? t.deck.dupHero(c.hero) : t.deck.add(t.deck.version(c.name, c.hero))}
                             title={taken ? t.deck.dupHero(c.hero) : blocked ? t.deck.full(DECK_SIZE) : undefined}
-                            whileHover={still || blocked ? undefined : { y: -6 }} whileTap={blocked ? undefined : { scale: 0.95 }} transition={{ duration: 0.15 }}
+                            whileHover={still || blocked ? undefined : { y: -6 }} onPointerEnter={(e) => { if (e.pointerType === "mouse" && !blocked) sfx("hover"); }} whileTap={blocked ? undefined : { scale: 0.95 }} transition={{ duration: 0.15 }}
                             className={`relative block w-full rounded-xl ${deckFocus} ${blocked && !taken ? "cursor-not-allowed" : "cursor-pointer"}`}>
                             <span className={`block transition-[filter,opacity] duration-200 motion-reduce:transition-none ${on ? "opacity-45 saturate-50" : taken ? "opacity-60 grayscale" : blocked ? "opacity-50" : "drop-shadow-[0_8px_12px_rgb(0_0_0/0.55)]"}`}>
                               {kit.face(c)}

@@ -7,6 +7,8 @@ import { useT } from "../lib/i18n";
 import type { PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
 import { MAX_DECKS, resolveDeck, type DeckBook, type DeckLook } from "../lib/game/deck";
+import { winRate, type SimResult } from "../lib/game/sim";
+import { sfx } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 
 const COSTS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
@@ -64,8 +66,10 @@ function ChipCurve({ cards, kit, label }: { cards: PoolCard[]; kit: DeckKit; lab
  * fica aqui: ela abre na oficina (montar à mão) ou no draft (1 de 3). Passar o mouse numa carta do leque abre espaço,
  * endireita e amplia a carta com o texto da habilidade.
  */
-export function DeckLobby({ book, versions, deck, look, kit, onPick, onNew, onEdit, onDraft, onOpen, onPlay, coverOf }: {
+export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew, onEdit, onDraft, onOpen, onPlay, coverOf }: {
   book: DeckBook; versions: Map<string, PoolCard[]>; deck: PoolCard[]; look: DeckLook; kit: DeckKit;
+  /** Partidas simuladas contra a IA (null enquanto simula ou com o baralho incompleto). */
+  odds: SimResult | null;
   onPick: (id: string) => void; onNew: () => void; onEdit: () => void; onDraft: () => void; onOpen: (key: string) => void; onPlay: () => void;
   coverOf: (cards: PoolCard[], id?: string) => PoolCard | undefined;
 }) {
@@ -77,6 +81,7 @@ export function DeckLobby({ book, versions, deck, look, kit, onPick, onNew, onEd
   const avg = deck.length ? Math.round(deck.reduce((a, c) => a + c.ovr, 0) / deck.length) : 0;
   const sorted = [...deck].sort((a, b) => kit.stats(a).cost - kit.stats(b).cost || a.name.localeCompare(b.name));
   const mid = (DECK_SIZE - 1) / 2;
+  const rate = odds ? winRate(odds) : 0;
   // o draft escreve no baralho atual se ele estiver vazio; senão abre um baralho novo
   const draftBlocked = deck.length > 0 && book.decks.length >= MAX_DECKS;
   const bookFull = book.decks.length >= MAX_DECKS;
@@ -91,13 +96,17 @@ export function DeckLobby({ book, versions, deck, look, kit, onPick, onNew, onEd
         <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-full bg-radial-[ellipse_60%_45%_at_50%_40%] from-amber-200/12 via-amber-500/5 to-transparent to-70%" />
 
         <header className="relative flex flex-col items-center gap-2 text-center">
-          <Label tone="bg-linear-to-b from-amber-200 to-game-brass" ink="text-zinc-950">{t.ui.title}</Label>
+          <Label tone="bg-lane-yellow" ink="text-zinc-950">{t.ui.title}</Label>
           <h1 className="font-display text-3xl font-extrabold tracking-[0.08em] text-balance uppercase drop-shadow-[0_4px_18px_rgb(0_0_0/0.8)] sm:text-4xl xl:text-5xl">{cur.name}</h1>
           <p className="flex flex-wrap items-center justify-center gap-2" aria-live="polite">
-            <Label tone={full ? "bg-linear-to-b from-teal-100 to-game-soul" : "bg-linear-to-b from-rose-200 to-rose-400"} ink={full ? "text-zinc-950" : "text-rose-950"} tilt={1}>
+            <Label tone={full ? "bg-lane-green" : "bg-game-ai"} ink="text-zinc-950" tilt={1}>
               {full ? t.deck.ready : t.deck.missing(DECK_SIZE - deck.length)}
             </Label>
             {deck.length > 0 && <Label tone="bg-comanda-paper" ink="text-comanda-ink">{t.deck.avg(avg)}</Label>}
+            {/* chance de vitória medida em partidas simuladas, na cor das faixas: verde favorito, amarelo parelho, vermelho azarão */}
+            {full && (odds
+              ? <span title={t.deck.oddsHint(odds.n)}><Label tone={rate >= 55 ? "bg-lane-green" : rate >= 45 ? "bg-lane-yellow" : "bg-game-ai"} ink="text-zinc-950">{t.deck.odds(rate)}</Label></span>
+              : <Label tone="bg-zinc-800" ink="text-zinc-300" className="motion-safe:animate-pulse">{t.deck.oddsWait}</Label>)}
             <Label tone="bg-zinc-800" ink="text-zinc-200" tilt={1}>{t.deck.looks[look]}</Label>
           </p>
         </header>
@@ -119,7 +128,7 @@ export function DeckLobby({ book, versions, deck, look, kit, onPick, onNew, onEd
                   transition={{ duration: 0.28, delay: still ? 0 : i * 0.03, ease: [0.23, 1, 0.32, 1] }}>
                   {c ? (
                     <motion.button type="button" onClick={() => onOpen(c.key)} aria-label={t.deck.open(t.deck.version(c.name, c.hero))}
-                      onHoverStart={() => setHot(i)} onFocus={() => setHot(i)} onBlur={() => setHot((h) => (h === i ? null : h))}
+                      onHoverStart={() => setHot(i)} onPointerEnter={(e) => { if (e.pointerType === "mouse") sfx("hover"); }} onFocus={() => setHot(i)} onBlur={() => setHot((h) => (h === i ? null : h))}
                       animate={on ? { y: "-14%", scale: 1.6, rotate: -k * 3 } : { y: 0, scale: 1, rotate: 0 }}
                       transition={still ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32 }}
                       className={`block w-full cursor-pointer rounded-xl ${on ? "drop-shadow-[0_18px_30px_rgb(0_0_0/0.85)]" : "drop-shadow-[0_10px_14px_rgb(0_0_0/0.6)]"} ${deckFocus}`}>
@@ -142,12 +151,12 @@ export function DeckLobby({ book, versions, deck, look, kit, onPick, onNew, onEd
 
         {/* ações: Jogar no meio, o dobro das vizinhas; no celular ele fica sozinho na primeira linha */}
         <div className="relative flex flex-wrap items-center justify-center gap-x-8 gap-y-4 pb-2">
-          <TagButton tone="paper" delay={0.1} onClick={onEdit}>{t.deck.edit}</TagButton>
-          <TagButton tone="brass" size="xl" tilt={1} delay={0} call={full} disabled={!full} title={full ? undefined : t.deck.missing(DECK_SIZE - deck.length)}
+          <TagButton tone="blue" delay={0.1} onClick={onEdit}>{t.deck.edit}</TagButton>
+          <TagButton tone="yellow" size="xl" tilt={1} delay={0} call={full} disabled={!full} title={full ? undefined : t.deck.missing(DECK_SIZE - deck.length)}
             onClick={onPlay} className="order-first basis-full sm:order-0 sm:basis-auto">
             {t.deck.play}
           </TagButton>
-          <TagButton tone="soul" tilt={1} delay={0.2} onClick={onDraft} disabled={draftBlocked} title={draftBlocked ? t.deck.maxDecks(MAX_DECKS) : t.deck.draftHint}>{t.deck.draft}</TagButton>
+          <TagButton tone="green" tilt={1} delay={0.2} call={!deck.length} onClick={onDraft} disabled={draftBlocked} title={draftBlocked ? t.deck.maxDecks(MAX_DECKS) : t.deck.draftHint}>{t.deck.draft}</TagButton>
         </div>
       </div>
 

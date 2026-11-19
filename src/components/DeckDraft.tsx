@@ -9,6 +9,7 @@ import { pill } from "../lib/ui";
 import type { PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
 import { draftOffer, type DeckLook } from "../lib/game/deck";
+import { sfx } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 
 /**
@@ -46,7 +47,7 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (zoom) { if (e.key === "Escape") setZoom(null); return; }
-      if ((e.target as HTMLElement).closest("input, textarea")) return;
+      if (e.target instanceof Element && e.target.closest("input, textarea")) return;
       const c = offer[Number(e.key) - 1];
       if (c && !done) pick(c);
     };
@@ -88,7 +89,7 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
                         animate={still ? { opacity: gone ? 0.2 : 1, scale: on ? 1.3 : 1 } : { opacity: gone ? 0 : 1, y: me ? -30 : gone ? 40 : on ? -24 : 0, rotateY: 0, scale: me ? 1.06 : on ? 1.3 : 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: hot ? 0.18 : 0.34, delay: chosen || still || hot ? 0 : 0.1 + i * 0.12, ease: [0.23, 1, 0.32, 1] }}
-                        onHoverStart={() => setHot(c.id)} onHoverEnd={() => setHot((h) => (h === c.id ? null : h))}>
+                        onHoverStart={() => setHot(c.id)} onPointerEnter={(e) => { if (e.pointerType === "mouse" && !chosen) sfx("hover"); }} onHoverEnd={() => setHot((h) => (h === c.id ? null : h))}>
                         <button type="button" onClick={() => pick(c)} disabled={chosen !== null} aria-label={`${i + 1}: ${t.deck.pick(t.deck.version(c.name, c.hero))}`}
                           onFocus={() => setHot(c.id)} onBlur={() => setHot((h) => (h === c.id ? null : h))}
                           className={`group relative block w-full cursor-pointer rounded-xl transform-3d active:scale-95 disabled:cursor-default ${deckFocus}`}>
@@ -113,8 +114,8 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
             <motion.div initial={still ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-4">
               <DeckCurve cards={picks} kit={kit} label={t.deck.curve} className="h-10 w-64" />
               <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
-                <TagButton tone="brass" size="xl" call disabled={picks.length < DECK_SIZE} onClick={() => onPlay(picks)}>{t.deck.playNow}</TagButton>
-                <TagButton tone="paper" tilt={1} delay={0.1} onClick={() => onSave(picks)}>{t.deck.save}</TagButton>
+                <TagButton tone="yellow" size="xl" call disabled={picks.length < DECK_SIZE} onClick={() => onPlay(picks)}>{t.deck.playNow}</TagButton>
+                <TagButton tone="blue" tilt={1} delay={0.1} onClick={() => onSave(picks)}>{t.deck.save}</TagButton>
               </div>
             </motion.div>
           )}
@@ -143,7 +144,7 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
               <div className="w-full">{kit.full(zoom)}</div>
               <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
                 <TagButton tone="paper" onClick={() => setZoom(null)}>{t.deck.close}</TagButton>
-                <TagButton tone="brass" tilt={1} call onClick={() => { const c = zoom; setZoom(null); pick(c); }}>{t.deck.pick(zoom.name)}</TagButton>
+                <TagButton tone="yellow" tilt={1} call onClick={() => { const c = zoom; setZoom(null); pick(c); }}>{t.deck.pick(zoom.name)}</TagButton>
               </div>
             </motion.div>
           </motion.div>
