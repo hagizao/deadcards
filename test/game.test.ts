@@ -5,7 +5,7 @@ import {
 } from "../src/lib/game/config";
 import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Loc, type Side } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
-import { MAX_DECKS, fillDeck, heroHolder, resolveDeck, sanitizeBook, swapHero, versionPlayer } from "../src/lib/game/deck";
+import { MAX_DECKS, draftOffer, fillDeck, heroHolder, resolveDeck, sanitizeBook, swapHero, versionPlayer } from "../src/lib/game/deck";
 
 function player(id: string, ovr: number, extra: Partial<Player> = {}): Player {
   return {
@@ -881,6 +881,24 @@ describe("deck montado e deck da IA", () => {
     expect(f.slice(0, 2)).toEqual(d);
     const byId = new Map(list.map((p) => [p.id, p]));
     expect(versionPlayer(byId, { id: "a~Wraith", hero: "Wraith" })).toMatchObject({ id: "a", hero: "Wraith" });
+  });
+
+  it("draft: oferece 3 jogadores fora do baralho, sem herói repetido, e um draft inteiro fecha 12 cartas válidas", () => {
+    const list = [player("a", 80, { hero: "Haze", heroPool: ["Wraith"] }), ...HEROES.slice(0, 20).map((hero, i) => player(`q${i}`, 60 + i, { hero }))];
+    const v = cardVersions(list);
+    const rnd = seeded(4);
+    let deck: PoolCard[] = [];
+    while (deck.length < 12) {
+      const offer = draftOffer(deck, v, rnd);
+      expect(offer).toHaveLength(3);
+      expect(new Set(offer.map((c) => c.hero)).size).toBe(3);
+      expect(new Set(offer.map((c) => c.key)).size).toBe(3);
+      for (const c of offer) {
+        expect(deck.some((x) => x.key === c.key || x.hero === c.hero)).toBe(false);
+      }
+      deck = [...deck, offer[0]];
+    }
+    expect(resolveDeck(deck.map((c) => c.id), v)).toHaveLength(12);
   });
 });
 

@@ -114,3 +114,33 @@ export function versionPlayer(byId: Map<string, Player>, c: { id?: string; hero:
   const base = byId.get(c.id.split("~")[0]);
   return base && c.hero ? { ...base, hero: c.hero, art: undefined } : null;
 }
+
+/**
+ * Oferta de uma rodada do draft (1 de 3, como a Arena): jogadores que ainda não estão no baralho, cada um numa versão de herói
+ * que o baralho ainda não tem (a principal, se der), sem repetir herói entre as opções. As opções têm OVR parecido, para a
+ * escolha ser de estilo e não óbvia: sorteia uma carta e completa com as de OVR mais perto dela.
+ */
+export function draftOffer(deck: PoolCard[], versions: Map<string, PoolCard[]>, rnd: () => number = Math.random, n = 3): PoolCard[] {
+  const used = new Set(deck.map((c) => c.key));
+  const heroes = new Set(deck.map((c) => c.hero));
+  const open = [...versions.values()]
+    .filter((l) => !used.has(l[0].key))
+    .map((l) => l.filter((v) => !heroes.has(v.hero)))
+    .filter((l) => l.length)
+    .map((l) => (rnd() < 0.7 ? l[0] : l[Math.floor(rnd() * l.length)]));
+  if (!open.length) return [];
+  const anchor = open[Math.floor(rnd() * open.length)];
+  const near = open.filter((c) => c !== anchor).sort((a, b) => Math.abs(a.ovr - anchor.ovr) - Math.abs(b.ovr - anchor.ovr) || rnd() - 0.5);
+  const out = [anchor];
+  const pick = new Set([anchor.hero]);
+  // entre as mais perto, sorteia um pouco para a mesma âncora não dar sempre as mesmas vizinhas
+  const pool = near.slice(0, Math.max(n * 2, 6));
+  while (out.length < n && pool.length) {
+    const c = pool.splice(Math.floor(rnd() * Math.min(pool.length, 3)), 1)[0];
+    if (pick.has(c.hero)) continue;
+    pick.add(c.hero);
+    out.push(c);
+  }
+  for (const c of near) if (out.length < n && !pick.has(c.hero) && !out.includes(c)) { pick.add(c.hero); out.push(c); }
+  return out.sort(() => rnd() - 0.5);
+}
