@@ -155,29 +155,19 @@
   50% { opacity: 0.9; transform: scale(1.1); }
 }
 
-/* Cardslock Game: a mesa chegando depois do Jogar, vista por uma câmera de cima: sobe das sombras na direção da câmera
-   (começa menor, apagada e fora de foco, e cresce até o lugar enquanto acende) */
+/* Cardslock Game: a mesa chegando depois do Jogar: só aparece, de 0% a 100% de opacidade, saindo do escuro (sem zoom) */
 @utility table-arrive {
-  animation: table-arrive 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
-  @media (prefers-reduced-motion: reduce) {
-    animation: table-fade 0.3s ease-out both;
-  }
+  animation: table-fade 0.9s ease-out both;
 }
-@keyframes table-arrive {
-  0% { opacity: 0; transform: scale(0.72); filter: brightness(0) blur(6px); }
-  30% { opacity: 1; }
-  100% { opacity: 1; transform: none; filter: none; }
-}
-/* as sombras em volta da mesa recuam do centro para fora das bordas (a luz chegando) */
+/* as sombras em volta da mesa somem devagar, depois dela (a luz chegando) */
 @utility table-shadows {
-  animation: table-shadows 1.1s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: table-shadows 1.2s ease-in-out both;
   @media (prefers-reduced-motion: reduce) {
     display: none;
   }
 }
 @keyframes table-shadows {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(3.5); }
+  to { opacity: 0; }
 }
 @keyframes table-fade {
   from { opacity: 0; }

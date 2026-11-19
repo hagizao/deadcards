@@ -589,7 +589,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
 
   return (
     <MotionConfig reducedMotion="user">
-    {/* vindo do Jogar, a mesa sobe das sombras na direção da câmera de cima e as sombras recuam para as bordas */}
+    {/* vindo do Jogar, a mesa aparece do escuro (só a opacidade) e as sombras em volta somem depois */}
     <div className={full ? `fixed inset-0 z-50 overflow-hidden px-3 sm:px-6 ${startFull && game === 0 ? "table-arrive" : ""}` : "contents"}>
     <BarTable />
     {full && startFull && game === 0 && <span aria-hidden="true" className="pointer-events-none fixed inset-0 z-100 table-shadows bg-radial from-transparent from-5% to-black to-55%" />}
