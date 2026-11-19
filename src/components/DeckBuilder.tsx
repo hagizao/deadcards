@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CardFocus } from "./CardFocus";
 import { DeckDraft } from "./DeckDraft";
 import { DeckForge } from "./DeckForge";
@@ -7,6 +7,8 @@ import { DeckLobby } from "./DeckLobby";
 import type { DeckKit } from "./DeckStrip";
 import { GameCard } from "./GameCard";
 import { playerArt } from "../lib/cards";
+import { getCardTier, getRarity } from "../lib/rarity";
+import { sfx } from "../lib/game/sfx";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { ABILITIES, cardStats, type GameConfig, type PoolCard } from "../lib/game/config";
@@ -18,6 +20,8 @@ import { simulate, type SimResult } from "../lib/game/sim";
 import { GAME_TEXT } from "../lib/game/text";
 
 const FLY_S = 0.3;
+/** Intervalo entre as cartas do aleatório. */
+const DEAL_MS = 170;
 type Flight = { id: number; from: DOMRect; to: DOMRect; card: ReactNode };
 let flightSeq = 0;
 type Mode = "lobby" | "forge" | "draft";
@@ -57,7 +61,7 @@ function useOdds(cfg: GameConfig, pool: PoolCard[], deck: PoolCard[]): SimResult
  */
 export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<string, PoolCard[]>; pool: PoolCard[]; cfg: GameConfig; onPlay: (deck: PoolCard[], look: DeckLook) => void }) {
   const t = useT(GAME_TEXT);
-  const { players, heroArt } = useData();
+  const { players, heroArt, settings } = useData();
   const still = useReducedMotion();
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
   const [book, setBook] = useState<DeckBook>(() => loadBook(t.deck.defaultName));
@@ -73,10 +77,16 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
   // versão vista na carta em destaque: pode ser uma de herói repetido, só para ver e trocar
   const [focusId, setFocusId] = useState<string | null>(null);
   const [flights, setFlights] = useState<Flight[]>([]);
+  // aleatório distribuindo: os relógios de cada carta (cancelados ao limpar ou sair)
+  const deals = useRef<number[]>([]);
+  const [dealing, setDealing] = useState(false);
+  const stopDeal = useCallback(() => { deals.current.forEach((id) => window.clearTimeout(id)); deals.current = []; setDealing(false); }, []);
+  useEffect(() => stopDeal, [stopDeal]);
 
   const stats = useCallback((c: PoolCard) => cardStats(c, cfg.cards, cfg.heroes), [cfg]);
   const kit: DeckKit = useMemo(() => ({
     stats,
+    tier: (c) => { const p = versionPlayer(byId, c); return p ? getCardTier(p, settings.tierConfig ?? []) : getRarity(c.ovr, settings.tierConfig ?? []); },
     face: (c) => {
       const s = stats(c);
       return <GameCard player={versionPlayer(byId, c)} name={c.name} cost={s.cost} power={s.power} base={s.power} text={null} />;
@@ -92,7 +102,7 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
       const a = p && playerArt(p, heroArt);
       return a ? { url: a.url, x: a.x, y: a.y } : null;
     },
-  }), [stats, byId, heroArt, t]);
+  }), [stats, byId, heroArt, t, settings.tierConfig]);
 
   const inDeck = new Map(deck.map((c) => [c.key, c]));
   const full = deck.length >= DECK_SIZE;
@@ -125,6 +135,26 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
     if (still || !from || !to) return;
     const id = ++flightSeq;
     setFlights((f) => [...f, { id, from, to, card: kit.face(c) }]);
+  };
+  /**
+   * Aleatório: completa o baralho distribuindo uma carta de cada vez, cada uma voando do botão para o baralho e fazendo o
+   * som de carta comprada ao chegar. Sem movimento, entram todas de uma vez.
+   */
+  const deal = () => {
+    const add = fillDeck(deck, versions).slice(deck.length);
+    if (still || !add.length) { setCards((d) => fillDeck(d, versions)); return; }
+    stopDeal();
+    setDealing(true);
+    const from = document.querySelector("[data-deal-from]")?.getBoundingClientRect() ?? null;
+    add.forEach((c, i) => {
+      deals.current.push(window.setTimeout(() => fly(c, from, target()), i * DEAL_MS));
+      deals.current.push(window.setTimeout(() => {
+        sfx("draw", 0.7);
+        // o jogador pode ter mexido no baralho no meio: não repete carta, herói nem passa de 12
+        setCards((d) => (d.length >= DECK_SIZE || d.some((x) => x.key === c.key) || heroTaken(d, c) ? d : [...d, c]));
+        if (i === add.length - 1) { deals.current = []; setDealing(false); }
+      }, i * DEAL_MS + FLY_S * 1000));
+    });
   };
   const toggle = (c: PoolCard, from: DOMRect | null = tileRect(c.key)) => {
     const on = inDeck.has(c.key);
@@ -167,8 +197,8 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
 
   const view = mode === "forge" ? (
     <DeckForge cur={cur} deck={deck} versions={versions} look={look} cover={cover} kit={kit} deckCount={book.decks.length} current={current}
-      onBack={() => setMode("lobby")} onPlay={() => play()} onOpen={openFocus} onToggle={(c) => toggle(c)} onPatch={patchCur}
-      onRandom={() => setCards((d) => fillDeck(d, versions))} onClear={() => setCards(() => [])}
+      onBack={() => { stopDeal(); setMode("lobby"); }} onPlay={() => play()} onOpen={openFocus} onToggle={(c) => toggle(c)} onPatch={patchCur}
+      dealing={dealing} onRandom={deal} onClear={() => { stopDeal(); setCards(() => []); }}
       onDuplicate={() => addDeck(cur.cards, `${cur.name} 2`)} onRemove={removeDeck} />
   ) : mode === "draft" ? (
     <DeckDraft versions={versions} look={look} kit={kit} onLeave={() => setMode("lobby")} onSave={saveDraft}

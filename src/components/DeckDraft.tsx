@@ -5,7 +5,6 @@ import { CardBack } from "./GameCard";
 import { DeckCurve, DeckPips, DeckStrip, deckFocus, type DeckKit } from "./DeckStrip";
 import { Icon } from "./Icon";
 import { useT } from "../lib/i18n";
-import { pill } from "../lib/ui";
 import type { PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
 import { draftOffer, type DeckLook } from "../lib/game/deck";
@@ -59,7 +58,7 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
     <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 text-dl-text">
       <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-10 h-120 bg-radial-[ellipse_55%_50%_at_50%_50%] from-teal-300/10 via-amber-500/5 to-transparent to-70%" />
       <header className="relative flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button type="button" onClick={onLeave} className={`${pill(false)} self-start active:scale-95 sm:self-center`}><Icon name="chevron-left" />{t.deck.leave}</button>
+        <TagButton tone="paper" size="sm" onClick={onLeave} className="self-start sm:self-center"><Icon name="chevron-left" />{t.deck.leave}</TagButton>
         <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
           <span className="text-[11px] font-bold tracking-[0.3em] text-game-brass uppercase">{t.deck.draft}</span>
           <h1 className="font-display text-2xl font-extrabold tracking-[0.08em] uppercase sm:text-4xl" aria-live="polite">

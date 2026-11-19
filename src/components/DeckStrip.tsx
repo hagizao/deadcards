@@ -1,12 +1,15 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Icon } from "./Icon";
 import type { CardStats, PoolCard } from "../lib/game/config";
+import type { Tier } from "../lib/rarity";
 
 export const deckFocus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text";
 
 /** O que as telas de baralho precisam saber de cada carta: números, a carta desenhada e a arte do herói. */
 export type DeckKit = {
   stats: (c: PoolCard) => CardStats;
+  /** Raridade da carta (cor da moldura). */
+  tier: (c: PoolCard) => Tier;
   face: (c: PoolCard) => ReactNode;
   /** A carta com o texto da habilidade e as animações da moldura, para ler (hover do leque). */
   full: (c: PoolCard) => ReactNode;
@@ -24,13 +27,17 @@ export function CostDot({ cost, className = "size-7 text-sm" }: { cost: number; 
 
 /**
  * Tira do baralho (como a lista de deck do Hearthstone): custo, nome e poder sobre um recorte da arte do herói, que some
- * para a esquerda. Tocar abre a carta; o × tira do baralho.
+ * para a esquerda. A borda tem a cor da raridade da carta (a mesma da moldura), com um filete de metal à esquerda.
+ * Tocar abre a carta; o × tira do baralho.
  */
 export function DeckStrip({ c, kit, cover, onOpen, onRemove, openLabel, removeLabel }: {
   c: PoolCard; kit: DeckKit; cover?: boolean; onOpen?: () => void; onRemove?: () => void; openLabel: string; removeLabel: string;
 }) {
   const s = kit.stats(c);
   const art = kit.art(c);
+  const tier = kit.tier(c);
+  // cor da raridade é dado da carta: vai por variável
+  const rk = { "--rk-c": tier.c, "--rk-hi": tier.hi, "--rk-lo": tier.lo } as CSSProperties;
   const body = (
     <>
       {art && (
@@ -46,7 +53,8 @@ export function DeckStrip({ c, kit, cover, onOpen, onRemove, openLabel, removeLa
     </>
   );
   return (
-    <div className="group relative flex items-center overflow-clip rounded-lg bg-zinc-900/90 shadow-[0_2px_8px_rgb(0_0_0/0.45)]">
+    <div style={rk} title={tier.name} className="group relative flex items-center overflow-clip rounded-lg bg-zinc-900/90 shadow-[inset_0_0_0_1.5px_var(--rk-c),0_0_12px_-3px_var(--rk-c),0_2px_8px_rgb(0_0_0/0.45)]">
+      <span aria-hidden="true" className="absolute inset-y-0 left-0 z-10 w-1 bg-linear-to-b from-(--rk-hi) via-(--rk-c) to-(--rk-lo)" />
       {onOpen ? (
         <button type="button" onClick={onOpen} aria-label={openLabel}
           className={`relative flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2 text-left transition active:scale-[0.98] motion-reduce:transition-none ${deckFocus}`}>

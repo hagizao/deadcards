@@ -15,11 +15,18 @@ const TAG = {
   green: { bg: "bg-lane-green", ink: "text-zinc-950", glow: "from-lane-green/60 via-lane-green/20" },
   paper: { bg: "bg-comanda-paper", ink: "text-comanda-ink", glow: "from-comanda-paper/50 via-comanda-paper/15" },
   danger: { bg: "bg-game-ai", ink: "text-zinc-950", glow: "from-game-ai/60 via-game-ai/20" },
+  /** Etiqueta escura, para o que está desligado (filtro não escolhido). */
+  ghost: { bg: "bg-zinc-800", ink: "text-zinc-200", glow: "from-zinc-500/40 via-zinc-700/10" },
 } as const;
+
+/** Recorte torto das etiquetas (o mesmo das placas dos locais). */
+export const TAG_CLIP = "[clip-path:polygon(2%_8%,99%_0,100%_90%,0_100%)]";
 export type TagTone = keyof typeof TAG;
 
 const SIZE = {
   sm: "min-h-11 px-3 text-[11px] sm:min-h-9",
+  /** Só um ícone (setas). */
+  icon: "size-11 text-sm",
   md: "min-h-12 px-5 text-xs",
   /** Jogar: o dobro das vizinhas. */
   xl: "min-h-20 px-12 text-2xl tracking-[0.18em] sm:min-h-24 sm:px-16 sm:text-3xl",
@@ -32,27 +39,30 @@ const SIZE = {
  * - `call`: está pronta para ser usada, então o papel dá o tique seco a cada segundo, como a placa dos locais na partida
  *   (tag-tick; o texto fica parado), com uma luz por trás. No hover o tique para e ela se endireita.
  */
-export function TagButton({ tone = "yellow", tilt = -1, size = "md", delay = 0, call = false, className = "", children, onClick, disabled, title, label }: {
+export function TagButton({ tone = "yellow", tilt = -1, size = "md", delay = 0, call = false, pressed, className = "", children, onClick, disabled, title, label, ...rest }: {
   tone?: TagTone; tilt?: 1 | -1; size?: keyof typeof SIZE; delay?: number; call?: boolean; className?: string; children: ReactNode;
+  /** Botão de liga/desliga (filtros): desligado fica na etiqueta escura; ligado, na cor do tom. */
+  pressed?: boolean;
   onClick?: () => void; disabled?: boolean; title?: string; label?: string;
-}) {
+} & { [k: `data-${string}`]: string | boolean | undefined }) {
   const still = useReducedMotion();
   const live = call && !disabled;
+  const look = TAG[pressed === false ? "ghost" : tone];
   return (
-    <motion.button type="button" onClick={onClick} disabled={disabled} title={title} aria-label={label}
+    <motion.button type="button" onClick={onClick} disabled={disabled} title={title} aria-label={label} aria-pressed={pressed} {...rest}
       onPointerEnter={(e) => { if (e.pointerType === "mouse" && !disabled) sfx("paper"); }}
       initial={still ? false : { opacity: 0, y: -26, rotate: tilt * 8, scale: 1.12 }}
       animate={{ opacity: 1, y: 0, rotate: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 520, damping: 22, delay }}
       whileHover={disabled || still ? undefined : { y: -4, scale: 1.05, rotate: 0, transition: { type: "spring", stiffness: 600, damping: 20 } }}
       whileTap={disabled ? undefined : { y: 2, scale: 0.95 }}
-      className={`group relative isolate inline-flex cursor-pointer items-center justify-center gap-1.5 font-extrabold tracking-widest uppercase drop-shadow-[0_4px_0_rgb(0_0_0/0.6)] disabled:cursor-not-allowed disabled:opacity-45 disabled:grayscale ${SIZE[size]} ${TAG[tone].ink} ${focus} ${className}`}>
+      className={`group relative isolate inline-flex cursor-pointer items-center justify-center gap-1.5 font-extrabold tracking-widest uppercase drop-shadow-[0_4px_0_rgb(0_0_0/0.6)] disabled:cursor-not-allowed disabled:opacity-45 disabled:grayscale ${SIZE[size]} ${look.ink} ${focus} ${className}`}>
       {/* luz por trás quando está pronta */}
       {live && (
-        <span aria-hidden="true" className={`pointer-events-none absolute -inset-5 -z-20 rounded-full bg-radial ${TAG[tone].glow} to-transparent to-70% blur-lg motion-safe:animate-pulse`} />
+        <span aria-hidden="true" className={`pointer-events-none absolute -inset-5 -z-20 rounded-full bg-radial ${look.glow} to-transparent to-70% blur-lg motion-safe:animate-pulse`} />
       )}
       <span aria-hidden="true"
-        className={`absolute inset-0 -z-10 transition-transform duration-150 [clip-path:polygon(2%_8%,99%_0,100%_90%,0_100%)] group-enabled:group-hover:rotate-0 group-enabled:group-hover:animate-none motion-reduce:transition-none ${live ? "tag-tick motion-reduce:-rotate-2" : tilt < 0 ? "-rotate-2" : "rotate-2"} ${TAG[tone].bg}`} />
+        className={`absolute inset-0 -z-10 transition-transform duration-150 ${TAG_CLIP} group-enabled:group-hover:rotate-0 group-enabled:group-hover:animate-none motion-reduce:transition-none ${live ? "tag-tick motion-reduce:-rotate-2" : tilt < 0 ? "-rotate-2" : "rotate-2"} ${look.bg}`} />
       {children}
     </motion.button>
   );

@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { FullscreenButton, TagButton } from "./BarButton";
 import { CardBack } from "./GameCard";
-import { deckFocus, type DeckKit } from "./DeckStrip";
+import { CostDot, deckFocus, type DeckKit } from "./DeckStrip";
 import { useT } from "../lib/i18n";
 import type { PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
@@ -24,36 +24,60 @@ export function Label({ tone, ink, tilt = -1, className = "", children }: { tone
   );
 }
 
-/** As 12 vagas como almas: acesas na cor das almas, apagadas como um encaixe vazio. */
-function SoulPips({ n }: { n: number }) {
+/**
+ * As 12 vagas como as orbes de almas da mesa: acesas brilham na cor das almas (cada uma acende com um pulo, em sequência),
+ * apagadas são encaixes fundos com aro de latão. Ao lado, a conta em números.
+ */
+function SoulPips({ n, still }: { n: number; still: boolean | null }) {
   return (
-    <span aria-hidden="true" className="flex items-center gap-1.5">
-      {Array.from({ length: DECK_SIZE }, (_, i) => (
-        <span key={i} className={`size-3 rounded-full transition duration-200 motion-reduce:transition-none ${i < n
-          ? "bg-radial-[at_50%_35%] from-teal-100 via-game-soul to-teal-700 shadow-[0_0_8px_var(--color-game-soul)]"
-          : "bg-zinc-950/80 shadow-[inset_0_1px_3px_rgb(0_0_0/0.9),0_1px_0_rgb(255_255_255/0.08)]"}`} />
-      ))}
+    <span className="flex items-center gap-3">
+      <span aria-hidden="true" className="flex items-center gap-1.5 sm:gap-2">
+        {Array.from({ length: DECK_SIZE }, (_, i) => (
+          <motion.span key={i} initial={false} animate={i < n && !still ? { scale: [0.6, 1.25, 1] } : { scale: 1 }}
+            transition={{ duration: 0.3, delay: i * 0.025 }}
+            className={`size-4 rounded-full sm:size-5 ${i < n
+              ? "bg-radial-[at_50%_30%] from-white via-game-soul to-teal-800 shadow-[0_0_10px_var(--color-game-soul),inset_0_-2px_3px_rgb(0_0_0/0.35)]"
+              : "bg-zinc-950 shadow-[inset_0_2px_4px_rgb(0_0_0/0.95)] ring-[1.5px] ring-game-brass/35"}`} />
+        ))}
+      </span>
+      <b className={`font-display text-lg leading-none font-extrabold tabular-nums ${n >= DECK_SIZE ? "text-game-soul" : "text-zinc-300"}`}>{n}<span className="text-sm text-zinc-500">/{DECK_SIZE}</span></b>
     </span>
   );
 }
 
-/** Curva de custo em pilhas de fichas de cassino (uma ficha por carta), como as apostas na mesa. */
-function ChipCurve({ cards, kit, label }: { cards: PoolCard[]; kit: DeckKit; label: string }) {
+/** Ficha de cassino por faixa de custo, nas cores da mesa: barato verde, médio azul, caro amarelo, muito caro vermelho. */
+const CHIP = [
+  "bg-lane-green", "bg-lane-green", "bg-lane-blue", "bg-lane-blue", "bg-lane-yellow", "bg-lane-yellow", "bg-game-ai", "bg-game-ai",
+] as const;
+
+/**
+ * Curva de custo em pilhas de fichas de cassino vistas de lado (uma ficha por carta, com as listras da borda), em cima de
+ * uma marca no feltro; embaixo, o custo na orbe de almas da carta. As fichas caem na pilha quando o baralho muda.
+ */
+function ChipCurve({ cards, kit, label, still }: { cards: PoolCard[]; kit: DeckKit; label: string; still: boolean | null }) {
   const curve = COSTS.map((n) => cards.filter((c) => Math.min(8, Math.max(1, kit.stats(c).cost)) === n).length);
   return (
-    <figure className="flex flex-col items-center gap-1" aria-label={`${label}: ${COSTS.map((n, i) => `${n}: ${curve[i]}`).join(", ")}`}>
-      <div className="flex h-12 items-end gap-1.5" aria-hidden="true">
+    <figure className="flex flex-col items-center gap-1.5" aria-label={`${label}: ${COSTS.map((n, i) => `${n}: ${curve[i]}`).join(", ")}`}>
+      <div className="flex h-16 items-end gap-1.5" aria-hidden="true">
         {curve.map((n, i) => (
-          <span key={COSTS[i]} className="flex w-5 flex-col-reverse items-center gap-px">
+          <span key={COSTS[i]} className="relative flex w-8 flex-col-reverse items-center gap-px">
+            {/* marca da pilha no feltro */}
+            <span className="absolute -bottom-1 h-2 w-9 rounded-[50%] bg-black/45 blur-[1px]" />
             {Array.from({ length: n }, (_, j) => (
-              <span key={j} className="h-1.5 w-full rounded-full bg-linear-to-r from-amber-700 via-amber-200 to-amber-700 shadow-[0_1px_0_rgb(0_0_0/0.7)] even:from-teal-800 even:via-teal-200 even:to-teal-800" />
+              <motion.span key={j} initial={still ? false : { y: -18, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 700, damping: 26, delay: still ? 0 : i * 0.04 + j * 0.05 }}
+                className={`relative h-2.5 w-full rounded-[50%] bg-[repeating-linear-gradient(90deg,transparent_0_5px,rgb(255_255_255/0.85)_5px_8px)] shadow-[inset_0_-2px_0_rgb(0_0_0/0.35),0_1px_0_rgb(0_0_0/0.8)] ${CHIP[i]}`} />
             ))}
-            {!n && <span className="h-1 w-full rounded-full bg-white/8" />}
+            {!n && <span className="relative h-2.5 w-full rounded-[50%] bg-white/6 shadow-[inset_0_1px_2px_rgb(0_0_0/0.8)]" />}
           </span>
         ))}
       </div>
-      <figcaption className="flex gap-1.5 text-[10px] font-bold text-zinc-500" aria-hidden="true">
-        {COSTS.map((n) => <span key={n} className="w-5 text-center">{n === 8 ? "8+" : n}</span>)}
+      <figcaption className="flex gap-1.5" aria-hidden="true">
+        {COSTS.map((n, i) => (
+          <span key={n} className="flex w-8 justify-center">
+            <CostDot cost={n} className={`size-5 text-[10px] ${curve[i] ? "" : "opacity-35 grayscale"}`} />
+          </span>
+        ))}
       </figcaption>
     </figure>
   );
@@ -113,7 +137,7 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
 
         {/* o leque: 12 posições em arco; vaga vazia é o verso do baralho apagado. A largura da carta vem da altura que sobra. */}
         <ol aria-label={t.deck.list} onPointerLeave={() => setHot(null)}
-          className="relative h-[calc(var(--w)*1.46+3.5rem)] w-full max-w-4xl shrink-0 [--gap:min(4.4rem,6.5vw)] [--w:clamp(4.4rem,min(14vw,calc((100dvh-36rem)/1.46)),10rem)]">
+          className="relative h-[calc(var(--w)*1.46+3.5rem)] w-full max-w-4xl shrink-0 [--gap:min(4.4rem,6.5vw)] [--w:clamp(4.4rem,min(14vw,calc((100dvh-38rem)/1.46)),10rem)]">
           {Array.from({ length: DECK_SIZE }, (_, i) => {
             const c = sorted[i];
             const k = i - mid;
@@ -145,8 +169,8 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
 
         {/* números: as vagas em almas e a curva em fichas, lado a lado */}
         <div className="relative flex flex-wrap items-end justify-center gap-x-8 gap-y-2">
-          <SoulPips n={deck.length} />
-          {deck.length > 0 ? <ChipCurve cards={deck} kit={kit} label={t.deck.curve} /> : <p className="max-w-xs text-center text-xs text-zinc-400">{t.deck.emptyHint}</p>}
+          <SoulPips n={deck.length} still={still} />
+          {deck.length > 0 ? <ChipCurve key={cur.id} cards={deck} kit={kit} label={t.deck.curve} still={still} /> : <p className="max-w-xs text-center text-xs text-zinc-400">{t.deck.emptyHint}</p>}
         </div>
 
         {/* ações: Jogar no meio, o dobro das vizinhas; no celular ele fica sozinho na primeira linha */}

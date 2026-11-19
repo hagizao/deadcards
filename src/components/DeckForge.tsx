@@ -1,12 +1,12 @@
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "motion/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { FullscreenButton, TagButton } from "./BarButton";
+import { FullscreenButton, TAG_CLIP, TagButton } from "./BarButton";
 import { CardBack } from "./GameCard";
 import { DeckCurve, DeckPips, DeckStrip, deckFocus, type DeckKit } from "./DeckStrip";
 import { HoldButton } from "./HoldButton";
 import { Icon } from "./Icon";
 import { useT } from "../lib/i18n";
-import { field, pill } from "../lib/ui";
+import { field } from "../lib/ui";
 import { ALT_MALUS, ALT_POL, type PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
 import { DECK_LOOKS, DECK_NAME_MAX, MAX_DECKS, heroTaken, type DeckLook, type SavedDeck } from "../lib/game/deck";
@@ -32,6 +32,8 @@ type Props = {
   /** Versão mostrada no fichário de quem ainda não está no baralho. */
   current: (l: PoolCard[]) => PoolCard;
   onBack: () => void; onPlay: () => void; onOpen: (key: string) => void; onToggle: (c: PoolCard) => void;
+  /** O aleatório está distribuindo cartas, uma de cada vez. */
+  dealing: boolean;
   onPatch: (p: Partial<SavedDeck>) => void; onRandom: () => void; onClear: () => void; onDuplicate: () => void; onRemove: () => void;
 };
 
@@ -40,7 +42,7 @@ type Props = {
  * carta põe ou tira do baralho e o "i" abre os detalhes. O baralho fica num trilho de tiras ao lado (no celular, numa barra
  * embaixo que abre a lista).
  */
-export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, current, onBack, onPlay, onOpen, onToggle, onPatch, onRandom, onClear, onDuplicate, onRemove }: Props) {
+export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, current, dealing, onBack, onPlay, onOpen, onToggle, onPatch, onRandom, onClear, onDuplicate, onRemove }: Props) {
   const t = useT(GAME_TEXT);
   const still = useReducedMotion();
   const size = usePageSize();
@@ -103,7 +105,7 @@ export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, cu
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 pb-28 text-dl-text lg:pb-0">
       {/* barra de cima: voltar, nome, verso e ações do baralho */}
       <header className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={onBack} className={`${pill(false)} active:scale-95`}><Icon name="chevron-left" />{t.deck.back}</button>
+        <TagButton tone="paper" size="sm" onClick={onBack}><Icon name="chevron-left" />{t.deck.back}</TagButton>
         <label className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
           <span className="text-[10px] font-bold tracking-[0.25em] text-game-brass uppercase">{t.deck.workshop} · {t.deck.rename}</span>
           <input className={`${field} font-display text-lg font-extrabold tracking-wider uppercase`} maxLength={DECK_NAME_MAX} value={cur.name}
@@ -118,11 +120,13 @@ export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, cu
             </button>
           ))}
         </fieldset>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={`${pill(false)} disabled:cursor-not-allowed disabled:opacity-50`} disabled={full} onClick={onRandom}><Icon name="shuffle" />{t.deck.random}</button>
-          <button type="button" className={`${pill(false)} disabled:cursor-not-allowed disabled:opacity-50`} disabled={!deck.length} onClick={onClear}>{t.deck.clear}</button>
-          <button type="button" className={`${pill(false)} disabled:cursor-not-allowed disabled:opacity-50`} disabled={deckCount >= MAX_DECKS} onClick={onDuplicate}>{t.deck.duplicate}</button>
-          <HoldButton className={`${pill(false)} text-rose-300`} label={`${t.deck.remove}: ${cur.name}`} onConfirm={onRemove}>{t.deck.remove}</HoldButton>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <TagButton tone="green" size="sm" tilt={1} delay={0.05} disabled={full || dealing} onClick={onRandom} data-deal-from><Icon name="shuffle" />{t.deck.random}</TagButton>
+          <TagButton tone="ghost" size="sm" delay={0.1} disabled={!deck.length} onClick={onClear}>{t.deck.clear}</TagButton>
+          <TagButton tone="blue" size="sm" tilt={1} delay={0.15} disabled={deckCount >= MAX_DECKS} onClick={onDuplicate}>{t.deck.duplicate}</TagButton>
+          {/* segurar para excluir: o vermelho enche a etiqueta (o recorte vale para o botão inteiro, então o foco é por dentro) */}
+          <HoldButton label={`${t.deck.remove}: ${cur.name}`} onConfirm={onRemove}
+            className={`inline-flex min-h-11 -rotate-1 cursor-pointer items-center bg-zinc-800 px-3 text-[11px] font-extrabold tracking-widest text-rose-200 uppercase transition hover:rotate-0 focus-visible:shadow-[inset_0_0_0_3px_var(--color-dl-text)] focus-visible:outline-none active:scale-95 motion-reduce:transition-none sm:min-h-9 ${TAG_CLIP}`}>{t.deck.remove}</HoldButton>
         </div>
         <FullscreenButton label={t.ui.fullscreen} className="ml-auto" />
       </header>
@@ -135,20 +139,21 @@ export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, cu
               <span className="sr-only">{t.deck.search}</span>
               <input type="search" className={`${field} w-full`} placeholder={t.deck.search} value={query} onChange={(e) => setQuery(e.target.value)} />
             </label>
-            {/* filtro de custo em orbes, como os cristais de mana do Hearthstone */}
-            <div role="group" aria-label={t.deck.costFilter} className="flex max-w-full items-center gap-1 overflow-x-auto py-1">
-              <button type="button" onClick={() => setCost(null)} aria-pressed={cost === null}
-                className={`min-h-11 shrink-0 cursor-pointer rounded-full px-3 text-xs font-bold tracking-wider uppercase transition active:scale-95 motion-reduce:transition-none sm:min-h-9 ${deckFocus} ${cost === null ? "bg-dl-text text-dl-black" : "text-zinc-300 hover:bg-white/8"}`}>
-                {t.deck.costAll}
-              </button>
-              {COSTS.map((c) => (
-                <button key={c} type="button" onClick={() => setCost((x) => (x === c ? null : c))} aria-pressed={cost === c} aria-label={`${t.deck.costFilter} ${c === 8 ? "8+" : c}`}
-                  className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-full text-sm font-extrabold transition active:scale-90 motion-reduce:transition-none sm:size-9 ${deckFocus} ${cost === c
-                    ? "bg-radial-[at_50%_35%] from-teal-300 via-teal-600 to-teal-900 text-white shadow-[0_0_0_2px_var(--color-game-soul),0_0_14px_var(--color-game-soul)]"
-                    : "bg-radial-[at_50%_35%] from-teal-800/80 to-teal-950/80 text-teal-100/70 hover:text-white"}`}>
-                  {c === 8 ? "8+" : c}
-                </button>
-              ))}
+            {/* "Todos" numa etiqueta; cada custo na orbe de almas da carta, acesa quando escolhida */}
+            <div role="group" aria-label={t.deck.costFilter} className="flex max-w-full items-center gap-1.5 overflow-x-auto px-1 py-2">
+              <TagButton tone="paper" size="sm" pressed={cost === null} onClick={() => setCost(null)} className="shrink-0">{t.deck.costAll}</TagButton>
+              {COSTS.map((c) => {
+                const on = cost === c;
+                return (
+                  <motion.button key={c} type="button" onClick={() => { sfx("soul", 0.5); setCost((x) => (x === c ? null : c)); }} aria-pressed={on} aria-label={`${t.deck.costFilter} ${c === 8 ? "8+" : c}`}
+                    animate={{ scale: on ? 1.12 : 1, y: on ? -2 : 0 }} whileHover={still ? undefined : { y: -3 }} whileTap={{ scale: 0.88 }} transition={{ type: "spring", stiffness: 600, damping: 24 }}
+                    className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-radial-[at_50%_35%] from-teal-400 via-teal-800 to-teal-950 text-sm font-extrabold text-white transition-[filter,box-shadow] duration-200 motion-reduce:transition-none sm:size-10 ${deckFocus} ${on
+                      ? "shadow-[0_0_0_2px_var(--color-game-soul),0_0_16px_var(--color-game-soul)]"
+                      : "shadow-[0_0_0_2px_rgb(255_255_255/0.1),0_3px_0_rgb(0_0_0/0.6)] brightness-[0.6] saturate-50 hover:brightness-100 hover:saturate-100"}`}>
+                    {c === 8 ? "8+" : c}
+                  </motion.button>
+                );
+              })}
             </div>
           </div>
 
@@ -202,20 +207,18 @@ export function DeckForge({ cur, deck, versions, look, cover, kit, deckCount, cu
                 </AnimatePresence>
               </div>
               <nav aria-label={t.deck.page(n + 1, pages)} className="flex items-center justify-center gap-3">
-                <button type="button" onClick={() => go(-1)} disabled={n === 0} aria-label={t.deck.prev}
-                  className={`grid size-11 cursor-pointer place-items-center rounded-full bg-white/6 text-zinc-200 transition hover:bg-white/12 active:scale-90 disabled:cursor-not-allowed disabled:opacity-30 motion-reduce:transition-none ${deckFocus}`}>
+                <TagButton tone="paper" size="icon" tilt={-1} onClick={() => go(-1)} disabled={n === 0} label={t.deck.prev}>
                   <Icon name="chevron-left" className="size-5" />
-                </button>
+                </TagButton>
                 <span className="flex items-center gap-1.5" aria-hidden="true">
                   {Array.from({ length: pages }, (_, i) => (
-                    <span key={i} className={`h-1.5 rounded-full transition-all duration-200 motion-reduce:transition-none ${i === n ? "w-6 bg-dl-text" : "w-1.5 bg-white/20"}`} />
+                    <span key={i} className={`size-2.5 rounded-full transition duration-200 motion-reduce:transition-none ${i === n ? "scale-125 bg-radial-[at_50%_35%] from-teal-100 via-game-soul to-teal-700 shadow-[0_0_8px_var(--color-game-soul)]" : "bg-zinc-950/80 shadow-[inset_0_1px_2px_rgb(0_0_0/0.9),0_1px_0_rgb(255_255_255/0.08)]"}`} />
                   ))}
                 </span>
                 <span className="sr-only" aria-live="polite">{t.deck.page(n + 1, pages)}</span>
-                <button type="button" onClick={() => go(1)} disabled={n >= pages - 1} aria-label={t.deck.next}
-                  className={`grid size-11 cursor-pointer place-items-center rounded-full bg-white/6 text-zinc-200 transition hover:bg-white/12 active:scale-90 disabled:cursor-not-allowed disabled:opacity-30 motion-reduce:transition-none ${deckFocus}`}>
+                <TagButton tone="paper" size="icon" tilt={1} onClick={() => go(1)} disabled={n >= pages - 1} label={t.deck.next}>
                   <Icon name="chevron-right" className="size-5" />
-                </button>
+                </TagButton>
               </nav>
             </>
           ) : <p className="py-10 text-center text-sm text-zinc-400">{t.deck.empty}</p>}
