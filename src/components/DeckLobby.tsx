@@ -83,7 +83,7 @@ function ChipCurve({ cards, kit, label, still }: { cards: PoolCard[]; kit: DeckK
       <figcaption className="flex gap-1.5 sm:gap-2" aria-hidden="true">
         {COSTS.map((n, i) => (
           <span key={n} className="flex w-8 justify-center sm:w-10">
-            <MiniSoul lit={curve[i] > 0} i={i + 20} className="size-6 text-[11px] sm:size-7 sm:text-xs">{n === 8 ? "8+" : n}</MiniSoul>
+            <MiniSoul lit={curve[i] > 0} i={i + 20} className="size-7 text-xs sm:size-8 sm:text-sm">{n === 8 ? "8+" : n}</MiniSoul>
           </span>
         ))}
       </figcaption>

@@ -26,10 +26,14 @@ export function MiniSoul({ lit, i = 0, className = "size-6", children }: { lit: 
       <span aria-hidden="true" className={`absolute inset-0 overflow-hidden rounded-full transition duration-300 motion-reduce:transition-none ${lit
         ? "bg-radial-[at_50%_35%] from-teal-600 via-teal-950 to-zinc-950 shadow-[inset_0_-0.2rem_0.4rem_rgb(0_0_0/0.7),0_0_0_1.5px_var(--color-game-soul),0_0_8px_var(--color-game-soul)]"
         : "bg-zinc-950 shadow-[inset_0_0.15rem_0.35rem_rgb(0_0_0/0.95)] ring-[1.5px] ring-game-brass/40"}`}>
-        <img src={soulsIcon} alt="" draggable={false} className={`absolute inset-0 m-auto h-4/5 ${lit ? "soul-flicker" : "opacity-15 grayscale"}`} />
+        {/* com número por cima, a chama fica mais fraca para o número ler bem */}
+        <span className={`absolute inset-0 ${children !== undefined ? "opacity-45" : ""}`}>
+          <img src={soulsIcon} alt="" draggable={false} className={`absolute inset-0 m-auto h-4/5 ${lit ? "soul-flicker" : "opacity-15 grayscale"}`} />
+        </span>
       </span>
+      {/* contorno escuro por baixo do preenchimento (paint-order) e sombra: lê em cima da chama */}
       {children !== undefined && (
-        <b className={`relative leading-none font-extrabold [text-shadow:0_1px_0_rgb(0_0_0/0.9),0_0_6px_rgb(0_0_0/0.9)] ${lit ? "text-white" : "text-zinc-400"}`}>{children}</b>
+        <b className={`relative leading-none font-black [-webkit-text-stroke:3px_rgb(0_0_0/0.85)] [paint-order:stroke_fill] [text-shadow:0_1px_2px_rgb(0_0_0),0_0_8px_rgb(0_0_0/0.9)] ${lit ? "text-white" : "text-zinc-300"}`}>{children}</b>
       )}
     </span>
   );
