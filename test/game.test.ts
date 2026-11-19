@@ -1510,3 +1510,21 @@ describe("simulação do baralho", () => {
     expect(winRate(strong)).toBeGreaterThan(winRate(weak));
   });
 });
+
+describe("previsão da mesa", () => {
+  it("soma o poder da carta e as já jogadas neste turno, sem mexer na partida", () => {
+    const m = new Match(gameConfig(undefined), pool, seeded(3));
+    m.E = 99;
+    const l = m.loc.find((x) => m.hand.some((c) => !m.canPlay(c, x)))!;
+    const [a, b] = m.hand.filter((c) => !m.canPlay(c, l));
+    const first = m.forecast(a, l);
+    expect(first.add).toBe(m.pow(a, l));
+    expect(first.total).toBeGreaterThanOrEqual(first.add);
+    expect(first.foe).toBe(m.total(l, "a"));
+    expect(m.hand).toContain(a);
+    if (b && !m.play(a, l) && !m.canPlay(b, l)) {
+      const next = m.forecast(b, l);
+      expect(next.total).toBe(first.total - first.add + m.pow(a, l) + next.add);
+    }
+  });
+});

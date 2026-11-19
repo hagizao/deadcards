@@ -482,6 +482,18 @@ export class Match {
       })));
     }
   }
+  /**
+   * Previsão da mesa para a carta da sua mão no local: o poder que ela teria lá agora (base, auras, efeitos do local e da
+   * própria habilidade constante; os efeitos ao revelar ainda não contam) e como fica o seu lado, somando as cartas que
+   * você já jogou neste turno. `foe` é o lado da IA agora.
+   */
+  forecast(c: GCard, l: Loc): { add: number; total: number; foe: number } {
+    const mine = l.s.p.filter((x) => x !== c && (x.rev || x.staged));
+    const add = this.pow(c, l);
+    const foes = l.s.a.filter((x) => x.rev).length;
+    const rift = this.ty(l, "rift") && mine.length + 1 > foes ? l.L.v : 0;
+    return { add, total: mine.reduce((a, x) => a + this.pow(x, l), rift + add), foe: this.total(l, "a") };
+  }
   total = (l: Loc, s: Side) => {
     const mine = l.s[s].filter((c) => c.rev);
     const rift = this.ty(l, "rift") && mine.length > l.s[opp(s)].filter((c) => c.rev).length ? l.L.v : 0;

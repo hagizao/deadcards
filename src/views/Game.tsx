@@ -554,6 +554,13 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
   /** Estado do local enquanto arrasta: o local sob a carta acende (se der para jogar lá) e os outros escurecem. */
   const dropAt = (l: Loc, i: number): Drop => shift ? (!m.moveOptions(shift.c).includes(l) ? "dim" : shift.over === i ? "over" : "ok") : !drag ? "off" : drag.over !== null && drag.over !== i ? "dim" : m.canPlay(drag.c, l) ? "off" : drag.over === i ? "over" : "ok";
   const canPlayAt = (l: Loc) => !!sel && !m.busy && !result && !m.canPlay(sel, l);
+  /** Previsão nos locais onde a carta escolhida (ou arrastada) pode entrar; arrastando por cima de um, só nele. */
+  const forecastAt = (l: Loc) => {
+    const c = drag?.c ?? sel;
+    if (!c || m.busy || result || !m.hand.includes(c) || m.canPlay(c, l)) return null;
+    if (drag && drag.over !== null && m.loc[drag.over] !== l) return null;
+    return m.forecast(c, l);
+  };
   /** The New York Oracle: só a sua próxima carta aparece. */
   const next = m.peek();
 
@@ -637,7 +644,7 @@ function Board({ newMatch, deckLook, startFull = false, onDeck }: { newMatch: ()
         <section aria-label={t.ui.arena} className="lane-board flex min-h-0 w-full flex-1 gap-0.5 sm:gap-1">
           {m.loc.map((l, i) => (
             <Location key={`${game}-${l.L.id}${i}`} dealAt={intro ? INTRO.lane(i) + 0.08 : undefined} m={m} l={l} i={i} t={t} marks={(s) => marksOf(l, i, s)} canPlay={canPlayAt(l)} onPlay={() => playAt(l)} dest={dests.includes(l)} onDest={() => hitLoc(l)}
-              drop={dropAt(l, i)}
+              drop={dropAt(l, i)} forecast={forecastAt(l)}
               card={(c) => (
                 <BoardCard key={`${c.id}-${c.rev}`} c={c} m={m} t={t} name={name(c)} face={face(c, false, true)} aura={auraOf(c)} looking={look === c} target={targets.includes(c)} mark={mode?.k === "card" && m.abilityOf(mode.c) === "Vindicta" && targets.includes(c)} acts={actsOf(c)}
                   shift={canShift(c) ? { on: (over) => { if (!shift) { sfx("grab", 0.7); setPeek(null); } setShift({ c, over }); }, drop: (i) => shiftTo(c, i) } : undefined}
@@ -1029,8 +1036,9 @@ function LaneBackdrop({ l, i, drop, fresh, dealAt }: {
   );
 }
 
-function Location({ m, l, i, t, marks, canPlay, onPlay, dest, onDest, drop, card, dealAt }: {
+function Location({ m, l, i, t, marks, canPlay, onPlay, dest, onDest, drop, card, dealAt, forecast }: {
   m: Match; l: Loc; i: number; t: T; marks: (s: Side) => Marks; canPlay: boolean; onPlay: () => void; dest: boolean; onDest: () => void; drop: Drop; card: (c: GCard) => React.ReactNode;
+  /** Previsão da carta escolhida ou arrastada neste local (ver Match.forecast). */ forecast?: { add: number; total: number; foe: number } | null;
   /** Abertura da mesa: a placa e os lados entram junto com a faixa. */ dealAt?: number;
 }) {
   const a = m.total(l, "a"), p = m.total(l, "p");
@@ -1060,6 +1068,15 @@ function Location({ m, l, i, t, marks, canPlay, onPlay, dest, onDest, drop, card
       <div className={`relative content-start ${side}`} aria-label={t.ui.yourSide(nm)} role="group">
         <SideMarks {...marks("p")} />
         {l.s.p.map(card)}
+        {/* previsão: quanto a carta soma e como fica o seu lado, na cor de quem venceria (verde, amarelo empate, vermelho) */}
+        {forecast && (
+          <span role="status" aria-label={t.ui.forecast(forecast.add, forecast.total, forecast.foe)}
+            className={`pointer-events-none absolute top-1 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full px-3 py-1 text-sm font-extrabold whitespace-nowrap shadow-[0_3px_10px_rgb(0_0_0/0.7)] sm:text-base ${forecast.total > forecast.foe ? "bg-game-me text-zinc-950" : forecast.total === forecast.foe ? "bg-lane-yellow text-zinc-950" : "bg-game-ai text-zinc-950"}`}>
+            <span aria-hidden="true">+{forecast.add}</span>
+            <span aria-hidden="true" className="opacity-60">→</span>
+            <span aria-hidden="true" className="tabular-nums">{forecast.total}</span>
+          </span>
+        )}
         {canPlay && (
           <button type="button" onClick={onPlay} aria-label={t.ui.playHere(nm)}
             className={`absolute inset-0 cursor-pointer rounded-md outline-2 outline-offset-2 outline-game-me outline-dashed hover:bg-game-me/10 active:bg-game-me/20 ${focus}`} />

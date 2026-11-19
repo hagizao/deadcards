@@ -63,7 +63,7 @@ export type GameText = {
       move: string; moveHint: (c: string) => string; mark: string; markHint: (c: string) => string; target: (c: string) => string; dest: (l: string) => string;
     };
     mastery: string; main: string; masterLine: string; locked: string; attrs: string; kw: string;
-    yourSide: (loc: string) => string; aiSide: (loc: string) => string; facedown: string; playHere: (loc: string) => string;
+    yourSide: (loc: string) => string; aiSide: (loc: string) => string; facedown: string; playHere: (loc: string) => string; forecast: (add: number, total: number, foe: number) => string;
     cardLabel: (name: string, cost: number, power: number) => string;
     /** O que cada status faz (caixa ao lado da carta ampliada). */
     statusTip: Record<keyof GameText["ui"]["status"], string>;
@@ -386,7 +386,7 @@ export const GAME_TEXT = strings<GameText>({
         target: (c) => `Escolher ${c}`, dest: (l) => `Escolher ${l}`,
       },
       mastery: "Maestria", main: "Atributo principal", masterLine: "Mestre", locked: "desbloqueia no nível Mestre", attrs: "Atributos", kw: "Palavras-chave",
-      yourSide: (l) => `Seu lado em ${l}`, aiSide: (l) => `Lado da IA em ${l}`, facedown: "Carta virada", playHere: (l) => `Jogar em ${l}`,
+      yourSide: (l) => `Seu lado em ${l}`, aiSide: (l) => `Lado da IA em ${l}`, facedown: "Carta virada", playHere: (l) => `Jogar em ${l}`, forecast: (a, n, f) => `Esta carta soma ${a}: seu lado fica com ${n} contra ${f} da IA`,
       cardLabel: (name, cost, power) => `${name}, custo ${cost}, poder ${power}`,
       statusTip: {
         debt: "Deve poder ao Pocket: os próximos ganhos pagam a dívida antes de contar.",
@@ -713,7 +713,7 @@ export const GAME_TEXT = strings<GameText>({
         target: (c) => `Choose ${c}`, dest: (l) => `Choose ${l}`,
       },
       mastery: "Mastery", main: "Main attribute", masterLine: "Master", locked: "unlocks at Master level", attrs: "Attributes", kw: "Keywords",
-      yourSide: (l) => `Your side at ${l}`, aiSide: (l) => `AI side at ${l}`, facedown: "Face-down card", playHere: (l) => `Play at ${l}`,
+      yourSide: (l) => `Your side at ${l}`, aiSide: (l) => `AI side at ${l}`, facedown: "Face-down card", playHere: (l) => `Play at ${l}`, forecast: (a, n, f) => `This card adds ${a}: your side goes to ${n} against the AI's ${f}`,
       cardLabel: (name, cost, power) => `${name}, cost ${cost}, power ${power}`,
       statusTip: {
         debt: "Owes power to Pocket: its next gains pay off the debt before they count.",
@@ -1040,7 +1040,7 @@ export const GAME_TEXT = strings<GameText>({
         target: (c) => `Elegir ${c}`, dest: (l) => `Elegir ${l}`,
       },
       mastery: "Maestría", main: "Atributo principal", masterLine: "Maestro", locked: "se desbloquea en el nivel Maestro", attrs: "Atributos", kw: "Palabras clave",
-      yourSide: (l) => `Tu lado en ${l}`, aiSide: (l) => `Lado de la IA en ${l}`, facedown: "Carta boca abajo", playHere: (l) => `Jugar en ${l}`,
+      yourSide: (l) => `Tu lado en ${l}`, aiSide: (l) => `Lado de la IA en ${l}`, facedown: "Carta boca abajo", playHere: (l) => `Jugar en ${l}`, forecast: (a, n, f) => `Esta carta suma ${a}: tu lado queda con ${n} contra ${f} de la IA`,
       cardLabel: (name, cost, power) => `${name}, coste ${cost}, poder ${power}`,
       statusTip: {
         debt: "Le debe poder a Pocket: sus próximas ganancias pagan la deuda antes de contar.",
