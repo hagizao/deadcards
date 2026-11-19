@@ -853,7 +853,7 @@ export class Match {
       if (this.master(c)) { a.st.immU = this.t + 1; c.st.immU = this.t + 1; }
       this.say({ k: "ivy", c: this.N(c), t: this.N(a) });
     } },
-    // cura as aliadas daqui ao poder original: tira perdas de poder (fixas e temporárias), queimaduras e a Telecinese; os ganhos ficam
+    // cura as aliadas daqui ao poder original: tira perdas de poder (fixas e temporárias) e queimaduras; os ganhos ficam (a Telecinese da Wraith continua)
     "Kelvin": { r: (c, l) => {
       l.s[c.side].filter((x) => x.rev).forEach((x) => {
         x.bonus = Math.max(0, x.bonus);
@@ -862,8 +862,6 @@ export class Match {
         x.st.tburn = [];
         x.st.ail = undefined;
         x.st.debt = undefined;
-        // o gelo também solta quem a Wraith ergueu
-        if ((x.st.stun ?? 0) >= this.t) { x.st.stun = 0; this.say({ k: "liftEnd", c: this.N(x) }); }
       });
       if (this.master(c)) this.foes(c, l).filter((t) => t.main === "MIR").forEach((t) => this.hurt(t, 2, c));
       this.say({ k: "kelvin", loc: l.L.name });
