@@ -4,6 +4,7 @@ import { CardFocus } from "./CardFocus";
 import { DeckDraft } from "./DeckDraft";
 import { DeckForge } from "./DeckForge";
 import { DeckLobby } from "./DeckLobby";
+import { BarRoom } from "./BarRoom";
 import type { DeckKit } from "./DeckStrip";
 import { GameCard } from "./GameCard";
 import { playerArt } from "../lib/cards";
@@ -222,6 +223,8 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
 
   return (
     <div className="w-full">
+      {/* o salão do bar no lugar do fundo do site */}
+      <BarRoom />
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={mode} initial={still ? { opacity: 0 } : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
           {view}

@@ -46,6 +46,9 @@
   --color-comanda-paper: #e6ddb5;
   --color-comanda-ink: #2a2622;
   --color-comanda-kraft: #b0844f;
+  /* salão do bar no lobby do Cardslock Game */
+  --color-bar-night: #0d0907;
+  --color-bar-wall: #2a1413;
 }
 
 /* mesa em faixas: cada lado de um local é uma grade 2x2, então a carta mede 1/6 da largura da mesa
@@ -335,4 +338,43 @@
 @keyframes card-call-glow {
   0%, 100% { opacity: 0.55; transform: scale(0.96); }
   50% { opacity: 1; transform: scale(1.08); }
+}
+
+/* Cardslock Game, salão do bar (lobby): papel de parede listrado bordô, quase preto, apagando para o chão */
+@utility bar-wall {
+  background:
+    linear-gradient(to bottom, transparent 15%, var(--color-bar-night) 66%),
+    repeating-linear-gradient(90deg, rgb(255 210 160 / 0.06) 0 2px, transparent 2px 46px, rgb(0 0 0 / 0.35) 46px 48px, transparent 48px 92px),
+    radial-gradient(ellipse 60% 50% at 50% 30%, color-mix(in oklab, var(--color-bar-wall) 100%, transparent), transparent 80%);
+}
+/* cone de luz do lampião, de cima para a mesa */
+@utility bar-cone {
+  background: linear-gradient(to bottom, rgb(255 196 120 / 0.14), rgb(255 170 90 / 0.05) 60%, transparent);
+  clip-path: polygon(44% 0, 56% 0, 82% 100%, 18% 100%);
+  filter: blur(18px);
+}
+/* a poça de luz da mesa treme de leve, como a chama do lampião */
+@utility table-flicker {
+  animation: table-flicker 7s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@keyframes table-flicker {
+  0%, 100% { opacity: 0.85; }
+  45% { opacity: 1; }
+  52% { opacity: 0.78; }
+  60% { opacity: 0.95; }
+}
+/* fumaça atravessando o salão devagar */
+@utility bar-smoke {
+  animation: bar-smoke 28s ease-in-out infinite alternate;
+  animation-delay: var(--d, 0s);
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@keyframes bar-smoke {
+  from { transform: translate(-8%, 4%) scale(1); opacity: 0.6; }
+  to { transform: translate(18%, -6%) scale(1.2); opacity: 1; }
 }
