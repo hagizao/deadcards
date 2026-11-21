@@ -1531,7 +1531,7 @@ function LocTile({ i, nm, desc, chips, a, p, next }: {
   return (
     <div className="@container flex w-full flex-col items-center gap-2 text-center leading-tight">
       <div className="flex w-full flex-wrap items-center justify-between gap-1 @sm:flex-nowrap">
-        <ScoreTag v={p} lead={p > a} side="p" ghost={next === undefined ? undefined : { v: next, vs: a }} />
+        <ScoreTag v={p} lead={p > a} side="p" ghost={next} />
         <motion.h3 key={nm} initial={{ opacity: 0, filter: "blur(6px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.9 }}
           className="order-first flex w-full min-w-0 justify-center text-lg font-extrabold tracking-wide wrap-break-word hyphens-auto text-zinc-950 [font-variant-caps:small-caps] @3xs:text-2xl @sm:order-0 @sm:w-auto @sm:flex-1 @sm:text-2xl @[26rem]:text-3xl">
           <TickTag tone={lane.tag} className="line-clamp-2 max-w-full min-w-0 px-2 py-1 sm:px-4">{nm}</TickTag>
@@ -1554,15 +1554,15 @@ function LocTile({ i, nm, desc, chips, a, p, next }: {
 }
 
 /** Poder de um lado numa caixa escura parada (sem recorte, para o halo e o +N/−N não serem cortados). */
-function ScoreTag({ v, lead, side, ghost }: { v: number; lead: boolean; side: Side; /** Previsão: o número que ficaria, contra `vs`. */ ghost?: { v: number; vs: number } }) {
+function ScoreTag({ v, lead, side, ghost }: { v: number; lead: boolean; side: Side; /** Previsão: o número que ficaria, na mesma cor do atual. */ ghost?: number }) {
   return (
     <span className="relative grid shrink-0 place-items-center rounded-xs bg-zinc-950 px-0.5 py-1 shadow-[0_3px_0_rgb(0_0_0/0.6)] sm:px-1.5">
-      <span className={`grid place-items-center transition-opacity duration-150 motion-reduce:transition-none ${ghost ? "opacity-20" : ""}`}><Score v={v} lead={lead} side={side} /></span>
-      {/* previsão por cima do número atual, translúcida, na cor de quem venceria (verde, amarelo empate, vermelho) */}
-      {ghost && (
+      <span className={`grid place-items-center transition-opacity duration-150 motion-reduce:transition-none ${ghost === undefined ? "" : "opacity-20"}`}><Score v={v} lead={lead} side={side} /></span>
+      {/* previsão por cima do número atual, translúcida e na mesma cor dele */}
+      {ghost !== undefined && (
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 grid place-items-center">
-          <em className={`text-2xl leading-none font-extrabold not-italic tabular-nums opacity-75 [text-shadow:0_0_12px_currentColor,0_2px_0_rgb(0_0_0/0.85)] motion-safe:animate-pulse sm:text-4xl ${ghost.v > ghost.vs ? "text-game-me" : ghost.v === ghost.vs ? "text-lane-yellow" : "text-game-ai"}`}>
-            {ghost.v}
+          <em className={`text-2xl leading-none font-extrabold not-italic tabular-nums opacity-75 [text-shadow:0_0_12px_currentColor,0_2px_0_rgb(0_0_0/0.85)] motion-safe:animate-pulse sm:text-4xl ${side === "p" ? "text-game-me" : "text-game-ai"}`}>
+            {ghost}
           </em>
         </span>
       )}
