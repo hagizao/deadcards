@@ -41,14 +41,20 @@ const DUST = Array.from({ length: 18 }, (_, i) => ({
  * (`[data-hot]` dentro do grupo `room`). No Jogar o lampião é esbarrado, o balcão sai de foco e o copo sai de quadro
  * enquanto a câmera desce para a mesa (BarTable). Fica por cima do fundo do site.
  */
-export function BarRoom({ mood, leaving }: { mood: BarMood | null; leaving: boolean }) {
+export function BarRoom({ mood, leaving, photo }: {
+  mood: BarMood | null; leaving: boolean;
+  /** Foto do salão escolhida no editor: entra no lugar da parede e do balcão desenhados; luz, mesa, fumaça e copo continuam. */
+  photo?: string;
+}) {
   const m = mood ?? "even";
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-bar-night">
-      <div className="absolute inset-0 bar-wall" />
-
-      {/* balcão ao fundo: prateleiras e garrafas fora de foco */}
+      {/* fundo: a foto do editor ou a parede e o balcão desenhados; no Jogar sai de foco */}
       <motion.div className="absolute inset-0" animate={leaving ? { opacity: 0, scale: 1.08 } : { opacity: 1, scale: 1 }} transition={{ duration: 0.6, ease: "easeIn" }}>
+      {photo ? (
+        <img src={photo} alt="" draggable={false} className="absolute inset-0 size-full scale-105 object-cover blur-[2px] brightness-50 saturate-90" />
+      ) : (<>
+        <div className="absolute inset-0 bar-wall" />
         <div className="absolute inset-x-0 top-[37%] h-1.5 bg-bar-shelf shadow-[0_6px_14px_rgb(0_0_0/0.7)] blur-[2px]" />
         <div className="absolute inset-x-0 top-[49%] h-1.5 bg-bar-shelf shadow-[0_6px_14px_rgb(0_0_0/0.7)] blur-[2px]" />
         {BOKEH.map((b, i) => (
@@ -61,6 +67,9 @@ export function BarRoom({ mood, leaving }: { mood: BarMood | null; leaving: bool
         ))}
         {/* tampo do balcão */}
         <div className="absolute inset-x-0 top-[55%] h-10 bg-linear-to-b from-bar-shelf to-transparent blur-[3px]" />
+      </>)}
+        {/* faróis de um carro passando lá fora varrem a parede de vez em quando */}
+        <div className="absolute inset-y-0 left-0 w-1/3 wall-sweep bg-linear-to-r from-transparent via-amber-50/7 to-transparent blur-2xl" />
       </motion.div>
 
       {/* mesa: a madeira deitada em perspectiva na metade de baixo, sumindo no escuro do fundo */}
@@ -71,7 +80,10 @@ export function BarRoom({ mood, leaving }: { mood: BarMood | null; leaving: bool
 
       {/* lampião: cone, poça na mesa e poeira balançam juntos; no Jogar ele é esbarrado */}
       <div className={`absolute inset-0 origin-[50%_-10%] ${leaving ? "lamp-knock" : "lamp-sway"}`}>
+      <div className="absolute inset-0 lamp-drift">
         <div className="absolute inset-x-0 top-0 h-full bar-cone" />
+        {/* raios de luz passando dentro do cone */}
+        <div className="absolute inset-x-[38%] top-0 h-4/5 cone-rays blur-md" />
         {/* a poça muda de clima com o crossfade entre as três luzes (por fora); a chama treme por dentro */}
         <div className={`absolute inset-x-0 bottom-0 h-3/5 transition-opacity duration-700 ${m === "hot" ? "opacity-100" : "opacity-0"}`}>
           <div className="size-full table-flicker bg-radial-[ellipse_45%_55%_at_50%_70%] from-amber-300/24 via-amber-600/9 to-transparent to-70%" />
@@ -88,6 +100,7 @@ export function BarRoom({ mood, leaving }: { mood: BarMood | null; leaving: bool
           <span key={i} className={`absolute dust-float rounded-full bg-amber-100/70 ${i % 2 ? "max-sm:hidden" : ""}`}
             style={{ left: `${d.left}%`, top: `${d.top}%`, width: d.size, height: d.size, "--d": `${d.delay}s`, "--t": `${d.dur}s` } as CSSProperties} />
         ))}
+      </div>
       </div>
 
       {/* fumaça solta pelo salão */}

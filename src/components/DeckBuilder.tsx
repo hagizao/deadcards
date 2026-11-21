@@ -238,7 +238,7 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
   return (
     <div className="group/room w-full">
       {/* o salão do bar no lugar do fundo do site */}
-      <BarRoom mood={mode === "lobby" ? mood : null} leaving={leaving} />
+      <BarRoom mood={mode === "lobby" ? mood : null} leaving={leaving} photo={settings.gameBg} />
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={mode} initial={still ? { opacity: 0 } : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
           {view}
