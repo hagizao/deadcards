@@ -982,9 +982,9 @@ export class Match {
       }));
     } },
     "Yamato": { r: (c, l, v) => {
-      if (this.total(l, c.side) - this.pow(c, l) >= this.total(l, opp(c.side))) return;
+      // só se ela for a única carta aliada aqui
+      if (l.s[c.side].some((x) => x !== c)) return;
       c.bonus += v;
-      c.st.immune = true;
       this.say({ k: "yamato", c: this.N(c) });
       if (!this.master(c)) return;
       this.later(() => { const L = this.locOf(c); if (L && this.losing(c.side, L)) c.mv.push({ n: 1, u: this.t + 1, bonus: 0, foes: true }); });

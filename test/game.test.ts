@@ -81,7 +81,7 @@ describe("carta padrão", () => {
 
   it("ajustes do admin sobrescrevem o padrão", () => {
     const c = cardStats(base, { x: { ab: "Pocket", cost: 2, desc: "  texto  " } });
-    expect(c).toMatchObject({ ab: "Pocket", cost: 2, v: 2, desc: "texto" });
+    expect(c).toMatchObject({ ab: "Pocket", cost: 2, v: 3, desc: "texto" });
   });
 });
 
@@ -1403,6 +1403,23 @@ describe("poder zerado e origem dos efeitos", () => {
     expect(m.locOf(rat)).toBeUndefined();
     expect(m.pow(v)).toBe(before);
     expect(m.log.some((e) => e.k === "zero")).toBe(true);
+  });
+
+  it("a Yamato só se transforma se for a única aliada no local, e não fica imune", () => {
+    const { m, put, mk } = arena();
+    dummy(put, "a", 0, 9, "foe");
+    const alone = mk(pc("y", "Yamato", flat(70)), "p");
+    m.loc[0].s.p.push(alone);
+    const before = alone.bonus;
+    m.act({ c: alone, l: m.loc[0] });
+    expect(alone.bonus - before).toBe(alone.v);
+    expect(m.immune(alone)).toBe(false);
+    dummy(put, "p", 1, 1, "ally");
+    const paired = mk(pc("z", "Yamato", flat(70)), "p");
+    m.loc[1].s.p.push(paired);
+    const was = paired.bonus;
+    m.act({ c: paired, l: m.loc[1] });
+    expect(paired.bonus).toBe(was);
   });
 
   it("a Aflição do Pocket nunca zera: para em 1, também na perda por turno do Mestre", () => {

@@ -102,7 +102,7 @@ export const ABILITIES = {
   "Haze": H("r", 0, 0, false), "Holliday": H("r", 0, -1, false), "Infernus": H("r", 2, -1), "Ivy": H("r", 2, -1),
   "Kelvin": H("r", 0, -1, false), "Lady Geist": H("r", 6, -3), "Lash": H("r", 1, -1), "McGinnis": H("r", 2, -1),
   "Mina": H("f", 1, -1), "Mirage": H("x", 2, 0), "Mo & Krill": H("c", 2, 0), "Nurse Harrow": H("c", 1, 0),
-  "Paige": H("c", 1, -2), "Paradox": H("r", 0, 0, false), "Pocket": H("r", 2, -2), "Rat King": H("r", 0, 0, false),
+  "Paige": H("c", 1, -2), "Paradox": H("r", 0, 0, false), "Pocket": H("r", 3, -2), "Rat King": H("r", 0, 0, false),
   "Rem": H("r", 2, -1), "Seven": H("f", 1, -1), "Shiv": H("r", 3, 0), "Silver": H("a", 6, -2),
   "Sinclair": H("x", 0, 0, false), "Solomon": H("c", 5, -1), "The Doorman": H("r", 0, 0, false), "Venator": H("r", 3, 0),
   "Victor": H("c", 2, 2), "Vindicta": H("r", 3, 0), "Violet": H("f", 1, -2), "Viscous": H("r", 2, 0),
