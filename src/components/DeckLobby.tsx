@@ -177,9 +177,11 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
             const push = hot === null || on ? 0 : i > hot ? 1 : -1;
             const pos = { "--k": k, "--push": push, zIndex: on ? 50 : i + 1 } as CSSProperties;
             return (
-              <li key={c?.key ?? `gap${i}`} style={pos}
+              <li key={c?.key ?? `gap${i}`} style={pos} data-hot={on || undefined}
                 className="absolute top-0 left-1/2 w-(--w) transform-[translateX(calc(-50%+var(--k)*var(--gap)+var(--push)*min(2.6rem,4vw)))_translateY(calc(var(--k)*var(--k)*0.11rem+0.4rem))_rotate(calc(var(--k)*3deg))] transition-transform duration-200 ease-out motion-reduce:transition-none">
+                {/* a luz do lampião cai no centro do leque: as pontas ficam na penumbra (a carta em destaque sobe para a luz) */}
                 <motion.div key={`${cur.id}-${c?.id ?? i}`} initial={still ? false : { y: 90, opacity: 0, rotate: -8 }}
+                  style={on ? undefined : { filter: `brightness(${(1 - Math.min(0.24, Math.abs(k) * 0.045)).toFixed(3)})` }}
                   animate={leaving ? { y: "110vh", rotate: drop[i].spin } : { y: 0, opacity: 1, rotate: 0 }}
                   transition={leaving
                     // gravidade: começa parada e acelera (cada carta solta num instante, fora de ordem)
@@ -200,6 +202,8 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
               </li>
             );
           })}
+          {/* brilho quente do lampião por cima do leque, balançando junto com a luz do bar */}
+          <span aria-hidden="true" className={`pointer-events-none absolute inset-x-[-10%] inset-y-[-15%] z-60 lamp-sheen bg-radial-[ellipse_40%_60%_at_50%_30%] from-amber-200/30 to-transparent to-70% mix-blend-soft-light transition-opacity duration-300 ${leaving ? "opacity-0" : ""}`} />
         </ol>
 
         {/* números: as vagas em almas e a curva em fichas, lado a lado */}

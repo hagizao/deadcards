@@ -447,7 +447,10 @@ let amb: { gain: GainNode; src: AudioBufferSourceNode } | null = null;
 let ambLoading = false;
 let ambOff: ReturnType<typeof setTimeout> | null = null;
 
-const ambGoal = () => (wanted && prefs.ambOn ? AMB_BASE * prefs.amb * duck : 0);
+/** No lobby a conversa fica baixa, ao fundo; na partida sobe ao volume cheio. */
+const LOBBY_AMB = 0.45;
+let lobby = false;
+const ambGoal = () => (prefs.ambOn ? AMB_BASE * prefs.amb * (wanted ? duck : lobby ? LOBBY_AMB : 0) : 0);
 
 /** Leva o volume da conversa até o alvo; sem ninguém ouvindo, desliga a fonte depois do fade. */
 function ambGlide(sec = 0.6) {
@@ -491,6 +494,13 @@ async function startAmb() {
     ambLoading = false;
   }
   ambGlide(1.2);
+}
+
+/** Conversa do bar baixinha no lobby (precisa vir de um gesto: o navegador bloqueia som automático). */
+export function lobbyAmb(on: boolean) {
+  lobby = on;
+  if (on) startAmb();
+  else ambGlide(0.4);
 }
 
 /* ---------- música ---------- */

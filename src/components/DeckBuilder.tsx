@@ -4,12 +4,12 @@ import { CardFocus } from "./CardFocus";
 import { DeckDraft } from "./DeckDraft";
 import { DeckForge } from "./DeckForge";
 import { DeckLobby } from "./DeckLobby";
-import { BarRoom } from "./BarRoom";
+import { BarRoom, type BarMood } from "./BarRoom";
 import type { DeckKit } from "./DeckStrip";
 import { GameCard } from "./GameCard";
 import { playerArt } from "../lib/cards";
 import { getCardTier, getRarity } from "../lib/rarity";
-import { sfx } from "../lib/game/sfx";
+import { lobbyAmb, sfx, startMusic } from "../lib/game/sfx";
 import { useData } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { ABILITIES, cardStats, type GameConfig, type PoolCard } from "../lib/game/config";
@@ -17,7 +17,7 @@ import { DECK_SIZE } from "../lib/game/engine";
 import {
   DECK_NAME_MAX, MAX_DECKS, fillDeck, heroHolder, heroTaken, loadBook, newDeck, resolveDeck, saveBook, swapHero, versionPlayer, type DeckBook, type DeckLook, type SavedDeck,
 } from "../lib/game/deck";
-import { simulate, type SimResult } from "../lib/game/sim";
+import { simulate, winRate, type SimResult } from "../lib/game/sim";
 import { GAME_TEXT } from "../lib/game/text";
 
 const FLY_S = 0.3;
@@ -74,6 +74,17 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
   const deck = useMemo(() => resolveDeck(cur.cards, versions), [cur.cards, versions]);
   const look: DeckLook = cur.look ?? "noir";
   const odds = useOdds(cfg, pool, deck);
+  // clima do bar pela chance contra a IA (as mesmas faixas do selo do lobby)
+  const rate = odds ? winRate(odds) : null;
+  const mood: BarMood | null = rate === null ? null : rate >= 55 ? "hot" : rate >= 45 ? "even" : "cold";
+  const [leaving, setLeaving] = useState(false);
+  // conversa do bar baixinha no lobby, a partir do primeiro gesto (o navegador bloqueia som automático)
+  useEffect(() => {
+    const go = () => lobbyAmb(true);
+    window.addEventListener("pointerdown", go, { once: true });
+    window.addEventListener("keydown", go, { once: true });
+    return () => { window.removeEventListener("pointerdown", go); window.removeEventListener("keydown", go); lobbyAmb(false); };
+  }, []);
   // versão mostrada de quem ainda não está no baralho
   const [shown, setShown] = useState<Record<string, string>>({});
   const [focusKey, setFocusKey] = useState<string | null>(null);
@@ -202,8 +213,11 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
    */
   const play = (cards = deck, wait = 0) => {
     document.documentElement.requestFullscreen?.()?.catch(() => {});
+    // a música e a conversa do bar sobem enquanto a câmera desce para a mesa
+    startMusic();
     if (!wait || still) return onPlay(cards, look);
     sfx("shuffle", 0.6);
+    setLeaving(true);
     window.setTimeout(() => onPlay(cards, look), wait);
   };
 
@@ -222,9 +236,9 @@ export function DeckBuilder({ versions, pool, cfg, onPlay }: { versions: Map<str
   );
 
   return (
-    <div className="w-full">
+    <div className="group/room w-full">
       {/* o salão do bar no lugar do fundo do site */}
-      <BarRoom />
+      <BarRoom mood={mode === "lobby" ? mood : null} leaving={leaving} />
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={mode} initial={still ? { opacity: 0 } : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
           {view}
