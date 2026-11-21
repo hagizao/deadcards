@@ -301,7 +301,8 @@ function Shell() {
       </header>
 
       <ReducedMotionNotice />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
+      {/* o jogo usa a largura toda: as laterais da mesa têm os baralhos, as almas e os itens */}
+      <main className={`mx-auto px-4 py-6 sm:px-6 sm:py-10 lg:px-8 ${tab === "game" ? "" : "max-w-7xl"}`}>
         <motion.div
             key={tab}
             initial={{ opacity: 0 }}

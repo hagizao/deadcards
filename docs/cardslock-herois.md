@@ -87,11 +87,11 @@ Os até 2 maiores atributos do jogador, se forem **90 ou mais**, viram palavras-
 | Nurse Harrow | Suporte | Tira 2 da inimiga mais forte daqui e dá ao seu aliado mais fraco aqui. | O inimigo não pode jogar cartas aqui no próximo turno. |
 | Paige | Suporte | Seus aliados neste local ganham +2. | Inimigas daqui não podem sair por conta própria. |
 | Paradox | Macro | Troca de lugar com a inimiga mais forte de outro local. | A inimiga trocada perde 2. |
-| Pocket | Movimentação | As inimigas daqui perdem 2. | E perdem 1 no fim de cada turno. |
+| Pocket | Movimentação | As inimigas daqui perdem 3. | E perdem 1 no fim de cada turno. |
 | Rat King | Macro | Põe 1 Rato (custo 1, poder 1) na sua mão; ele ganha +1 por turno na mão (até +3). | O Rato custa 0. |
 | Rem | Suporte | As inimigas daqui adormecem: −2 até o fim do próximo turno. | Enquanto elas dormem, suas cartas aqui têm +1. |
 | Seven | Consistência | Tempestade canalizada: no fim deste turno e do próximo, as inimigas daqui perdem 1. | Imparável: a tempestade não é interrompida. |
-| Shiv | Mira | Destrói a inimiga mais fraca daqui com 2 ou menos de poder. Se não houver, até o fim do próximo turno você pode **marcar** uma inimiga daqui: ela é executada na sua vez de revelar, se tiver 2 ou menos. | Se destruir, usa de novo (uma vez). |
+| Shiv | Mira | Destrói a inimiga mais fraca daqui com 2 ou menos de poder. | Se destruir, usa de novo (uma vez). |
 | Silver | Consistência | Se sofrer dano, no fim do próximo turno vira lobisomem: +6 permanente. | Ao virar lobisomem, destrói a inimiga mais fraca daqui. |
 | Sinclair | Macro | Uma vez por partida, pode se mover deixando uma ilusão no local de origem (metade do poder, sem habilidade). | A ilusão tem o poder inteiro. |
 | Solomon | Macro | Se o seu lado deste local estiver cheio, ganha +5. | Funciona com 1 carta a menos. |
@@ -104,4 +104,4 @@ Os até 2 maiores atributos do jogador, se forem **90 ou mais**, viram palavras-
 | Vyper | Mira | Petrifica a próxima inimiga revelada aqui. | Ela também perde 2. |
 | Warden | Consistência | Ganha +1 por inimiga aqui. | Última Resistência: no fim da partida, cada inimiga daqui perde 1 e o Warden ganha esse poder. |
 | Wraith | Movimentação | Ergue a inimiga mais forte daqui: o poder dela conta como 0 até o fim do próximo turno, ou até um Suporte inimigo ser revelado aqui. | Se você estiver perdendo aqui no fim do próximo turno, a Wraith vai para outro local aleatório. |
-| Yamato | Consistência | Se você estiver perdendo aqui, ganha +4 e fica imune. | Se ainda estiver perdendo no fim do próximo turno, pode ir para outro local com inimigas. |
+| Yamato | Consistência | Se você for a única carta aliada aqui, ganha +4. | Se ainda estiver perdendo no fim do próximo turno, pode ir para outro local com inimigas. |

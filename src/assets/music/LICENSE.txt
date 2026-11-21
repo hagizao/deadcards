@@ -5,3 +5,9 @@ midnight-on-miller-street.mp3
   Fonte: https://opengameart.org/content/midnight-on-miller-street
   Licença: Creative Commons Attribution 4.0 (CC BY 4.0) - https://creativecommons.org/licenses/by/4.0/
   Alterações: versão "loopable" recodificada em MP3 112 kbps, sem metadados.
+
+bar-walla.mp3
+  "AMBRest_Busy restaurant or bar walla; very noisy", da SSE Library (Sound Effects for Educators, USC)
+  Fonte: https://archive.org/details/SSE_Library_AMBIENCE
+  Licença: CC0 1.0 (domínio público) - https://creativecommons.org/publicdomain/zero/1.0/
+  Alterações: nenhuma; o jogo toca em loop pelo Web Audio, cortando as pontas.

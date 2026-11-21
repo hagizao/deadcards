@@ -1,35 +1,84 @@
 // Regras e configuração do Cardslock Game: catálogo de habilidades e locais, carta padrão de cada jogador
 // e validação da configuração que o admin salva no editor. Sem dependências do front: o worker importa este arquivo.
 
-export const LOC_TYPES = ["none", "enter", "costLow", "costHigh", "slots", "endturn", "midboss", "urn", "loot", "zipline", "shrine", "patron", "ritual", "chaos", "shop"] as const;
+export const LOC_TYPES = [
+  "none", "enter", "costLow", "costHigh", "slots", "endturn", "midboss", "urn", "loot", "zipline", "shrine", "patron", "ritual", "chaos", "shop",
+  "bet", "stock", "gun", "spirit", "cheap", "heal", "noplay", "grave", "bell", "nomove", "rift", "crew", "clock", "hotel", "late", "rats", "museum",
+  "nofx", "hoop", "sacrifice", "arrive", "copy", "teleport", "oracle", "bull", "toll", "costMin", "ambush", "smoke",
+] as const;
 export type LocType = (typeof LOC_TYPES)[number];
 
 /** Campos que cada efeito de local usa: v = valor, n = número (custo, turno, espaços…). */
 export const LOC_FIELDS: Record<LocType, ("v" | "n")[]> = {
   none: [], enter: ["v"], costLow: ["v", "n"], costHigh: ["v", "n"], slots: ["n"], endturn: ["v"], midboss: ["v", "n"],
   urn: ["v"], loot: ["v"], zipline: [], shrine: [], patron: [], ritual: [], chaos: ["n"], shop: ["v"],
+  bet: ["v"], stock: ["n"], gun: ["v"], spirit: ["v"], cheap: ["v"], heal: [], noplay: [], grave: [], bell: ["v", "n"], nomove: [],
+  rift: ["v"], crew: ["v"], clock: [], hotel: ["n"], late: ["n"], rats: ["v"], museum: ["n"], nofx: [], hoop: ["v", "n"], sacrifice: ["v", "n"],
+  arrive: ["v"], copy: [], teleport: [], oracle: [], bull: ["n"], toll: ["v"], costMin: ["n"], ambush: ["v", "n"], smoke: [],
 };
-export const LOC_N_RANGE: Partial<Record<LocType, [number, number]>> = { slots: [1, 4], costLow: [0, 8], costHigh: [0, 8], midboss: [1, 8], chaos: [1, 15] };
+export const LOC_N_RANGE: Partial<Record<LocType, [number, number]>> = {
+  slots: [1, 4], costLow: [0, 8], costHigh: [0, 8], midboss: [1, 8], chaos: [1, 15], stock: [1, 10], bell: [1, 8], hotel: [1, 8], late: [1, 8],
+  museum: [0, 100], hoop: [0, 100], sacrifice: [0, 10], bull: [1, 8], costMin: [0, 8], ambush: [1, 8],
+};
 export const LOC_V_RANGE: [number, number] = [-10, 10];
+/** Valores fora da faixa comum: a Fenda Instável dá +100 a quem tem mais cartas lá. */
+const LOC_V_RANGE_BY: Partial<Record<LocType, [number, number]>> = { rift: [0, 200] };
+export const vRange = (t: LocType): [number, number] => LOC_V_RANGE_BY[t] ?? LOC_V_RANGE;
 export const nRange = (t: LocType): [number, number] => LOC_N_RANGE[t] ?? [1, 6];
 
-export type GameLoc = { id: string; name: string; type: LocType; v: number; n: number; desc: string };
+/** Local da partida. art = chave da imagem no R2 (locs/<id>.webp); fx = foco horizontal da arte na faixa (0 a 100). */
+export type GameLoc = { id: string; name: string; type: LocType; v: number; n: number; desc: string; art?: string; fx?: number };
+/** URL da arte do local, servida do R2. */
+export const locArtUrl = (art: string) => `/img/${art}`;
 
-export const DEFAULT_LOCS: GameLoc[] = [
-  { id: "l1", name: "Guardião", type: "costLow", v: 2, n: 2 },
-  { id: "l2", name: "Walker", type: "costHigh", v: 3, n: 5 },
-  { id: "l3", name: "Chefe do Meio", type: "midboss", v: 1, n: 6 },
-  { id: "l4", name: "Urna de Almas", type: "urn", v: 1, n: 1 },
-  { id: "l5", name: "Sacrifício do Pecador", type: "loot", v: 1, n: 1 },
-  { id: "l6", name: "Tirolesa", type: "zipline", v: 0, n: 1 },
-  { id: "l7", name: "Santuário", type: "shrine", v: 0, n: 1 },
-  { id: "l8", name: "Patrono", type: "patron", v: 0, n: 1 },
-  { id: "l9", name: "Círculo do Ritual", type: "ritual", v: 0, n: 1 },
-  { id: "l10", name: "Maelstrom", type: "chaos", v: 0, n: 8 },
-  { id: "l11", name: "Estação de Metrô", type: "slots", v: 0, n: 3 },
-  { id: "l12", name: "Loja de Curiosidades", type: "enter", v: 1, n: 1 },
-  { id: "l13", name: "Loja Secreta", type: "shop", v: 1, n: 1 },
-].map((l) => ({ ...l, type: l.type as LocType, desc: "" }));
+/** Os 45 locais do Cardslock Game: lugares do Cursed Apple, cada um com um efeito tirado da lore (deadlock.wiki). */
+export const DEFAULT_LOCS: GameLoc[] = ([
+  ["bar", "Bar", "bet", 1, 1],
+  ["bilheteria", "Bilheteria", "enter", 1, 1],
+  ["bolsa-de-valores", "Bolsa de Valores", "stock", 0, 3],
+  ["buff-arma", "Arma", "gun", 2, 1],
+  ["buff-espirito", "Espiritualidade", "spirit", 2, 1],
+  ["buff-movimento", "Movimento", "cheap", 1, 1],
+  ["buff-vida", "Vida", "heal", 0, 1],
+  ["casa-abandonada", "Casa Abandonada", "noplay", 0, 1],
+  ["cemiterio", "Cemitério", "grave", 0, 1],
+  ["chinatown", "Chinatown", "bell", 3, 4],
+  ["estacao-de-trem", "Estação de Trem", "zipline", 0, 1],
+  ["estatua-da-coruja", "Estátua da Coruja", "nomove", 0, 1],
+  ["fenda-instavel", "Fenda Instável", "rift", 100, 1],
+  ["fabrica", "Fábricas Fairfax", "endturn", -1, 1],
+  ["grande-estatua", "Grande Estátua", "none", 0, 1],
+  ["grande-navio", "Grande Navio", "crew", 1, 1],
+  ["grande-portao", "Grande Portão", "slots", 0, 2],
+  ["grande-relogio", "Grande Relógio", "clock", 0, 1],
+  ["grande-torre", "Grande Torre", "costHigh", 2, 5],
+  ["grande-arvore", "Grande Árvore", "endturn", 1, 1],
+  ["guardian", "Guardian", "costLow", 2, 2],
+  ["hotel-baronesa", "Hotel Baronesa", "hotel", 0, 4],
+  ["igreja", "Igreja", "ritual", 0, 1],
+  ["jardim", "Jardim", "late", 0, 7],
+  ["lanchonete", "Lanchonete", "loot", 1, 1],
+  ["loja-de-curiosidades", "Loja de Curiosidades", "shop", 1, 1],
+  ["maelstrom", "Maelstrom", "chaos", 0, 8],
+  ["metro", "Metrô", "rats", 1, 1],
+  ["midboss", "Midboss", "midboss", 2, 6],
+  ["minas-fairfax", "Minas Fairfax", "urn", 1, 1],
+  ["museu", "Museu", "museum", 0, 50],
+  ["piscinao", "Piscinão", "nofx", 0, 1],
+  ["quadra-de-basquete", "Quadra de Basquete", "hoop", 3, 50],
+  ["sinners-sacrifice", "Sinner's Sacrifice", "sacrifice", 1, 2],
+  ["taxi", "Táxi", "arrive", 2, 1],
+  ["teatro", "Teatro", "copy", 0, 1],
+  ["teletransportador", "Teletransportador", "teleport", 0, 1],
+  ["the-new-york-oracle", "The New York Oracle", "oracle", 0, 1],
+  ["touro", "Touro", "bull", 0, 5],
+  ["troll", "Troll", "toll", 1, 1],
+  ["universidade-de-umbria", "Universidade de Umbria", "costMin", 0, 7],
+  ["viela", "Viela", "ambush", 3, 7],
+  ["veu-de-fumaca", "Véu de Fumaça", "smoke", 0, 1],
+  ["walker", "Walker", "patron", 0, 1],
+  ["zona-de-treino", "Zona de Treino", "shrine", 0, 1],
+] as const).map(([id, name, type, v, n]) => ({ id, name, type: type as LocType, v, n, desc: "", art: `locs/${id}.webp`, fx: 50 }));
 
 /**
  * Momento da habilidade, mostrado como selo na carta: r = ao revelar, c = constante (enquanto estiver no local),
@@ -53,7 +102,7 @@ export const ABILITIES = {
   "Haze": H("r", 0, 0, false), "Holliday": H("r", 0, -1, false), "Infernus": H("r", 2, -1), "Ivy": H("r", 2, -1),
   "Kelvin": H("r", 0, -1, false), "Lady Geist": H("r", 6, -3), "Lash": H("r", 1, -1), "McGinnis": H("r", 2, -1),
   "Mina": H("f", 1, -1), "Mirage": H("x", 2, 0), "Mo & Krill": H("c", 2, 0), "Nurse Harrow": H("c", 1, 0),
-  "Paige": H("c", 1, -2), "Paradox": H("r", 0, 0, false), "Pocket": H("r", 2, -2), "Rat King": H("r", 0, 0, false),
+  "Paige": H("c", 1, -2), "Paradox": H("r", 0, 0, false), "Pocket": H("r", 3, -2), "Rat King": H("r", 0, 0, false),
   "Rem": H("r", 2, -1), "Seven": H("f", 1, -1), "Shiv": H("r", 3, 0), "Silver": H("a", 6, -2),
   "Sinclair": H("x", 0, 0, false), "Solomon": H("c", 5, -1), "The Doorman": H("r", 0, 0, false), "Venator": H("r", 3, 0),
   "Victor": H("c", 2, 2), "Vindicta": H("r", 3, 0), "Violet": H("f", 1, -2), "Viscous": H("r", 2, 0),
@@ -69,9 +118,12 @@ export const ability = (k: AbilityKey): AbilityDef => ABILITIES[k];
 export const ROLE_ABILITY: Record<string, AbilityKey> = { Carry: "self", OffCarry: "hit", Frontline: "aura", Suporte: "team", Flex: "draw" };
 
 export type CardOverride = { ab?: AbilityKey; cost?: number; power?: number; v?: number; desc?: string };
+/** Endereço de um efeito sonoro enviado pelo editor (R2, pasta sounds/). */
+export const SOUND_URL = /^\/img\/sounds\/[\w-]+\.(mp3|ogg|wav|webm)$/;
 export type ItemOverride = { off?: boolean; v?: number };
 /** Ajuste por herói: o atributo principal que define a Maestria, e o custo, o perfil e o poder base da carta. */
-export type HeroOverride = { stat?: StatKey; cost?: number; prof?: Profile; base?: number };
+/** `sound`: efeito sonoro enviado para a habilidade do herói (`/img/sounds/...`), no lugar do som sintetizado. */
+export type HeroOverride = { stat?: StatKey; cost?: number; prof?: Profile; base?: number; sound?: string };
 export type GameConfig = { locs: GameLoc[]; cards: Record<string, CardOverride>; items: Record<string, ItemOverride>; heroes: Record<string, HeroOverride> };
 
 /* ---------- atributos e Maestria ---------- */
@@ -108,8 +160,8 @@ const hc = (cost: number, prof: Profile, base: number): HeroCard => ({ cost, pro
 export const HERO_CARD: Partial<Record<AbilityKey, HeroCard>> = {
   "Calico": hc(1, "P", -1), "Holliday": hc(1, "P", 1), "Vyper": hc(1, "P", -2), "Venator": hc(1, "P", -1), "Violet": hc(1, "P", -2), "Graves": hc(1, "P", 1),
   "Abrams": hc(2, "P", 1), "Mina": hc(2, "P", -2), "Paige": hc(2, "H", 0), "Lash": hc(2, "P", 1), "Bebop": hc(2, "P", 1), "Rat King": hc(2, "P", 0),
-  "Viscous": hc(3, "H", 2), "Kelvin": hc(3, "P", 1), "Nurse Harrow": hc(3, "H", 2), "Mirage": hc(3, "P", 1), "Seven": hc(3, "P", 0), "Dynamo": hc(3, "H", 3),
-  "Billy": hc(4, "P", 3), "Celeste": hc(4, "P", 3), "Mo & Krill": hc(4, "P", 0), "Infernus": hc(4, "P", 3), "McGinnis": hc(4, "H", 4), "Warden": hc(4, "P", 1),
+  "Viscous": hc(3, "H", 2), "Kelvin": hc(3, "P", 1), "Nurse Harrow": hc(3, "H", 2), "Mirage": hc(3, "P", 1), "Dynamo": hc(3, "H", 3),
+  "Billy": hc(4, "P", 3), "Celeste": hc(4, "P", 3), "Mo & Krill": hc(4, "P", 0), "Infernus": hc(4, "P", 3), "McGinnis": hc(4, "H", 4), "Warden": hc(4, "P", 1), "Seven": hc(4, "P", 0),
   "Pocket": hc(5, "P", 3), "Grey Talon": hc(5, "P", 5), "Rem": hc(5, "H", 5), "Apollo": hc(5, "P", 5), "Sinclair": hc(5, "P", 6), "The Doorman": hc(5, "P", 6), "Lady Geist": hc(5, "H", 2),
   "Vindicta": hc(6, "P", 6), "Shiv": hc(6, "H", 7), "Ivy": hc(6, "H", 4), "Drifter": hc(6, "P", 6), "Silver": hc(6, "P", 6), "Deadman Danny": hc(6, "H", 6),
   "Wraith": hc(7, "P", 5), "Yamato": hc(7, "P", 6), "Haze": hc(7, "P", 9),
@@ -132,8 +184,8 @@ export function heroCard(hero: AbilityKey, heroes: GameConfig["heroes"] = {}): H
   return { cost: o.cost ?? d.cost, prof: o.prof ?? d.prof, base: o.base ?? d.base };
 }
 
-/** Teto de remoção: zerar, transformar, destruir ou trocar poder só pega alvos com até CAP_PER_COST × o custo da carta. */
-export const CAP_PER_COST = 2;
+/** Teto de remoção, escrito na carta: zerar, transformar, destruir ou trocar poder só pega inimigas com até este poder. */
+export const REMOVAL_CAP = { "Baba": 16, "Lady Geist": 10, "Silver": 12, "Wraith": 8 } as const satisfies Partial<Record<AbilityKey, number>>;
 /** Mina drena nos N turnos a partir do que revela; Violet ganha no máximo VIOLET_MAX; o portal do Doorman leva DOOR_MAX cartas. */
 export const MINA_TURNS = 3;
 export const VIOLET_MAX = 4;
@@ -167,7 +219,7 @@ export const PRO_ON_POWER: ReadonlySet<AbilityKey> = new Set<AbilityKey>(["Warde
 /* ---------- itens da loja ---------- */
 /** Lojas: em que round abrem e de quais tiers são os 3 itens oferecidos (início do mid e início do late). */
 /** Lojas: em que round abrem e de quais tiers são os 3 itens oferecidos (early, mid e late). */
-export const SHOPS: Record<number, ItemTier[]> = { 3: [1, 2], 6: [3, 4] };
+export const SHOPS: Record<number, ItemTier[]> = { 4: [1, 2], 7: [3, 4] };
 export const SHOP_ROUNDS = Object.keys(SHOPS).map(Number);
 export const ITEM_TIERS = [1, 2, 3, 4] as const;
 export type ItemTier = (typeof ITEM_TIERS)[number];
@@ -179,11 +231,11 @@ export const itemCost = (tier: ItemTier) => TIER_COST[tier];
 type ItemDef = { tier: ItemTier; slot: ItemSlot; v: number; usesV: boolean; foe?: boolean };
 const I = (tier: ItemTier, slot: ItemSlot, v: number, foe = false): ItemDef => ({ tier, slot, v, usesV: true, ...(foe && { foe }) });
 
-/** Chave = nome do item no Deadlock (inglês, igual à API), com o tier real do jogo. 2 de cada categoria por tier. */
+/** Chave = nome do item no Deadlock (inglês, igual à API), com o tier real do jogo. Efeitos tirados do deadlock.wiki. */
 export const ITEMS = {
   "High-Velocity Rounds": I(1, "weapon", 3), "Close Quarters": I(1, "weapon", 3),
   "Extra Health": I(1, "vitality", 2), "Healing Rite": I(1, "vitality", 2),
-  "Extra Spirit": I(1, "spirit", 1), "Golden Goose Egg": I(1, "spirit", 1),
+  "Extra Spirit": I(1, "spirit", 1), "Golden Goose Egg": I(1, "spirit", 2),
   "Swift Striker": I(2, "weapon", 4), "Long Range": I(2, "weapon", 4),
   "Battle Vest": I(2, "vitality", 4), "Healing Booster": I(2, "vitality", 3),
   "Arcane Surge": I(2, "spirit", 1), "Slowing Hex": I(2, "spirit", 2, true),
@@ -192,7 +244,23 @@ export const ITEMS = {
   "Surge of Power": I(3, "spirit", 6), "Superior Cooldown": I(3, "spirit", 2),
   "Glass Cannon": I(4, "weapon", 10), "Ricochet": I(4, "weapon", 5, true),
   "Colossus": I(4, "vitality", 7), "Unstoppable": I(4, "vitality", 6),
-  "Echo Shard": I(4, "spirit", 3), "Refresher": I(4, "spirit", 4),
+  "Echo Shard": I(4, "spirit", 3), "Refresher": I(4, "spirit", 6),
+  // tier 1
+  "Monster Rounds": I(1, "weapon", 2), "Rapid Rounds": I(1, "weapon", 2),
+  "Extra Regen": I(1, "vitality", 1), "Grit": I(1, "vitality", 2), "Rebuttal": I(1, "vitality", 1),
+  "Spirit Strike": I(1, "spirit", 2, true), "Rusted Barrel": I(1, "spirit", 3, true),
+  // tier 2
+  "Slowing Bullets": I(2, "weapon", 3), "Titanic Magazine": I(2, "weapon", 3), "Mystic Shot": I(2, "weapon", 3),
+  "Guardian Ward": I(2, "vitality", 3), "Return Fire": I(2, "vitality", 2), "Healbane": I(2, "vitality", 3, true),
+  "Cold Front": I(2, "spirit", 2, true), "Mystic Vulnerability": I(2, "spirit", 2, true), "Spirit Sap": I(2, "spirit", 3, true),
+  // tier 3
+  "Berserker": I(3, "weapon", 5), "Alchemical Fire": I(3, "weapon", 2, true), "Headhunter": I(3, "weapon", 6),
+  "Fortitude": I(3, "vitality", 5), "Dispel Magic": I(3, "vitality", 5), "Healing Nova": I(3, "vitality", 3),
+  "Decay": I(3, "spirit", 2, true), "Silence Wave": I(3, "spirit", 3, true),
+  // tier 4
+  "Frenzy": I(4, "weapon", 7), "Crippling Headshot": I(4, "weapon", 6, true),
+  "Cheat Death": I(4, "vitality", 7), "Divine Barrier": I(4, "vitality", 6),
+  "Arctic Blast": I(4, "spirit", 3, true), "Cursed Relic": I(4, "spirit", 6, true),
 } satisfies Record<string, ItemDef>;
 export type ItemKey = keyof typeof ITEMS;
 export const ITEM_KEYS = Object.keys(ITEMS) as ItemKey[];
@@ -224,7 +292,7 @@ export const ABILITY_V_RANGE: [number, number] = [0, 10];
 export const NAME_MAX = 24;
 export const DESC_MAX = 160;
 export const MIN_LOCS = 3;
-const MAX_LOCS = 40;
+const MAX_LOCS = 60;
 const MAX_CARDS = 2000;
 
 /** Carta do pool. `key` identifica o jogador (todas as versões dele têm a mesma); `alt` marca a versão de um herói de afinidade. */
@@ -292,6 +360,8 @@ const clampInt = (x: unknown, [a, b]: [number, number], fallback: number) => {
 };
 const text = (x: unknown, max: number) => (typeof x === "string" ? x.trim().slice(0, max) : "");
 const ID_RE = /^[\w-]{1,64}$/;
+/** Arte de local: só imagens da pasta locs/ do R2. */
+const LOC_ART_RE = /^locs\/[\w-]{1,64}\.webp$/;
 
 export function sanitizeLoc(raw: unknown, i = 0): GameLoc {
   const l = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -304,9 +374,11 @@ export function sanitizeLoc(raw: unknown, i = 0): GameLoc {
     id: typeof l.id === "string" && ID_RE.test(l.id) ? l.id : `l${i + 1}`,
     name: text(l.name, NAME_MAX) || "Local",
     type: t,
-    v: clampInt(v, LOC_V_RANGE, 0),
+    v: clampInt(v, vRange(t), 0),
     n: clampInt(l.n, nRange(t), nRange(t)[0] || 1),
     desc: text(l.desc, DESC_MAX),
+    ...(typeof l.art === "string" && LOC_ART_RE.test(l.art) ? { art: l.art } : {}),
+    ...(l.fx !== undefined ? { fx: clampInt(l.fx, [0, 100], 50) } : {}),
   };
 }
 
@@ -334,6 +406,7 @@ function sanitizeHeroes(raw: unknown): GameConfig["heroes"] {
     if (o.cost !== undefined) r.cost = clampInt(o.cost, [1, COST_RANGE[1]], 1);
     if (o.base !== undefined) r.base = clampInt(o.base, BASE_RANGE, 0);
     if (isProfile(o.prof)) r.prof = o.prof;
+    if (typeof o.sound === "string" && SOUND_URL.test(o.sound)) r.sound = o.sound;
     return Object.keys(r).length ? [[k, r]] : [];
   }));
 }
@@ -369,10 +442,15 @@ export function sanitizeGameConfig(raw: unknown): GameConfig | null {
   };
 }
 
+/** Nomes antigos dos locais padrão: a configuração salva com o nome antigo passa a usar o novo. */
+const RENAMED: Record<string, string> = { "Buff de Arma": "Arma", "Buff de Espírito": "Espiritualidade", "Buff de Movimento": "Movimento", "Buff de Vida": "Vida" };
+
 /** Configuração em uso: a salva, ou os locais padrão. */
 export function gameConfig(saved: unknown): GameConfig {
   const g = (isRecord(saved) ? saved : {}) as Partial<GameConfig>;
-  const locs = Array.isArray(g.locs) && g.locs.length >= MIN_LOCS ? g.locs.map(sanitizeLoc) : DEFAULT_LOCS.map((l) => ({ ...l }));
+  const locs = Array.isArray(g.locs) && g.locs.length >= MIN_LOCS
+    ? g.locs.map(sanitizeLoc).map((l) => (RENAMED[l.name] ? { ...l, name: RENAMED[l.name] } : l))
+    : DEFAULT_LOCS.map((l) => ({ ...l }));
   const clean = sanitizeGameConfig({ locs, cards: isRecord(g.cards) ? g.cards : {}, items: isRecord(g.items) ? g.items : {}, heroes: isRecord(g.heroes) ? g.heroes : {} });
   return { locs, cards: clean?.cards ?? {}, items: clean?.items ?? {}, heroes: clean?.heroes ?? {} };
 }

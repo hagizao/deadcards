@@ -37,7 +37,7 @@ export const api = {
   createCode: (body: { code: string; playerId: string; maxUses: number; startsAt: number | null; expiresAt: number | null }) =>
     call("/api/codes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   removeCode: (code: string) => call(`/api/codes/${encodeURIComponent(code)}`, { method: "DELETE" }),
-  upload: async (folder: "players" | "teams" | "heroes" | "bg" | "home", file: File) =>
+  upload: async (folder: "players" | "teams" | "heroes" | "bg" | "home" | "sounds", file: File) =>
     (await call(`/api/upload/${folder}`, { method: "POST", headers: { "content-type": file.type }, body: file })).url!,
 };
 

@@ -2,3 +2,7 @@ Sons do Cardslock Game: pacotes "Casino Audio" e "Interface Sounds" de Kenney (w
 licença Creative Commons Zero (CC0): http://creativecommons.org/publicdomain/zero/1.0/
 Obtidos em https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips
 e https://opengameart.org/content/interface-sounds
+
+crowd-gasp.ogg: "CRWDReac_Crowd Gasping In Surprise, Voiced 02" de ShangusBurger (Shane Vincent, pacote GameSoundCon 2024 Walla),
+licença Creative Commons Zero (CC0): http://creativecommons.org/publicdomain/zero/1.0/
+Obtido em https://freesound.org/people/ShangusBurger/sounds/763993/ (prévia em alta qualidade do Freesound).

@@ -9,12 +9,16 @@ import { TeamLogo } from "../components/TeamLogo";
 import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
 import {
-  ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, LOC_V_RANGE, MIN_LOCS, NAME_MAX, POWER_RANGE,
+  ABILITIES, ABILITY_KEYS, ABILITY_V_RANGE, COST_RANGE, DEFAULT_LOCS, DESC_MAX, LOC_FIELDS, LOC_TYPES, MIN_LOCS, NAME_MAX, POWER_RANGE,
   ITEMS, ITEM_KEYS, SHOP_ROUNDS, SHOPS, ITEM_TIERS, ITEM_V_RANGE, HERO_KEYS, HERO_STAT, HERO_CARD, HERO_POOL_MAX, ALT_POL, ALT_MALUS, BASE_RANGE, HABILITY_AT, heroCard, MASTERY_AT, STAT_KEYS as GAME_STATS,
-  cardStats, gameConfig, itemCost, itemStats, nRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey, type HeroOverride, type Profile,
+  cardStats, gameConfig, itemCost, itemStats, locArtUrl, nRange, vRange, type AbilityKey, type CardOverride, type GameConfig, type GameLoc, type ItemKey, type ItemOverride, type LocType, type PoolCard, type StatKey, type HeroOverride, type Profile,
 } from "../lib/game/config";
-import { cardPool } from "../lib/game/engine";
+import { cardPool, type HeardEv } from "../lib/game/engine";
+import { CHOREO, Rig } from "../lib/game/choreo";
 import { GAME_TEXT } from "../lib/game/text";
+import { abilitySfx } from "../lib/game/heroSfx";
+import { createPortal } from "react-dom";
+import { AbilityFx, FxLayer, type Box, type FxScene } from "../components/AbilityFx";
 
 const SECTIONS = [
   { id: "card", label: "Carta" },
@@ -62,6 +66,188 @@ function ImagePick({ folder, onUrl, label = "Enviar imagem" }: { folder: Paramet
         }}
       />
     </label>
+  );
+}
+
+const MAX_SOUND_MB = 1;
+const ring = "has-focus-visible:ring-2 has-focus-visible:ring-zinc-100 focus-visible:ring-2 focus-visible:ring-zinc-100 focus-visible:outline-none active:scale-95";
+
+/** Toca um efeito: o arquivo enviado ou, sem ele, o som sintetizado da habilidade. */
+const hear = (url: string | undefined, ab: AbilityKey) => (url ? void new Audio(url).play().catch(() => {}) : abilitySfx(ab));
+
+/**
+ * Efeito sonoro do herói: enviar (mp3, ogg, wav ou webm de até 1 MB), ouvir o atual (o que está salvo) e o novo (o
+ * desta edição, antes de salvar), e voltar ao som sintetizado da habilidade.
+ */
+function SoundPick({ url, saved, ab, applying, onUrl, onApply }: {
+  url?: string; saved?: string; ab: AbilityKey; applying: boolean; onUrl: (url: string | undefined) => void; onApply: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="button" className={`${ghost} ${ring}`} onClick={() => hear(saved, ab)}>▶ Ouvir atual</button>
+      {url !== saved && (
+        <>
+          <button type="button" className={`${ghost} ${ring}`} onClick={() => hear(url, ab)}>▶ Ouvir novo</button>
+          <button type="button" className={`${primary} ${ring}`} disabled={applying} onClick={onApply}>{applying ? "Aplicando…" : "Aplicar no jogo"}</button>
+        </>
+      )}
+      <label className={`${ghost} ${ring} inline-flex items-center gap-2 ${busy ? "cursor-wait opacity-50" : ""}`}>
+        {busy ? "Enviando…" : url ? "Trocar som" : "Enviar som"}
+        <input
+          type="file"
+          accept="audio/mpeg,audio/ogg,audio/wav,audio/x-wav,audio/webm,.mp3,.ogg,.wav,.webm"
+          className="sr-only"
+          disabled={busy}
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            if (f.size > MAX_SOUND_MB * 1024 * 1024) return alert(`O som precisa ter até ${MAX_SOUND_MB} MB.`);
+            setBusy(true);
+            try { onUrl(await api.upload("sounds", f)); } catch (err) { alert((err as Error).message); } finally { setBusy(false); }
+          }}
+        />
+      </label>
+      {url && <button type="button" className={`${ghost} ${ring}`} onClick={() => onUrl(undefined)}>Usar som padrão</button>}
+    </div>
+  );
+}
+
+/** Cabeçalho de uma caixa recolhível (`<details>`): título e a seta que vira ao abrir. */
+function Fold({ title }: { title: string }) {
+  return (
+    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-2 transition hover:bg-zinc-800/40 focus-visible:ring-2 focus-visible:ring-zinc-100 focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+      <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">{title}</h2>
+      <span className="flex items-center gap-2 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+        <span className="group-open/fold:hidden">Abrir</span>
+        <span className="hidden group-open/fold:inline">Recolher</span>
+        <span aria-hidden className="transition-transform group-open/fold:rotate-180 motion-reduce:transition-none">▾</span>
+      </span>
+    </summary>
+  );
+}
+
+/** Lugares da mesa de mentira da prévia: o herói, duas inimigas, uma aliada e as vagas do outro local. */
+type Spot = "src" | "f1" | "f2" | "ally" | "awayA" | "awayP";
+const SPOT_ID: Partial<Record<Spot, number>> = { src: -1, f1: -2, f2: -3, ally: -4 };
+/**
+ * Um momento da habilidade na prévia: quem age (`src`), quem ela mexe (`dst`), de onde e para onde as cartas vão e o
+ * momento especial (`ev`). Herói sem passos mexe na primeira inimiga.
+ */
+type Step = { ev?: HeardEv; src?: Spot; dst?: Spot[]; from?: Partial<Record<Spot, Spot>>; to?: Partial<Record<Spot, Spot>>; self?: boolean };
+const PREVIEW: Partial<Record<AbilityKey, Step[]>> = {
+  "Abrams": [{ dst: ["f1"], to: { f1: "awayA" } }],
+  "Apollo": [{}, { ev: "parry", dst: ["f1"] }],
+  "Bebop": [{}, { ev: "pull", dst: ["f2"], from: { f2: "awayA" } }],
+  "Calico": [{}, { ev: "late", dst: ["f1", "f2"] }],
+  "Celeste": [{ dst: ["f1", "f2"] }],
+  "Deadman Danny": [{ dst: ["f1", "f2"] }],
+  "Drifter": [{ dst: ["f1"], self: true }],
+  "Dynamo": [{ dst: ["f1"], from: { f1: "awayA" } }],
+  "Graves": [{ ev: "end", dst: ["ally", "f2"] }],
+  "Grey Talon": [{ dst: ["f1"], self: true }],
+  "Haze": [{ dst: ["f1"] }, { ev: "late", dst: ["f1"] }],
+  "Holliday": [{ dst: ["f1"], to: { src: "awayP", f1: "awayA" } }],
+  "Ivy": [{ dst: ["ally"] }],
+  "Kelvin": [{ dst: ["ally"] }],
+  "Lash": [{ dst: ["f1", "f2"], to: { f1: "awayA", f2: "awayA" } }],
+  "McGinnis": [{ dst: ["ally"] }],
+  "Mina": [{}, { ev: "end", dst: ["f1"] }],
+  "Mirage": [{ dst: [] }], "Mo & Krill": [{ dst: [] }], "Rat King": [{ dst: [] }], "Sinclair": [{ dst: [] }], "Yamato": [{ dst: [] }], "The Doorman": [{ dst: [] }],
+  "Nurse Harrow": [{ dst: ["f1", "ally"] }],
+  "Paige": [{ dst: ["ally"] }],
+  "Paradox": [{ dst: ["f1"], from: { f1: "awayA" }, to: { src: "awayP" } }],
+  "Pocket": [{ dst: ["f1", "f2"] }],
+  "Rem": [{ dst: ["f1", "f2"] }],
+  "Seven": [{}, { ev: "end", dst: ["f1", "f2"] }],
+  "Silver": [{ ev: "late", dst: ["f1"] }],
+  "Solomon": [{ dst: ["ally"] }],
+  "Venator": [{ dst: [] }, { ev: "trap", src: "f1", dst: ["f1"] }],
+  "Victor": [{ dst: ["f1", "f2", "ally"] }],
+  "Vindicta": [{ dst: ["f1"], self: true }],
+  "Violet": [{ ev: "end", dst: [] }],
+  "Viscous": [{ dst: ["ally"] }],
+  "Vyper": [{ dst: [] }, { ev: "petri", src: "f1", dst: ["f1"] }],
+  "Warden": [{ dst: ["f1", "f2"] }],
+  "Wraith": [{ dst: ["f1"] }, { ev: "late", dst: [], to: { src: "awayP" } }],
+};
+/** Habilidades genéricas (sem herói) seguem com o efeito por cima da mesa. */
+const PREVIEW_ALLY = new Set<AbilityKey>(["team", "aura"]);
+const PREVIEW_NONE = new Set<AbilityKey>(["self", "draw"]);
+const boxOf = (el: Element | null): Box | null => {
+  const r = el?.getBoundingClientRect();
+  return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height } : null;
+};
+
+/**
+ * Prévia da animação de um herói numa mesa de mentira: a carta do herói e uma aliada embaixo, duas inimigas em cima
+ * e as vagas de outro local ao lado, com as mesmas coreografias da partida. Toca junto o som (o enviado nesta edição ou o padrão).
+ */
+function FxPreview({ hero, icon, sound }: { hero: AbilityKey; icon?: string; sound?: string }) {
+  const stage = useRef<HTMLDivElement>(null);
+  const [run, setRun] = useState<{ k: number; scene: FxScene } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const q = (s: Spot) => boxOf(stage.current?.querySelector(`[data-fx="${s}"]`) ?? null);
+  const quake = (p: 1 | 2 | 3) => { stage.current?.animate([0, -1, 1, -0.6, 0].map((k) => ({ transform: `translate(${k * p * 3}px, ${-k * p * 1.5}px)` })), { duration: 260 }); };
+  /** Roda os momentos da coreografia em sequência, um depois do outro. */
+  const choreo = (steps: Step[]) => {
+    const recipe = CHOREO[hero];
+    if (!recipe) return;
+    setBusy(true);
+    let t = 0;
+    steps.forEach((st) => {
+      const src = st.src ?? "src", dst = st.dst ?? ["f1"];
+      const ms = recipe.ms(dst.length, !!st.self, st.ev);
+      setTimeout(() => {
+        const rig = new Rig();
+        // cartas que trocam de lugar: o dublê sai da vaga de origem e termina na de destino
+        [src, ...dst].forEach((k) => {
+          const id = SPOT_ID[k], from = st.from?.[k], to = st.to?.[k];
+          if (id !== undefined && (from || to)) rig.hold(id, q(from ?? k), k !== "src" && k !== "ally", q(to ?? k) ?? undefined);
+        });
+        rig.start(hero, { id: SPOT_ID[src] ?? -1, box: null }, dst.map((k) => ({ id: SPOT_ID[k] ?? -1, foe: k === "f1" || k === "f2" })),
+          { self: !!st.self, ev: st.ev, lane: boxOf(stage.current?.querySelector("[data-lane]") ?? null), alt: q("awayP"), shake: quake });
+      }, t);
+      t += ms + 350;
+    });
+    setTimeout(() => setBusy(false), t);
+  };
+  const play = () => {
+    hear(sound, hero);
+    if (CHOREO[hero]) return choreo(PREVIEW[hero] ?? [{}]);
+    const src = q("src"), f1 = q("f1"), ally = q("ally");
+    if (!src || !f1 || !ally) return;
+    const dst = PREVIEW_NONE.has(hero) ? [] : PREVIEW_ALLY.has(hero) ? [{ box: ally, foe: false }] : [{ box: f1, foe: true }];
+    setRun({ k: (run?.k ?? 0) + 1, scene: { src, dst, loc: boxOf(stage.current), me: true } });
+  };
+  const card = "aspect-295/430 w-16 shrink-0 rounded-lg shadow-lg sm:w-20";
+  const face = "flex size-full items-center justify-center overflow-hidden rounded-lg text-[10px] font-bold uppercase";
+  const slot = `${card} border-2 border-dashed border-zinc-700 shadow-none`;
+  return (
+    <div className="flex flex-col gap-3">
+      <div ref={stage} className="flex justify-center gap-4 rounded-2xl bg-zinc-950/70 bg-radial-[at_50%_40%] from-zinc-800/60 to-transparent px-4 py-5">
+        <div data-lane className="flex flex-col items-center justify-between gap-8">
+          <div className="flex gap-3">
+            <div data-fx="f1" data-card={-2} className={card}><div className={`${face} bg-game-ai/30 text-game-ai`}>Inimiga</div></div>
+            <div data-fx="f2" data-card={-3} className={card}><div className={`${face} bg-game-ai/30 text-game-ai`}>Inimiga</div></div>
+          </div>
+          <div className="flex gap-3">
+            <div data-fx="src" data-card={-1} className={`${card} ring-2 ring-game-brass`}><div className={`${face} bg-zinc-800`}>{icon ? <img src={icon} alt={hero} className="size-full object-cover" /> : hero}</div></div>
+            <div data-fx="ally" data-card={-4} className={card}><div className={`${face} bg-game-me/30 text-game-me`}>Aliada</div></div>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-between gap-8 border-l border-zinc-800 pl-4">
+          <div data-fx="awayA" className={slot} />
+          <div data-fx="awayP" className={slot} />
+        </div>
+      </div>
+      <button type="button" disabled={busy} className={`${primary} ${ring} self-start disabled:cursor-wait disabled:opacity-60`} onClick={play}>▶ Ver animação</button>
+      {run && createPortal(
+        <FxLayer><AbilityFx key={run.k} ab={hero} scene={run.scene} onDone={() => setRun(null)} /></FxLayer>,
+        document.body,
+      )}
+    </div>
   );
 }
 
@@ -690,7 +876,12 @@ function CodesForm() {
 /* ---------- Cardslock Game ---------- */
 
 const GT = GAME_TEXT.pt;
-const LOC_N_LABEL: Partial<Record<LocType, string>> = { slots: "Espaços", costLow: "Custo", costHigh: "Custo", midboss: "Turno", chaos: "Poder máximo" };
+const LOC_N_LABEL: Partial<Record<LocType, string>> = {
+  slots: "Espaços", costLow: "Custo", costHigh: "Custo", midboss: "Turno", chaos: "Poder máximo", stock: "Almas máximas", bell: "Turno", hotel: "Turno",
+  late: "Revela no turno", museum: "Chance (%)", hoop: "Chance (%)", sacrifice: "Poder perdido", bull: "Turno", costMin: "Custo mínimo", ambush: "A partir do turno",
+};
+/** Artes já enviadas ao R2 (uma por local padrão). */
+const LOC_ARTS = DEFAULT_LOCS.flatMap((l) => (l.art ? [{ art: l.art, name: l.name }] : []));
 const clampTo = (x: number, [a, b]: [number, number]) => Math.max(a, Math.min(b, Math.round(x)));
 
 function NumField({ label, value, range, onChange }: { label: string; value: number; range: [number, number]; onChange: (v: number) => void }) {
@@ -699,6 +890,33 @@ function NumField({ label, value, range, onChange }: { label: string; value: num
       <input type="number" inputMode="numeric" className={input} min={range[0]} max={range[1]} value={value}
         onChange={(e) => { if (e.target.value !== "" && Number.isFinite(+e.target.value)) onChange(clampTo(+e.target.value, range)); }} />
     </Field>
+  );
+}
+
+/**
+ * Foto de fundo do salão do Cardslock Game (lobby, oficina e draft). Salva na hora ao enviar ou remover, sem esperar outro
+ * botão, e só mexe nesta foto: as outras configurações do jogo e a aparência do site ficam como estão.
+ */
+function GameBgField() {
+  const { settings, reload } = useData();
+  const { busy, msg, run } = useSaver(reload);
+  const save = (url: string | null) => run(() => api.save("settings", "app", { gameBg: url }), url ? "Foto do fundo aplicada: já vale no jogo." : "Fundo voltou ao bar desenhado.");
+  const photo = settings.gameBg;
+  return (
+    <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
+      <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Foto de fundo</h2>
+      <p className="text-sm text-zinc-400">Troca só a foto do salão atrás do baralho. A luz do lampião, a mesa, a fumaça e o copo continuam por cima. Sem foto, fica o bar desenhado.</p>
+      <div className="flex flex-wrap items-center gap-4">
+        {photo
+          ? <img src={photo} alt="Foto de fundo atual do Cardslock Game" className="h-28 w-48 rounded-lg object-cover" />
+          : <span className="grid h-28 w-48 place-items-center rounded-lg bg-zinc-950/70 text-xs text-zinc-500">Bar desenhado</span>}
+        <div className="flex flex-wrap items-center gap-2">
+          <ImagePick folder="bg" label={busy ? "Salvando…" : photo ? "Trocar foto" : "Enviar foto"} onUrl={(url) => save(url)} />
+          {photo && <button type="button" className={ghost} disabled={busy} onClick={() => save(null)}>Remover</button>}
+        </div>
+        <Toast msg={msg} />
+      </div>
+    </section>
   );
 }
 
@@ -724,6 +942,9 @@ function GameForm() {
   const shown = pool.filter((p) => !q || `${p.name} ${p.hero} ${p.position} ${GT.abilities[cardStats(p, cfg.cards, cfg.heroes).ab].name}`.toLowerCase().includes(q));
   const card = shown.find((p) => p.id === cardId) ?? shown[0];
   const stats = card && cardStats(card, cfg.cards, cfg.heroes);
+  // o que está salvo agora, para ouvir o som atual e comparar com o editado
+  const savedHeroes = useMemo(() => gameConfig(settings.game).heroes, [settings.game]);
+  const [soundHero, setSoundHero] = useState<AbilityKey>(HERO_KEYS[0]);
   const override = card ? cfg.cards[card.id] : undefined;
   const setCard = (patch: CardOverride) => {
     if (!card) return;
@@ -749,10 +970,24 @@ function GameForm() {
     if (o.cost === d?.cost) delete o.cost;
     if (o.prof === d?.prof) delete o.prof;
     if (o.base === d?.base) delete o.base;
+    if (!o.sound) delete o.sound;
     const heroes = { ...c.heroes, [k]: o };
     if (!Object.keys(o).length) delete heroes[k];
     return { ...c, heroes };
   });
+  /**
+   * Salva só o som deste herói, em cima do que já está salvo: vale na hora no jogo, sem levar junto as outras
+   * edições desta tela que ainda não foram salvas.
+   */
+  const applySound = (k: AbilityKey) => {
+    const base = gameConfig(settings.game);
+    const h: HeroOverride = { ...base.heroes[k] };
+    const sound = cfg.heroes[k]?.sound;
+    if (sound) h.sound = sound; else delete h.sound;
+    const heroes = { ...base.heroes, [k]: h };
+    if (!Object.keys(h).length) delete heroes[k];
+    run(() => api.save("settings", "game", { game: { ...base, heroes } }), sound ? `Som de ${k} aplicado: já vale na próxima habilidade.` : `${k} voltou ao som padrão.`);
+  };
   const resetCard = () => {
     if (!card) return;
     setCfg((c) => { const cards = { ...c.cards }; delete cards[card.id]; return { ...c, cards }; });
@@ -769,6 +1004,7 @@ function GameForm() {
 
   return (
     <div className="flex flex-col gap-6">
+      <GameBgField />
       <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
         <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Localizações</h2>
         <div className="flex flex-wrap items-end gap-3">
@@ -796,7 +1032,7 @@ function GameForm() {
               </div>
               {LOC_FIELDS[loc.type].length > 0 && (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {LOC_FIELDS[loc.type].includes("v") && <NumField label="Valor" value={loc.v} range={LOC_V_RANGE} onChange={(v) => setLoc({ v })} />}
+                  {LOC_FIELDS[loc.type].includes("v") && <NumField label="Valor" value={loc.v} range={vRange(loc.type)} onChange={(v) => setLoc({ v })} />}
                   {LOC_FIELDS[loc.type].includes("n") && <NumField label={LOC_N_LABEL[loc.type] ?? "Número"} value={loc.n} range={nRange(loc.type)} onChange={(n) => setLoc({ n })} />}
                 </div>
               )}
@@ -804,10 +1040,24 @@ function GameForm() {
                 <textarea className={`${input} min-h-16 resize-y`} rows={3} maxLength={DESC_MAX} placeholder={GT.locs[loc.type].text(loc)} value={loc.desc} onChange={(e) => setLoc({ desc: e.target.value })} />
               </Field>
               <p className="text-xs text-zinc-400">Em branco, o jogo mostra o texto automático do efeito (o texto cinza no campo).</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Arte">
+                  <select className={input} value={loc.art ?? ""} onChange={(e) => setLoc({ art: e.target.value || undefined })}>
+                    <option value="">Sem arte (névoa)</option>
+                    {LOC_ARTS.map((a) => <option key={a.art} value={a.art}>{a.name}</option>)}
+                  </select>
+                </Field>
+                <Field label={`Foco da arte: ${loc.fx ?? 50}%`}>
+                  <input type="range" min={0} max={100} step={1} value={loc.fx ?? 50} disabled={!loc.art} onChange={(e) => setLoc({ fx: +e.target.value })}
+                    className="h-11 w-full cursor-pointer accent-game-brass focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dl-text disabled:cursor-not-allowed disabled:opacity-40" />
+                </Field>
+              </div>
             </div>
-            <div className="flex flex-col gap-1 rounded-2xl bg-zinc-950/60 p-4 text-center">
-              <b className="font-display tracking-wide text-dl-text">{loc.name || "Sem nome"}</b>
-              <span className="text-sm text-zinc-300">{loc.desc.trim() || GT.locs[loc.type].text(loc)}</span>
+            <div className="relative flex aspect-9/14 flex-col justify-end gap-1 overflow-hidden rounded-2xl bg-zinc-950/60 p-4 text-center">
+              {loc.art && <img src={locArtUrl(loc.art)} alt="" className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${loc.fx ?? 50}% 50%` }} />}
+              <div className="absolute inset-0 bg-linear-to-b from-black/60 via-transparent to-black/90" />
+              <b className="relative font-display tracking-wide text-dl-text">{loc.name || "Sem nome"}</b>
+              <span className="relative text-sm text-zinc-300">{loc.desc.trim() || GT.locs[loc.type].text(loc)}</span>
             </div>
           </div>
         )}
@@ -872,7 +1122,45 @@ function GameForm() {
       </section>
 
       <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
-        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Heróis</h2>
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Sons e animações</h2>
+        <p className="text-xs text-zinc-400">
+          Escolha o herói para ver a animação da habilidade e trocar o som. O som é um mp3, ogg, wav ou webm curto, de até 1 MB: ele toca no lugar do som da habilidade sempre que uma carta com a habilidade desse herói age, em todas as versões.
+        </p>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2">
+          {HERO_KEYS.map((k) => {
+            const icon = heroIcon(k) ?? heroArt(k)?.url;
+            const on = k === soundHero;
+            const own = cfg.heroes[k]?.sound;
+            return (
+              <button key={k} type="button" aria-pressed={on} onClick={() => setSoundHero(k)}
+                className={`group relative flex min-h-11 cursor-pointer flex-col items-center gap-1 rounded-xl p-1.5 text-[10px] font-bold text-zinc-300 transition hover:bg-zinc-800/80 hover:text-white focus-visible:ring-2 focus-visible:ring-zinc-100 focus-visible:outline-none active:scale-95 ${on ? "bg-zinc-800 text-white ring-2 ring-game-brass" : "bg-zinc-950/60"}`}>
+                <span className="aspect-square w-full overflow-hidden rounded-lg bg-zinc-900">
+                  {icon && <img src={icon} alt="" className="size-full object-cover" />}
+                </span>
+                <span className="w-full truncate text-center">{k}</span>
+                {own && <span title="Som próprio" className="absolute top-1 right-1 rounded-full bg-game-brass px-1 text-[9px] text-dl-black">♪</span>}
+                {own !== savedHeroes[k]?.sound && <span className="sr-only">(alterado)</span>}
+              </button>
+            );
+          })}
+        </div>
+        <div className="grid items-start gap-4 rounded-2xl bg-zinc-950/40 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <FxPreview key={soundHero} hero={soundHero} icon={heroIcon(soundHero) ?? heroArt(soundHero)?.url} sound={cfg.heroes[soundHero]?.sound} />
+          <div className="flex flex-col gap-2">
+          <span className="text-sm font-bold text-zinc-100">{soundHero} <span className="text-xs font-normal text-zinc-400">· {GT.abilities[soundHero].name}</span></span>
+          <SoundPick url={cfg.heroes[soundHero]?.sound} saved={savedHeroes[soundHero]?.sound} ab={soundHero} applying={busy}
+            onUrl={(sound) => setHero(soundHero, { sound })} onApply={() => applySound(soundHero)} />
+          <p className="text-xs text-zinc-400">
+            {cfg.heroes[soundHero]?.sound ? "Som próprio enviado." : "Sem som próprio: usa o som padrão da habilidade."}
+            {cfg.heroes[soundHero]?.sound !== savedHeroes[soundHero]?.sound && <b className="text-game-brass"> Som novo ainda não vale no jogo: clique em Aplicar no jogo.</b>}
+          </p>
+          </div>
+        </div>
+      </section>
+
+      <details className="noir-glass group/fold rounded-3xl p-3">
+        <Fold title="Heróis" />
+        <div className="flex flex-col gap-4 px-2 pt-4 pb-2">
         <p className="text-xs text-zinc-400">
           O atributo principal define a Maestria da carta: abaixo de {MASTERY_AT[0]} é {GT.levels[0]}, de {MASTERY_AT[0]} a {MASTERY_AT[1] - 1} é {GT.levels[1]} e a partir de {MASTERY_AT[1]} é {GT.levels[2]} (libera a frase de Mestre).
         </p>
@@ -905,10 +1193,12 @@ function GameForm() {
             );
           })}
         </div>
-      </section>
+        </div>
+      </details>
 
-      <section className="noir-glass flex flex-col gap-4 rounded-3xl p-5">
-        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Itens da loja</h2>
+      <details className="noir-glass group/fold rounded-3xl p-3">
+        <Fold title="Itens da loja" />
+        <div className="flex flex-col gap-4 px-2 pt-4 pb-2">
         <p className="text-xs text-zinc-400">
           Lojas nos rounds {SHOP_ROUNDS.map((r) => `${r} (tier ${SHOPS[r].join("/")})`).join(", ")}: cada lado pode comprar 1 entre 3 itens e mira uma carta com a seta (itens de ataque miram uma inimiga). O item age no fim do turno da compra. Item desligado não aparece no sorteio.
         </p>
@@ -934,7 +1224,8 @@ function GameForm() {
             </div>
           </div>
         ))}
-      </section>
+        </div>
+      </details>
 
       <div className="noir-glass sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3">
         <button type="button" className={primary} disabled={busy} onClick={save}>{busy ? "Salvando…" : "Salvar"}</button>

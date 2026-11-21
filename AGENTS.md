@@ -27,6 +27,7 @@ O dev roda tudo local (Vite + `@cloudflare/vite-plugin`) em `http://localhost:51
 | `npm test` | Testes (Vitest) em `test/` |
 | `npm run db:migrate` | Aplica migrations no D1 local |
 | `npm run db:import -- <save.json> [--remote]` | Importa um save JSON para D1 e R2 |
+| `npm run locs:import -- <pasta> [--remote]` | Converte as artes dos locais (PNG) para webp e sobe no R2 em `locs/<id>.webp` |
 | `npm run deploy` | Build + deploy no Cloudflare |
 
 ## Arquitetura

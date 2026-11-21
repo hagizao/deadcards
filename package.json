@@ -12,6 +12,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply deadcards --remote",
     "typegen": "wrangler types",
     "db:import": "node scripts/import-save.mjs",
+    "locs:import": "node scripts/import-locs.mjs",
     "test": "tsc -p test && vitest run",
     "lint": "eslint ."
   },

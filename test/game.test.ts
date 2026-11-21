@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   ABILITIES, DEFAULT_LOCS, HERO_KEYS, HERO_STAT, ITEMS, ITEM_KEYS, SHOPS, ALT_MALUS, ALT_POL, cardStats, powerParts, defaultCard, itemCost, ovrBand, gameConfig, heroStat, mastery, ABILITY_KINDS, sanitizeGameConfig, trimItemIcons,
-  type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type PoolCard,
+  type CardStatsBlock, type GameConfig, type GameLoc, type ItemKey, type LocType, type PoolCard,
 } from "../src/lib/game/config";
-import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Side } from "../src/lib/game/engine";
+import { AI_OVR_GAP, MIN_POOL, Match, TURNS, aiDeck, cardPool, cardVersions, type GCard, type Loc, type Side } from "../src/lib/game/engine";
 import type { Player } from "../src/lib/types";
-import { MAX_DECKS, fillDeck, heroHolder, resolveDeck, sanitizeBook, swapHero, versionPlayer } from "../src/lib/game/deck";
+import { simulate, winRate } from "../src/lib/game/sim";
+import { MAX_DECKS, draftOffer, fillDeck, heroHolder, resolveDeck, sanitizeBook, swapHero, versionPlayer } from "../src/lib/game/deck";
 
 function player(id: string, ovr: number, extra: Partial<Player> = {}): Player {
   return {
@@ -80,7 +81,7 @@ describe("carta padrão", () => {
 
   it("ajustes do admin sobrescrevem o padrão", () => {
     const c = cardStats(base, { x: { ab: "Pocket", cost: 2, desc: "  texto  " } });
-    expect(c).toMatchObject({ ab: "Pocket", cost: 2, v: 2, desc: "texto" });
+    expect(c).toMatchObject({ ab: "Pocket", cost: 2, v: 3, desc: "texto" });
   });
 });
 
@@ -106,6 +107,11 @@ describe("sanitizeGameConfig", () => {
   it("sem configuração salva, usa os locais padrão", () => {
     expect(gameConfig(undefined).locs).toHaveLength(DEFAULT_LOCS.length);
   });
+
+  it("locais salvos com o nome antigo de buff passam a se chamar só Vida, Arma...", () => {
+    const locs = DEFAULT_LOCS.slice(0, 3).map((l, i) => (i === 0 ? { ...l, name: "Buff de Vida" } : i === 1 ? { ...l, name: "Meu Buff" } : l));
+    expect(gameConfig({ locs }).locs.map((l) => l.name).slice(0, 2)).toEqual(["Vida", "Meu Buff"]);
+  });
 });
 
 describe("partida", () => {
@@ -115,6 +121,16 @@ describe("partida", () => {
     expect(m.E).toBe(1);
     expect(m.hand).toHaveLength(4);
     expect(m.loc.map((l) => l.rev)).toEqual([true, false, false]);
+  });
+
+  it("com 7 cartas na mão, a carta comprada queima e sai da partida", () => {
+    const m = new Match(gameConfig(undefined), pool, seeded(1));
+    while (m.hand.length < 7) m.hand.push(m.deck.pop()!);
+    const top = m.deck[m.deck.length - 1], left = m.deck.length;
+    m.nextTurn();
+    expect(m.hand).toHaveLength(7);
+    expect(m.deck).toHaveLength(left - 1);
+    expect(m.burned).toEqual([{ s: "p", c: top }]);
   });
 
   it("jogar sem almas é recusado; jogar e desfazer devolve as almas", () => {
@@ -185,11 +201,11 @@ describe("itens: configuração", () => {
     expect(sanitizeGameConfig({ locs: DEFAULT_LOCS, items: [] })).toBeNull();
   });
 
-  it("tem 6 itens por tier, 2 de cada categoria", () => {
+  it("tem 54 itens, com pelo menos 4 de cada categoria em cada tier", () => {
+    expect(ITEM_KEYS).toHaveLength(54);
     for (const tier of [1, 2, 3, 4]) {
       const ks = ITEM_KEYS.filter((k) => ITEMS[k].tier === tier);
-      expect(ks).toHaveLength(6);
-      for (const slot of ["weapon", "vitality", "spirit"]) expect(ks.filter((k) => ITEMS[k].slot === slot)).toHaveLength(2);
+      for (const slot of ["weapon", "vitality", "spirit"]) expect(ks.filter((k) => ITEMS[k].slot === slot).length).toBeGreaterThanOrEqual(4);
     }
   });
 
@@ -215,8 +231,8 @@ describe("itens: lojas e alvo", () => {
     }
   };
 
-  it("lojas abrem nos rounds 3 e 6, com 3 itens dos tiers da fase e os mesmos tiers para os dois lados", () => {
-    expect(SHOPS).toEqual({ 3: [1, 2], 6: [3, 4] });
+  it("lojas abrem nos rounds 4 e 7, com 3 itens dos tiers da fase e os mesmos tiers para os dois lados", () => {
+    expect(SHOPS).toEqual({ 4: [1, 2], 7: [3, 4] });
     expect([1, 2, 3, 4].map((t) => itemCost(t as 1 | 2 | 3 | 4))).toEqual([1, 2, 4, 6]);
     for (let seed = 1; seed <= 20; seed++) {
       const m = new Match(cfgWith(all), pool, seeded(seed));
@@ -234,7 +250,7 @@ describe("itens: lojas e alvo", () => {
 
   it("comprar mira uma carta sua, cobra na hora e age só nela no fim do turno; desfazer devolve", () => {
     const m = new Match(cfgWith(["Extra Health"]), pool, seeded(7));
-    playTo(m, 3);
+    playTo(m, 4);
     const mine = m.loc.flatMap((l) => l.s.p);
     expect(mine.length).toBeGreaterThan(0);
     const [target] = mine;
@@ -253,9 +269,25 @@ describe("itens: lojas e alvo", () => {
     expect(m.offer).toBeNull();
   });
 
+  it("Golden Goose Egg: o aliado mirado perde 1 e você ganha 2 almas a mais no próximo turno", () => {
+    const go = (buy: boolean) => {
+      const m = new Match(cfgWith(["Golden Goose Egg"]), pool, seeded(7));
+      playTo(m, 4);
+      const target = m.loc.flatMap((l) => l.s.p).find((c) => m.pow(c) > 1)!;
+      const before = m.pow(target);
+      if (buy) expect(m.buy("Golden Goose Egg", target)).toBe(true);
+      m.runEndTurn();
+      return { m, target, before };
+    };
+    const a = go(true), b = go(false);
+    expect(a.m.itemTargets("p", "Golden Goose Egg").every((c) => c.side === "p")).toBe(true);
+    expect(a.target.st.fx?.some((x) => x.k === "item" && x.v === -1)).toBe(true);
+    expect(a.m.E - b.m.E).toBe(2);
+  });
+
   it("item de ataque mira uma inimiga; sem alvo ou sem almas, não compra", () => {
     const m = new Match(cfgWith(["Slowing Hex", "Toxic Bullets", "Ricochet"]), pool, seeded(9));
-    playTo(m, 3);
+    playTo(m, 4);
     const k = m.offer!.p.find((x) => ITEMS[x].tier === 2)!;
     expect(k).toBe("Slowing Hex");
     expect(m.itemTargets("p", k).every((c) => c.side === "a")).toBe(true);
@@ -267,10 +299,10 @@ describe("itens: lojas e alvo", () => {
 
   it("a loja é opcional: o turno fecha sem comprar", () => {
     const m = new Match(cfgWith(all), pool, seeded(4));
-    playTo(m, 3);
+    playTo(m, 4);
     expect(m.offer).not.toBeNull();
     m.runEndTurn();
-    expect(m.t).toBe(4);
+    expect(m.t).toBe(5);
     expect(m.owned.p).toEqual([]);
   });
 
@@ -284,7 +316,7 @@ describe("itens: lojas e alvo", () => {
 
   it("sem itens ligados não há loja", () => {
     const m = new Match(cfgWith([]), pool, seeded(4));
-    playTo(m, 3);
+    playTo(m, 4);
     expect(m.offer).toBeNull();
   });
 
@@ -305,15 +337,61 @@ describe("itens: lojas e alvo", () => {
   });
 });
 
-describe("comeback e recompensa", () => {
-  it("quem perde em mais locais ganha +1 alma no próximo round", () => {
+describe("itens novos", () => {
+  type Fx = { ITEM_FX: Record<string, (c: GCard, s: Side, v: number) => void> };
+  const dummy = (put: ReturnType<typeof arena>["put"], side: Side, li: number, power: number, id: string) => {
+    const c = put(pc(id, "Herói Novo", flat(70)), side, li);
+    c.ab = "none"; c.base = power; c.bonus = 0;
+    return c;
+  };
+
+  it("Healing Nova dá o bônus à carta e às aliadas do mesmo local, não às de outro", () => {
+    const { m, put } = arena();
+    const a = dummy(put, "p", 0, 3, "a"), b = dummy(put, "p", 0, 3, "b"), far = dummy(put, "p", 1, 3, "far");
+    (m as unknown as Fx).ITEM_FX["Healing Nova"](a, "p", 3);
+    expect([a.bonus, b.bonus, far.bonus]).toEqual([3, 3, 0]);
+  });
+
+  it("Cold Front tira poder de todas as inimigas do local só até o fim do próximo turno", () => {
+    const { m, put } = arena();
+    const x = dummy(put, "a", 0, 5, "x"), y = dummy(put, "a", 0, 5, "y");
+    (m as unknown as Fx).ITEM_FX["Cold Front"](x, "p", 2);
+    expect([m.pow(x), m.pow(y)]).toEqual([3, 3]);
+    m.t += 2;
+    expect([m.pow(x), m.pow(y)]).toEqual([5, 5]);
+  });
+
+  it("Cheat Death deixa a carta imune até o fim do próximo turno", () => {
+    const { m, put } = arena();
+    const c = dummy(put, "p", 0, 3, "c");
+    (m as unknown as Fx).ITEM_FX["Cheat Death"](c, "p", 7);
+    expect(m.immune(c)).toBe(true);
+    m.t += 1;
+    expect(m.immune(c)).toBe(true);
+    m.t += 1;
+    expect(m.immune(c)).toBe(false);
+  });
+
+  it("Extra Regen soma agora e no fim dos 2 turnos seguintes", () => {
+    const { m, put } = arena();
+    const c = dummy(put, "p", 0, 3, "c");
+    (m as unknown as Fx).ITEM_FX["Extra Regen"](c, "p", 1);
+    expect(c.bonus).toBe(1);
+    for (let k = 0; k < 3; k++) { m.t++; m.endOfTurn(); }
+    expect(c.bonus).toBe(3);
+  });
+});
+
+describe("almas extras e recompensa", () => {
+  it("estar perdendo em mais locais não dá alma extra", () => {
     const { m, put } = arena();
     const c = put(pc("a", "Herói Novo", flat(70)), "a", 0);
     c.ab = "none"; c.base = 5;
     m.endOfTurn();
     m.nextTurn();
-    expect(m.E).toBe(m.t + 1);
+    expect(m.E).toBe(m.t);
     expect(m.AE).toBe(m.t);
+    expect(m.log.some((e) => (e.k as string) === "comeback")).toBe(false);
   });
 
   it("virar um local que o outro segurava há 2 rounds dá +1 alma", () => {
@@ -460,6 +538,92 @@ describe("escolhas, movimento e execução", () => {
     expect(m.pow(b)).toBeLessThan(9);
   });
 
+  it("a habilidade registra quem ela mexeu e onde agiu, para a animação", () => {
+    const { m, put, stage } = arena();
+    const a = put(pc("a", "Herói Novo", flat(70)), "a", 2);
+    put(pc("b", "Herói Novo", flat(70)), "a", 1);
+    m.heard.length = 0;
+    const gt = stage(pc("g", "Grey Talon", flat(70)), 0);
+    m.choose(gt, { card: a });
+    m.reveal(gt, m.loc[0]);
+    expect(m.heard).toEqual([{ ab: "Grey Talon", id: gt.id, side: "p", to: [a.id], at: 0, self: false }]);
+  });
+
+  it("o puxão do gancho do Bebop entra na lista como ação dele, para a animação do gancho", () => {
+    const { m, mk, put } = arena();
+    const b = put(pc("b", "Bebop", flat(70)), "p", 0);
+    m.heard.length = 0;
+    const a = mk(pc("a", "Herói Novo", flat(70)), "a");
+    a.staged = true;
+    m.loc[2].s.a.push(a);
+    m.reveal(a, m.loc[2]);
+    expect(m.locOf(a)).toBe(m.loc[0]);
+    expect(m.heard[0]).toEqual({ ab: "Bebop", id: b.id, side: "p", to: [a.id], at: 0, self: false, ev: "pull" });
+  });
+
+  it("Victor anima os dois lados; o Mestre só o lado inimigo", () => {
+    for (const lvl of [0, 2] as const) {
+      const { m, put, stage } = arena();
+      const ally = put(pc("al", "Herói Novo", flat(70)), "p", 0);
+      const foe = put(pc("fo", "Herói Novo", flat(70)), "a", 0);
+      m.heard.length = 0;
+      const v = stage(pc("v", "Victor", flat(70)), 0);
+      v.lvl = lvl;
+      m.reveal(v, m.loc[0]);
+      const to = m.heard.find((h) => h.id === v.id)?.to ?? [];
+      expect(to.includes(foe.id)).toBe(true);
+      expect(to.includes(ally.id)).toBe(lvl !== 2);
+    }
+  });
+
+  it("armadilha do Venator e olhar da Vyper entram na lista quando a inimiga é revelada", () => {
+    for (const [ab, ev] of [["Venator", "trap"], ["Vyper", "petri"]] as const) {
+      const { m, mk, put } = arena();
+      put(pc("v", ab, flat(70)), "p", 0);
+      m.heard.length = 0;
+      const a = mk(pc("a", "Herói Novo", flat(70)), "a");
+      a.staged = true;
+      m.loc[0].s.a.push(a);
+      m.reveal(a, m.loc[0]);
+      expect(m.heard[0]).toEqual({ ab, id: a.id, side: "p", to: [a.id], at: 0, self: false, ev });
+    }
+  });
+
+  it("o contra-golpe do Apollo entra na lista depois do golpe que ele aparou", () => {
+    const { m, put, stage } = arena();
+    const ap = put(pc("ap", "Apollo", flat(70)), "a", 0);
+    m.heard.length = 0;
+    const gt = stage(pc("g", "Grey Talon", flat(70)), 0);
+    m.choose(gt, { card: ap });
+    m.reveal(gt, m.loc[0]);
+    expect(m.heard.map((h) => [h.ab, h.ev])).toEqual([["Grey Talon", undefined], ["Apollo", "parry"]]);
+    expect(m.heard[1]).toMatchObject({ id: ap.id, to: [gt.id] });
+  });
+
+  it("os raios do Seven no fim do turno e o bote da Calico entram na lista com o momento", () => {
+    const { m, put } = arena();
+    const foe = put(pc("a", "Herói Novo", flat(70)), "a", 0);
+    foe.base = 20;
+    const sv = put(pc("s", "Seven", flat(70)), "p", 0);
+    const ca = put(pc("c", "Calico", flat(70)), "p", 0);
+    m.heard.length = 0;
+    m.t++;
+    m.endOfTurn();
+    expect(m.heard).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ab: "Seven", id: sv.id, ev: "end", to: expect.arrayContaining([foe.id]) }),
+      expect.objectContaining({ ab: "Calico", id: ca.id, ev: "late", to: expect.arrayContaining([foe.id]) }),
+    ]));
+  });
+
+  it("a Nurse Harrow mostra para a animação a inimiga drenada e o aliado curado", () => {
+    const { m, put } = arena();
+    const foe = put(pc("a", "Herói Novo", flat(70)), "a", 0);
+    const ally = put(pc("b", "Herói Novo", flat(70)), "p", 0);
+    m.heard.length = 0;
+    const nh = put(pc("n", "Nurse Harrow", flat(70)), "p", 0);
+    expect(m.heard).toEqual([{ ab: "Nurse Harrow", id: nh.id, side: "p", to: [foe.id, ally.id], at: 0, self: false }]);
+  });
+
   it("Holliday leva a inimiga escolhida para o local escolhido", () => {
     const { m, put, stage } = arena();
     const a = put(pc("a", "Herói Novo", flat(70)), "a", 0);
@@ -481,6 +645,42 @@ describe("escolhas, movimento e execução", () => {
     expect(m.loc[0].s.p.some((x) => x.p.token === "illusion")).toBe(true);
   });
 
+  it("carta movida neste turno pode voltar ou ir para outro lugar, desfazendo o movimento", () => {
+    const { m, put } = arena();
+    const mi = put(pc("m", "Mirage", flat(70)), "p", 0);
+    const si = put(pc("s", "Sinclair", flat(70)), "p", 0);
+    const before = m.pow(mi);
+    expect(m.moveCard(mi, m.loc[1])).toBe(true);
+    expect(m.moveCard(si, m.loc[2])).toBe(true);
+    expect(m.loc[0].s.p.some((x) => x.p.token === "illusion")).toBe(true);
+    // a Mirage pode ir de volta ou para o outro local
+    expect(m.moveOptions(mi)).toEqual([m.loc[0], m.loc[2]]);
+    expect(m.moveCard(mi, m.loc[2])).toBe(true);
+    expect(m.locOf(mi)).toBe(m.loc[2]);
+    expect(m.pow(mi)).toBe(before + mi.v);
+    // o movimento do Sinclair, feito depois, continua valendo
+    expect(m.locOf(si)).toBe(m.loc[2]);
+    // desfazer o do Sinclair: volta para o local de origem e a ilusão some
+    expect(m.moveCard(si, m.loc[0])).toBe(true);
+    expect(m.locOf(si)).toBe(m.loc[0]);
+    expect(m.loc[0].s.p.some((x) => x.p.token === "illusion")).toBe(false);
+    // desfazer o da Mirage: sem o bônus da viagem
+    expect(m.moveCard(mi, m.loc[0])).toBe(true);
+    expect(m.locOf(mi)).toBe(m.loc[0]);
+    expect(m.pow(mi)).toBe(before);
+    expect(m.moveOptions(mi)).toEqual([m.loc[1], m.loc[2]]);
+  });
+
+  it("depois do fim do turno o movimento não pode mais ser desfeito", () => {
+    const { m, put } = arena();
+    const mi = put(pc("m", "Mirage", flat(70)), "p", 0);
+    expect(m.moveCard(mi, m.loc[1])).toBe(true);
+    m.endTurn();
+    m.busy = false;
+    expect(m.moveOptions(mi)).toEqual([]);
+    expect(m.moveCard(mi, m.loc[0])).toBe(false);
+  });
+
   it("carta acorrentada não se move", () => {
     const { m, put } = arena();
     const mi = put(pc("m", "Mirage", flat(70)), "p", 0);
@@ -488,18 +688,14 @@ describe("escolhas, movimento e execução", () => {
     expect(m.moveOptions(mi)).toEqual([]);
   });
 
-  it("Shiv sem alvo abre a janela; a inimiga marcada é executada no próximo turno se estiver fraca", () => {
+  it("Shiv sem alvo fraco não faz nada (sem janela para marcar depois)", () => {
     const { m, put } = arena();
     const big = put(pc("a", "Herói Novo", flat(70)), "a", 0);
     big.base = 9; big.bonus = 0;
     const shiv = put(pc("s", "Shiv", flat(70)), "p", 0);
     expect(m.locOf(big)).toBe(m.loc[0]);
     m.t++;
-    expect(m.markOptions(shiv)).toContain(big);
-    m.mark(shiv, big);
-    big.bonus = shiv.v - 9;
-    m.act({ c: shiv, l: m.loc[0], exec: true });
-    expect(m.locOf(big)).toBeUndefined();
+    expect(m.markOptions(shiv)).toEqual([]);
   });
 
   it("partidas com o jogador escolhendo alvos, movendo e marcando terminam sem erro (Mestres e Aprendizes)", () => {
@@ -541,14 +737,17 @@ describe("balanceamento das habilidades", () => {
     return c;
   };
 
-  it("teto de remoção: a Wraith só ergue inimigas com até 2 × o custo dela", () => {
+  it("a Wraith ergue a inimiga mais forte daqui com até 8 de poder", () => {
     const { m, put } = arena();
     const big = dummy(put, "a", 0, 20);
-    const mid = dummy(put, "a", 0, 9);
-    const w = put(pc("w", "Wraith", flat(70)), "p", 0);
-    expect(w.cost).toBe(7);
+    const mid = dummy(put, "a", 0, 8);
+    const low = dummy(put, "a", 0, 5);
+    put(pc("w", "Wraith", flat(70)), "p", 0);
     expect(m.pow(big)).toBe(20);
     expect(m.pow(mid)).toBe(0);
+    expect(m.pow(low)).toBe(5);
+    // erguida conta como 0, mas não é eliminada
+    expect(m.locOf(mid)).toBeTruthy();
   });
 
   it("Lady Geist troca no máximo o valor da habilidade", () => {
@@ -619,6 +818,22 @@ describe("balanceamento das habilidades", () => {
     put(pc("s", "Shiv", flat(70)), "p", 0);
     expect(m.locOf(t)).toBeUndefined();
   });
+
+  it("Shiv executa inimigas com 0 de poder (de base, por dano, atordoadas ou entocadas)", () => {
+    const { m, put } = arena();
+    const zero = dummy(put, "a", 0, 0);
+    const hurt = dummy(put, "a", 1, 4);
+    hurt.bonus = -6;
+    const stun = dummy(put, "a", 2, 9);
+    stun.st.stun = m.t;
+    const deep = dummy(put, "a", 2, 7, "deep");
+    deep.st.burrow = true;
+    put(pc("s0", "Shiv", flat(70)), "p", 0);
+    put(pc("s1", "Shiv", flat(70)), "p", 1);
+    put(pc("s2", "Shiv", flat(70)), "p", 2);
+    put(pc("s3", "Shiv", flat(70)), "p", 2);
+    expect([m.locOf(zero), m.locOf(hurt), m.locOf(stun), m.locOf(deep)]).toEqual([undefined, undefined, undefined, undefined]);
+  });
 });
 
 describe("versões e heróis de afinidade", () => {
@@ -682,6 +897,40 @@ describe("deck montado e deck da IA", () => {
     expect(f.slice(0, 2)).toEqual(d);
     const byId = new Map(list.map((p) => [p.id, p]));
     expect(versionPlayer(byId, { id: "a~Wraith", hero: "Wraith" })).toMatchObject({ id: "a", hero: "Wraith" });
+  });
+
+  it("draft: oferece 3 jogadores fora do baralho, sem herói repetido, e um draft inteiro fecha 12 cartas válidas", () => {
+    const list = [player("a", 80, { hero: "Haze", heroPool: ["Wraith"] }), ...HEROES.slice(0, 20).map((hero, i) => player(`q${i}`, 60 + i, { hero }))];
+    const v = cardVersions(list);
+    const rnd = seeded(4);
+    let deck: PoolCard[] = [];
+    while (deck.length < 12) {
+      const offer = draftOffer(deck, v, rnd);
+      expect(offer).toHaveLength(3);
+      expect(new Set(offer.map((c) => c.hero)).size).toBe(3);
+      expect(new Set(offer.map((c) => c.key)).size).toBe(3);
+      for (const c of offer) {
+        expect(deck.some((x) => x.key === c.key || x.hero === c.hero)).toBe(false);
+      }
+      deck = [...deck, offer[0]];
+    }
+    expect(resolveDeck(deck.map((c) => c.id), v)).toHaveLength(12);
+  });
+
+  it("draft: raras só entram na vaga rara, e aí abrem a oferta com comuns", () => {
+    const list = HEROES.slice(0, 24).map((hero, i) => player(`q${i}`, 60 + i, { hero }));
+    const v = cardVersions(list);
+    const rare = (c: PoolCard) => c.ovr >= 80;
+    const rnd = seeded(9);
+    for (let i = 0; i < 40; i++) expect(draftOffer([], v, rnd, 3, { rare }).some(rare)).toBe(false);
+    for (let i = 0; i < 40; i++) {
+      const offer = draftOffer([], v, rnd, 3, { rare, rareSlot: true });
+      expect(offer.filter(rare)).toHaveLength(1);
+      expect(offer).toHaveLength(3);
+    }
+    // só raras na coleção: entram mesmo sem a vaga
+    const onlyRare = cardVersions(HEROES.slice(0, 5).map((hero, i) => player(`r${i}`, 90 + i, { hero })));
+    expect(draftOffer([], onlyRare, rnd, 3, { rare })).toHaveLength(3);
   });
 });
 
@@ -844,5 +1093,469 @@ describe("versões guardadas e duas cartas do mesmo herói", () => {
     const byId = new Map(list.map((p) => [p.id, p]));
     expect(versionPlayer(byId, { id: "s2~Holliday", hero: "Holliday" })).toMatchObject({ id: "s2", hero: "Holliday" });
     expect(v.get("s")!.find((c) => c.id === "s2~Holliday")!.ovr).toBe(83);
+  });
+});
+
+/* ---------- locais novos ---------- */
+
+type Inner = { rnd: () => number; move(c: GCard, from: unknown, to: unknown): boolean };
+
+describe("locais novos", () => {
+  /** Partida com o local testado num dos 3 espaços e os outros dois sem efeito. */
+  function at(type: LocType, v = 0, n = 1, t = 1) {
+    const locs: GameLoc[] = [{ id: "x", name: "X", type, v, n, desc: "" }, ...plainLocs.slice(1)];
+    const a = arena({ ...heroCfg(), locs }, t);
+    const m = a.m;
+    const L = m.loc.find((l) => l.L.type === type)!;
+    const other = m.loc.find((l) => l !== L)!;
+    let i = 0;
+    /** Carta sem habilidade; revelada no local, a menos que reveal = false. */
+    const card = (side: Side, base = 3, o: { cost?: number; role?: string; at?: typeof L; reveal?: boolean; ab?: GCard["ab"] } = {}) => {
+      const c = a.mk(pc(`c${i++}`, "Herói Novo", flat(70)), side);
+      Object.assign(c, { ab: o.ab ?? "none", base, cost: o.cost ?? 1 });
+      if (o.role) c.p.role = o.role;
+      const l = o.at ?? L;
+      l.s[side].push(c);
+      if (o.reveal !== false) m.reveal(c, l);
+      return c;
+    };
+    const inner = m as unknown as Inner;
+    return { m, L, other, card, inner };
+  }
+
+  it("Buff de Arma dá poder só a Carry e OffCarry", () => {
+    const { m, L, card } = at("gun", 2);
+    expect(m.pow(card("p", 3, { role: "Carry" }), L)).toBe(5);
+    expect(m.pow(card("p", 3, { role: "Suporte" }), L)).toBe(3);
+  });
+
+  it("Grande Navio dá +v por aliado revelado aqui", () => {
+    const { m, L, card } = at("crew", 1);
+    const a = card("p"); card("p"); card("p");
+    expect(m.pow(a, L)).toBe(5);
+  });
+
+  it("Fenda Instável dá +100 a quem tem mais cartas; empate não dá nada", () => {
+    const { m, L, card } = at("rift", 100);
+    card("p", 1); card("p", 1); card("a", 5);
+    expect(m.total(L, "p")).toBe(102);
+    expect(m.total(L, "a")).toBe(5);
+    card("a", 1);
+    expect(m.total(L, "p")).toBe(2);
+  });
+
+  it("Casa Abandonada não aceita cartas; Universidade só aceita custo mínimo", () => {
+    const closed = at("noplay");
+    const c = closed.m.hand[0];
+    closed.m.E = 10;
+    expect(closed.m.canPlay(c, closed.L)).toBe("closed");
+    const uni = at("costMin", 0, 7);
+    uni.m.E = 10;
+    const h = uni.m.hand[0];
+    h.cost = 3;
+    expect(uni.m.canPlay(h, uni.L)).toBe("minCost");
+    h.cost = 7;
+    expect(uni.m.canPlay(h, uni.L)).toBeNull();
+  });
+
+  it("Buff de Movimento barateia, Troll cobra pedágio e desfazer devolve o que foi pago", () => {
+    const cheap = at("cheap", 1);
+    const c = cheap.m.hand[0];
+    c.cost = 3; cheap.m.E = 5;
+    expect(cheap.m.play(c, cheap.L)).toBeNull();
+    expect(cheap.m.E).toBe(3);
+    cheap.m.unstage(c);
+    expect(cheap.m.E).toBe(5);
+    const toll = at("toll", 1);
+    const d = toll.m.hand[0];
+    d.cost = 3;
+    expect(toll.m.playCost(d, toll.L)).toBe(4);
+  });
+
+  it("Estátua da Coruja não recebe cartas movidas; Táxi dá +v a quem chega", () => {
+    const owl = at("nomove");
+    const c = owl.card("p", 3, { at: owl.other });
+    expect(owl.inner.move(c, owl.other, owl.L)).toBe(false);
+    const taxi = at("arrive", 2);
+    const d = taxi.card("p", 3, { at: taxi.other });
+    expect(taxi.inner.move(d, taxi.other, taxi.L)).toBe(true);
+    expect(taxi.m.pow(d, taxi.L)).toBe(5);
+  });
+
+  it("Véu de Fumaça: se os dois jogam aqui no mesmo turno, as duas voltam para a mão", () => {
+    const { m, L, card } = at("smoke");
+    m.ahand = []; m.AE = 0;
+    const p = card("p", 3, { reveal: false }); p.staged = true;
+    const a = card("a", 3, { reveal: false }); a.staged = true;
+    m.endTurn();
+    expect(L.s.p).toHaveLength(0);
+    expect(L.s.a).toHaveLength(0);
+    expect(m.hand).toContain(p);
+    expect(m.ahand).toContain(a);
+  });
+
+  it("Véu de Fumaça: só um lado jogando, a carta fica", () => {
+    const { m, L, card } = at("smoke");
+    m.ahand = []; m.AE = 0;
+    const p = card("p", 3, { reveal: false }); p.staged = true;
+    const q = m.endTurn();
+    expect(L.s.p).toContain(p);
+    expect(q.some((x) => x.c === p)).toBe(true);
+  });
+
+  it("Jardim: as cartas daqui só revelam no turno 7", () => {
+    const early = at("late", 0, 7, 3);
+    early.m.ahand = [];
+    const p = early.card("p", 3, { reveal: false }); p.staged = true;
+    // jogada aqui antes da hora: virada para baixo, também para quem jogou
+    expect(early.m.faceDown(p)).toBe(true);
+    const q = early.m.endTurn();
+    expect(early.m.faceDown(p)).toBe(true);
+    expect(q.some((x) => x.c === p)).toBe(false);
+    expect(p).toMatchObject({ staged: false, rev: false });
+    expect(p.st.wait).toBe(true);
+    const late = at("late", 0, 7, 7);
+    late.m.ahand = [];
+    const w = late.card("p", 3, { reveal: false }); w.st.wait = true;
+    expect(late.m.endTurn().some((x) => x.c === w)).toBe(true);
+  });
+
+  it("Museu: a carta pode voltar para a mão ao revelar", () => {
+    const yes = at("museum", 0, 100);
+    const c = yes.card("p");
+    expect(yes.L.s.p).not.toContain(c);
+    expect(yes.m.hand).toContain(c);
+    const no = at("museum", 0, 0);
+    const d = no.card("p");
+    expect(d.rev).toBe(true);
+    expect(no.L.s.p).toContain(d);
+  });
+
+  it("Quadra de Basquete: chance de +v por carta", () => {
+    const hit = at("hoop", 3, 50);
+    hit.inner.rnd = () => 0;
+    expect(hit.m.pow(hit.card("p"), hit.L)).toBe(6);
+    const miss = at("hoop", 3, 50);
+    miss.inner.rnd = () => 0.99;
+    expect(miss.m.pow(miss.card("p"), miss.L)).toBe(3);
+  });
+
+  it("Sinner's Sacrifice tira poder e dá alma; Viela embosca a partir do turno n", () => {
+    const sac = at("sacrifice", 1, 2);
+    sac.m.extra = { p: 0, a: 0 };
+    expect(sac.m.pow(sac.card("p", 5), sac.L)).toBe(3);
+    expect(sac.m.extra.p).toBe(1);
+    const early = at("ambush", 3, 7, 6);
+    expect(early.m.pow(early.card("p"), early.L)).toBe(3);
+    const late = at("ambush", 3, 7, 7);
+    expect(late.m.pow(late.card("p"), late.L)).toBe(6);
+  });
+
+  it("Buff de Espírito: +v na habilidade de quem usa valor, senão +1 de poder", () => {
+    const { m, L, card } = at("spirit", 2);
+    const sp = card("p");
+    expect(m.pow(sp, L)).toBe(4);
+    const h = card("p", 3, { ab: "hit" });
+    expect(h.v).toBe(sp.v + 2);
+  });
+
+  it("Teletransportador dá um movimento; Teatro cria uma cópia com o mesmo poder", () => {
+    const tp = at("teleport");
+    expect(tp.card("p").mv).toHaveLength(1);
+    const th = at("copy");
+    th.card("p", 4);
+    expect(th.L.s.p).toHaveLength(2);
+    expect(th.L.s.p[1]).toMatchObject({ tok: true, rev: true });
+    expect(th.m.total(th.L, "p")).toBe(8);
+  });
+
+  it("Piscinão desliga as habilidades daqui", () => {
+    const { m, card } = at("nofx");
+    expect(m.abilityOf(card("p", 3, { ab: "aura" }))).toBe("none");
+  });
+
+  it("Bar: quem vence ganha almas e quem perde paga", () => {
+    const { m, card } = at("bet", 1);
+    card("p", 5);
+    m.extra = { p: 0, a: 0 };
+    m.endOfTurn();
+    // quem vence ganha 1 e quem perde paga 1
+    expect(m.extra).toEqual({ p: 1, a: -1 });
+  });
+
+  it("Chinatown: o sino dá almas a quem vence no turno n", () => {
+    const { m, card } = at("bell", 3, 4, 4);
+    card("p", 5);
+    m.extra = { p: 0, a: 0 };
+    m.endOfTurn();
+    expect(m.extra.p).toBe(3);
+  });
+
+  it("Bolsa de Valores: almas que sobram viram poder na carta mais fraca, até n", () => {
+    const { m, L, card } = at("stock", 0, 3);
+    const weak = card("p", 1); const strong = card("p", 5);
+    m.E = 5; m.AE = 0;
+    m.endOfTurn();
+    expect(m.pow(weak, L)).toBe(4);
+    expect(m.pow(strong, L)).toBe(5);
+  });
+
+  it("Vida limpa o dano; Cemitério devolve quem ficou com 0", () => {
+    const heal = at("heal");
+    const c = heal.card("p", 5);
+    c.bonus = -2; c.st.tmp.push({ v: -2, u: 99 });
+    heal.m.endOfTurn();
+    expect(heal.m.pow(c, heal.L)).toBe(5);
+    const grave = at("grave");
+    const d = grave.card("p", 0);
+    grave.m.endOfTurn();
+    expect(grave.L.s.p).not.toContain(d);
+    expect(grave.m.hand).toContain(d);
+  });
+
+  it("Hotel Baronesa: no turno n a mais fraca de cada lado volta para a mão", () => {
+    const { m, L, card } = at("hotel", 0, 4, 4);
+    const pw = card("p", 1); card("p", 5);
+    const aw = card("a", 2); card("a", 6);
+    m.endOfTurn();
+    expect(L.s.p).not.toContain(pw);
+    expect(L.s.a).not.toContain(aw);
+    expect(L.s.p).toHaveLength(1);
+  });
+
+  it("Metrô: um rato aparece do lado com menos cartas", () => {
+    const { m, L, card } = at("rats", 1);
+    card("p"); card("a"); card("a");
+    m.endOfTurn();
+    expect(L.s.p).toHaveLength(2);
+    expect(L.s.p[1].tok).toBe(true);
+  });
+
+  it("Touro: no turno n as cartas de quem perde aqui são destruídas", () => {
+    const { m, L, card } = at("bull", 0, 5, 5);
+    card("p", 9); card("a", 2); card("a", 3);
+    m.endOfTurn();
+    expect(L.s.a).toHaveLength(0);
+    expect(L.s.p).toHaveLength(1);
+  });
+
+  it("The New York Oracle revela só a sua próxima carta", () => {
+    const { m } = at("oracle");
+    expect(m.peek()).toBe(m.deck[m.deck.length - 1]);
+    expect(arena().m.peek()).toBeNull();
+  });
+
+  it("os 45 locais padrão têm id único e arte no R2", () => {
+    expect(DEFAULT_LOCS).toHaveLength(45);
+    expect(new Set(DEFAULT_LOCS.map((l) => l.id)).size).toBe(45);
+    DEFAULT_LOCS.forEach((l) => expect(l.art).toBe(`locs/${l.id}.webp`));
+  });
+
+  it("sanitize aceita a Fenda com +100, recusa arte fora de locs/ e limita o foco", () => {
+    const base = plainLocs.slice(1);
+    const g = sanitizeGameConfig({ locs: [{ name: "F", type: "rift", v: 100, n: 1, art: "locs/f.webp", fx: 150 }, { name: "B", type: "none", art: "../x.png" }, ...base] })!;
+    expect(g.locs[0]).toMatchObject({ v: 100, art: "locs/f.webp", fx: 100 });
+    expect(g.locs[1].art).toBeUndefined();
+  });
+});
+
+describe("Kelvin e Metrô", () => {
+  type Priv2 = { locEnd: (l: Loc, lead: Side | null) => void; movable: (c: GCard, from: Loc, to: Loc, self: boolean) => boolean };
+  const dummy = (put: ReturnType<typeof arena>["put"], side: Side, li: number, power: number, id: string) => {
+    const c = put(pc(id, "Herói Novo", flat(70)), side, li);
+    c.ab = "none"; c.base = power; c.bonus = 0;
+    return c;
+  };
+
+  it("Kelvin ao revelar cura as aliadas daqui ao poder original e mantém os ganhos", () => {
+    const { m, put } = arena();
+    const hurt = dummy(put, "p", 0, 5, "hurt"), buffed = dummy(put, "p", 0, 5, "buffed"), far = dummy(put, "p", 1, 5, "far");
+    hurt.bonus = -3; hurt.st.tmp.push({ v: -2, u: m.t + 1 }); hurt.st.burn = 1;
+    buffed.bonus = 2;
+    far.bonus = -3;
+    put(pc("k", "Kelvin", flat(70)), "p", 0);
+    expect([m.pow(hurt), hurt.st.burn]).toEqual([5, 0]);
+    expect(m.pow(buffed)).toBe(7);
+    expect(m.pow(far)).toBe(2);
+  });
+
+  it("Kelvin não solta a aliada erguida pela Wraith (a Telecinese segue até o fim)", () => {
+    const { m, put } = arena();
+    const lifted = dummy(put, "p", 0, 6, "lifted");
+    lifted.st.stun = m.t + 1;
+    expect(m.pow(lifted)).toBe(0);
+    put(pc("k", "Kelvin", flat(70)), "p", 0);
+    expect(m.pow(lifted)).toBe(0);
+    expect(lifted.st.stun).toBe(m.t + 1);
+  });
+
+  it("o Rato do Metrô aparece no Metrô e não sai de lá", () => {
+    const { m, put } = arena();
+    const metro = m.loc[0];
+    metro.L = { ...metro.L, type: "rats", v: 1 };
+    dummy(put, "a", 0, 3, "x");
+    (m as unknown as Priv2).locEnd(metro, "a");
+    const rat = metro.s.p.find((c) => c.tok);
+    expect(rat).toBeTruthy();
+    expect(m.loc.slice(1).every((l) => !l.s.p.some((c) => c.tok))).toBe(true);
+    expect((m as unknown as Priv2).movable(rat!, metro, m.loc[1], true)).toBe(false);
+  });
+});
+
+describe("poder zerado e origem dos efeitos", () => {
+  const dummy = (put: ReturnType<typeof arena>["put"], side: Side, li: number, power: number, id: string) => {
+    const c = put(pc(id, "Herói Novo", flat(70)), side, li);
+    c.ab = "none"; c.base = power; c.bonus = 0;
+    return c;
+  };
+
+  it("carta reduzida a 0 é eliminada; a Vindicta que zera não cai do céu", () => {
+    const { m, put, mk } = arena();
+    const rat = dummy(put, "a", 1, 1, "rat");
+    const v = mk(pc("v", "Vindicta", flat(70)), "p");
+    m.loc[0].s.p.push(v);
+    const before = v.base + v.bonus;
+    m.act({ c: v, l: m.loc[0] });
+    expect(m.locOf(rat)).toBeUndefined();
+    expect(m.pow(v)).toBe(before);
+    expect(m.log.some((e) => e.k === "zero")).toBe(true);
+  });
+
+  it("a Yamato só se transforma se for a única aliada no local, e não fica imune", () => {
+    const { m, put, mk } = arena();
+    dummy(put, "a", 0, 9, "foe");
+    const alone = mk(pc("y", "Yamato", flat(70)), "p");
+    m.loc[0].s.p.push(alone);
+    const before = alone.bonus;
+    m.act({ c: alone, l: m.loc[0] });
+    expect(alone.bonus - before).toBe(alone.v);
+    expect(m.immune(alone)).toBe(false);
+    dummy(put, "p", 1, 1, "ally");
+    const paired = mk(pc("z", "Yamato", flat(70)), "p");
+    m.loc[1].s.p.push(paired);
+    const was = paired.bonus;
+    m.act({ c: paired, l: m.loc[1] });
+    expect(paired.bonus).toBe(was);
+  });
+
+  it("a Aflição do Pocket nunca zera: para em 1, também na perda por turno do Mestre", () => {
+    const { m, put, mk } = arena();
+    const one = dummy(put, "a", 0, 1, "one"), three = dummy(put, "a", 0, 3, "three"), big = dummy(put, "a", 0, 9, "big");
+    const p = mk(pc("p", "Pocket", flat(70)), "p");
+    p.v = 5;
+    p.lvl = 2;
+    m.loc[0].s.p.push(p);
+    m.act({ c: p, l: m.loc[0] });
+    expect([m.pow(one), m.pow(three), m.pow(big)]).toEqual([1, 1, 4]);
+    m.endOfTurn();
+    m.endOfTurn();
+    expect([m.pow(one), m.pow(three), m.pow(big)]).toEqual([1, 1, 2]);
+    expect(m.locOf(one) && m.locOf(three)).toBeTruthy();
+  });
+
+  it("o que a Aflição não tira vira dívida: o próximo ganho paga a dívida antes de contar", () => {
+    const { m, put, mk } = arena();
+    const o = dummy(put, "a", 0, 4, "o");
+    const p = mk(pc("p", "Pocket", flat(70)), "p");
+    p.v = 5;
+    m.loc[0].s.p.push(p);
+    m.act({ c: p, l: m.loc[0] });
+    expect(m.pow(o)).toBe(1);
+    expect(o.st.debt?.v).toBe(2);
+    const as = (m as unknown as { as: (c: { k: "item"; item: string }, f: () => void) => void }).as.bind(m);
+    as({ k: "item", item: "Extra Spirit" }, () => { o.bonus += 1; });
+    expect(m.pow(o)).toBe(1);
+    expect(o.st.debt?.v).toBe(1);
+    as({ k: "item", item: "Extra Spirit" }, () => { o.bonus += 3; });
+    expect(m.pow(o)).toBe(3);
+    expect(o.st.debt).toBeUndefined();
+    // a caixa "de onde vem" mostra o Pocket com tudo o que ele tirou
+    expect(m.powParts(o).reduce((a, x) => a + x.v, 0)).toBe(3);
+  });
+
+  it("entocada, erguida ou com 0 impresso não é eliminada", () => {
+    const { m, put } = arena();
+    const zero = dummy(put, "p", 0, 0, "z");
+    const mk = put(pc("mk", "Mo & Krill", flat(70)), "p", 1);
+    m.endOfTurn();
+    expect(m.locOf(zero)).toBeTruthy();
+    expect(m.locOf(mk)).toBeTruthy();
+  });
+
+  it("a eliminação se repete quando uma aura muda de alvo e zera outra carta", () => {
+    const { m, put } = arena();
+    const a = dummy(put, "p", 0, 3, "a"), b = dummy(put, "p", 0, 2, "b");
+    const n = put(pc("n", "Nurse Harrow", flat(70)), "a", 0);
+    n.v = 2;
+    expect([m.pow(a), m.pow(b)]).toEqual([1, 2]);
+    a.bonus = -1;
+    m.endOfTurn();
+    expect(m.locOf(a)).toBeUndefined();
+    expect(m.locOf(b)).toBeUndefined();
+  });
+
+  it("Billy acorrenta no Santuário mesmo sem tirar poder", () => {
+    const { m, put } = arena();
+    m.loc[0].L = { ...m.loc[0].L, type: "shrine" };
+    const t = dummy(put, "a", 0, 5, "t");
+    put(pc("b", "Billy", flat(70)), "p", 0);
+    expect(m.pow(t)).toBe(5);
+    expect(t.st.chained).toBe(true);
+  });
+
+  it("Baba só transforma inimigas até o teto escrito na carta", () => {
+    const { put } = arena();
+    const big = dummy(put, "a", 0, 17, "big"), ok = dummy(put, "a", 0, 16, "ok");
+    big.cost = 9; ok.cost = 2;
+    put(pc("b", "Baba", flat(70)), "p", 0);
+    expect(big.p.token).toBeUndefined();
+    expect(ok.p.token).toBe("pigeon");
+  });
+
+  it("a caixa do poder mostra cada efeito com a origem", () => {
+    const { m, put } = arena();
+    const t = dummy(put, "p", 0, 12, "t");
+    const pocket = put(pc("pk", "Pocket", flat(70)), "a", 0);
+    const parts = m.powParts(t);
+    expect(parts).toContainEqual(expect.objectContaining({ k: "from", n: pocket.p.name, v: -pocket.v }));
+    expect(parts.reduce((a, x) => a + x.v, 0)).toBe(m.pow(t));
+    expect(parts.some((x) => x.k === "bonus")).toBe(false);
+  });
+});
+
+describe("simulação do baralho", () => {
+  const deck = pool.slice(0, 12);
+  it("dá o mesmo resultado com a mesma semente e soma as partidas", () => {
+    const a = simulate(gameConfig(undefined), pool, deck, 20, 7);
+    const b = simulate(gameConfig(undefined), pool, deck, 20, 7);
+    expect(a).toEqual(b);
+    expect(a.n).toBe(20);
+    expect(a.win + a.loss + a.draw).toBe(20);
+    expect(winRate(a)).toBeGreaterThanOrEqual(0);
+    expect(winRate(a)).toBeLessThanOrEqual(100);
+  });
+  it("baralho bem mais forte vence mais", () => {
+    const byOvr = [...pool].sort((x, y) => y.ovr - x.ovr);
+    const strong = simulate(gameConfig(undefined), byOvr.slice(-40), byOvr.slice(0, 12), 60);
+    const weak = simulate(gameConfig(undefined), byOvr.slice(0, 40), byOvr.slice(-12), 60);
+    expect(winRate(strong)).toBeGreaterThan(winRate(weak));
+  });
+});
+
+describe("previsão da mesa", () => {
+  it("soma o poder da carta e as já jogadas neste turno, sem mexer na partida", () => {
+    const m = new Match(gameConfig(undefined), pool, seeded(3));
+    m.E = 99;
+    const l = m.loc.find((x) => m.hand.some((c) => !m.canPlay(c, x)))!;
+    const [a, b] = m.hand.filter((c) => !m.canPlay(c, l));
+    const first = m.forecast(a, l);
+    expect(first.add).toBe(m.pow(a, l));
+    expect(first.total).toBeGreaterThanOrEqual(first.add);
+    expect(first.foe).toBe(m.total(l, "a"));
+    expect(m.hand).toContain(a);
+    if (b && !m.play(a, l) && !m.canPlay(b, l)) {
+      const next = m.forecast(b, l);
+      expect(next.total).toBe(first.total - first.add + m.pow(a, l) + next.add);
+    }
   });
 });

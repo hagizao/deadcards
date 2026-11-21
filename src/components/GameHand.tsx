@@ -3,9 +3,9 @@
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, useVelocity } from "motion/react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { GCard } from "../lib/game/engine";
-import { TipBoxes } from "./GameCard";
-
-type Tip = { title: string; text: string };
+import { dropUnder as dropAt, pointOf } from "../lib/game/drop";
+import { sfx, slideSpeed, slideStart, slideStop } from "../lib/game/sfx";
+import { TipBoxes, type Tip } from "./GameCard";
 type Props = {
   cards: GCard[];
   selected: GCard | null;
@@ -19,6 +19,11 @@ type Props = {
   onDrop: (c: GCard, i: number) => void;
   /** Carta sendo arrastada e o local sob o cursor, para acender os locais. */
   onDrag: (c: GCard | null, over: number | null) => void;
+  /**
+   * Abertura da mesa: as `keep` primeiras (a mão inicial) sobem da borda de baixo uma a uma, a partir de `at` segundos,
+   * a cada `step`; as que chegam depois (a compra do primeiro turno) vêm do baralho como nos outros turnos.
+   */
+  deal?: { at: number; step: number; keep: number };
 };
 
 const RATIO = 430 / 295;
@@ -26,16 +31,6 @@ const TIP_W = 192;
 /** Parte da carta que fica à mostra; o resto afunda abaixo da borda e sobe no hover. */
 const SHOW = 0.62;
 const TOP = 8;
-
-/** Local (`data-drop`) sob o ponto da tela. */
-function dropAt(x: number, y: number): number | null {
-  for (const el of document.elementsFromPoint(x, y)) {
-    const v = (el as HTMLElement).dataset?.drop;
-    if (v !== undefined) return Number(v);
-  }
-  return null;
-}
-const pointOf = (e: MouseEvent | TouchEvent | PointerEvent) => ("clientX" in e ? { x: e.clientX, y: e.clientY } : { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY });
 
 export function GameHand(p: Props) {
   const [cw, setCw] = useState(0);
@@ -61,7 +56,7 @@ export function GameHand(p: Props) {
   const H = W * RATIO;
   const boxH = Math.round(H * SHOW + TOP);
   // a ampliada usa a tela, não só a faixa da mão (no celular a mão divide a linha com o orbe e o botão)
-  const zoomW = Math.max(W, Math.min(250, vw * 0.6, vh * 0.4));
+  const zoomW = Math.max(W, Math.min(325, vw * 0.75, vh * 0.52));
   const scale = Math.max(1, zoomW / W);
   const mid = (n - 1) / 2;
   const spacing = n > 1 ? Math.min(W * 0.78, (cw - W - 8) / (n - 1)) : 0;
@@ -87,11 +82,12 @@ export function GameHand(p: Props) {
     // corta só embaixo: a carta afunda na borda, mas a ampliada pode subir por cima da mesa
     <div ref={measure} className="relative w-full [clip-path:inset(-100vh_-100vw_0_-100vw)]" style={{ height: boxH }}>
       {cw > 0 && (
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={!!p.deal}>
           {p.cards.map((c, i) => (
             <motion.div key={c.id} className="absolute origin-bottom" style={{ top: TOP, left: cw / 2 - W / 2, width: W, zIndex: c.id === drag ? 60 : i === li ? 50 : i + 1 }}
-              initial={{ x: cw / 2, y: -H, rotate: 25, opacity: 0 }} animate={{ ...pose(i), opacity: 1 }} exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.18 } }}
-              transition={{ type: "spring", stiffness: 380, damping: 30 }}>
+              initial={p.deal && i < p.deal.keep ? { x: pose(i).x, y: boxH + H, rotate: 0, opacity: 0 } : { x: cw / 2, y: -H, rotate: 25, opacity: 0 }}
+              animate={{ ...pose(i), opacity: 1 }} exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.18 } }}
+              transition={p.deal ? { type: "spring", stiffness: i < p.deal.keep ? 190 : 380, damping: i < p.deal.keep ? 22 : 30, delay: i < p.deal.keep ? p.deal.at + i * p.deal.step : 0 } : { type: "spring", stiffness: 380, damping: 30 }}>
               <HandCard c={c} p={p} zoomed={i === li} dragging={c.id === drag}
                 onHover={(on) => setHover((h) => (on ? c.id : h === c.id ? null : h))}
                 onDragState={(on) => { setDrag(on ? c.id : null); if (on) setHover(null); }} />
@@ -131,15 +127,15 @@ function HandCard({ c, p, zoomed, dragging, onHover, onDragState }: {
     <motion.button type="button" aria-label={p.label(c)} aria-pressed={p.selected === c} disabled={p.disabled}
       drag={!p.disabled} dragSnapToOrigin dragMomentum={false} dragElastic={1} style={{ x, y, rotate: tilt }}
       whileDrag={{ scale: 0.82 }}
-      onDragStart={() => { setMoved(true); onDragState(true); }}
-      onDrag={(e) => { const pt = pointOf(e); p.onDrag(c, dropAt(pt.x, pt.y)); }}
-      onDragEnd={(e) => end(e)}
+      onDragStart={() => { setMoved(true); onDragState(true); slideStart(); }}
+      onDrag={(e, info) => { const pt = pointOf(e); p.onDrag(c, dropAt(pt.x, pt.y)); slideSpeed(Math.hypot(info.velocity.x, info.velocity.y)); }}
+      onDragEnd={(e) => { slideStop(); end(e); }}
       onClick={() => { if (moved) { setMoved(false); return; } p.onSelect(c); }}
-      onPointerEnter={(e) => { if (e.pointerType === "mouse") onHover(true); }}
+      onPointerEnter={(e) => { if (e.pointerType === "mouse") { onHover(true); if (!dragging) sfx("hover"); } }}
       onPointerLeave={(e) => { if (e.pointerType === "mouse") onHover(false); }}
       onFocus={() => onHover(true)} onBlur={() => onHover(false)}
       className={`block w-full cursor-grab touch-none rounded-lg transition-[filter] duration-150 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-dl-text active:cursor-grabbing disabled:cursor-not-allowed ${
-        can ? "drop-shadow-[0_0_10px_var(--color-game-me)]" : "brightness-75"} ${dragging ? "cursor-grabbing" : ""}`}>
+        can ? "drop-shadow-[0_0_10px_var(--color-game-me)]" : "brightness-50 saturate-50"} ${dragging ? "cursor-grabbing" : ""}`}>
       {p.render(c, zoomed)}
     </motion.button>
   );

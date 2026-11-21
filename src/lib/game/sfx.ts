@@ -1,33 +1,34 @@
-// Áudio do Cardslock Game: efeitos (Kenney, CC0; ver src/assets/sfx/LICENSE.txt), baque sintetizado para cartas pesadas
-// e música de fundo ("Midnight on Miller Street", tcarisland, CC BY 4.0; ver src/assets/music/LICENSE.txt).
-// Volume e mudo de efeitos e música ficam separados e salvos no navegador.
+// Áudio do Cardslock Game: efeitos (Kenney e a plateia do Freesound, CC0; ver src/assets/sfx/LICENSE.txt), baque sintetizado para cartas pesadas
+// música de fundo ("Midnight on Miller Street", tcarisland, CC BY 4.0) e conversa do bar (SSE Library, CC0); ver src/assets/music/LICENSE.txt.
+// O arrasto e a batida das cartas na madeira são sintetizados. Volume e mudo de efeitos, música e conversa ficam separados e salvos no navegador.
 import { useSyncExternalStore } from "react";
+import walla from "../../assets/music/bar-walla.mp3";
 import music from "../../assets/music/midnight-on-miller-street.mp3";
+import gasp from "../../assets/sfx/crowd-gasp.ogg";
 import draw from "../../assets/sfx/draw.ogg";
 import endTurn from "../../assets/sfx/end-turn.ogg";
 import error from "../../assets/sfx/error.ogg";
 import grab from "../../assets/sfx/grab.ogg";
-import land from "../../assets/sfx/land.ogg";
 import loss from "../../assets/sfx/loss.ogg";
-import place from "../../assets/sfx/place.ogg";
 import shuffle from "../../assets/sfx/shuffle.ogg";
-import slam from "../../assets/sfx/slam.ogg";
 import soul from "../../assets/sfx/soul.ogg";
-import target from "../../assets/sfx/target.ogg";
 import win from "../../assets/sfx/win.ogg";
 
-const FILES = { draw, endTurn, error, grab, land, loss, place, shuffle, slam, soul, target, win };
-export type Sfx = keyof typeof FILES;
+const FILES = { draw, endTurn, error, gasp, grab, loss, shuffle, soul, win };
+/** Carta tocando a mesa: sintetizada como carta pesada batendo na madeira (força de cada uma). */
+const WOOD = { place: 0.6, land: 0.75, slam: 1, target: 0.45 } as const;
+export type Sfx = keyof typeof FILES | keyof typeof WOOD | "reveal" | "hover" | "burn" | "paper" | "impact" | "bell";
 
 /** Volume e mudo de cada canal (0 a 1). */
-export type AudioPrefs = { sfx: number; music: number; sfxOn: boolean; musicOn: boolean };
+export type AudioPrefs = { sfx: number; music: number; amb: number; sfxOn: boolean; musicOn: boolean; ambOn: boolean };
 
 const KEY = "cardslock-audio";
 const SFX_BASE = 0.45;
 const MUSIC_BASE = 0.35;
+const AMB_BASE = 0.5;
 /** Quanto a música abaixa por baixo do resultado da partida. */
 const DUCK = 0.35;
-const DEFAULTS: AudioPrefs = { sfx: 0.8, music: 0.6, sfxOn: true, musicOn: true };
+const DEFAULTS: AudioPrefs = { sfx: 0.8, music: 0.6, amb: 0.5, sfxOn: true, musicOn: true, ambOn: true };
 
 function load(): AudioPrefs {
   if (typeof localStorage === "undefined") return DEFAULTS;
@@ -37,8 +38,9 @@ function load(): AudioPrefs {
     const old = localStorage.getItem("cardslock-mute") === "1";
     const n = (x: unknown, d: number) => (typeof x === "number" && x >= 0 && x <= 1 ? x : d);
     return {
-      sfx: n(v?.sfx, DEFAULTS.sfx), music: n(v?.music, DEFAULTS.music),
+      sfx: n(v?.sfx, DEFAULTS.sfx), music: n(v?.music, DEFAULTS.music), amb: n(v?.amb, DEFAULTS.amb),
       sfxOn: typeof v?.sfxOn === "boolean" ? v.sfxOn : !old, musicOn: typeof v?.musicOn === "boolean" ? v.musicOn : true,
+      ambOn: typeof v?.ambOn === "boolean" ? v.ambOn : true,
     };
   } catch {
     return DEFAULTS;
@@ -47,39 +49,458 @@ function load(): AudioPrefs {
 
 let prefs = load();
 const subs = new Set<() => void>();
-const cache = new Map<Sfx, HTMLAudioElement>();
+const cache = new Map<string, HTMLAudioElement>();
 let ctx: AudioContext | null = null;
 
 const sfxLevel = () => (prefs.sfxOn ? prefs.sfx : 0);
+const hasCtx = () => typeof window !== "undefined" && "AudioContext" in window;
+/** Contexto de áudio único (criado no primeiro gesto do jogador). */
+function audioCtx() {
+  ctx ??= new AudioContext();
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  return ctx;
+}
+
+/** Contexto, instante e volume final para um som sintetizado (null com o canal mudo ou sem Web Audio). */
+export function voice(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return null;
+  const c = audioCtx();
+  return { c, t: c.currentTime, vol: SFX_BASE * lv * strength };
+}
 
 /** Toca um efeito (sem efeito com o canal mudo ou se o navegador bloquear). */
 export function sfx(name: Sfx, volume = 1) {
+  if (name in WOOD) return woodHit(WOOD[name as keyof typeof WOOD] * volume);
+  if (name === "reveal") return revealSwell(volume);
+  if (name === "hover") return cardFlick(volume);
+  if (name === "burn") return cardBurn(volume);
+  if (name === "paper") return paperRustle(volume);
+  if (name === "impact") return bigImpact(volume);
+  if (name === "bell") return deskBell(volume);
+  playFile(FILES[name as keyof typeof FILES], volume);
+}
+
+/** Toca um arquivo de áudio no canal de efeitos (o mesmo elemento fica em cache e é clonado a cada toque). */
+function playFile(src: string, volume: number) {
   const lv = sfxLevel();
   if (!lv || typeof Audio === "undefined") return;
-  let base = cache.get(name);
-  if (!base) { base = new Audio(FILES[name]); base.preload = "auto"; cache.set(name, base); }
+  let base = cache.get(src);
+  if (!base) { base = new Audio(src); base.preload = "auto"; cache.set(src, base); }
   const a = base.cloneNode() as HTMLAudioElement;
   a.volume = Math.min(1, SFX_BASE * volume * lv);
   a.play().catch(() => {});
 }
 
+/** Efeito sonoro enviado para uma carta no editor. */
+export const cardSfx = (url: string, volume = 1) => playFile(url, volume * 1.6);
+
 /** Baque grave para a carta pesada caindo na mesa. */
 export function thump(strength = 1) {
   const lv = sfxLevel();
-  if (!lv || typeof window === "undefined" || !("AudioContext" in window)) return;
-  ctx ??= new AudioContext();
-  const t = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const osc = c.createOscillator();
+  const gain = c.createGain();
   osc.type = "sine";
   osc.frequency.setValueAtTime(110, t);
   osc.frequency.exponentialRampToValueAtTime(38, t + 0.28);
   gain.gain.setValueAtTime(0.0001, t);
   gain.gain.exponentialRampToValueAtTime(0.5 * SFX_BASE * strength * lv, t + 0.015);
   gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
-  osc.connect(gain).connect(ctx.destination);
+  osc.connect(gain).connect(c.destination);
   osc.start(t);
   osc.stop(t + 0.42);
+}
+
+/* ---------- copo arrastando na madeira ---------- */
+let slide: { gain: GainNode; band: BiquadFilterNode; stop: () => void } | null = null;
+let slideIdle: ReturnType<typeof setTimeout> | null = null;
+
+/** Ruído branco (estalos) ou marrom (grave, como atrito pesado). */
+export function noise(c: BaseAudioContext, sec: number, brown = false) {
+  const b = c.createBuffer(1, Math.floor(c.sampleRate * sec), c.sampleRate);
+  const d = b.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < d.length; i++) {
+    const w = Math.random() * 2 - 1;
+    // marrom: integra o branco, tirando o agudo; o ganho compensa a queda de volume
+    d[i] = brown ? (last = (last + 0.02 * w) / 1.02) * 3.5 : w;
+  }
+  return b;
+}
+let burst: AudioBuffer | null = null;
+
+/** Carta queimando (mão cheia): a chama pega num sopro que abre, estala e se apaga em ~2,9 s. */
+function cardBurn(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  // o fogo: ruído marrom que abre do grave para o médio e some
+  const fire = c.createBufferSource();
+  fire.buffer = noise(c, 3.1, true);
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass"; lp.Q.value = 0.7;
+  lp.frequency.setValueAtTime(300, t);
+  lp.frequency.exponentialRampToValueAtTime(2600, t + 0.5);
+  lp.frequency.exponentialRampToValueAtTime(1400, t + 2);
+  lp.frequency.exponentialRampToValueAtTime(500, t + 2.9);
+  const fg = c.createGain();
+  fg.gain.setValueAtTime(0.0001, t);
+  fg.gain.exponentialRampToValueAtTime(2.2 * vol, t + 0.15);
+  fg.gain.exponentialRampToValueAtTime(1.4 * vol, t + 2);
+  fg.gain.exponentialRampToValueAtTime(0.0001, t + 3);
+  fire.connect(lp).connect(fg).connect(c.destination);
+  fire.start(t);
+  fire.stop(t + 3.1);
+  // estalos do papel: estouros curtos e agudos em momentos soltos
+  burst ??= noise(c, 0.3);
+  for (let i = 0; i < 24; i++) {
+    const at = t + 0.05 + Math.random() * 2.6;
+    const pop = c.createBufferSource();
+    pop.buffer = burst;
+    const hp = c.createBiquadFilter();
+    hp.type = "highpass"; hp.frequency.value = 1800 + Math.random() * 2500;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime((0.4 + Math.random() * 0.8) * vol, at + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.03);
+    pop.connect(hp).connect(g).connect(c.destination);
+    pop.start(at, Math.random() * 0.25);
+    pop.stop(at + 0.04);
+  }
+}
+
+/** Carta enorme (9 ou mais de poder) caindo: um estrondo grave e longo com o tremor da madeira por baixo (a plateia é o efeito "gasp"). */
+function bigImpact(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  // estrondo: seno que cai de 75 para 30 Hz e demora a sumir
+  const boom = c.createOscillator();
+  boom.type = "sine";
+  boom.frequency.setValueAtTime(75, t);
+  boom.frequency.exponentialRampToValueAtTime(30, t + 0.9);
+  const bg = c.createGain();
+  bg.gain.setValueAtTime(0.0001, t);
+  bg.gain.exponentialRampToValueAtTime(1.6 * vol, t + 0.012);
+  bg.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+  boom.connect(bg).connect(c.destination);
+  boom.start(t);
+  boom.stop(t + 1.35);
+  // tremor da mesa: ruído marrom bem grave
+  const rum = c.createBufferSource();
+  rum.buffer = noise(c, 1, true);
+  const rl = c.createBiquadFilter();
+  rl.type = "lowpass"; rl.frequency.value = 160;
+  const rg = c.createGain();
+  rg.gain.setValueAtTime(0.0001, t);
+  rg.gain.exponentialRampToValueAtTime(1.8 * vol, t + 0.02);
+  rg.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  rum.connect(rl).connect(rg).connect(c.destination);
+  rum.start(t);
+  rum.stop(t + 1);
+}
+
+/** Parciais de metal soando juntos (frequências em Hz e peso de cada um), com ataque seco e cauda longa. */
+export function ring(c: AudioContext, at: number, parts: readonly (readonly [number, number, number])[], vol: number) {
+  for (const [fq, g, dur] of parts) {
+    const o = c.createOscillator();
+    o.type = "sine";
+    o.frequency.value = fq;
+    const gn = c.createGain();
+    gn.gain.setValueAtTime(0.0001, at);
+    gn.gain.exponentialRampToValueAtTime(g * vol, at + 0.003);
+    gn.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(gn).connect(c.destination);
+    o.start(at);
+    o.stop(at + dur + 0.02);
+  }
+}
+
+/** Sino de balcão (a loja abriu): um "ding" claro com parciais de sino e cauda longa. */
+function deskBell(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  // o martelinho batendo
+  const k = c.createBufferSource();
+  k.buffer = noise(c, 0.02);
+  const kb = c.createBiquadFilter();
+  kb.type = "highpass"; kb.frequency.value = 3000;
+  const kg = c.createGain();
+  kg.gain.setValueAtTime(0.4 * vol, t);
+  kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
+  k.connect(kb).connect(kg).connect(c.destination);
+  k.start(t);
+  k.stop(t + 0.02);
+  // parciais de sino de mesa (fundamental perto de 1,9 kHz)
+  ring(c, t, [[1880, 0.35, 1.8], [1893, 0.2, 1.6], [4360, 0.12, 0.9], [7990, 0.05, 0.5], [12470, 0.02, 0.25]], vol);
+}
+
+let lastPaper = 0;
+/** A conta de papel sendo levantada da mesa: um farfalhar curto e seco (no máximo um a cada 150 ms). */
+function paperRustle(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  if (t - lastPaper < 0.15) return;
+  lastPaper = t;
+  const vol = SFX_BASE * lv * strength;
+  burst ??= noise(c, 0.3);
+  // o papel dobrando: estalinhos agudos em sequência
+  for (let i = 0; i < 6; i++) {
+    const at = t + i * 0.02 + Math.random() * 0.012;
+    const src = c.createBufferSource();
+    src.buffer = burst;
+    const band = c.createBiquadFilter();
+    band.type = "bandpass"; band.frequency.value = 2500 + Math.random() * 2500; band.Q.value = 0.8;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime((0.25 + Math.random() * 0.25) * vol, at + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.035);
+    src.connect(band).connect(g).connect(c.destination);
+    src.start(at, Math.random() * 0.25);
+    src.stop(at + 0.05);
+  }
+  // o ar do papel subindo: um sopro curto e macio
+  const air = c.createBufferSource();
+  air.buffer = burst;
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass"; lp.frequency.value = 1400;
+  const ag = c.createGain();
+  ag.gain.setValueAtTime(0.0001, t);
+  ag.gain.exponentialRampToValueAtTime(0.18 * vol, t + 0.04);
+  ag.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  air.connect(lp).connect(ag).connect(c.destination);
+  air.start(t);
+  air.stop(t + 0.16);
+}
+
+let lastFlick = 0;
+/** Passar o mouse pelas cartas da mão: o roçar curto de uma carta grossa na outra (no máximo um a cada 60 ms). */
+function cardFlick(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  if (t - lastFlick < 0.06) return;
+  lastFlick = t;
+  burst ??= noise(c, 0.3);
+  const src = c.createBufferSource();
+  src.buffer = burst;
+  const band = c.createBiquadFilter();
+  band.type = "bandpass"; band.frequency.value = 900 + Math.random() * 300; band.Q.value = 1.1;
+  const gain = c.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.35 * SFX_BASE * lv * strength, t + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  src.connect(band).connect(gain).connect(c.destination);
+  src.start(t, Math.random() * 0.2);
+  src.stop(t + 0.08);
+}
+
+/** Local se revelando: a névoa se abre num sopro que sobe e o tampo ressoa grave por baixo. */
+function revealSwell(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  const air = c.createBufferSource();
+  air.buffer = noise(c, 1.6, true);
+  const band = c.createBiquadFilter();
+  band.type = "bandpass"; band.Q.value = 1.4;
+  band.frequency.setValueAtTime(220, t);
+  band.frequency.exponentialRampToValueAtTime(1300, t + 1.1);
+  const airGain = c.createGain();
+  airGain.gain.setValueAtTime(0.0001, t);
+  airGain.gain.exponentialRampToValueAtTime(1.6 * vol, t + 0.55);
+  airGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+  air.connect(band).connect(airGain).connect(c.destination);
+  air.start(t);
+  air.stop(t + 1.5);
+  const low = c.createOscillator();
+  low.type = "sine";
+  low.frequency.setValueAtTime(55, t);
+  low.frequency.linearRampToValueAtTime(80, t + 1.1);
+  const lowGain = c.createGain();
+  lowGain.gain.setValueAtTime(0.0001, t);
+  lowGain.gain.exponentialRampToValueAtTime(0.5 * vol, t + 0.6);
+  lowGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+  low.connect(lowGain).connect(c.destination);
+  low.start(t);
+  low.stop(t + 1.5);
+}
+
+/** Carta pesada batendo na mesa de madeira: baque grave do tampo, o "toc" da tábua e o estalo do contato. */
+function woodHit(strength = 1) {
+  const lv = sfxLevel();
+  if (!lv || !hasCtx()) return;
+  const c = audioCtx();
+  const t = c.currentTime;
+  const vol = SFX_BASE * lv * strength;
+  // tampo: um grave curto que cai, mais fundo quanto mais forte a batida
+  const body = c.createOscillator();
+  const bodyGain = c.createGain();
+  body.type = "sine";
+  body.frequency.setValueAtTime(140 - 35 * strength, t);
+  body.frequency.exponentialRampToValueAtTime(48, t + 0.2);
+  bodyGain.gain.setValueAtTime(0.0001, t);
+  bodyGain.gain.exponentialRampToValueAtTime(0.9 * vol, t + 0.005);
+  bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2 + 0.12 * strength);
+  body.connect(bodyGain).connect(c.destination);
+  body.start(t);
+  body.stop(t + 0.45);
+  // tábua: ruído curto passando pelas ressonâncias da madeira
+  burst ??= noise(c, 0.3);
+  const knock = c.createBufferSource();
+  knock.buffer = burst;
+  const knockGain = c.createGain();
+  knockGain.gain.setValueAtTime(0.0001, t);
+  knockGain.gain.exponentialRampToValueAtTime(1.4 * vol, t + 0.003);
+  knockGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09 + 0.05 * strength);
+  for (const [f, q] of [[190, 2.5], [420, 4], [760, 5]]) {
+    const band = c.createBiquadFilter();
+    band.type = "bandpass"; band.frequency.value = f; band.Q.value = q;
+    knock.connect(band).connect(knockGain);
+  }
+  knockGain.connect(c.destination);
+  // contato: estalo seco e baixo da borda da carta
+  const tick = c.createBufferSource();
+  tick.buffer = burst;
+  const high = c.createBiquadFilter();
+  high.type = "bandpass"; high.frequency.value = 1800; high.Q.value = 0.8;
+  const tickGain = c.createGain();
+  tickGain.gain.setValueAtTime(0.25 * vol, t);
+  tickGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.02);
+  tick.connect(high).connect(tickGain).connect(c.destination);
+  knock.start(t);
+  tick.start(t);
+  knock.stop(t + 0.3);
+  tick.stop(t + 0.05);
+}
+
+/** Começa o arrasto: o som fica pronto e só aparece quando a carta anda (ver slideSpeed). */
+export function slideStart() {
+  if (slide || !sfxLevel() || !hasCtx()) return;
+  const c = audioCtx();
+  const src = c.createBufferSource();
+  src.buffer = noise(c, 2, true);
+  src.loop = true;
+  // fricção: ruído marrom numa faixa grave, como uma base pesada deslizando na madeira (sem o chiado agudo)
+  const band = c.createBiquadFilter();
+  band.type = "bandpass"; band.frequency.value = 160; band.Q.value = 0.9;
+  const low = c.createBiquadFilter();
+  low.type = "lowpass"; low.frequency.value = 520;
+  // veios da madeira: um ruído lento faz o volume tremer, como o fundo do copo pulando nas emendas
+  const grain = c.createBufferSource();
+  grain.buffer = noise(c, 2);
+  grain.loop = true;
+  const grainLow = c.createBiquadFilter();
+  grainLow.type = "lowpass"; grainLow.frequency.value = 25;
+  const grainAmt = c.createGain();
+  grainAmt.gain.value = 3;
+  const body = c.createGain();
+  body.gain.value = 0.7;
+  grain.connect(grainLow).connect(grainAmt).connect(body.gain);
+  const gain = c.createGain();
+  gain.gain.value = 0;
+  src.connect(band).connect(low).connect(body).connect(gain).connect(c.destination);
+  src.start();
+  grain.start();
+  slide = { gain, band, stop: () => { src.stop(); grain.stop(); } };
+}
+
+/** Velocidade do arrasto (px/s): mais rápido, mais alto e mais agudo. Parado, some. */
+export function slideSpeed(v: number) {
+  if (!slide || !ctx) return;
+  const k = Math.min(1, v / 1400);
+  const t = ctx.currentTime;
+  slide.gain.gain.setTargetAtTime(k * 3 * SFX_BASE * sfxLevel(), t, 0.05);
+  slide.band.frequency.setTargetAtTime(120 + k * 140, t, 0.06);
+  // sem movimento por um instante, o copo para
+  if (slideIdle) clearTimeout(slideIdle);
+  slideIdle = v > 0 ? setTimeout(() => slideSpeed(0), 90) : null;
+}
+
+/** Fim do arrasto: o som some rápido. */
+export function slideStop() {
+  if (slideIdle) { clearTimeout(slideIdle); slideIdle = null; }
+  if (!slide || !ctx) return;
+  const s = slide;
+  slide = null;
+  s.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.03);
+  setTimeout(s.stop, 250);
+}
+
+/* ---------- conversa do bar ---------- */
+let amb: { gain: GainNode; src: AudioBufferSourceNode } | null = null;
+let ambLoading = false;
+let ambOff: ReturnType<typeof setTimeout> | null = null;
+
+/** No lobby a conversa fica baixa, ao fundo; na partida sobe ao volume cheio. */
+const LOBBY_AMB = 0.45;
+let lobby = false;
+const ambGoal = () => (prefs.ambOn ? AMB_BASE * prefs.amb * (wanted ? duck : lobby ? LOBBY_AMB : 0) : 0);
+
+/** Leva o volume da conversa até o alvo; sem ninguém ouvindo, desliga a fonte depois do fade. */
+function ambGlide(sec = 0.6) {
+  if (ambOff) { clearTimeout(ambOff); ambOff = null; }
+  if (!amb || !ctx) return;
+  const g = amb.gain.gain, t = ctx.currentTime, goal = ambGoal();
+  g.cancelScheduledValues(t);
+  g.setValueAtTime(g.value, t);
+  g.linearRampToValueAtTime(goal, t + sec);
+  if (goal === 0) {
+    ambOff = setTimeout(() => {
+      if (ambGoal() > 0 || !amb) return;
+      amb.src.stop();
+      amb = null;
+    }, sec * 1000 + 100);
+  }
+}
+
+/** Liga a conversa em loop pelo Web Audio (sem a emenda que o <audio> deixa no loop). */
+async function startAmb() {
+  if (amb) return ambGlide(1.2);
+  if (ambLoading || !hasCtx() || !ambGoal()) return;
+  ambLoading = true;
+  try {
+    const c = audioCtx();
+    const buf = await c.decodeAudioData(await (await fetch(walla)).arrayBuffer());
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    // corta as pontas (silêncio do MP3) para o loop não ter buraco
+    src.loopStart = 0.15;
+    src.loopEnd = buf.duration - 0.15;
+    const gain = c.createGain();
+    gain.gain.value = 0;
+    src.connect(gain).connect(c.destination);
+    src.start(0, 0.15);
+    amb = { gain, src };
+  } catch {
+    // sem conversa se o navegador não decodificar; o resto do áudio segue
+  } finally {
+    ambLoading = false;
+  }
+  ambGlide(1.2);
+}
+
+/** Conversa do bar baixinha no lobby (precisa vir de um gesto: o navegador bloqueia som automático). */
+export function lobbyAmb(on: boolean) {
+  lobby = on;
+  if (on) startAmb();
+  else ambGlide(0.4);
 }
 
 /* ---------- música ---------- */
@@ -116,22 +537,27 @@ export function startMusic() {
   wanted = true;
   if (!track) { track = new Audio(music); track.loop = true; track.volume = 0; fade = 0; }
   glide(1200);
+  startAmb();
 }
 /** Para a música com um fade curto (ao sair da tela do jogo). */
 export function stopMusic() {
   wanted = false;
   glide(400);
+  ambGlide(0.4);
 }
 /** Abaixa a música por baixo de um momento importante (resultado da partida). */
 export function duckMusic(on: boolean) {
   duck = on ? DUCK : 1;
   glide(500);
+  ambGlide(0.5);
 }
 
 export function setAudio(patch: Partial<AudioPrefs>) {
   prefs = { ...prefs, ...patch };
   localStorage.setItem(KEY, JSON.stringify(prefs));
   if ("music" in patch || "musicOn" in patch) glide(200);
+  if ("amb" in patch || "ambOn" in patch) { if (amb) ambGlide(0.2); else if (wanted) startAmb(); }
+  if (slide && !sfxLevel()) slideStop();
   subs.forEach((f) => f());
 }
 

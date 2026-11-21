@@ -22,8 +22,11 @@ export interface Env {
 }
 
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
+// efeito sonoro próprio de uma carta: arquivo curto, na pasta "sounds"
+const AUDIO_TYPES: Record<string, string> = { "audio/mpeg": "mp3", "audio/ogg": "ogg", "audio/wav": "wav", "audio/x-wav": "wav", "audio/webm": "webm" };
 const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const MAX_SOUND_BYTES = 1024 * 1024;
 const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art", "heroPool"];
 const ID_RE = /^[\w-]{1,64}$/;
 
@@ -110,6 +113,7 @@ async function appData(env: Env): Promise<Response> {
       tierConfig: s.tierConfig ?? undefined,
       bg: bg ? { ...bg, imageUrl: imgUrl((s.bgImageKey as string) ?? null) } : undefined,
       homeHero: imgUrl((s.homeHeroKey as string) ?? null),
+      gameBg: imgUrl((s.gameBgKey as string) ?? null),
       game: s.game ?? undefined,
     },
   });
@@ -126,6 +130,7 @@ async function serveImage(env: Env, key: string): Promise<Response> {
 }
 
 async function upload(env: Env, request: Request, folder: string): Promise<Response> {
+  if (folder === "sounds") return uploadSound(env, request);
   const ext = IMAGE_TYPES[request.headers.get("content-type") ?? ""];
   if (!ext) return bad("tipo de imagem não suportado");
   if (!UPLOAD_FOLDERS.includes(folder)) return bad("pasta inválida");
@@ -133,6 +138,17 @@ async function upload(env: Env, request: Request, folder: string): Promise<Respo
   if (!body.byteLength || body.byteLength > MAX_UPLOAD_BYTES) return bad("imagem vazia ou maior que 8 MB");
   const key = `${folder}/${crypto.randomUUID()}.${ext}`;
   await env.ASSETS_BUCKET.put(key, body, { httpMetadata: { contentType: request.headers.get("content-type")! } });
+  return Response.json({ url: `/img/${key}` });
+}
+
+async function uploadSound(env: Env, request: Request): Promise<Response> {
+  const type = request.headers.get("content-type") ?? "";
+  const ext = AUDIO_TYPES[type];
+  if (!ext) return bad("tipo de áudio não suportado: use mp3, ogg, wav ou webm");
+  const body = await request.arrayBuffer();
+  if (!body.byteLength || body.byteLength > MAX_SOUND_BYTES) return bad("áudio vazio ou maior que 1 MB");
+  const key = `sounds/${crypto.randomUUID()}.${ext}`;
+  await env.ASSETS_BUCKET.put(key, body, { httpMetadata: { contentType: type } });
   return Response.json({ url: `/img/${key}` });
 }
 
@@ -187,6 +203,8 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
     if (b.tierConfig !== undefined) rows.tierConfig = b.tierConfig;
     if (b.bg !== undefined) { const bg = b.bg as Record<string, unknown> | null; rows.bg = bg ? { ...bg, imageUrl: "" } : null; rows.bgImageKey = keyOf(bg?.imageUrl); }
     if (b.homeHero !== undefined) rows.homeHeroKey = keyOf(b.homeHero);
+    // foto do salão do Cardslock Game: só imagem já enviada ao R2 (/img/...); qualquer outra coisa limpa
+    if (b.gameBg !== undefined) rows.gameBgKey = keyOf(b.gameBg);
     if (b.game !== undefined) {
       const game = sanitizeGameConfig(b.game);
       if (!game) return bad("configuração do jogo inválida");
