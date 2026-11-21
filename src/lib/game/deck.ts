@@ -115,12 +115,19 @@ export function versionPlayer(byId: Map<string, Player>, c: { id?: string; hero:
   return base && c.hero ? { ...base, hero: c.hero, art: undefined } : null;
 }
 
+/** Chance de uma rodada do draft ter a vaga rara, além da rodada sorteada que sempre tem (pelo menos 1 por draft). */
+export const RARE_CHANCE = 0.05;
+
 /**
  * Oferta de uma rodada do draft (1 de 3, como a Arena): jogadores que ainda não estão no baralho, cada um numa versão de herói
  * que o baralho ainda não tem (a principal, se der), sem repetir herói entre as opções. As opções têm OVR parecido, para a
  * escolha ser de estilo e não óbvia: sorteia uma carta e completa com as de OVR mais perto dela.
+ *
+ * Cartas raras (`rare`: especiais e Eternus) ficam fora das ofertas comuns e só entram quando a rodada tem a vaga rara
+ * (`rareSlot`): aí uma rara sorteada abre a oferta e as outras são comuns de OVR perto dela.
  */
-export function draftOffer(deck: PoolCard[], versions: Map<string, PoolCard[]>, rnd: () => number = Math.random, n = 3): PoolCard[] {
+export function draftOffer(deck: PoolCard[], versions: Map<string, PoolCard[]>, rnd: () => number = Math.random, n = 3,
+  opts: { rare?: (c: PoolCard) => boolean; rareSlot?: boolean } = {}): PoolCard[] {
   const used = new Set(deck.map((c) => c.key));
   const heroes = new Set(deck.map((c) => c.hero));
   const open = [...versions.values()]
@@ -129,8 +136,13 @@ export function draftOffer(deck: PoolCard[], versions: Map<string, PoolCard[]>, 
     .filter((l) => l.length)
     .map((l) => (rnd() < 0.7 ? l[0] : l[Math.floor(rnd() * l.length)]));
   if (!open.length) return [];
-  const anchor = open[Math.floor(rnd() * open.length)];
-  const near = open.filter((c) => c !== anchor).sort((a, b) => Math.abs(a.ovr - anchor.ovr) - Math.abs(b.ovr - anchor.ovr) || rnd() - 0.5);
+  const { rare, rareSlot } = opts;
+  const rares = rare ? open.filter(rare) : [];
+  const common = rare ? open.filter((c) => !rare(c)) : open;
+  // sem comuns sobrando (coleção pequena), as raras entram como as outras
+  const base = common.length ? common : open;
+  const anchor = rareSlot && rares.length ? rares[Math.floor(rnd() * rares.length)] : base[Math.floor(rnd() * base.length)];
+  const near = base.filter((c) => c !== anchor).sort((a, b) => Math.abs(a.ovr - anchor.ovr) - Math.abs(b.ovr - anchor.ovr) || rnd() - 0.5);
   const out = [anchor];
   const pick = new Set([anchor.hero]);
   // entre as mais perto, sorteia um pouco para a mesma âncora não dar sempre as mesmas vizinhas

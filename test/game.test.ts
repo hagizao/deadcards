@@ -916,6 +916,22 @@ describe("deck montado e deck da IA", () => {
     }
     expect(resolveDeck(deck.map((c) => c.id), v)).toHaveLength(12);
   });
+
+  it("draft: raras só entram na vaga rara, e aí abrem a oferta com comuns", () => {
+    const list = HEROES.slice(0, 24).map((hero, i) => player(`q${i}`, 60 + i, { hero }));
+    const v = cardVersions(list);
+    const rare = (c: PoolCard) => c.ovr >= 80;
+    const rnd = seeded(9);
+    for (let i = 0; i < 40; i++) expect(draftOffer([], v, rnd, 3, { rare }).some(rare)).toBe(false);
+    for (let i = 0; i < 40; i++) {
+      const offer = draftOffer([], v, rnd, 3, { rare, rareSlot: true });
+      expect(offer.filter(rare)).toHaveLength(1);
+      expect(offer).toHaveLength(3);
+    }
+    // só raras na coleção: entram mesmo sem a vaga
+    const onlyRare = cardVersions(HEROES.slice(0, 5).map((hero, i) => player(`r${i}`, 90 + i, { hero })));
+    expect(draftOffer([], onlyRare, rnd, 3, { rare })).toHaveLength(3);
+  });
 });
 
 describe("calibração de 8 rounds", () => {

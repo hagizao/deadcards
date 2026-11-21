@@ -533,3 +533,39 @@
   92% { opacity: 1; }
   100% { transform: translateX(320%) skewX(-12deg); opacity: 0; }
 }
+
+/* draft: carta rara (especial ou Eternus) flutua e balança devagar */
+@utility rare-float {
+  animation: rare-float 2.4s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@keyframes rare-float {
+  0%, 100% { transform: translateY(0) rotate(-1.6deg); }
+  50% { transform: translateY(-10px) rotate(1.6deg); }
+}
+/* luz da raridade pulsando por trás da carta rara */
+@utility rare-glow {
+  animation: rare-glow 1.6s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+@keyframes rare-glow {
+  0%, 100% { opacity: 0.35; transform: scale(0.92); }
+  50% { opacity: 0.85; transform: scale(1.06); }
+}
+/* selo "Rara!" pulsando (centrado pelo próprio transform) */
+@utility rare-badge {
+  transform: translateX(-50%);
+  animation: rare-badge 1.6s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@keyframes rare-badge {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.08); }
+}

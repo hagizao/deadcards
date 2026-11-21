@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { FullscreenButton, TagButton } from "./BarButton";
 import { CardBack } from "./GameCard";
 import { DeckCurve, DeckPips, DeckStrip, deckFocus, type DeckKit } from "./DeckStrip";
@@ -7,7 +7,7 @@ import { Icon } from "./Icon";
 import { useT } from "../lib/i18n";
 import type { PoolCard } from "../lib/game/config";
 import { DECK_SIZE } from "../lib/game/engine";
-import { draftOffer, type DeckLook } from "../lib/game/deck";
+import { RARE_CHANCE, draftOffer, type DeckLook } from "../lib/game/deck";
 import { sfx } from "../lib/game/sfx";
 import { GAME_TEXT } from "../lib/game/text";
 
@@ -24,7 +24,11 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
   const t = useT(GAME_TEXT);
   const still = useReducedMotion();
   const [picks, setPicks] = useState<PoolCard[]>([]);
-  const [offer, setOffer] = useState<PoolCard[]>(() => draftOffer([], versions));
+  // especiais e Eternus: raras no draft, mas uma rodada sorteada sempre tem uma (pelo menos 1 por draft)
+  const isRare = (c: PoolCard) => { const tier = kit.tier(c); return !!tier.custom || tier.key === "eternus"; };
+  const [rareAt] = useState(() => Math.floor(Math.random() * DECK_SIZE));
+  const offerFor = (deck: PoolCard[]) => draftOffer(deck, versions, Math.random, 3, { rare: isRare, rareSlot: deck.length === rareAt || Math.random() < RARE_CHANCE });
+  const [offer, setOffer] = useState<PoolCard[]>(() => offerFor([]));
   const [chosen, setChosen] = useState<string | null>(null);
   const [hot, setHot] = useState<string | null>(null);
   // carta aberta grande para ler (com Escolher)
@@ -39,10 +43,13 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
     window.setTimeout(() => {
       const next = [...picks, c];
       setPicks(next);
-      setOffer(next.length >= DECK_SIZE ? [] : draftOffer(next, versions));
+      setOffer(next.length >= DECK_SIZE ? [] : offerFor(next));
       setChosen(null);
     }, still ? 0 : 380);
   };
+  // uma rara na mesa toca o som de revelação
+  const rareIn = offer.some(isRare);
+  useEffect(() => { if (rareIn) sfx("reveal"); }, [offer, rareIn]);
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (zoom) { if (e.key === "Escape") setZoom(null); return; }
@@ -55,7 +62,7 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
   });
 
   return (
-    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 text-dl-text">
+    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 text-dl-text 2xl:max-w-400">
       <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-10 h-120 bg-radial-[ellipse_55%_50%_at_50%_50%] from-teal-300/10 via-amber-500/5 to-transparent to-70%" />
       <header className="relative flex flex-col gap-3 sm:flex-row sm:items-center">
         <TagButton tone="paper" size="sm" onClick={onLeave} className="self-start sm:self-center"><Icon name="chevron-left" />{t.deck.leave}</TagButton>
@@ -70,6 +77,8 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
       </header>
 
       <div className="relative flex flex-col gap-8 lg:flex-row lg:items-start">
+        {/* calha vazia do tamanho da lista das escolhidas, para as cartas ficarem no centro da tela */}
+        <div aria-hidden="true" className="hidden 2xl:block 2xl:w-80 2xl:shrink-0" />
         <section aria-label={t.deck.draftHint} className="flex min-w-0 flex-1 flex-col items-center gap-6">
           <DeckPips n={picks.length} max={DECK_SIZE} className="w-full max-w-sm" />
           {!done ? (
@@ -82,6 +91,8 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
                     const me = chosen === c.id;
                     const gone = chosen !== null && !me;
                     const on = hot === c.id && !chosen;
+                    const rare = isRare(c);
+                    const glow = rare ? ({ "--rare": kit.tier(c).c } as CSSProperties) : undefined;
                     return (
                       <motion.li key={`${picks.length}-${c.id}`} className={`relative flex w-[clamp(6.2rem,28vw,14rem)] flex-col items-center gap-2 ${on ? "z-20" : "z-0"}`}
                         initial={still ? { opacity: 0 } : { opacity: 0, y: 60, rotateY: 180 }}
@@ -94,9 +105,18 @@ export function DeckDraft({ versions, look, kit, onLeave, onSave, onPlay }: {
                           className={`group relative block w-full cursor-pointer rounded-xl transform-3d active:scale-95 disabled:cursor-default ${deckFocus}`}>
                           {/* o verso por trás: aparece enquanto a carta gira */}
                           <span aria-hidden="true" className="absolute inset-0 transform-[rotateY(180deg)] backface-hidden"><CardBack look={look} /></span>
-                          <span className={`block backface-hidden ${me ? "drop-shadow-[0_0_24px_var(--color-game-me)]" : "drop-shadow-[0_12px_18px_rgb(0_0_0/0.6)] group-hover:drop-shadow-[0_0_18px_rgb(255_239_215/0.35)]"}`}>
+                          {/* rara: flutua e balança com a luz da raridade pulsando por trás */}
+                          {rare && <span aria-hidden="true" className="pointer-events-none absolute inset-[-12%] rare-glow rounded-full bg-radial from-(--rare) to-transparent to-70% blur-xl" style={glow} />}
+                          <span style={glow}
+                            className={`block backface-hidden ${rare && !chosen ? "rare-float" : ""} ${me ? "drop-shadow-[0_0_24px_var(--color-game-me)]" : rare ? "drop-shadow-[0_0_22px_var(--rare)]" : "drop-shadow-[0_12px_18px_rgb(0_0_0/0.6)] group-hover:drop-shadow-[0_0_18px_rgb(255_239_215/0.35)]"}`}>
                             {kit.full(c)}
                           </span>
+                          {rare && (
+                            <span style={{ ...glow, background: kit.tier(c).hi }}
+                              className="absolute -top-3 left-1/2 z-10 rare-badge rounded-full px-3 py-0.5 text-[11px] font-extrabold tracking-[0.2em] whitespace-nowrap text-zinc-950 uppercase shadow-[0_0_16px_var(--rare)]">
+                              {t.deck.rare}
+                            </span>
+                          )}
                         </button>
                         <button type="button" onClick={() => setZoom(c)} aria-label={t.deck.open(t.deck.version(c.name, c.hero))}
                           className={`flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[11px] text-zinc-400 transition hover:bg-white/8 hover:text-zinc-100 active:scale-95 motion-reduce:transition-none sm:min-h-8 ${deckFocus} ${on ? "opacity-0" : ""}`}>

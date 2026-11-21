@@ -44,7 +44,7 @@ export type GameText = {
     /** Tela de baralhos (lobby), oficina (montar à mão) e draft (1 de 3). */
     edit: string; draft: string; draftHint: string; missing: (n: number) => string; emptyHint: string; back: string;
     page: (n: number, total: number) => string; prev: string; next: string; costAll: string; costFilter: string; inDeckTag: string;
-    round: (n: number, max: number) => string; pick: (name: string) => string; draftDone: string; save: string; playNow: string; leave: string;
+    round: (n: number, max: number) => string; rare: string; pick: (name: string) => string; draftDone: string; save: string; playNow: string; leave: string;
     draftName: (n: number) => string; ready: string; workshop: string; odds: (n: number) => string; oddsWait: string; oddsHint: (n: number) => string;
   };
   ui: {
@@ -362,7 +362,7 @@ export const GAME_TEXT = strings<GameText>({
       edit: "Editar baralho", draft: "Draft 1 de 3", draftHint: "Doze rodadas: a cada uma, escolha 1 entre 3 jogadores.", missing: (n) => `${pl(n, "Falta", "Faltam")} ${n} ${pl(n, "carta", "cartas")}`,
       emptyHint: "Monte carta a carta na oficina ou deixe o draft escolher com você.", back: "Baralhos",
       page: (n, total) => `Página ${n} de ${total}`, prev: "Página anterior", next: "Próxima página", costAll: "Todos", costFilter: "Custo", inDeckTag: "No baralho",
-      round: (n, max) => `Escolha ${n} de ${max}`, pick: (name) => `Escolher ${name}`, draftDone: "Baralho pronto", save: "Salvar baralho", playNow: "Jogar agora", leave: "Sair do draft",
+      round: (n, max) => `Escolha ${n} de ${max}`, rare: "Rara!", pick: (name) => `Escolher ${name}`, draftDone: "Baralho pronto", save: "Salvar baralho", playNow: "Jogar agora", leave: "Sair do draft",
       draftName: (n) => `Draft ${n}`, ready: "Pronto para jogar", workshop: "Oficina",
       odds: (n) => `Vence ${n}% contra a IA`, oddsWait: "Testando contra a IA…", oddsHint: (n) => `${n} partidas simuladas contra a IA, os dois lados jogando do mesmo jeito.`,
     },
@@ -689,7 +689,7 @@ export const GAME_TEXT = strings<GameText>({
       edit: "Edit deck", draft: "Draft 1 of 3", draftHint: "Twelve rounds: each time, pick 1 of 3 players.", missing: (n) => `${n} ${pl(n, "card", "cards")} missing`,
       emptyHint: "Build it card by card in the workshop, or let the draft choose with you.", back: "Decks",
       page: (n, total) => `Page ${n} of ${total}`, prev: "Previous page", next: "Next page", costAll: "All", costFilter: "Cost", inDeckTag: "In deck",
-      round: (n, max) => `Pick ${n} of ${max}`, pick: (name) => `Pick ${name}`, draftDone: "Deck ready", save: "Save deck", playNow: "Play now", leave: "Leave draft",
+      round: (n, max) => `Pick ${n} of ${max}`, rare: "Rare!", pick: (name) => `Pick ${name}`, draftDone: "Deck ready", save: "Save deck", playNow: "Play now", leave: "Leave draft",
       draftName: (n) => `Draft ${n}`, ready: "Ready to play", workshop: "Workshop",
       odds: (n) => `Wins ${n}% vs the AI`, oddsWait: "Testing against the AI…", oddsHint: (n) => `${n} simulated matches against the AI, both sides playing the same way.`,
     },
@@ -1016,7 +1016,7 @@ export const GAME_TEXT = strings<GameText>({
       edit: "Editar mazo", draft: "Draft 1 de 3", draftHint: "Doce rondas: en cada una, elige 1 entre 3 jugadores.", missing: (n) => `${pl(n, "Falta", "Faltan")} ${n} ${pl(n, "carta", "cartas")}`,
       emptyHint: "Ármalo carta por carta en el taller o deja que el draft elija contigo.", back: "Mazos",
       page: (n, total) => `Página ${n} de ${total}`, prev: "Página anterior", next: "Página siguiente", costAll: "Todos", costFilter: "Coste", inDeckTag: "En el mazo",
-      round: (n, max) => `Elección ${n} de ${max}`, pick: (name) => `Elegir a ${name}`, draftDone: "Mazo listo", save: "Guardar mazo", playNow: "Jugar ahora", leave: "Salir del draft",
+      round: (n, max) => `Elección ${n} de ${max}`, rare: "¡Rara!", pick: (name) => `Elegir a ${name}`, draftDone: "Mazo listo", save: "Guardar mazo", playNow: "Jugar ahora", leave: "Salir del draft",
       draftName: (n) => `Draft ${n}`, ready: "Listo para jugar", workshop: "Taller",
       odds: (n) => `Gana ${n}% contra la IA`, oddsWait: "Probando contra la IA…", oddsHint: (n) => `${n} partidas simuladas contra la IA, los dos lados jugando igual.`,
     },
