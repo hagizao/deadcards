@@ -59,6 +59,8 @@ export type Settings = {
   tierConfig?: TierBand[];
   bg?: BgSettings;
   homeHero?: string;
+  /** Foto de fundo do salão do Cardslock Game (lobby, oficina e draft); sem ela, o bar desenhado. */
+  gameBg?: string;
   game?: GameConfig;
 };
 

@@ -685,6 +685,7 @@ function LookForm() {
   const { settings, reload } = useData();
   const [bg, setBg] = useState(settings.bg);
   const [homeHero, setHomeHero] = useState(settings.homeHero);
+  const [gameBg, setGameBg] = useState(settings.gameBg);
   const [tiers, setTiers] = useState<TierBand[]>(() => structuredClone(settings.tierConfig ?? DEFAULT_TIER_CONFIG));
   const { busy, msg, run } = useSaver(reload);
   const setTier = (i: number, patch: Partial<TierBand>) => setTiers((t) => t.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -700,6 +701,15 @@ function LookForm() {
           <div className="flex gap-2">
             <ImagePick folder="home" onUrl={setHomeHero} />
             {homeHero && <button type="button" className={ghost} onClick={() => setHomeHero(undefined)}>Remover</button>}
+          </div>
+        </div>
+        <div className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
+          <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Foto de fundo do Cardslock Game</span>
+          <p className="text-xs text-zinc-400">Troca só a foto do salão; a luz do lampião, a mesa, a fumaça e o copo continuam por cima. Sem foto, fica o bar desenhado.</p>
+          {gameBg && <img src={gameBg} alt="Foto de fundo atual do Cardslock Game" className="h-28 rounded-lg object-cover" />}
+          <div className="flex gap-2">
+            <ImagePick folder="bg" onUrl={setGameBg} />
+            {gameBg && <button type="button" className={ghost} onClick={() => setGameBg(undefined)}>Remover</button>}
           </div>
         </div>
       </div>
@@ -719,7 +729,7 @@ function LookForm() {
         ))}
       </div>
       <div className="flex items-center gap-3 lg:col-span-2">
-        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { bg: bg ?? null, homeHero: homeHero ?? null, tierConfig: tiers }), "Aparência salva!")}>
+        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { bg: bg ?? null, homeHero: homeHero ?? null, gameBg: gameBg ?? null, tierConfig: tiers }), "Aparência salva!")}>
           {busy ? "Salvando…" : "Salvar aparência"}
         </button>
         <Toast msg={msg} />

@@ -113,6 +113,7 @@ async function appData(env: Env): Promise<Response> {
       tierConfig: s.tierConfig ?? undefined,
       bg: bg ? { ...bg, imageUrl: imgUrl((s.bgImageKey as string) ?? null) } : undefined,
       homeHero: imgUrl((s.homeHeroKey as string) ?? null),
+      gameBg: imgUrl((s.gameBgKey as string) ?? null),
       game: s.game ?? undefined,
     },
   });
@@ -202,6 +203,8 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
     if (b.tierConfig !== undefined) rows.tierConfig = b.tierConfig;
     if (b.bg !== undefined) { const bg = b.bg as Record<string, unknown> | null; rows.bg = bg ? { ...bg, imageUrl: "" } : null; rows.bgImageKey = keyOf(bg?.imageUrl); }
     if (b.homeHero !== undefined) rows.homeHeroKey = keyOf(b.homeHero);
+    // foto do salão do Cardslock Game: só imagem já enviada ao R2 (/img/...); qualquer outra coisa limpa
+    if (b.gameBg !== undefined) rows.gameBgKey = keyOf(b.gameBg);
     if (b.game !== undefined) {
       const game = sanitizeGameConfig(b.game);
       if (!game) return bad("configuração do jogo inválida");
