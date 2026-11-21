@@ -135,10 +135,12 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
 
   return (
     // altura da tela menos o menu do site e o respiro da página: tudo cabe sem rolar
-    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-5 text-dl-text lg:h-[calc(100dvh-10rem)] lg:min-h-128 lg:flex-row lg:gap-6">
+    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-5 text-dl-text lg:h-[calc(100dvh-10rem)] lg:min-h-128 lg:flex-row lg:gap-6 2xl:max-w-400">
       <FullscreenButton label={t.ui.fullscreen} className={`absolute top-0 right-0 z-30 ${fade}`} />
+      {/* calha vazia do tamanho da prateleira de baralhos, para o centro do lobby ficar no centro da tela */}
+      <div aria-hidden="true" className="hidden xl:block xl:w-60 xl:shrink-0" />
 
-      <div className="relative flex min-w-0 flex-1 flex-col items-center justify-between gap-3 lg:min-h-0">
+      <div className="@container relative flex min-w-0 flex-1 flex-col items-center justify-between gap-3 lg:min-h-0">
         {/* luz do lampião sobre o leque */}
         {/* ao jogar, a luz do lampião sobe e some (a câmera está descendo) */}
         <motion.span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-full bg-radial-[ellipse_60%_45%_at_50%_40%] from-amber-200/12 via-amber-500/5 to-transparent to-70%"
@@ -166,7 +168,7 @@ export function DeckLobby({ book, versions, deck, look, kit, odds, onPick, onNew
         {/* o leque: 12 posições em arco; vaga vazia é o verso do baralho apagado. A largura da carta vem da altura que sobra. */}
         {/* na saída, as cartas despencam em queda livre até a borda de baixo da tela, por cima do escuro */}
         <ol aria-label={t.deck.list} onPointerLeave={() => setHot(null)}
-          className={`relative h-[calc(var(--w)*1.46+3.5rem)] w-full max-w-4xl shrink-0 [--gap:min(4.4rem,6.5vw)] ${leaving ? "pointer-events-none z-50" : ""} [--w:clamp(4.4rem,min(14vw,calc((100dvh-41rem)/1.46)),10rem)]`}>
+          className={`relative h-[calc(var(--w)*1.46+3.5rem)] w-full max-w-4xl shrink-0 [--gap:min(4.4rem,6.5vw)] lg:[--gap:min(4.4rem,calc((100cqw-var(--w))/12))] ${leaving ? "pointer-events-none z-50" : ""} [--w:clamp(4.4rem,min(14vw,calc((100dvh-41rem)/1.46)),10rem)]`}>
           {Array.from({ length: DECK_SIZE }, (_, i) => {
             const c = sorted[i];
             const k = i - mid;
