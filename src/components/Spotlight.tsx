@@ -4,7 +4,7 @@ import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { STAT_KEYS, getPlayerHistory, getPlayerOvr, getPlayerTrend, isMainCard, teamOf, useLabel } from "../lib/cards";
+import { STAT_KEYS, getPlayerHistory, getPlayerOvr, getPlayerTrend, isAltHero, isMainCard, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
@@ -118,7 +118,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             <div ref={flashRef} aria-hidden="true" className="pointer-events-none absolute -inset-16 rounded-full opacity-0" style={{ background: `radial-gradient(circle, ${tier.hi} 0%, ${tier.c}99 30%, transparent 68%)` }} />
           )}
           <div ref={cardRef} className="relative">
-            <Card player={player} variant="editor" />
+            <Card player={player} variant="editor" signature={isMainCard(player) && versions.some(isAltHero)} />
           </div>
         </motion.div>
 
@@ -177,7 +177,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
                     onClick={() => onSwitch(v.id)}
                     className={pill(v.id === player.id)}
                   >
-                    {isMainCard(v) ? t.main : v.special ? t.special : t.version} · {teamOf(teams, v).tag}
+                    {isAltHero(v) ? v.hero : `${isMainCard(v) ? t.main : v.special ? t.special : t.version} · ${isMainCard(v) && versions.some(isAltHero) ? v.hero : teamOf(teams, v).tag}`}
                   </button>
                 ))}
               </div>

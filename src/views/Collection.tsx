@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useDeferredValue, useState } from "react";
 import { useData } from "../lib/data";
-import { getPlayerOvr, isMainCard, teamOf, useLabel } from "../lib/cards";
+import { getPlayerOvr, isAltHero, isMainCard, teamOf, useLabel } from "../lib/cards";
 import { Card } from "../components/Card";
 import { strings, useT } from "../lib/i18n";
 import { easeOut, field, pageTitle, pill, primaryBtn } from "../lib/ui";
@@ -10,6 +10,7 @@ import { addOwned, useMyCards } from "../lib/myCards";
 import { SignInOptions } from "./Login";
 
 type Mode = "mine" | "all";
+type HeroMode = "signature" | "every";
 type SortKey = "ovr" | "name" | "MIR" | "MAC" | "SUP" | "MOV" | "POL" | "CON";
 const PAGE = 24;
 
@@ -17,7 +18,11 @@ const S = strings({
   pt: {
     title: "Coleção",
     count: (n: number) => `${n} ${n === 1 ? "carta" : "cartas"}`,
-    progress: (n: number, total: number) => `${n} de ${total} cartas na sua coleção`,
+    progress: (n: number, total: number) => `Assinatura: ${n} de ${total}`,
+    progressAlt: (n: number, total: number) => `Heróis jogados: ${n} de ${total}`,
+    heroMode: "Quais heróis",
+    signature: "Só herói de assinatura",
+    every: "Todos os heróis",
     mine: "Minha coleção",
     all: "Ver todas as cartas",
     view: "O que mostrar",
@@ -30,7 +35,7 @@ const S = strings({
     team: "Time",
     allTeams: "Todos os times",
     hero: "Herói",
-    allHeroes: "Todos os heróis",
+    allHeroes: "Qualquer herói",
     role: "Role",
     allRoles: "Todas as roles",
     sort: "Ordenar",
@@ -43,7 +48,11 @@ const S = strings({
   en: {
     title: "Collection",
     count: (n: number) => `${n} ${n === 1 ? "card" : "cards"}`,
-    progress: (n: number, total: number) => `${n} of ${total} cards in your collection`,
+    progress: (n: number, total: number) => `Signature: ${n} of ${total}`,
+    progressAlt: (n: number, total: number) => `Other heroes: ${n} of ${total}`,
+    heroMode: "Which heroes",
+    signature: "Signature hero only",
+    every: "All heroes",
     mine: "My collection",
     all: "See all cards",
     view: "What to show",
@@ -56,7 +65,7 @@ const S = strings({
     team: "Team",
     allTeams: "All teams",
     hero: "Hero",
-    allHeroes: "All heroes",
+    allHeroes: "Any hero",
     role: "Role",
     allRoles: "All roles",
     sort: "Sort",
@@ -69,7 +78,11 @@ const S = strings({
   es: {
     title: "Colección",
     count: (n: number) => `${n} ${n === 1 ? "carta" : "cartas"}`,
-    progress: (n: number, total: number) => `${n} de ${total} cartas en tu colección`,
+    progress: (n: number, total: number) => `Firma: ${n} de ${total}`,
+    progressAlt: (n: number, total: number) => `Otros héroes: ${n} de ${total}`,
+    heroMode: "Qué héroes",
+    signature: "Solo héroe de firma",
+    every: "Todos los héroes",
     mine: "Mi colección",
     all: "Ver todas las cartas",
     view: "Qué mostrar",
@@ -82,7 +95,7 @@ const S = strings({
     team: "Equipo",
     allTeams: "Todos los equipos",
     hero: "Héroe",
-    allHeroes: "Todos los héroes",
+    allHeroes: "Cualquier héroe",
     role: "Rol",
     allRoles: "Todos los roles",
     sort: "Ordenar",
@@ -99,6 +112,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   const label = useLabel();
   const { teams, players, me } = useData();
   const [mode, setMode] = useState<Mode>("mine");
+  const [heroMode, setHeroMode] = useState<HeroMode>("signature");
   // ids das cartas que a pessoa tem; null enquanto carrega
   const { owned } = useMyCards();
   const [q, setQ] = useState("");
@@ -116,9 +130,16 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
 
   const heroes = [...new Set(players.map((p) => p.hero))].sort();
   const roles = [...new Set(players.map((p) => p.position))].sort();
+  const every = heroMode === "every";
+  // jogadores com cartas de heróis jogados: a principal ganha a tag de assinatura quando elas aparecem junto
+  const withAlts = new Set(players.filter(isAltHero).map((p) => p.variantOf!));
+  const signatures = players.filter((p) => !isAltHero(p));
+  const alts = players.filter(isAltHero);
   const list = players
-    // na sua coleção entram todas as versões que você tem; em "todas", só a principal (ou todas, se marcar)
-    .filter((p) => (mine ? has(p.id) && (!onlySpecial || p.special) : onlySpecial ? p.special : allVersions || isMainCard(p)) && (team === "ALL" || p.teamId === team) && (hero === "ALL" || p.hero === hero) && (role === "ALL" || p.position === role))
+    // herói jogado só aparece em "todos os heróis"
+    .filter((p) => every || !isAltHero(p))
+    // na sua coleção entram todas as versões que você tem; em "todas", só a principal (ou as outras versões, se marcar)
+    .filter((p) => (mine ? has(p.id) && (!onlySpecial || p.special) : onlySpecial ? p.special : isMainCard(p) || isAltHero(p) || allVersions) && (team === "ALL" || p.teamId === team) && (hero === "ALL" || p.hero === hero) && (role === "ALL" || p.position === role))
     .filter((p) => !query || `${p.name} ${p.hero} ${p.position} ${teamOf(teams, p).name}`.toLowerCase().includes(query))
     .sort((a, b) => (sort === "name" ? a.name.localeCompare(b.name) : sort === "ovr" ? getPlayerOvr(b) - getPlayerOvr(a) : b.stats[sort] - a.stats[sort]));
 
@@ -127,14 +148,29 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
       <div className="noir-glass space-y-4 rounded-2xl p-5 sm:p-7">
         <div>
           <h1 className={pageTitle}>{t.title}</h1>
-          <p className="mt-1.5 text-xs text-zinc-400">{me && owned ? t.progress(owned.size, players.length) : (me || !mine) && t.count(list.length)}</p>
+          <p className="mt-1.5 text-xs text-zinc-400">
+            {me && owned
+              ? <>{t.progress(signatures.filter((p) => owned.has(p.id)).length, signatures.length)}{alts.length > 0 && <> · {t.progressAlt(alts.filter((p) => owned.has(p.id)).length, alts.length)}</>}</>
+              : (me || !mine) && t.count(list.length)}
+          </p>
         </div>
-        <div role="group" aria-label={t.view} className="flex flex-wrap gap-2">
-          {(["mine", "all"] as const).map((m) => (
-            <button key={m} type="button" aria-pressed={mode === m} onClick={() => { setMode(m); setLimit(PAGE); }} className={pill(mode === m)}>
-              {t[m]}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <div role="group" aria-label={t.view} className="flex flex-wrap gap-2">
+            {(["mine", "all"] as const).map((m) => (
+              <button key={m} type="button" aria-pressed={mode === m} onClick={() => { setMode(m); setLimit(PAGE); }} className={pill(mode === m)}>
+                {t[m]}
+              </button>
+            ))}
+          </div>
+          {alts.length > 0 && (
+            <div role="group" aria-label={t.heroMode} className="flex flex-wrap gap-2">
+              {(["signature", "every"] as const).map((m) => (
+                <button key={m} type="button" aria-pressed={heroMode === m} onClick={() => { setHeroMode(m); setLimit(PAGE); }} className={pill(heroMode === m)}>
+                  {t[m]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {me ? <RedeemForm onRedeemed={addOwned} /> : mine && (
           <div className="flex max-w-sm flex-col gap-3">
@@ -189,7 +225,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
             <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }} transition={{ duration: 0.2, ease: easeOut }}>
               {/* em "todas", a carta que você não tem fica em preto e branco; no destaque ela aparece normal */}
               <div className={me && !mine && !has(p.id) ? "opacity-80 grayscale transition hover:opacity-100" : undefined}>
-                <Card player={p} variant="medium" onOpen={() => onOpenCard(p.id)} />
+                <Card player={p} variant="medium" signature={every && isMainCard(p) && withAlts.has(p.id)} onOpen={() => onOpenCard(p.id)} />
               </div>
             </motion.div>
           ))}

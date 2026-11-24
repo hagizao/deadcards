@@ -11,14 +11,15 @@ import { TrendBadge } from "./TrendBadge";
 type Variant = "team" | "medium" | "editor";
 
 const S = strings({
-  pt: { view: "Visualizar Carta", viewOf: (name: string) => `Visualizar carta de ${name}` },
-  en: { view: "View Card", viewOf: (name: string) => `View ${name}'s card` },
-  es: { view: "Ver Carta", viewOf: (name: string) => `Ver la carta de ${name}` },
+  pt: { view: "Visualizar Carta", viewOf: (name: string) => `Visualizar carta de ${name}`, signature: "Assinatura" },
+  en: { view: "View Card", viewOf: (name: string) => `View ${name}'s card`, signature: "Signature" },
+  es: { view: "Ver Carta", viewOf: (name: string) => `Ver la carta de ${name}`, signature: "Firma" },
 });
 
 const STAT_ORDER = ["MIR", "MOV", "MAC", "POL", "SUP", "CON"] as const;
 
-export function Card({ player, variant = "team", onOpen }: { player: Player; variant?: Variant; onOpen?: () => void }) {
+/** `signature`: mostra a tag de herói de assinatura (onde as cartas de heróis jogados aparecem junto). */
+export function Card({ player, variant = "team", onOpen, signature }: { player: Player; variant?: Variant; onOpen?: () => void; signature?: boolean }) {
   const { teams, settings, heroArt } = useData();
   const t = useT(S);
   const label = useLabel();
@@ -100,6 +101,12 @@ export function Card({ player, variant = "team", onOpen }: { player: Player; var
                 <span className="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">{team.tag || "FA"}</span>
               )}
             </div>
+            {signature && (
+              <span className="flex items-center gap-1 rounded-sm bg-amber-300 px-1.5 py-0.5 text-[9px] font-black tracking-widest text-zinc-950 uppercase shadow-[0_0_12px_rgb(252_211_77/0.6)]">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="size-2.5 fill-current"><path d="m12 2 3 7 7 .6-5.3 4.7 1.6 7.2L12 17.8 5.7 21.5l1.6-7.2L2 9.6 9 9z" /></svg>
+                {t.signature}
+              </span>
+            )}
           </div>
 
           <div className={`relative z-10 mt-auto ${medium ? "pb-5" : editor ? "pb-9" : "pb-8"}`}>
