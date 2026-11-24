@@ -86,6 +86,9 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
           <Particles tierKey={rk} />
           {player.special && !rk.noSweep && <div className="sp-card-fx" />}
 
+          {/* herói de assinatura: faixa dourada na diagonal do canto superior direito */}
+          {signature && <div className="sig-ribbon"><span>{t.signature}</span></div>}
+
           <div className="relative z-10 flex items-start justify-between gap-2">
             <div className="flex flex-col items-start">
               <div className="flex items-center gap-1.5">
@@ -101,13 +104,6 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
                 <span className="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">{team.tag || "FA"}</span>
               )}
             </div>
-            {/* herói de assinatura: selo dourado com estrela, sem texto em cima da arte */}
-            {signature && (
-              <span role="img" aria-label={t.signature} title={t.signature}
-                className={`${editor ? "size-9" : medium ? "size-6" : "size-7"} flex shrink-0 items-center justify-center rounded-full bg-linear-to-br from-amber-100 via-amber-300 to-amber-600 text-amber-950 shadow-[0_0_14px_rgb(252_211_77/0.55)] ring-1 ring-amber-100/70`}>
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[55%] fill-current drop-shadow-[0_1px_0_rgb(255_255_255/0.4)]"><path d="m12 2 3 7 7 .6-5.3 4.7 1.6 7.2L12 17.8 5.7 21.5l1.6-7.2L2 9.6 9 9z" /></svg>
-              </span>
-            )}
           </div>
 
           <div className={`relative z-10 mt-auto ${medium ? "pb-5" : editor ? "pb-9" : "pb-8"}`}>

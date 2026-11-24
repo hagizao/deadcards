@@ -148,6 +148,16 @@ function PlayedHeroes({ main, onOpen }: { main: Player; onOpen: (id: string) => 
       special: undefined, specialText: undefined, frame: undefined, art: undefined, inactive: undefined };
     run(() => api.save("players", id, body), `Carta de ${main.name} com ${hero} criada (OVR ${ovr}).`);
   };
+  // depois de mudar a principal (atributos, OVR ou trocar qual é a principal), as cartas de heróis jogados voltam a ficar ALT_HERO_DROP abaixo
+  const ovr = Math.max(1, getPlayerOvr(main) - ALT_HERO_DROP);
+  const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, main.stats[k] - ALT_HERO_DROP)])) as Stats;
+  const stale = [...byHero.values()].filter((c) => getPlayerOvr(c) !== ovr || STAT_KEYS.some((k) => c.stats[k] !== stats[k]));
+  const resync = () => run(async () => {
+    for (const c of stale) {
+      const history = [...c.history.filter((h) => h.date !== today()), { date: today(), ovr }];
+      await api.save("players", c.id, { ...c, stats, ovr, history });
+    }
+  }, `${stale.length} ${stale.length === 1 ? "carta atualizada" : "cartas atualizadas"} para OVR ${ovr}.`);
   return (
     <div className="space-y-2 rounded-2xl bg-zinc-950/40 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -155,7 +165,15 @@ function PlayedHeroes({ main, onOpen }: { main: Player; onOpen: (id: string) => 
           Heróis jogados <span className="text-zinc-100">{byHero.size}</span>
           <span className="ml-2 tracking-normal normal-case">clique para criar a carta ({ALT_HERO_DROP} abaixo da assinatura) ou abrir a que já existe</span>
         </span>
-        <input className={`${input} max-w-48 py-1.5`} placeholder="Buscar herói" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="flex flex-wrap items-center gap-2">
+          {stale.length > 0 && (
+            <button type="button" disabled={busy} onClick={resync} className={`${chip} bg-amber-300 text-zinc-950 hover:bg-amber-200 disabled:opacity-50`}
+              title={`Deixa as cartas de heróis jogados com tudo ${ALT_HERO_DROP} abaixo desta carta`}>
+              Recalcular {stale.length} (assinatura − {ALT_HERO_DROP})
+            </button>
+          )}
+          <input className={`${input} max-w-48 py-1.5`} placeholder="Buscar herói" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
       </div>
       <div className="grid max-h-44 grid-cols-6 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-9">
         {heroNames.filter((h) => h !== main.hero && h.toLowerCase().includes(q.toLowerCase()))
