@@ -1,5 +1,6 @@
 import { useState, type RefObject } from "react";
 import { strings, useT } from "../lib/i18n";
+import { captureCard, downloadBlob, pngName } from "../lib/cardImage";
 
 const S = strings({
   pt: { export: "Exportar PNG", saving: "Exportando…", error: "Não foi possível exportar a carta. Tente de novo." },
@@ -18,22 +19,7 @@ export function CardExportButton({ cardRef, name, disabled }: { cardRef: RefObje
     setExporting(true);
     setFailed(false);
     try {
-      const { toBlob } = await import("html-to-image");
-      await document.fonts.ready;
-      const blob = await toBlob(card, {
-        pixelRatio: 2,
-        style: { transform: "none", filter: "none" },
-        filter: (node) => !(node instanceof Element && node.matches(".rk-particles, .rk-glint, .sp-card-fx, .card-hover-overlay")),
-      });
-      if (!blob?.size) throw new Error("Empty PNG");
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `deadcards-${name.trim().replace(/[^\p{L}\p{N}_-]+/gu, "-").slice(0, 80) || "card"}.png`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadBlob(await captureCard(card), pngName(name));
     } catch {
       setFailed(true);
     } finally {
