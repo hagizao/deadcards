@@ -75,3 +75,30 @@
   from { transform: scale(0.6); opacity: 1; }
   to { transform: scale(1.6); opacity: 0; }
 }
+
+/* pack fechado: embalagem metalizada com dentes em cima e embaixo e um brilho que passa */
+@utility pack-foil {
+  --crimp: 7px;
+  background: linear-gradient(155deg, #26211b 0%, #4a4033 38%, #1d1a16 62%, #3a3229 100%);
+  clip-path: polygon(
+    0 var(--crimp), 5% 0, 10% var(--crimp), 15% 0, 20% var(--crimp), 25% 0, 30% var(--crimp), 35% 0, 40% var(--crimp), 45% 0, 50% var(--crimp), 55% 0, 60% var(--crimp), 65% 0, 70% var(--crimp), 75% 0, 80% var(--crimp), 85% 0, 90% var(--crimp), 95% 0, 100% var(--crimp),
+    100% calc(100% - var(--crimp)), 95% 100%, 90% calc(100% - var(--crimp)), 85% 100%, 80% calc(100% - var(--crimp)), 75% 100%, 70% calc(100% - var(--crimp)), 65% 100%, 60% calc(100% - var(--crimp)), 55% 100%, 50% calc(100% - var(--crimp)), 45% 100%, 40% calc(100% - var(--crimp)), 35% 100%, 30% calc(100% - var(--crimp)), 25% 100%, 20% calc(100% - var(--crimp)), 15% 100%, 10% calc(100% - var(--crimp)), 5% 100%, 0 calc(100% - var(--crimp))
+  );
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -20% -60%;
+    background: linear-gradient(105deg, transparent 42%, rgb(255 239 215 / 0.28) 50%, transparent 58%);
+    transform: translateX(-60%);
+    animation: pack-shine 3.2s var(--ease-out) infinite;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &::after { animation: none; opacity: 0; }
+  }
+}
+
+@keyframes pack-shine {
+  0%, 55% { transform: translateX(-60%); }
+  100% { transform: translateX(60%); }
+}

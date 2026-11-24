@@ -8,12 +8,15 @@ import { Card } from "../components/Card";
 import { TeamLogo } from "../components/TeamLogo";
 import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
+import { PackArt } from "../components/Pack";
+import { DEFAULT_PACK_ODDS, PACK_KINDS, PACK_NAME_MAX, drawCard, kindChances, packKind, packPool, type PackKind, type PackType } from "../lib/packs";
 
 const SECTIONS = [
   { id: "card", label: "Carta" },
   { id: "teams", label: "Times" },
   { id: "heroes", label: "Heróis" },
   { id: "look", label: "Aparência" },
+  { id: "packs", label: "Packs" },
   { id: "codes", label: "Códigos" },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
@@ -118,6 +121,7 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
           {section === "teams" && <TeamsForm />}
           {section === "heroes" && <HeroesForm />}
           {section === "look" && <LookForm />}
+          {section === "packs" && <PacksForm />}
           {section === "codes" && <CodesForm />}
         </motion.div>
       </AnimatePresence>
@@ -645,7 +649,148 @@ function LookForm() {
   );
 }
 
-type Code = { code: string; player_id: string; max_uses: number; uses: number; starts_at: number | null; expires_at: number | null };
+const KIND_LABEL: Record<PackKind, string> = { alt: "Herói jogado", signature: "Herói de assinatura", special: "Especial e outras versões" };
+const pct = (n: number) => `${(n * 100).toLocaleString("pt-BR", { maximumFractionDigits: n < 0.01 ? 2 : 1 })}%`;
+
+/** Tipos de pack: nome, arte, chances por tipo de carta e times do pool, com a prévia das chances reais. */
+function PacksForm() {
+  const { players, teams } = useData();
+  const [types, setTypes] = useState<PackType[]>([]);
+  const [d, setD] = useState<PackType | null>(null);
+  const [sim, setSim] = useState<{ kind: Record<PackKind, number>; top: [string, number][] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const load = (pick?: string) => api.packTypes().then((t) => {
+    setTypes(t);
+    setD((cur) => structuredClone(t.find((x) => x.id === (pick ?? cur?.id)) ?? t[0] ?? null));
+  }).catch((e: Error) => setMsg(`Erro: ${e.message}`));
+  useEffect(() => { load(); }, []);
+
+  const blank = (): PackType => ({ id: newId("pack"), name: "Novo pack", cards: 1, odds: { ...DEFAULT_PACK_ODDS }, teams: [] });
+  const set = (patch: Partial<PackType>) => { setD((p) => (p ? { ...p, ...patch } : p)); setSim(null); };
+  const run = async (fn: () => Promise<unknown>, ok: string, pick?: string) => {
+    setBusy(true);
+    setMsg("");
+    try { await fn(); await load(pick); setMsg(ok); } catch (e) { setMsg(`Erro: ${(e as Error).message}`); } finally { setBusy(false); }
+  };
+
+  // prévia para quem ainda não tem nenhuma carta do pool
+  const pool = d ? packPool(players, d, new Set()) : [];
+  const chances = d ? kindChances(pool, d.odds) : null;
+  const sum = d ? PACK_KINDS.reduce((a, k) => a + d.odds[k], 0) : 0;
+  const simulate = () => {
+    if (!d) return;
+    const kind = { alt: 0, signature: 0, special: 0 } as Record<PackKind, number>;
+    const hits = new Map<string, number>();
+    const N = 1000;
+    for (let i = 0; i < N; i++) {
+      const c = drawCard(pool, d.odds);
+      if (!c) break;
+      kind[packKind(c)]++;
+      hits.set(c.id, (hits.get(c.id) ?? 0) + 1);
+    }
+    const name = (id: string) => { const p = players.find((x) => x.id === id); return p ? `${p.name} · ${p.hero}` : id; };
+    setSim({ kind, top: [...hits].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, n]) => [name(id), n]) });
+  };
+
+  return (
+    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="noir-glass space-y-6 rounded-3xl p-5 sm:p-7">
+        <div className="flex flex-wrap items-center gap-2">
+          {types.map((t) => (
+            <button key={t.id} type="button" aria-pressed={d?.id === t.id} onClick={() => { setD(structuredClone(t)); setSim(null); }}
+              className={`${chip} ${d?.id === t.id ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>{t.name}</button>
+          ))}
+          <button type="button" onClick={() => { setD(blank()); setSim(null); }} className={`${chip} border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white`}>+ Novo pack</button>
+        </div>
+
+        {d && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Nome"><input className={input} value={d.name} maxLength={PACK_NAME_MAX} onChange={(e) => set({ name: e.target.value })} /></Field>
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Arte da embalagem</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <ImagePick folder="packs" onUrl={(url) => set({ art: url })} />
+                  {d.art && <button type="button" className={ghost} onClick={() => set({ art: undefined })}>Usar padrão</button>}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+                Chances por tipo de carta <span className={sum === 100 ? "text-emerald-300" : "text-red-300"}>{sum}/100</span>
+              </span>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {PACK_KINDS.map((k) => (
+                  <Field key={k} label={KIND_LABEL[k]}>
+                    <input type="number" min={0} max={100} className={input} value={d.odds[k]} onChange={(e) => set({ odds: { ...d.odds, [k]: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) } })} />
+                  </Field>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Times do pool {d.teams.length === 0 && <span className="text-zinc-100">· todos</span>}</span>
+              <div className="flex flex-wrap gap-2">
+                {teams.map((t) => {
+                  const on = d.teams.includes(t.id);
+                  return (
+                    <button key={t.id} type="button" aria-pressed={on} onClick={() => set({ teams: on ? d.teams.filter((x) => x !== t.id) : [...d.teams, t.id] })}
+                      className={`${chip} ${on ? "bg-amber-300 text-zinc-950 hover:bg-amber-200" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>{t.tag}</button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {chances && (
+              <div className="space-y-2 rounded-2xl bg-zinc-950/40 p-4">
+                <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Chances reais para quem não tem nenhuma carta · {pool.length} cartas no pool</span>
+                <ul className="grid gap-1 text-sm text-zinc-200">
+                  {PACK_KINDS.map((k) => (
+                    <li key={k} className="flex flex-wrap justify-between gap-2">
+                      <span>{KIND_LABEL[k]} <span className="text-zinc-500">({chances[k].cards})</span></span>
+                      <span className="font-bold">{pct(chances[k].chance)}{chances[k].cards > 0 && <span className="font-normal text-zinc-400"> · cada carta {pct(chances[k].chance / chances[k].cards)}</span>}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button type="button" onClick={simulate} disabled={!pool.length || sum !== 100} className={ghost}>Simular 1000 aberturas</button>
+                  {sim && (
+                    <p className="text-xs text-zinc-300">
+                      {PACK_KINDS.map((k) => `${KIND_LABEL[k]}: ${sim.kind[k]}`).join(" · ")}
+                      <span className="block text-zinc-500">Mais saíram: {sim.top.map(([n, c]) => `${n} (${c})`).join(", ")}</span>
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500">Quem já tem cartas do pool não tira repetida: a chance delas passa para as outras. O pack de teste fica no seu inventário na aba Resgatar.</p>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" className={primary} disabled={busy || sum !== 100 || !d.name.trim()}
+                onClick={() => run(() => api.savePackType(d.id, { name: d.name.trim(), art: d.art, odds: d.odds, teams: d.teams }), `Pack "${d.name.trim()}" salvo!`, d.id)}>Salvar pack</button>
+              {types.some((t) => t.id === d.id) && (
+                <button type="button" className={danger} disabled={busy}
+                  onClick={() => { if (confirm(`Apagar o pack "${d.name}"?`)) run(() => api.removePackType(d.id), "Pack apagado.", ""); }}>Apagar</button>
+              )}
+              <Toast msg={msg} />
+            </div>
+          </>
+        )}
+        {!d && <Toast msg={msg} />}
+      </div>
+      {d && (
+        <div className="flex flex-col items-center gap-3 lg:sticky lg:top-24">
+          <PackArt name={d.name || "Pack"} art={d.art} size="lg" />
+          <span className="text-xs text-zinc-400">1 carta por pack</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type Code = { code: string; player_id: string | null; pack_type_id: string | null; max_uses: number; uses: number; starts_at: number | null; expires_at: number | null };
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => ALPHABET[b % ALPHABET.length]).join("");
@@ -666,6 +811,10 @@ function CodesForm() {
   const [now, setNow] = useState(0);
   const [code, setCode] = useState(randomCode);
   const [pick, setPick] = useState("");
+  // o código dá uma carta ou um pack (que vai fechado para o inventário)
+  const [gives, setGives] = useState<"card" | "pack">("card");
+  const [packTypes, setPackTypes] = useState<PackType[]>([]);
+  const [packPick, setPackPick] = useState("");
   const [maxUses, setMaxUses] = useState(1);
   const [startsAt, setStartsAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -675,6 +824,7 @@ function CodesForm() {
   const label = (p: Player) => `${p.name} · ${p.hero} · ${teams.find((t) => t.id === p.teamId)?.tag ?? ""}`;
   const byLabel = new Map(players.filter((p) => !isRetired(p)).map((p) => [label(p), p.id]));
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? id;
+  const giftOf = (c: Code) => (c.pack_type_id ? `Pack · ${packTypes.find((t) => t.id === c.pack_type_id)?.name ?? c.pack_type_id}` : nameOf(c.player_id ?? ""));
 
   const load = () =>
     fetch("/api/codes")
@@ -682,17 +832,21 @@ function CodesForm() {
       .then((c) => { setCodes(c); setNow(Math.floor(Date.now() / 1000)); })
       .catch((e: Error) => setMsg(`Erro: ${e.message}`));
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.packTypes().then((t) => { setPackTypes(t); setPackPick((cur) => cur || t[0]?.id || ""); }).catch(() => setPackTypes([]));
+  }, []);
 
   const expireIn = (ms: number | null) => setExpiresAt(ms === null ? "" : localInput(new Date(Date.now() + ms)));
 
   const create = async () => {
-    const playerId = byLabel.get(pick);
-    if (!playerId) return setMsg("Erro: escolha uma carta da lista");
+    const playerId = gives === "card" ? byLabel.get(pick) : undefined;
+    if (gives === "card" && !playerId) return setMsg("Erro: escolha uma carta da lista");
+    if (gives === "pack" && !packPick) return setMsg("Erro: crie um pack na seção Packs");
     setBusy(true);
     setMsg("");
     try {
-      await api.createCode({ code, playerId, maxUses, startsAt: toTs(startsAt), expiresAt: toTs(expiresAt) });
+      await api.createCode({ code, ...(gives === "card" ? { playerId } : { packTypeId: packPick }), maxUses, startsAt: toTs(startsAt), expiresAt: toTs(expiresAt) });
       setMsg(`Código ${code} criado`);
       setCode(randomCode());
       await load();
@@ -720,7 +874,7 @@ function CodesForm() {
       <div className="noir-glass space-y-6 rounded-3xl p-5 sm:p-7">
         <div>
           <h2 className="text-lg font-extrabold tracking-[0.12em] text-zinc-100 uppercase">Novo código</h2>
-          <p className="mt-1 text-xs text-zinc-400">Quem digitar o código na aba Resgatar ganha a carta escolhida.</p>
+          <p className="mt-1 text-xs text-zinc-400">Quem digitar o código na aba Resgatar ganha a carta escolhida, ou o pack, que fica fechado no inventário até a pessoa abrir.</p>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
@@ -731,12 +885,28 @@ function CodesForm() {
             </div>
           </Field>
 
-          <Field label="2. Carta">
-            <input list="codes-players" value={pick} onChange={(e) => setPick(e.target.value)} placeholder="Digite o nome do jogador…" className={input} />
-            <datalist id="codes-players">
-              {players.filter((p) => !isRetired(p)).sort((a, b) => a.name.localeCompare(b.name)).map((p) => <option key={p.id} value={label(p)} />)}
-            </datalist>
-          </Field>
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">2. Dá</span>
+              {(["card", "pack"] as const).map((g) => (
+                <button key={g} type="button" aria-pressed={gives === g} onClick={() => setGives(g)}
+                  className={`${quick} ${gives === g ? "border-zinc-100 bg-zinc-100 text-zinc-950 hover:text-zinc-950" : ""}`}>{g === "card" ? "Carta" : "Pack"}</button>
+              ))}
+            </div>
+            {gives === "card" ? (
+              <>
+                <input list="codes-players" value={pick} onChange={(e) => setPick(e.target.value)} placeholder="Digite o nome do jogador…" aria-label="Carta" className={input} />
+                <datalist id="codes-players">
+                  {players.filter((p) => !isRetired(p)).sort((a, b) => a.name.localeCompare(b.name)).map((p) => <option key={p.id} value={label(p)} />)}
+                </datalist>
+              </>
+            ) : (
+              <select value={packPick} onChange={(e) => setPackPick(e.target.value)} aria-label="Pack" className={input}>
+                {packTypes.length === 0 && <option value="">Nenhum pack: crie na seção Packs</option>}
+                {packTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            )}
+          </div>
 
           <Field label="3. Quantas pessoas podem resgatar">
             <div className="flex items-center gap-2">
@@ -764,7 +934,7 @@ function CodesForm() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <button type="button" onClick={create} disabled={busy || !code || !pick} className={primary}>{busy ? "Criando…" : "Criar código"}</button>
+          <button type="button" onClick={create} disabled={busy || !code || (gives === "card" ? !pick : !packPick)} className={primary}>{busy ? "Criando…" : "Criar código"}</button>
           <Toast msg={msg} />
         </div>
       </div>
@@ -777,7 +947,7 @@ function CodesForm() {
           return (
             <div key={c.code} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-zinc-200/10 bg-zinc-900/60 px-4 py-3 text-xs text-zinc-200">
               <span className="font-extrabold tracking-[0.15em] text-zinc-100">{c.code}</span>
-              <span className="max-w-48 truncate">{nameOf(c.player_id)}</span>
+              <span className="max-w-48 truncate">{giftOf(c)}</span>
               <span>{c.uses}/{c.max_uses} usos</span>
               <span className="text-zinc-400">{fmtTs(c.starts_at)} → {fmtTs(c.expires_at)}</span>
               <span className={`font-bold tracking-wider uppercase ${st.cls}`}>{st.label}</span>
