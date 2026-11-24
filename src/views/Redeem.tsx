@@ -126,7 +126,7 @@ export function Redeem({ onOpenCard }: { onOpenCard: (id: string) => void }) {
       )}
 
       <AnimatePresence>
-        {opening && <PackOpening key={opening.id} pack={opening} onClose={closeOpening} onOpened={addOwned} onOpenCard={onOpenCard} />}
+        {opening && <PackOpening key={opening.id} pack={opening} onClose={closeOpening} onOpened={addOwned} />}
       </AnimatePresence>
 
       <AnimatePresence mode="wait">

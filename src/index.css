@@ -102,3 +102,19 @@
   0%, 55% { transform: translateX(-60%); }
   100% { transform: translateX(60%); }
 }
+
+/* raios de luz saindo do pack, na cor da borda da carta (--ray-c / --ray-hi) */
+@utility pack-rays {
+  border-radius: 9999px;
+  background: repeating-conic-gradient(from 0deg, var(--ray-c) 0deg var(--ray-w, 4deg), transparent var(--ray-w, 4deg) var(--ray-step, 20deg));
+  mask: radial-gradient(circle, #000 0%, rgb(0 0 0 / 0.55) 25%, rgb(0 0 0 / 0.15) 48%, transparent 66%);
+  filter: blur(1.5px);
+  animation: pack-rays-spin var(--ray-speed, 24s) linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes pack-rays-spin {
+  to { rotate: 360deg; }
+}
