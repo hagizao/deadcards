@@ -1,11 +1,18 @@
+import { AnimatePresence, motion } from "motion/react";
 import { useState, type FormEvent } from "react";
 import { call, useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
-import { field, primaryBtn } from "../lib/ui";
+import { easeOut, field, pageTitle, primaryBtn } from "../lib/ui";
+import { addOwned } from "../lib/myCards";
+import { Card } from "../components/Card";
+import { SignInOptions } from "./Login";
 
 const S = strings({
   pt: {
     title: "Resgatar código",
+    subtitle: "Digite o código para colocar a carta na sua coleção.",
+    signIn: "Entre para resgatar cartas com um código.",
+    got: "Nova carta na sua coleção",
     placeholder: "Código",
     label: "Código de resgate",
     redeeming: "Resgatando…",
@@ -20,6 +27,9 @@ const S = strings({
   },
   en: {
     title: "Redeem a code",
+    subtitle: "Enter the code to add the card to your collection.",
+    signIn: "Sign in to redeem cards with a code.",
+    got: "New card in your collection",
     placeholder: "Code",
     label: "Redeem code",
     redeeming: "Redeeming…",
@@ -34,6 +44,9 @@ const S = strings({
   },
   es: {
     title: "Canjear código",
+    subtitle: "Escribe el código para sumar la carta a tu colección.",
+    signIn: "Inicia sesión para canjear cartas con un código.",
+    got: "Nueva carta en tu colección",
     placeholder: "Código",
     label: "Código de canje",
     redeeming: "Canjeando…",
@@ -48,8 +61,38 @@ const S = strings({
   },
 });
 
-/** Resgate de carta por código (fica na Coleção). Avisa quem chamou com o id da carta nova. */
-export function RedeemForm({ onRedeemed }: { onRedeemed: (id: string) => void }) {
+/** Aba Resgatar: código vira carta na coleção, e a carta nova aparece grande logo abaixo. */
+export function Redeem({ onOpenCard }: { onOpenCard: (id: string) => void }) {
+  const t = useT(S);
+  const { me, players } = useData();
+  const [last, setLast] = useState<string | null>(null);
+  const card = last ? players.find((p) => p.id === last) : undefined;
+  return (
+    <section className="flex flex-col gap-6">
+      <div className="noir-glass flex flex-col gap-4 rounded-2xl p-5 sm:p-7">
+        <div>
+          <h1 className={pageTitle}>{t.title}</h1>
+          <p className="mt-1.5 text-xs text-zinc-400">{me ? t.subtitle : t.signIn}</p>
+        </div>
+        {me
+          ? <RedeemForm onRedeemed={(id) => { addOwned(id); setLast(id); }} />
+          : <div className="max-w-sm"><SignInOptions /></div>}
+      </div>
+      <AnimatePresence mode="wait">
+        {card && (
+          <motion.div key={card.id} initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.28, ease: easeOut }}
+            className="flex flex-col items-center gap-4">
+            <p className="text-xs font-bold tracking-[0.2em] text-amber-200 uppercase">{t.got}</p>
+            <Card player={card} onOpen={() => onOpenCard(card.id)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+/** Formulário de resgate por código. Avisa quem chamou com o id da carta nova. */
+function RedeemForm({ onRedeemed }: { onRedeemed: (id: string) => void }) {
   const t = useT(S);
   const { players } = useData();
   const [code, setCode] = useState("");
@@ -76,7 +119,6 @@ export function RedeemForm({ onRedeemed }: { onRedeemed: (id: string) => void })
 
   return (
     <form onSubmit={submit} aria-label={t.title} className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.title}</span>
       <input
         value={code}
         onChange={(e) => setCode(e.target.value)}
@@ -86,7 +128,7 @@ export function RedeemForm({ onRedeemed }: { onRedeemed: (id: string) => void })
         autoCapitalize="characters"
         spellCheck={false}
         required
-        className={`${field} w-48 tracking-[0.2em] uppercase placeholder:tracking-normal placeholder:normal-case`}
+        className={`${field} w-56 tracking-[0.2em] uppercase placeholder:tracking-normal placeholder:normal-case`}
       />
       <button type="submit" disabled={busy} className={primaryBtn}>
         {busy ? t.redeeming : t.redeem}

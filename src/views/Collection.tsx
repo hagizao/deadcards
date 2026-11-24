@@ -5,8 +5,7 @@ import { getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from
 import { Card } from "../components/Card";
 import { strings, useT } from "../lib/i18n";
 import { easeOut, field, pageTitle, pill, primaryBtn } from "../lib/ui";
-import { RedeemForm } from "./Redeem";
-import { addOwned, useMyCards } from "../lib/myCards";
+import { useMyCards } from "../lib/myCards";
 import { SignInOptions } from "./Login";
 import { Icon } from "../components/Icon";
 
@@ -25,8 +24,8 @@ const S = strings({
     every: "Todos os heróis",
     mine: "Minha coleção",
     all: "Ver todas as cartas",
-    signIn: "Entre para ver sua coleção e resgatar cartas com um código. Ou só veja todas as cartas.",
-    empty: "Você ainda não tem cartas. Resgate um código acima ou veja todas as cartas.",
+    signIn: "Entre para ver sua coleção. Ou só veja todas as cartas.",
+    empty: "Você ainda não tem cartas. Resgate um código na aba Resgatar ou veja todas as cartas.",
     noMatch: "Nenhuma carta com esses filtros.",
     loading: "Carregando sua coleção…",
     searchPlaceholder: "Buscar jogador, herói, time…",
@@ -52,8 +51,8 @@ const S = strings({
     every: "All heroes",
     mine: "My collection",
     all: "See all cards",
-    signIn: "Sign in to see your collection and redeem cards with a code. Or just browse all cards.",
-    empty: "You don't have any cards yet. Redeem a code above or browse all cards.",
+    signIn: "Sign in to see your collection. Or just browse all cards.",
+    empty: "You don't have any cards yet. Redeem a code in the Redeem tab or browse all cards.",
     noMatch: "No cards match these filters.",
     loading: "Loading your collection…",
     searchPlaceholder: "Search player, hero, team…",
@@ -79,8 +78,8 @@ const S = strings({
     every: "Todos los héroes",
     mine: "Mi colección",
     all: "Ver todas las cartas",
-    signIn: "Inicia sesión para ver tu colección y canjear cartas con un código. O solo mira todas las cartas.",
-    empty: "Todavía no tienes cartas. Canjea un código arriba o mira todas las cartas.",
+    signIn: "Inicia sesión para ver tu colección. O solo mira todas las cartas.",
+    empty: "Todavía no tienes cartas. Canjea un código en la pestaña Canjear o mira todas las cartas.",
     noMatch: "Ninguna carta con esos filtros.",
     loading: "Cargando tu colección…",
     searchPlaceholder: "Buscar jugador, héroe, equipo…",
@@ -163,7 +162,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
             ))}
           </div>
         )}
-        {me ? <RedeemForm onRedeemed={addOwned} /> : mine && (
+        {!me && mine && (
           <div className="flex max-w-sm flex-col gap-3">
             <p className="text-sm text-zinc-300">{t.signIn}</p>
             <SignInOptions />
