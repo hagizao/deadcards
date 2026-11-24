@@ -8,6 +8,7 @@ import { easeOut, field, pageTitle, pill, primaryBtn } from "../lib/ui";
 import { RedeemForm } from "./Redeem";
 import { addOwned, useMyCards } from "../lib/myCards";
 import { SignInOptions } from "./Login";
+import { Icon } from "../components/Icon";
 
 type Mode = "mine" | "all";
 type HeroMode = "signature" | "every";
@@ -16,7 +17,6 @@ const PAGE = 30;
 
 const S = strings({
   pt: {
-    title: "Coleção",
     count: (n: number) => `${n} ${n === 1 ? "carta" : "cartas"}`,
     progress: (n: number, total: number) => `Assinatura: ${n} de ${total}`,
     progressAlt: (n: number, total: number) => `Outras versões: ${n} de ${total}`,
@@ -25,7 +25,6 @@ const S = strings({
     every: "Todos os heróis",
     mine: "Minha coleção",
     all: "Ver todas as cartas",
-    view: "O que mostrar",
     signIn: "Entre para ver sua coleção e resgatar cartas com um código. Ou só veja todas as cartas.",
     empty: "Você ainda não tem cartas. Resgate um código acima ou veja todas as cartas.",
     noMatch: "Nenhuma carta com esses filtros.",
@@ -45,7 +44,6 @@ const S = strings({
     more: (n: number) => `Mostrar mais (${n})`,
   },
   en: {
-    title: "Collection",
     count: (n: number) => `${n} ${n === 1 ? "card" : "cards"}`,
     progress: (n: number, total: number) => `Signature: ${n} of ${total}`,
     progressAlt: (n: number, total: number) => `Other versions: ${n} of ${total}`,
@@ -54,7 +52,6 @@ const S = strings({
     every: "All heroes",
     mine: "My collection",
     all: "See all cards",
-    view: "What to show",
     signIn: "Sign in to see your collection and redeem cards with a code. Or just browse all cards.",
     empty: "You don't have any cards yet. Redeem a code above or browse all cards.",
     noMatch: "No cards match these filters.",
@@ -74,7 +71,6 @@ const S = strings({
     more: (n: number) => `Show more (${n})`,
   },
   es: {
-    title: "Colección",
     count: (n: number) => `${n} ${n === 1 ? "carta" : "cartas"}`,
     progress: (n: number, total: number) => `Firma: ${n} de ${total}`,
     progressAlt: (n: number, total: number) => `Otras versiones: ${n} de ${total}`,
@@ -83,7 +79,6 @@ const S = strings({
     every: "Todos los héroes",
     mine: "Mi colección",
     all: "Ver todas las cartas",
-    view: "Qué mostrar",
     signIn: "Inicia sesión para ver tu colección y canjear cartas con un código. O solo mira todas las cartas.",
     empty: "Todavía no tienes cartas. Canjea un código arriba o mira todas las cartas.",
     noMatch: "Ninguna carta con esos filtros.",
@@ -140,32 +135,32 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   return (
     <section className="space-y-5">
       <div className="noir-glass space-y-4 rounded-2xl p-5 sm:p-7">
-        <div>
-          <h1 className={pageTitle}>{t.title}</h1>
-          <p className="mt-1.5 text-xs text-zinc-400">
-            {me && owned
-              ? <>{t.progress(signatures.filter((p) => owned.has(p.id)).length, signatures.length)}{alts.length > 0 && <> · {t.progressAlt(alts.filter((p) => owned.has(p.id)).length, alts.length)}</>}</>
-              : (me || !mine) && t.count(list.length)}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className={pageTitle}>{mine ? t.mine : t.all}</h1>
+            <p className="mt-1.5 text-xs text-zinc-400">
+              {me && owned
+                ? <>{t.progress(signatures.filter((p) => owned.has(p.id)).length, signatures.length)}{alts.length > 0 && <> · {t.progressAlt(alts.filter((p) => owned.has(p.id)).length, alts.length)}</>}</>
+                : (me || !mine) && t.count(list.length)}
+            </p>
+          </div>
+          {/* ver todas as cartas: à direita, aceso quando ligado; desligado volta para a sua coleção */}
+          <button type="button" aria-pressed={!mine} onClick={() => { setMode(mine ? "all" : "mine"); setLimit(PAGE); }}
+            className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-4 text-xs font-extrabold tracking-widest uppercase transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:scale-95 motion-reduce:transition-none ${
+              mine ? "bg-zinc-800/80 text-zinc-200 hover:bg-zinc-700 hover:text-white" : "bg-amber-300 text-zinc-950 shadow-[0_0_22px_rgb(252_211_77/0.45)] hover:bg-amber-200"}`}>
+            <Icon name="cards" className="size-4" />
+            {t.all}
+          </button>
         </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2">
-          <div role="group" aria-label={t.view} className="flex flex-wrap gap-2">
-            {(["mine", "all"] as const).map((m) => (
-              <button key={m} type="button" aria-pressed={mode === m} onClick={() => { setMode(m); setLimit(PAGE); }} className={pill(mode === m)}>
+        {alts.length > 0 && (
+          <div role="group" aria-label={t.heroMode} className="flex flex-wrap gap-2">
+            {(["signature", "every"] as const).map((m) => (
+              <button key={m} type="button" aria-pressed={heroMode === m} onClick={() => { setHeroMode(m); setLimit(PAGE); }} className={pill(heroMode === m)}>
                 {t[m]}
               </button>
             ))}
           </div>
-          {alts.length > 0 && (
-            <div role="group" aria-label={t.heroMode} className="flex flex-wrap gap-2">
-              {(["signature", "every"] as const).map((m) => (
-                <button key={m} type="button" aria-pressed={heroMode === m} onClick={() => { setHeroMode(m); setLimit(PAGE); }} className={pill(heroMode === m)}>
-                  {t[m]}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
         {me ? <RedeemForm onRedeemed={addOwned} /> : mine && (
           <div className="flex max-w-sm flex-col gap-3">
             <p className="text-sm text-zinc-300">{t.signIn}</p>

@@ -19,13 +19,13 @@ gsap.registerPlugin(SplitText);
 const revealed = new Set<string>();
 
 const S = strings({
-  pt: { favorite: "Favoritar", favorited: "Favorita", limit: `Até ${MAX_FAVORITES} favoritas. Abra uma favorita e desmarque para marcar outra.`, failed: "Não foi possível salvar a favorita.",
+  pt: { notOwned: "Você não possui esta carta", favorite: "Favoritar", favorited: "Favorita", limit: `Até ${MAX_FAVORITES} favoritas. Abra uma favorita e desmarque para marcar outra.`, failed: "Não foi possível salvar a favorita.",
     cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por",
     stats: "Atributos", statNames: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" } },
-  en: { favorite: "Favorite", favorited: "Favorite", limit: `Up to ${MAX_FAVORITES} favorites. Open one and unmark it to pick another.`, failed: "Could not save the favorite.",
+  en: { notOwned: "You don't own this card", favorite: "Favorite", favorited: "Favorite", limit: `Up to ${MAX_FAVORITES} favorites. Open one and unmark it to pick another.`, failed: "Could not save the favorite.",
     cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version", artBy: "Art by",
     stats: "Attributes", statNames: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" } },
-  es: { favorite: "Marcar favorita", favorited: "Favorita", limit: `Hasta ${MAX_FAVORITES} favoritas. Abre una y desmárcala para marcar otra.`, failed: "No se pudo guardar la favorita.",
+  es: { notOwned: "No tienes esta carta", favorite: "Marcar favorita", favorited: "Favorita", limit: `Hasta ${MAX_FAVORITES} favoritas. Abre una y desmárcala para marcar otra.`, failed: "No se pudo guardar la favorita.",
     cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de",
     stats: "Atributos", statNames: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" } },
 });
@@ -127,6 +127,12 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             <div>
               <h2 className="font-display text-3xl font-black tracking-[0.12em] text-dl-text uppercase"><span ref={nameRef} key={player.id + player.name}>{player.name}</span></h2>
               <p className="mt-1 text-sm text-zinc-300">{label(team.name)} ({team.tag}) · {label(player.position || "Flex")} · {player.hero}</p>
+              {me && owned && !owned.has(player.id) && (
+                <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-zinc-800/80 px-3 py-1 text-xs font-bold text-zinc-300">
+                  <span aria-hidden="true" className="size-2 rounded-full bg-zinc-500" />
+                  {t.notOwned}
+                </p>
+              )}
               {player.art?.credit && <ArtCreditLine credit={player.art.credit} label={t.artBy} />}
             </div>
             <button type="button" onClick={onClose} aria-label={t.close} className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-zinc-800/60 text-zinc-300 transition hover:bg-zinc-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:size-9"><Icon name="x" /></button>
@@ -169,21 +175,21 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
           {versions.length > 1 && (
             <div>
               <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.versions} ({versions.length})</h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {versions.map((v) => {
                   const icon = heroIcon(v.hero);
-                  // herói jogado é só o rosto do herói; as outras versões mantêm o rótulo
-                  const text = isAltHero(v) ? null : `${isMainCard(v) ? t.main : v.special ? t.special : t.version}${isMainCard(v) ? "" : ` · ${teamOf(teams, v).tag}`}`;
+                  const on = v.id === player.id;
+                  // herói jogado é só o rosto do herói; principal, especial e versão de outro time ganham legenda
+                  const caption = isAltHero(v) ? null : isMainCard(v) ? t.main : `${v.special ? t.special : t.version} · ${teamOf(teams, v).tag}`;
                   // versão que você não tem fica em preto e branco
                   const missing = !!me && !!owned && !owned.has(v.id);
                   return (
-                    <button key={v.id} type="button" onClick={() => onSwitch(v.id)} aria-pressed={v.id === player.id}
-                      aria-label={text ? `${text} · ${v.hero}` : v.hero} title={v.hero}
-                      className={`${pill(v.id === player.id)} ${text ? "pl-1.5" : "px-1.5"} ${missing ? "grayscale" : ""}`}>
-                      {icon
-                        ? <img src={icon} alt="" className="size-8 rounded-full bg-zinc-950/60 object-cover" />
-                        : !text && <span>{v.hero}</span>}
-                      {text}
+                    <button key={v.id} type="button" onClick={() => onSwitch(v.id)} aria-pressed={on} aria-label={caption ? `${caption} · ${v.hero}` : v.hero} title={v.hero}
+                      className="group flex w-16 cursor-pointer flex-col items-center gap-1 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
+                      <span className={`flex size-14 items-center justify-center overflow-hidden rounded-full bg-zinc-900 transition group-hover:scale-105 group-active:scale-95 motion-reduce:transition-none ${on ? "ring-2 ring-dl-text ring-offset-2 ring-offset-zinc-950" : "ring-1 ring-zinc-200/15"} ${missing ? "opacity-60 grayscale" : ""}`}>
+                        {icon ? <img src={icon} alt="" className="size-full scale-110 object-cover" /> : <span className="text-[10px] font-bold text-zinc-300">{v.hero.slice(0, 3)}</span>}
+                      </span>
+                      {caption && <span className={`max-w-full truncate text-[10px] font-bold tracking-wider uppercase ${on ? "text-dl-text" : "text-zinc-400"}`}>{caption}</span>}
                     </button>
                   );
                 })}

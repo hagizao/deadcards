@@ -131,6 +131,53 @@ function blankPlayer(teamId: string): Player {
   return { id: "", teamId, name: "", position: "Carry", hero: "Abrams", stats, ovr: calculateOVR(stats), c1: "#0e7490", c2: "#082f49", history: [], footer: "Cardslock" };
 }
 
+/**
+ * Heróis jogados pelo jogador, além do de assinatura: cada um vira uma carta-versão com tudo ALT_HERO_DROP abaixo.
+ * Clicar num herói sem carta cria a carta; num que já tem, abre a carta para editar.
+ */
+function PlayedHeroes({ main, onOpen }: { main: Player; onOpen: (id: string) => void }) {
+  const { players, heroNames, heroIcon, reload } = useData();
+  const { busy, msg, run } = useSaver(reload);
+  const [q, setQ] = useState("");
+  const byHero = new Map(cardVersions(players, main).filter(isAltHero).map((c) => [c.hero, c]));
+  const add = (hero: string) => {
+    const id = newId("p");
+    const ovr = Math.max(1, getPlayerOvr(main) - ALT_HERO_DROP);
+    const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, main.stats[k] - ALT_HERO_DROP)])) as Stats;
+    const body: Player = { ...structuredClone(main), id, hero, stats, ovr, variantOf: main.id, altHero: true, history: [{ date: today(), ovr, base: true }],
+      special: undefined, specialText: undefined, frame: undefined, art: undefined, inactive: undefined };
+    run(() => api.save("players", id, body), `Carta de ${main.name} com ${hero} criada (OVR ${ovr}).`);
+  };
+  return (
+    <div className="space-y-2 rounded-2xl bg-zinc-950/40 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+          Heróis jogados <span className="text-zinc-100">{byHero.size}</span>
+          <span className="ml-2 tracking-normal normal-case">clique para criar a carta ({ALT_HERO_DROP} abaixo da assinatura) ou abrir a que já existe</span>
+        </span>
+        <input className={`${input} max-w-48 py-1.5`} placeholder="Buscar herói" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className="grid max-h-44 grid-cols-6 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-9">
+        {heroNames.filter((h) => h !== main.hero && h.toLowerCase().includes(q.toLowerCase()))
+          .sort((a, b) => Number(byHero.has(b)) - Number(byHero.has(a)))
+          .map((h) => {
+            const icon = heroIcon(h);
+            const card = byHero.get(h);
+            return (
+              <button key={h} type="button" disabled={busy} onClick={() => (card ? onOpen(card.id) : add(h))} aria-pressed={!!card}
+                title={card ? `${h}: abrir carta (OVR ${getPlayerOvr(card)})` : `${h}: criar carta`}
+                className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 transition hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-95 disabled:cursor-wait disabled:opacity-50 ${card ? "border-amber-300 shadow-[0_0_10px_rgb(252_211_77/0.45)]" : "border-zinc-200/10 opacity-50 grayscale hover:opacity-100 hover:grayscale-0"}`}>
+                {icon ? <img src={icon} alt={h} className="size-full object-cover" loading="lazy" /> : <span className="text-[9px] text-zinc-300">{h}</span>}
+                {card && <span className="absolute right-0.5 bottom-0.5 rounded-sm bg-zinc-950/85 px-1 text-[9px] font-black text-amber-200">{getPlayerOvr(card)}</span>}
+              </button>
+            );
+          })}
+      </div>
+      <Toast msg={msg} />
+    </div>
+  );
+}
+
 function withHistory(p: Player, date: string, rebase: boolean): Player {
   const ovr = Math.min(99, Math.max(1, Math.round(p.ovr ?? calculateOVR(p.stats))));
   const history = (p.id ? getPlayerHistory(p) : []).map((h) => ({ ...h }));
@@ -260,6 +307,10 @@ function PlayerForm({ editId, onEditId, versionOf, altHero, onNewVersion }: { ed
             })}
           </div>
         </div>
+
+        {isMainCard(d) && (existing
+          ? <PlayedHeroes main={existing} onOpen={onEditId} />
+          : <p className="text-xs text-zinc-400">Salve a carta para adicionar os heróis jogados além do herói de assinatura.</p>)}
 
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {STAT_KEYS.map((k) => <Range key={k} label={k} value={d.stats[k]} min={1} max={99} onChange={(v) => setStat(k, v)} />)}
