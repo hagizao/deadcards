@@ -1,5 +1,9 @@
 import type { Player, Team, TierBand, HistoryPoint } from "./types";
 import { strings, useT } from "./i18n";
+import { isAltHero, isMainCard } from "./cardKinds";
+
+// regras de tipo de carta ficam sem React para o worker também usar
+export { ALT_HERO_DROP, isAltHero, isMainCard, isRetired } from "./cardKinds";
 
 export const REGIONS = ["Europa", "América do Norte", "Brasil", "América do Sul", "Ásia", "Sem Time"];
 
@@ -127,26 +131,6 @@ export function hexToRgba(hex: string, alpha = 1): string {
   if (c.length === 3) c = c.split("").map((x) => x + x).join("");
   if (!/^[0-9a-f]{6}$/i.test(c)) return `rgba(24, 24, 27, ${alpha})`;
   return `rgba(${parseInt(c.slice(0, 2), 16)}, ${parseInt(c.slice(2, 4), 16)}, ${parseInt(c.slice(4, 6), 16)}, ${alpha})`;
-}
-
-export function isMainCard(p: Player): boolean {
-  return !p.variantOf || p.variantOf === p.id;
-}
-
-/** Carta de herói jogado: todos os atributos e o OVR ficam isso abaixo da carta de assinatura. */
-export const ALT_HERO_DROP = 2;
-
-/** Carta de herói jogado: versão do jogador com outro herói, fora do herói de assinatura. */
-export function isAltHero(p: Player): boolean {
-  return !isMainCard(p) && !!p.altHero;
-}
-
-/**
- * Herói jogado aposentado: o herói saiu da lista do jogador, mas alguém já tinha a carta.
- * Quem tem continua com ela; para o resto ela some e não pode mais ser dada.
- */
-export function isRetired(p: Player): boolean {
-  return isAltHero(p) && !!p.inactive;
 }
 
 export function teamOf(teams: Team[], p: Player): Team {
