@@ -25,6 +25,8 @@ const ghost = `${btn} border border-zinc-200/20 text-zinc-300 hover:text-white b
 const chip = `${btn} min-h-11 sm:min-h-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:opacity-80`;
 const danger = `${btn} bg-red-600/90 hover:bg-red-500 text-white`;
 const today = () => new Date().toISOString().slice(0, 10);
+// heróis jogados além do de assinatura: cada um vira uma carta com tudo ALT_HERO_DROP abaixo
+const MAX_PLAYED = 5;
 const newId = (p: string) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -85,8 +87,6 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
   const [section, setSection] = useState<Section>("card");
   const [prevEditId, setPrevEditId] = useState(editId);
   const [versionOf, setVersionOf] = useState<string | null>(null);
-  // a nova versão é de outro herói que o jogador joga (e não um time ou carta especial)
-  const [altHero, setAltHero] = useState(false);
   if (editId !== prevEditId) {
     setPrevEditId(editId);
     if (editId) {
@@ -98,9 +98,8 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
     setVersionOf(null);
     onEditId(id);
   };
-  const newVersion = (mainId: string, hero = false) => {
+  const newVersion = (mainId: string) => {
     setVersionOf(mainId);
-    setAltHero(hero);
     onEditId(null);
   };
   return (
@@ -115,7 +114,7 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
       </div>
       <AnimatePresence mode="wait">
         <motion.div key={section} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.22 }}>
-          {section === "card" && <PlayerForm key={editId ?? (versionOf ? `new:${versionOf}:${altHero}` : "new")} editId={editId} onEditId={pick} versionOf={versionOf} altHero={altHero} onNewVersion={newVersion} />}
+          {section === "card" && <PlayerForm key={editId ?? (versionOf ? `new:${versionOf}` : "new")} editId={editId} onEditId={pick} versionOf={versionOf} onNewVersion={newVersion} />}
           {section === "teams" && <TeamsForm />}
           {section === "heroes" && <HeroesForm />}
           {section === "look" && <LookForm />}
@@ -131,71 +130,6 @@ function blankPlayer(teamId: string): Player {
   return { id: "", teamId, name: "", position: "Carry", hero: "Abrams", stats, ovr: calculateOVR(stats), c1: "#0e7490", c2: "#082f49", history: [], footer: "Cardslock" };
 }
 
-/**
- * Heróis jogados pelo jogador, além do de assinatura: cada um vira uma carta-versão com tudo ALT_HERO_DROP abaixo.
- * Clicar num herói sem carta cria a carta; num que já tem, abre a carta para editar.
- */
-function PlayedHeroes({ main, onOpen }: { main: Player; onOpen: (id: string) => void }) {
-  const { players, heroNames, heroIcon, reload } = useData();
-  const { busy, msg, run } = useSaver(reload);
-  const [q, setQ] = useState("");
-  const byHero = new Map(cardVersions(players, main).filter(isAltHero).map((c) => [c.hero, c]));
-  const add = (hero: string) => {
-    const id = newId("p");
-    const ovr = Math.max(1, getPlayerOvr(main) - ALT_HERO_DROP);
-    const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, main.stats[k] - ALT_HERO_DROP)])) as Stats;
-    const body: Player = { ...structuredClone(main), id, hero, stats, ovr, variantOf: main.id, altHero: true, history: [{ date: today(), ovr, base: true }],
-      special: undefined, specialText: undefined, frame: undefined, art: undefined, inactive: undefined };
-    run(() => api.save("players", id, body), `Carta de ${main.name} com ${hero} criada (OVR ${ovr}).`);
-  };
-  // depois de mudar a principal (atributos, OVR ou trocar qual é a principal), as cartas de heróis jogados voltam a ficar ALT_HERO_DROP abaixo
-  const ovr = Math.max(1, getPlayerOvr(main) - ALT_HERO_DROP);
-  const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, main.stats[k] - ALT_HERO_DROP)])) as Stats;
-  const stale = [...byHero.values()].filter((c) => getPlayerOvr(c) !== ovr || STAT_KEYS.some((k) => c.stats[k] !== stats[k]));
-  const resync = () => run(async () => {
-    for (const c of stale) {
-      const history = [...c.history.filter((h) => h.date !== today()), { date: today(), ovr }];
-      await api.save("players", c.id, { ...c, stats, ovr, history });
-    }
-  }, `${stale.length} ${stale.length === 1 ? "carta atualizada" : "cartas atualizadas"} para OVR ${ovr}.`);
-  return (
-    <div className="space-y-2 rounded-2xl bg-zinc-950/40 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
-          Heróis jogados <span className="text-zinc-100">{byHero.size}</span>
-          <span className="ml-2 tracking-normal normal-case">clique para criar a carta ({ALT_HERO_DROP} abaixo da assinatura) ou abrir a que já existe</span>
-        </span>
-        <div className="flex flex-wrap items-center gap-2">
-          {stale.length > 0 && (
-            <button type="button" disabled={busy} onClick={resync} className={`${chip} bg-amber-300 text-zinc-950 hover:bg-amber-200 disabled:opacity-50`}
-              title={`Deixa as cartas de heróis jogados com tudo ${ALT_HERO_DROP} abaixo desta carta`}>
-              Recalcular {stale.length} (assinatura − {ALT_HERO_DROP})
-            </button>
-          )}
-          <input className={`${input} max-w-48 py-1.5`} placeholder="Buscar herói" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-      </div>
-      <div className="grid max-h-44 grid-cols-6 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-9">
-        {heroNames.filter((h) => h !== main.hero && h.toLowerCase().includes(q.toLowerCase()))
-          .sort((a, b) => Number(byHero.has(b)) - Number(byHero.has(a)))
-          .map((h) => {
-            const icon = heroIcon(h);
-            const card = byHero.get(h);
-            return (
-              <button key={h} type="button" disabled={busy} onClick={() => (card ? onOpen(card.id) : add(h))} aria-pressed={!!card}
-                title={card ? `${h}: abrir carta (OVR ${getPlayerOvr(card)})` : `${h}: criar carta`}
-                className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 transition hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-95 disabled:cursor-wait disabled:opacity-50 ${card ? "border-amber-300 shadow-[0_0_10px_rgb(252_211_77/0.45)]" : "border-zinc-200/10 opacity-50 grayscale hover:opacity-100 hover:grayscale-0"}`}>
-                {icon ? <img src={icon} alt={h} className="size-full object-cover" loading="lazy" /> : <span className="text-[9px] text-zinc-300">{h}</span>}
-                {card && <span className="absolute right-0.5 bottom-0.5 rounded-sm bg-zinc-950/85 px-1 text-[9px] font-black text-amber-200">{getPlayerOvr(card)}</span>}
-              </button>
-            );
-          })}
-      </div>
-      <Toast msg={msg} />
-    </div>
-  );
-}
-
 function withHistory(p: Player, date: string, rebase: boolean): Player {
   const ovr = Math.min(99, Math.max(1, Math.round(p.ovr ?? calculateOVR(p.stats))));
   const history = (p.id ? getPlayerHistory(p) : []).map((h) => ({ ...h }));
@@ -206,25 +140,22 @@ function withHistory(p: Player, date: string, rebase: boolean): Player {
   return { ...p, ovr, history };
 }
 
-function PlayerForm({ editId, onEditId, versionOf, altHero, onNewVersion }: { editId: string | null; onEditId: (id: string | null) => void; versionOf: string | null; altHero: boolean; onNewVersion: (mainId: string, hero?: boolean) => void }) {
+function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: string | null; onEditId: (id: string | null) => void; versionOf: string | null; onNewVersion: (mainId: string) => void }) {
   const { players, teams, heroNames, heroIcon, settings, reload } = useData();
   const existing = editId ? players.find((p) => p.id === editId) : undefined;
   const base = !existing && versionOf ? players.find((p) => p.id === versionOf) : undefined;
   const [d, setD] = useState<Player>(() => {
     if (existing) return structuredClone({ ...existing, ovr: getPlayerOvr(existing) });
-    if (base && altHero) {
-      // herói jogado: tudo ALT_HERO_DROP abaixo da principal (OVR incluso), com o primeiro herói que ele ainda não tem
-      const taken = new Set(cardVersions(players, base).map((c) => c.hero));
-      const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, base.stats[k] - ALT_HERO_DROP)])) as Stats;
-      return { ...structuredClone(base), stats, ovr: Math.max(1, getPlayerOvr(base) - ALT_HERO_DROP), hero: heroNames.find((h) => !taken.has(h)) ?? base.hero,
-        id: "", variantOf: base.id, altHero: true, history: [], inactive: undefined, special: undefined, specialText: undefined, frame: undefined, art: undefined };
-    }
     if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, altHero: undefined, history: [], inactive: undefined, special: true };
     return blankPlayer(teams[0]?.id ?? "");
   });
   const [date, setDate] = useState(today);
   const [rebase, setRebase] = useState(false);
   const [heroQuery, setHeroQuery] = useState("");
+  // a mesma área de heróis serve para o de assinatura (1) e, na carta principal, para os heróis jogados (até MAX_PLAYED)
+  const [heroTab, setHeroTab] = useState<"signature" | "played">("signature");
+  const altsOf = (id: string) => players.filter((p) => p.variantOf === id && isAltHero(p));
+  const [played, setPlayed] = useState<string[]>(() => (existing && isMainCard(existing) ? altsOf(existing.id).map((c) => c.hero) : []));
   const { busy, msg, run } = useSaver(reload);
   const set = (patch: Partial<Player>) => setD((p) => ({ ...p, ...patch }));
   const setStat = (k: keyof Stats, v: number) => setD((p) => { const stats = { ...p.stats, [k]: v }; return { ...p, stats, ovr: calculateOVR(stats) }; });
@@ -234,12 +165,46 @@ function PlayerForm({ editId, onEditId, versionOf, altHero, onNewVersion }: { ed
   const save = () => {
     const id = d.id || newId("p");
     const body = { ...preview, id, name: d.name.trim() || "NOVO JOGADOR", footer: d.footer?.trim().slice(0, 30), specialText: d.special ? d.specialText?.trim().slice(0, 400) : undefined, frame: d.special ? frame : undefined };
-    run(async () => { await api.save("players", id, body); await reload(); onEditId(id); }, `Carta de "${body.name}" salva!`);
+    run(async () => {
+      await api.save("players", id, body);
+      if (isMainCard(body)) await syncPlayed(body);
+      await reload();
+      onEditId(id);
+    }, `Carta de "${body.name}" salva!`);
+  };
+  // cria, apaga e atualiza as cartas de heróis jogados para ficarem iguais à seleção, tudo ALT_HERO_DROP abaixo da principal
+  const syncPlayed = async (main: Player) => {
+    const ovr = Math.max(1, getPlayerOvr(main) - ALT_HERO_DROP);
+    const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, main.stats[k] - ALT_HERO_DROP)])) as Stats;
+    const have = altsOf(main.id);
+    for (const c of have) if (!played.includes(c.hero)) await api.remove("players", c.id);
+    for (const hero of played) {
+      const c = have.find((x) => x.hero === hero);
+      if (!c) {
+        const id = newId("p");
+        await api.save("players", id, { ...structuredClone(main), id, hero, stats, ovr, variantOf: main.id, altHero: true, history: [{ date: today(), ovr, base: true }],
+          special: undefined, specialText: undefined, frame: undefined, art: undefined, inactive: undefined });
+        continue;
+      }
+      const same = getPlayerOvr(c) === ovr && STAT_KEYS.every((k) => c.stats[k] === stats[k]) && c.name === main.name && c.teamId === main.teamId && c.position === main.position;
+      if (same) continue;
+      const history = getPlayerOvr(c) === ovr ? c.history : [...c.history.filter((h) => h.date !== today()), { date: today(), ovr }];
+      await api.save("players", c.id, { ...c, name: main.name, teamId: main.teamId, position: main.position, stats, ovr, history });
+    }
+  };
+  const pickHero = (h: string) => {
+    if (heroTab === "signature") {
+      set({ hero: h });
+      setPlayed((list) => list.filter((x) => x !== h));
+    } else {
+      setPlayed((list) => (list.includes(h) ? list.filter((x) => x !== h) : list.length < MAX_PLAYED ? [...list, h] : list));
+    }
   };
   const remove = () => {
     if (!d.id) return;
     run(async () => { await api.remove("players", d.id); onEditId(null); }, "Carta excluída.");
   };
+  const playedTab = heroTab === "played" && isMainCard(d);
   const main = existing ? players.find((p) => p.id === (existing.variantOf || existing.id)) ?? existing : base;
   const versions = main ? cardVersions(players, main) : [];
   const tagOf = (p: Player) => teams.find((t) => t.id === p.teamId)?.tag ?? "?";
@@ -252,7 +217,7 @@ function PlayerForm({ editId, onEditId, versionOf, altHero, onNewVersion }: { ed
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <span className="rk-chip">{d.id ? "Modo Edição" : "Modo Criação"}</span>
-            <h2 className="mt-2 text-2xl font-black tracking-[0.12em] text-white uppercase">{d.id ? `Editar: ${existing?.name ?? d.name}` : base ? `${altHero ? "Novo herói jogado" : "Nova versão"} de ${base.name}` : "Criar Novo Jogador"}</h2>
+            <h2 className="mt-2 text-2xl font-black tracking-[0.12em] text-white uppercase">{d.id ? `Editar: ${existing?.name ?? d.name}` : base ? `Nova versão de ${base.name}` : "Criar Novo Jogador"}</h2>
           </div>
           <select className={`${input} min-h-11 w-auto sm:min-h-0`} value={main && isMainCard(main) ? main.id : ""} onChange={(e) => onEditId(e.target.value || null)} aria-label="Jogador">
             <option value="">+ Novo jogador</option>
@@ -270,7 +235,6 @@ function PlayerForm({ editId, onEditId, versionOf, altHero, onNewVersion }: { ed
                 </button>
               );
             })}
-            <button type="button" className={`${chip} border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white`} onClick={() => onNewVersion(main.id, true)}>+ Herói jogado</button>
             <button type="button" className={`${chip} border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white`} onClick={() => onNewVersion(main.id)}>+ Nova versão</button>
           </div>
         )}
@@ -299,36 +263,46 @@ function PlayerForm({ editId, onEditId, versionOf, altHero, onNewVersion }: { ed
             ) : (
               <p className="text-xs text-zinc-400">Carta principal de {cardVersions(players, d).length - 1} versões. Para trocar, abra uma versão e use Tornar principal.</p>
             )}
-            {!isMainCard(d) && (
-              <label className="mt-2 flex items-center gap-2 text-sm text-zinc-300">
-                <input type="checkbox" checked={!!d.altHero} onChange={(e) => set({ altHero: e.target.checked || undefined })} className="accent-amber-300" />
-                Herói jogado (o mesmo jogador com outro herói; fica fora do elenco e da tier list)
-              </label>
-            )}
           </div>
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Herói: <span className="text-zinc-100">{d.hero}</span></span>
-            <input className={`${input} max-w-48 py-1.5`} placeholder="Buscar herói" value={heroQuery} onChange={(e) => setHeroQuery(e.target.value)} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+              {playedTab
+                ? <>Heróis jogados <span className="text-amber-200">{played.length}/{MAX_PLAYED}</span></>
+                : <>Herói de assinatura: <span className="text-zinc-100">{d.hero}</span></>}
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {isMainCard(d) && (
+                <button type="button" aria-pressed={playedTab} onClick={() => setHeroTab(playedTab ? "signature" : "played")}
+                  className={`${chip} ${playedTab ? "bg-amber-300 text-zinc-950 hover:bg-amber-200" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>
+                  {playedTab ? "Voltar ao herói de assinatura" : `Heróis jogados (${played.length}/${MAX_PLAYED})`}
+                </button>
+              )}
+              <input className={`${input} max-w-48 py-1.5`} placeholder="Buscar herói" aria-label="Buscar herói" value={heroQuery} onChange={(e) => setHeroQuery(e.target.value)} />
+            </div>
           </div>
-          <div className="grid max-h-44 grid-cols-6 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-9">
-            {heroNames.filter((h) => h.toLowerCase().includes(heroQuery.toLowerCase())).map((h) => {
+          <div className="grid max-h-44 grid-cols-6 gap-1.5 overflow-y-auto p-1 sm:grid-cols-9">
+            {heroNames.filter((h) => h.toLowerCase().includes(heroQuery.toLowerCase()))
+              // nos heróis jogados, os escolhidos vêm primeiro para não sumirem no fim da lista
+              .sort((x, y) => (playedTab ? Number(played.includes(y)) - Number(played.includes(x)) : 0))
+              .map((h) => {
               const icon = heroIcon(h);
+              const on = playedTab ? played.includes(h) : d.hero === h;
+              // nos heróis jogados, o de assinatura fica travado e a seleção para em MAX_PLAYED
+              const locked = playedTab && (h === d.hero || (!on && played.length >= MAX_PLAYED));
               return (
-                <motion.button key={h} type="button" whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }} onClick={() => set({ hero: h })} title={h} aria-pressed={d.hero === h}
-                  className={`aspect-square cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 ${d.hero === h ? "border-white shadow-[0_0_12px_rgba(255,255,255,0.5)]" : "border-zinc-200/10 opacity-70 hover:opacity-100"}`}>
+                <button key={h} type="button" onClick={() => pickHero(h)} title={playedTab && h === d.hero ? `${h} (assinatura)` : h} aria-pressed={on} disabled={locked}
+                  className={`aspect-square cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 transition hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-25 disabled:grayscale disabled:hover:scale-100 motion-reduce:transition-none ${
+                    on ? (playedTab ? "border-amber-300 shadow-[0_0_12px_rgb(252_211_77/0.5)]" : "border-white shadow-[0_0_12px_rgba(255,255,255,0.5)]") : "border-zinc-200/10 opacity-70 hover:opacity-100"}`}>
                   {icon ? <img src={icon} alt={h} className="size-full object-cover" loading="lazy" /> : <span className="text-[9px] text-zinc-300">{h}</span>}
-                </motion.button>
+                </button>
               );
             })}
           </div>
+          {playedTab && <p className="text-xs text-zinc-400">Cada herói jogado vira uma carta com tudo {ALT_HERO_DROP} abaixo da assinatura. Aplica ao salvar.</p>}
         </div>
-
-        {isMainCard(d) && (existing
-          ? <PlayedHeroes main={existing} onOpen={onEditId} />
-          : <p className="text-xs text-zinc-400">Salve a carta para adicionar os heróis jogados além do herói de assinatura.</p>)}
 
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {STAT_KEYS.map((k) => <Range key={k} label={k} value={d.stats[k]} min={1} max={99} onChange={(v) => setStat(k, v)} />)}
