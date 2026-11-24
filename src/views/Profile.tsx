@@ -6,53 +6,51 @@ import { Range } from "../components/Range";
 import { POSITIONS, STAT_KEYS, calculateOVR, getPlayerOvr, teamOf, useLabel } from "../lib/cards";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { PROFILE_CARD_PATH, PROFILE_NAME_MAX, favoritePath, profilePlayer, profileUrl, summarizeCollection, type ProfileCard, type ProfileCardState, type PublicProfile } from "../lib/profile";
+import { MAX_FAVORITES, PROFILE_CARD_PATH, PROFILE_NAME_MAX, favoritePath, profilePlayer, profileUrl, summarizeCollection, type ProfileCard, type ProfileCardState, type PublicProfile } from "../lib/profile";
 import { getCardTier } from "../lib/rarity";
+import type { Player } from "../lib/types";
 import { field, pageTitle, pill, primaryBtn } from "../lib/ui";
 
 const S = strings({
   pt: {
-    favorites: "Favoritas", addFavorite: (n: string) => `Favoritar ${n}`, removeFavorite: (n: string) => `Desfavoritar ${n}`, favoriteFailed: "Não foi possível salvar o favorito.",
+    favorites: "Favoritas", addFavorite: (n: string) => `Favoritar ${n}`, removeFavorite: (n: string) => `Desfavoritar ${n}`, favoriteFailed: "Não foi possível salvar o favorito.", favoriteLimit: `Até ${MAX_FAVORITES} favoritas. Tire uma para marcar outra.`, favoritesHint: `Marque até ${MAX_FAVORITES} cartas com a estrela para elas ficarem em destaque aqui.`,
     progress: "Progresso", best: "Maior OVR", catalog: (owned: number, total: number) => `${owned} de ${total} cartas`,
     rarity: "Filtrar por raridade", all: "Todas", search: "Buscar cartas", searchPlaceholder: "Jogador, herói ou time…",
-    sort: "Ordenar cartas", sortOvr: "Ordenar: OVR", sortName: "Ordenar: Nome", sortTeam: "Ordenar: Time",
     noResults: "Nenhuma carta corresponde aos filtros.", more: (n: number) => `Mostrar mais (${n})`,
     name: "Nome na carta", hero: "Herói", role: "Função", stats: "Atributos",
     hint: "Defina como você se vê no jogo. A carta aparece só no seu perfil, fora da tier list.",
     save: "Salvar carta", saving: "Salvando…", cancel: "Cancelar", unsaved: "Alterações não salvas.",
     loading: "Carregando perfil…", history: "Histórico de versões",
     edit: "Editar minha carta", create: "Montar minha carta", share: "Copiar link", copied: "Link copiado.", copyFailed: "Não foi possível copiar o link.",
-    noCard: "Ainda não montou uma carta.", cards: "Cartas resgatadas", noCards: "Nenhuma carta resgatada ainda.", redeem: "Resgatar carta",
+    noCard: "Ainda não montou uma carta.", cards: "Coleção", noCards: "Nenhuma carta na coleção ainda.", redeem: "Resgatar carta",
     not_found: "Perfil não encontrado.",
     invalid_card: "Confira o nome, o herói e os atributos.", unavailable: "Não foi possível carregar agora.", login: "Entre para editar sua carta.",
   },
   en: {
-    favorites: "Favorites", addFavorite: (n: string) => `Favorite ${n}`, removeFavorite: (n: string) => `Unfavorite ${n}`, favoriteFailed: "Could not save the favorite.",
+    favorites: "Favorites", addFavorite: (n: string) => `Favorite ${n}`, removeFavorite: (n: string) => `Unfavorite ${n}`, favoriteFailed: "Could not save the favorite.", favoriteLimit: `Up to ${MAX_FAVORITES} favorites. Remove one to pick another.`, favoritesHint: `Star up to ${MAX_FAVORITES} cards to feature them here.`,
     progress: "Progress", best: "Highest OVR", catalog: (owned: number, total: number) => `${owned} of ${total} cards`,
     rarity: "Filter by rarity", all: "All", search: "Search cards", searchPlaceholder: "Player, hero or team…",
-    sort: "Sort cards", sortOvr: "Sort: OVR", sortName: "Sort: Name", sortTeam: "Sort: Team",
     noResults: "No cards match your filters.", more: (n: number) => `Show more (${n})`,
     name: "Name on card", hero: "Hero", role: "Role", stats: "Attributes",
     hint: "Set how you see yourself in game. The card only shows on your profile, outside the tier list.",
     save: "Save card", saving: "Saving…", cancel: "Cancel", unsaved: "Unsaved changes.",
     loading: "Loading profile…", history: "Version history",
     edit: "Edit my card", create: "Build my card", share: "Copy link", copied: "Link copied.", copyFailed: "Could not copy the link.",
-    noCard: "No card built yet.", cards: "Redeemed cards", noCards: "No cards redeemed yet.", redeem: "Redeem a card",
+    noCard: "No card built yet.", cards: "Collection", noCards: "No cards in the collection yet.", redeem: "Redeem a card",
     not_found: "Profile not found.",
     invalid_card: "Check the name, hero and attributes.", unavailable: "Could not load right now.", login: "Sign in to edit your card.",
   },
   es: {
-    favorites: "Favoritas", addFavorite: (n: string) => `Marcar ${n} como favorita`, removeFavorite: (n: string) => `Quitar ${n} de favoritas`, favoriteFailed: "No se pudo guardar el favorito.",
+    favorites: "Favoritas", addFavorite: (n: string) => `Marcar ${n} como favorita`, removeFavorite: (n: string) => `Quitar ${n} de favoritas`, favoriteFailed: "No se pudo guardar el favorito.", favoriteLimit: `Hasta ${MAX_FAVORITES} favoritas. Quita una para marcar otra.`, favoritesHint: `Marca hasta ${MAX_FAVORITES} cartas con la estrella para destacarlas aquí.`,
     progress: "Progreso", best: "OVR más alto", catalog: (owned: number, total: number) => `${owned} de ${total} cartas`,
     rarity: "Filtrar por rareza", all: "Todas", search: "Buscar cartas", searchPlaceholder: "Jugador, héroe o equipo…",
-    sort: "Ordenar cartas", sortOvr: "Ordenar: OVR", sortName: "Ordenar: Nombre", sortTeam: "Ordenar: Equipo",
     noResults: "Ninguna carta coincide con los filtros.", more: (n: number) => `Mostrar más (${n})`,
     name: "Nombre en la carta", hero: "Héroe", role: "Rol", stats: "Atributos",
     hint: "Define cómo te ves en el juego. La carta solo aparece en tu perfil, fuera de la tier list.",
     save: "Guardar carta", saving: "Guardando…", cancel: "Cancelar", unsaved: "Cambios sin guardar.",
     loading: "Cargando perfil…", history: "Historial de versiones",
     edit: "Editar mi carta", create: "Armar mi carta", share: "Copiar enlace", copied: "Enlace copiado.", copyFailed: "No se pudo copiar el enlace.",
-    noCard: "Todavía no armó una carta.", cards: "Cartas canjeadas", noCards: "Todavía no canjeó cartas.", redeem: "Canjear carta",
+    noCard: "Todavía no armó una carta.", cards: "Colección", noCards: "Todavía no hay cartas en la colección.", redeem: "Canjear carta",
     not_found: "Perfil no encontrado.",
     invalid_card: "Revisa el nombre, el héroe y los atributos.", unavailable: "No se pudo cargar ahora.", login: "Inicia sesión para editar tu carta.",
   },
@@ -169,52 +167,63 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
 }
 
 const PAGE = 18;
-type Sort = "ovr" | "name" | "team";
 
 function ProfileCards({ ids, initialFavorites, owner, onOpenCard, onRedeem }: { ids: string[]; initialFavorites: string[]; owner: boolean; onOpenCard: (id: string) => void; onRedeem: () => void }) {
   const t = useT(S);
   const { players, teams, settings } = useData();
   const [q, setQ] = useState("");
   const [rarity, setRarity] = useState<string>();
-  const [sort, setSort] = useState<Sort>("ovr");
   const [limit, setLimit] = useState(PAGE);
   const [favorites, setFavorites] = useState(initialFavorites);
-  const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [popped, setPopped] = useState<string>();
   const pending = useRef(new Set<string>());
-  const [favoriteFailed, setFavoriteFailed] = useState(false);
+  const [favoriteIssue, setFavoriteIssue] = useState<"favoriteFailed" | "favoriteLimit">();
   const query = useDeferredValue(q.trim().toLowerCase());
-  const favoriteIds = new Set(favorites);
 
   const summary = summarizeCollection(players, ids, settings.tierConfig!);
+  const byOvr = (a: Player, b: Player) => getPlayerOvr(b) - getPlayerOvr(a) || a.name.localeCompare(b.name);
+  // favoritas (até MAX_FAVORITES) sobem para o topo, em destaque, por OVR como o resto
+  const pinned = summary.cards.filter((p) => favorites.includes(p.id)).sort(byOvr).slice(0, MAX_FAVORITES);
+  const favoriteIds = new Set(pinned.map((p) => p.id));
+  // o resto da coleção por OVR, do maior para o menor
   const list = summary.cards
-    .filter((p) => !onlyFavorites || favoriteIds.has(p.id))
+    .filter((p) => !favoriteIds.has(p.id))
     .filter((p) => !rarity || getCardTier(p, settings.tierConfig!).tierKey === rarity)
     .filter((p) => !query || `${p.name} ${p.hero} ${teamOf(teams, p).name} ${teamOf(teams, p).tag}`.toLowerCase().includes(query))
-    .sort((a, b) => sort === "name" ? a.name.localeCompare(b.name)
-      : sort === "team" ? teamOf(teams, a).name.localeCompare(teamOf(teams, b).name) || a.name.localeCompare(b.name)
-        : getPlayerOvr(b) - getPlayerOvr(a) || a.name.localeCompare(b.name));
+    .sort(byOvr);
   const pick = (key?: string) => { setRarity(key); setLimit(PAGE); };
-  const favoriteCount = summary.cards.filter((p) => favoriteIds.has(p.id)).length;
 
   const toggleFavorite = async (id: string) => {
     if (pending.current.has(id)) return;
-    pending.current.add(id);
     const was = favoriteIds.has(id);
+    if (!was && favoriteIds.size >= MAX_FAVORITES) { setFavoriteIssue("favoriteLimit"); return; }
+    pending.current.add(id);
     const set = (on: boolean) => setFavorites((f) => on ? [id, ...f.filter((x) => x !== id)] : f.filter((x) => x !== id));
     set(!was);
     setPopped(was ? undefined : id);
-    setFavoriteFailed(false);
+    setFavoriteIssue(undefined);
     try {
       const res = await fetch(favoritePath(id), { method: was ? "DELETE" : "PUT" });
       if (!res.ok) throw new Error(String(res.status));
-    } catch {
+    } catch (e) {
       set(was);
-      setFavoriteFailed(true);
+      setFavoriteIssue(e instanceof Error && e.message === "409" ? "favoriteLimit" : "favoriteFailed");
     } finally {
       pending.current.delete(id);
     }
   };
+
+  const star = (player: Player, fav: boolean) => owner ? (
+    <button type="button" aria-pressed={fav} onClick={() => toggleFavorite(player.id)} onAnimationEnd={(e) => e.animationName === "fav-ring" && setPopped(undefined)}
+      aria-label={fav ? t.removeFavorite(player.name) : t.addFavorite(player.name)} title={fav ? t.removeFavorite(player.name) : t.addFavorite(player.name)}
+      className={`absolute top-2 right-2 z-20 flex size-11 cursor-pointer items-center justify-center rounded-full bg-dl-black/80 shadow-lg backdrop-blur-sm transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:scale-95 motion-reduce:transition-none sm:size-9 ${fav ? "text-amber-300" : "text-zinc-300 hover:text-white"} ${popped === player.id ? "fav-pop" : ""}`}>
+      <Icon name="star" className={`size-5 ${fav ? "fill-current" : ""}`} />
+    </button>
+  ) : fav && (
+    <span role="img" aria-label={t.favorites} className="absolute top-2 right-2 z-20 flex size-9 items-center justify-center rounded-full bg-dl-black/80 text-amber-300">
+      <Icon name="star" className="size-5 fill-current" />
+    </span>
+  );
 
   return (
     <section aria-labelledby="profile-cards-title" className="noir-glass flex flex-col gap-5 rounded-2xl p-4 sm:p-6">
@@ -245,61 +254,57 @@ function ProfileCards({ ids, initialFavorites, owner, onOpenCard, onRedeem }: { 
               </div>
             )}
           </div>
-          <div role="group" aria-label={t.rarity} className="flex flex-wrap gap-2">
-            <button type="button" aria-pressed={!rarity} onClick={() => pick()} className={pill(!rarity)}>{t.all}</button>
-            {summary.rarities.map((r) => (
-              <button key={r.tierKey} type="button" aria-pressed={rarity === r.tierKey} disabled={!r.count}
-                onClick={() => pick(rarity === r.tierKey ? undefined : r.tierKey)}
-                className={`${pill(rarity === r.tierKey)} disabled:cursor-not-allowed disabled:opacity-40`}>
-                <span aria-hidden="true" className="size-2 rounded-full" style={{ background: r.c }} />
-                {r.name}
-                <span className="tabular-nums opacity-70">{r.count}</span>
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(owner || favoriteCount > 0) && (
-              <button type="button" aria-pressed={onlyFavorites} disabled={!favoriteCount}
-                onClick={() => { setOnlyFavorites(!onlyFavorites); setLimit(PAGE); }}
-                className={`${pill(onlyFavorites)} disabled:cursor-not-allowed disabled:opacity-40`}>
-                <Icon name="star" className={`size-3.5 ${onlyFavorites ? "fill-current" : ""}`} />
+
+          {(pinned.length > 0 || owner) && (
+            <div className="flex flex-col gap-3">
+              <h3 className="flex items-center gap-2 text-xs font-bold tracking-widest text-amber-200 uppercase">
+                <Icon name="star" className="size-3.5 fill-current" />
                 {t.favorites}
-                <span className="tabular-nums opacity-70">{favoriteCount}</span>
-              </button>
-            )}
-            <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder={t.searchPlaceholder} aria-label={t.search} className={`${field} min-w-0 flex-1 basis-56`} />
-            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t.sort} className={field}>
-              <option value="ovr">{t.sortOvr}</option>
-              <option value="name">{t.sortName}</option>
-              <option value="team">{t.sortTeam}</option>
-            </select>
-          </div>
-          {favoriteFailed && <p role="alert" className="text-sm text-red-300">{t.favoriteFailed}</p>}
-          {list.length ? (
-            <ul className="flex flex-wrap justify-center gap-6 sm:justify-start">
-              {list.slice(0, limit).map((player) => {
-                const fav = favoriteIds.has(player.id);
-                return (
-                  <li key={player.id} className="relative">
-                    <Card player={player} variant="medium" onOpen={() => onOpenCard(player.id)} />
-                    {owner ? (
-                      <button type="button" aria-pressed={fav} onClick={() => toggleFavorite(player.id)} onAnimationEnd={(e) => e.animationName === "fav-ring" && setPopped(undefined)}
-                        aria-label={fav ? t.removeFavorite(player.name) : t.addFavorite(player.name)} title={fav ? t.removeFavorite(player.name) : t.addFavorite(player.name)}
-                        className={`absolute top-2 right-2 z-20 flex size-11 cursor-pointer items-center justify-center rounded-full bg-dl-black/80 shadow-lg backdrop-blur-sm transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:scale-95 motion-reduce:transition-none sm:size-9 ${fav ? "text-amber-300" : "text-zinc-300 hover:text-white"} ${popped === player.id ? "fav-pop" : ""}`}>
-                        <Icon name="star" className={`size-5 ${fav ? "fill-current" : ""}`} />
-                      </button>
-                    ) : fav && (
-                      <span role="img" aria-label={t.favorites} className="absolute top-2 right-2 z-20 flex size-9 items-center justify-center rounded-full bg-dl-black/80 text-amber-300">
-                        <Icon name="star" className="size-5 fill-current" />
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : <p role="status" className="text-sm text-zinc-400">{t.noResults}</p>}
-          {list.length > limit && (
-            <button type="button" onClick={() => setLimit((l) => l + PAGE)} className={`${primaryBtn} self-center`}>{t.more(list.length - limit)}</button>
+                <span className="text-zinc-400 tabular-nums">{pinned.length}/{MAX_FAVORITES}</span>
+              </h3>
+              {pinned.length ? (
+                <ul className="flex flex-wrap justify-center gap-6 sm:justify-start">
+                  {pinned.map((player) => (
+                    <li key={player.id} className="relative drop-shadow-[0_0_28px_rgb(252_211_77/0.35)]">
+                      <Card player={player} onOpen={() => onOpenCard(player.id)} />
+                      {star(player, true)}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-sm text-zinc-400">{t.favoritesHint}</p>}
+            </div>
+          )}
+          {favoriteIssue && <p role="alert" className="text-sm text-red-300">{t[favoriteIssue]}</p>}
+
+          {(list.length > 0 || rarity || query) && (
+            <>
+              <div role="group" aria-label={t.rarity} className="flex flex-wrap gap-2">
+                <button type="button" aria-pressed={!rarity} onClick={() => pick()} className={pill(!rarity)}>{t.all}</button>
+                {summary.rarities.map((r) => (
+                  <button key={r.tierKey} type="button" aria-pressed={rarity === r.tierKey} disabled={!r.count}
+                    onClick={() => pick(rarity === r.tierKey ? undefined : r.tierKey)}
+                    className={`${pill(rarity === r.tierKey)} disabled:cursor-not-allowed disabled:opacity-40`}>
+                    <span aria-hidden="true" className="size-2 rounded-full" style={{ background: r.c }} />
+                    {r.name}
+                    <span className="tabular-nums opacity-70">{r.count}</span>
+                  </button>
+                ))}
+              </div>
+              <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder={t.searchPlaceholder} aria-label={t.search} className={`${field} w-full sm:max-w-sm`} />
+              {list.length ? (
+                <ul className="flex flex-wrap justify-center gap-6 sm:justify-start">
+                  {list.slice(0, limit).map((player) => (
+                    <li key={player.id} className="relative">
+                      <Card player={player} variant="medium" onOpen={() => onOpenCard(player.id)} />
+                      {star(player, false)}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p role="status" className="text-sm text-zinc-400">{t.noResults}</p>}
+              {list.length > limit && (
+                <button type="button" onClick={() => setLimit((l) => l + PAGE)} className={`${primaryBtn} self-center`}>{t.more(list.length - limit)}</button>
+              )}
+            </>
           )}
         </>
       ) : <p className="text-sm text-zinc-400">{t.noCards}</p>}
