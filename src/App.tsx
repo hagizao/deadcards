@@ -48,6 +48,7 @@ const S = strings({
     terms: "Termos",
     managed: "Projeto 4fun gerenciado pelo Hagizao:",
     notAffiliated: "Não afiliado à Valve.",
+    edl: ["Heróis jogados pelos jogadores com dados do", ", sem relação oficial com o site."],
     rmBefore: "Seu sistema está com ",
     rmBold: "movimento reduzido",
     rmAfter: " ativado, então as animações das cartas estão desligadas. Para vê-las, desative essa opção nas configurações de acessibilidade do seu sistema.",
@@ -65,6 +66,7 @@ const S = strings({
     terms: "Terms",
     managed: "4fun project run by Hagizao:",
     notAffiliated: "Not affiliated with Valve.",
+    edl: ["Players' other heroes based on data from", ", with no official affiliation."],
     rmBefore: "Your system has ",
     rmBold: "reduced motion",
     rmAfter: " turned on, so the card animations are off. To see them, turn off that option in your system's accessibility settings.",
@@ -82,6 +84,7 @@ const S = strings({
     terms: "Términos",
     managed: "Proyecto 4fun administrado por Hagizao:",
     notAffiliated: "No afiliado a Valve.",
+    edl: ["Héroes jugados por los jugadores con datos de", ", sin relación oficial con el sitio."],
     rmBefore: "Tu sistema tiene activado el ",
     rmBold: "movimiento reducido",
     rmAfter: ", así que las animaciones de las cartas están desactivadas. Para verlas, desactiva esa opción en los ajustes de accesibilidad de tu sistema.",
@@ -337,7 +340,8 @@ function Shell() {
           <a href="https://www.youtube.com/@hagizao" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">YouTube</a> ·{" "}
           <a href="https://www.twitch.tv/hagizao" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">Twitch</a> ·{" "}
           <a href="https://kick.com/hagizao" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">Kick</a>.{" "}
-          {t.notAffiliated}
+          {t.notAffiliated}{" "}
+          {t.edl[0]} <a href="https://edl.gg" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">edl.gg</a>{t.edl[1]}
         </p>
       </footer>
 
