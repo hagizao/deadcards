@@ -11,17 +11,22 @@ import { CardExportButton } from "./CardExportButton";
 import { TrendBadge } from "./TrendBadge";
 import { Icon } from "./Icon";
 import { easeOut, pill } from "../lib/ui";
+import { MAX_FAVORITES } from "../lib/profile";
+import { toggleFavorite, useMyCards, type FavoriteResult } from "../lib/myCards";
 import type { ArtCredit } from "../lib/types";
 
 gsap.registerPlugin(SplitText);
 const revealed = new Set<string>();
 
 const S = strings({
-  pt: { cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por",
+  pt: { favorite: "Favoritar", favorited: "Favorita", limit: `Até ${MAX_FAVORITES} favoritas. Abra uma favorita e desmarque para marcar outra.`, failed: "Não foi possível salvar a favorita.",
+    cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por",
     stats: "Atributos", statNames: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" } },
-  en: { cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version", artBy: "Art by",
+  en: { favorite: "Favorite", favorited: "Favorite", limit: `Up to ${MAX_FAVORITES} favorites. Open one and unmark it to pick another.`, failed: "Could not save the favorite.",
+    cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version", artBy: "Art by",
     stats: "Attributes", statNames: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" } },
-  es: { cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de",
+  es: { favorite: "Marcar favorita", favorited: "Favorita", limit: `Hasta ${MAX_FAVORITES} favoritas. Abre una y desmárcala para marcar otra.`, failed: "No se pudo guardar la favorita.",
+    cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de",
     stats: "Atributos", statNames: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" } },
 });
 
@@ -34,6 +39,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   const flashRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLSpanElement>(null);
   const [exportReadyId, setExportReadyId] = useState<string>();
+  const { owned, favorites } = useMyCards();
+  const [favIssue, setFavIssue] = useState<{ id: string; r: Exclude<FavoriteResult, "ok"> }>();
+  const [favBusy, setFavBusy] = useState(false);
   const tier = player ? getCardTier(player, settings.tierConfig!) : null;
   const ovr = player ? getPlayerOvr(player) : 0;
   const reveal = useMemo(
@@ -75,6 +83,16 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   const history = getPlayerHistory(player);
   const groupKey = player.variantOf || player.id;
   const versions = players.filter((p) => p.id === groupKey || p.variantOf === groupKey);
+  // só dá para favoritar carta que está na sua coleção
+  const canFavorite = !!owned?.has(player.id);
+  const fav = favorites.includes(player.id);
+  const flipFavorite = async () => {
+    setFavBusy(true);
+    setFavIssue(undefined);
+    const r = await toggleFavorite(player.id);
+    setFavBusy(false);
+    if (r !== "ok") setFavIssue({ id: player.id, r });
+  };
 
   return (
     <motion.div
@@ -117,10 +135,18 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
           <div className="flex flex-wrap items-center gap-2">
             <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.custom ? t.special : tier.name}</span>
             <TrendBadge delta={getPlayerTrend(player)} size="editor" />
+            {canFavorite && (
+              <button type="button" aria-pressed={fav} disabled={favBusy} onClick={flipFavorite}
+                className={`${pill(fav)} disabled:cursor-wait disabled:opacity-60`}>
+                <Icon name="star" className={`size-4 ${fav ? "fill-current" : ""}`} />
+                {fav ? t.favorited : t.favorite}
+              </button>
+            )}
             <CardExportButton key={player.id} cardRef={cardRef} name={player.name} disabled={reveal && exportReadyId !== playerId} />
             {onEdit && <button type="button" onClick={() => onEdit(player.id)} className={`${pill(true)} ml-auto hover:bg-white`}>{t.edit}</button>}
             {player.special && player.specialText && <span className="text-xs font-bold text-amber-200">✦ {player.specialText}</span>}
           </div>
+          {favIssue?.id === player.id && <p role="alert" className="text-sm text-red-300">{t[favIssue.r]}</p>}
 
           <div>
             <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.stats}</h3>

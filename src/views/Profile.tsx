@@ -6,14 +6,15 @@ import { Range } from "../components/Range";
 import { POSITIONS, STAT_KEYS, calculateOVR, getPlayerOvr, teamOf, useLabel } from "../lib/cards";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { MAX_FAVORITES, PROFILE_CARD_PATH, PROFILE_NAME_MAX, favoritePath, profilePlayer, profileUrl, summarizeCollection, type ProfileCard, type ProfileCardState, type PublicProfile } from "../lib/profile";
+import { MAX_FAVORITES, PROFILE_CARD_PATH, PROFILE_NAME_MAX, profilePlayer, profileUrl, summarizeCollection, type ProfileCard, type ProfileCardState, type PublicProfile } from "../lib/profile";
 import { getCardTier } from "../lib/rarity";
+import { useMyCards } from "../lib/myCards";
 import type { Player } from "../lib/types";
 import { field, pageTitle, pill, primaryBtn } from "../lib/ui";
 
 const S = strings({
   pt: {
-    favorites: "Favoritas", addFavorite: (n: string) => `Favoritar ${n}`, removeFavorite: (n: string) => `Desfavoritar ${n}`, favoriteFailed: "Não foi possível salvar o favorito.", favoriteLimit: `Até ${MAX_FAVORITES} favoritas. Tire uma para marcar outra.`, favoritesHint: `Marque até ${MAX_FAVORITES} cartas com a estrela para elas ficarem em destaque aqui.`,
+    favorites: "Favoritas", favoritesHint: `Abra uma carta e toque em Favoritar: até ${MAX_FAVORITES} ficam em destaque aqui.`,
     progress: "Progresso", best: "Maior OVR", catalog: (owned: number, total: number) => `${owned} de ${total} cartas`,
     rarity: "Filtrar por raridade", all: "Todas", search: "Buscar cartas", searchPlaceholder: "Jogador, herói ou time…",
     noResults: "Nenhuma carta corresponde aos filtros.", more: (n: number) => `Mostrar mais (${n})`,
@@ -27,7 +28,7 @@ const S = strings({
     invalid_card: "Confira o nome, o herói e os atributos.", unavailable: "Não foi possível carregar agora.", login: "Entre para editar sua carta.",
   },
   en: {
-    favorites: "Favorites", addFavorite: (n: string) => `Favorite ${n}`, removeFavorite: (n: string) => `Unfavorite ${n}`, favoriteFailed: "Could not save the favorite.", favoriteLimit: `Up to ${MAX_FAVORITES} favorites. Remove one to pick another.`, favoritesHint: `Star up to ${MAX_FAVORITES} cards to feature them here.`,
+    favorites: "Favorites", favoritesHint: `Open a card and tap Favorite: up to ${MAX_FAVORITES} are featured here.`,
     progress: "Progress", best: "Highest OVR", catalog: (owned: number, total: number) => `${owned} of ${total} cards`,
     rarity: "Filter by rarity", all: "All", search: "Search cards", searchPlaceholder: "Player, hero or team…",
     noResults: "No cards match your filters.", more: (n: number) => `Show more (${n})`,
@@ -41,7 +42,7 @@ const S = strings({
     invalid_card: "Check the name, hero and attributes.", unavailable: "Could not load right now.", login: "Sign in to edit your card.",
   },
   es: {
-    favorites: "Favoritas", addFavorite: (n: string) => `Marcar ${n} como favorita`, removeFavorite: (n: string) => `Quitar ${n} de favoritas`, favoriteFailed: "No se pudo guardar el favorito.", favoriteLimit: `Hasta ${MAX_FAVORITES} favoritas. Quita una para marcar otra.`, favoritesHint: `Marca hasta ${MAX_FAVORITES} cartas con la estrella para destacarlas aquí.`,
+    favorites: "Favoritas", favoritesHint: `Abre una carta y toca Marcar favorita: hasta ${MAX_FAVORITES} se destacan aquí.`,
     progress: "Progreso", best: "OVR más alto", catalog: (owned: number, total: number) => `${owned} de ${total} cartas`,
     rarity: "Filtrar por rareza", all: "Todas", search: "Buscar cartas", searchPlaceholder: "Jugador, héroe o equipo…",
     noResults: "Ninguna carta coincide con los filtros.", more: (n: number) => `Mostrar más (${n})`,
@@ -161,23 +162,22 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
         </div>
       )}
 
-      <ProfileCards ids={profile.cards} initialFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} onRedeem={onRedeem} />
+      <ProfileCards ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} onRedeem={onRedeem} />
     </section>
   );
 }
 
 const PAGE = 18;
 
-function ProfileCards({ ids, initialFavorites, owner, onOpenCard, onRedeem }: { ids: string[]; initialFavorites: string[]; owner: boolean; onOpenCard: (id: string) => void; onRedeem: () => void }) {
+function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { ids: string[]; profileFavorites: string[]; owner: boolean; onOpenCard: (id: string) => void; onRedeem: () => void }) {
   const t = useT(S);
   const { players, teams, settings } = useData();
   const [q, setQ] = useState("");
   const [rarity, setRarity] = useState<string>();
   const [limit, setLimit] = useState(PAGE);
-  const [favorites, setFavorites] = useState(initialFavorites);
-  const [popped, setPopped] = useState<string>();
-  const pending = useRef(new Set<string>());
-  const [favoriteIssue, setFavoriteIssue] = useState<"favoriteFailed" | "favoriteLimit">();
+  // no seu perfil as favoritas acompanham o que você marca no destaque da carta
+  const mine = useMyCards();
+  const favorites = owner && mine.owned ? mine.favorites : profileFavorites;
   const query = useDeferredValue(q.trim().toLowerCase());
 
   const summary = summarizeCollection(players, ids, settings.tierConfig!);
@@ -193,34 +193,9 @@ function ProfileCards({ ids, initialFavorites, owner, onOpenCard, onRedeem }: { 
     .sort(byOvr);
   const pick = (key?: string) => { setRarity(key); setLimit(PAGE); };
 
-  const toggleFavorite = async (id: string) => {
-    if (pending.current.has(id)) return;
-    const was = favoriteIds.has(id);
-    if (!was && favoriteIds.size >= MAX_FAVORITES) { setFavoriteIssue("favoriteLimit"); return; }
-    pending.current.add(id);
-    const set = (on: boolean) => setFavorites((f) => on ? [id, ...f.filter((x) => x !== id)] : f.filter((x) => x !== id));
-    set(!was);
-    setPopped(was ? undefined : id);
-    setFavoriteIssue(undefined);
-    try {
-      const res = await fetch(favoritePath(id), { method: was ? "DELETE" : "PUT" });
-      if (!res.ok) throw new Error(String(res.status));
-    } catch (e) {
-      set(was);
-      setFavoriteIssue(e instanceof Error && e.message === "409" ? "favoriteLimit" : "favoriteFailed");
-    } finally {
-      pending.current.delete(id);
-    }
-  };
-
-  const star = (player: Player, fav: boolean) => owner ? (
-    <button type="button" aria-pressed={fav} onClick={() => toggleFavorite(player.id)} onAnimationEnd={(e) => e.animationName === "fav-ring" && setPopped(undefined)}
-      aria-label={fav ? t.removeFavorite(player.name) : t.addFavorite(player.name)} title={fav ? t.removeFavorite(player.name) : t.addFavorite(player.name)}
-      className={`absolute top-2 right-2 z-20 flex size-11 cursor-pointer items-center justify-center rounded-full bg-dl-black/80 shadow-lg backdrop-blur-sm transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:scale-95 motion-reduce:transition-none sm:size-9 ${fav ? "text-amber-300" : "text-zinc-300 hover:text-white"} ${popped === player.id ? "fav-pop" : ""}`}>
-      <Icon name="star" className={`size-5 ${fav ? "fill-current" : ""}`} />
-    </button>
-  ) : fav && (
-    <span role="img" aria-label={t.favorites} className="absolute top-2 right-2 z-20 flex size-9 items-center justify-center rounded-full bg-dl-black/80 text-amber-300">
+  // a estrela só indica; marcar e desmarcar é no destaque da carta
+  const star = (fav: boolean) => fav && (
+    <span role="img" aria-label={t.favorites} className="pointer-events-none absolute top-2 right-2 z-20 flex size-9 items-center justify-center rounded-full bg-dl-black/80 text-amber-300">
       <Icon name="star" className="size-5 fill-current" />
     </span>
   );
@@ -267,14 +242,13 @@ function ProfileCards({ ids, initialFavorites, owner, onOpenCard, onRedeem }: { 
                   {pinned.map((player) => (
                     <li key={player.id} className="relative drop-shadow-[0_0_28px_rgb(252_211_77/0.35)]">
                       <Card player={player} onOpen={() => onOpenCard(player.id)} />
-                      {star(player, true)}
+                      {star(true)}
                     </li>
                   ))}
                 </ul>
               ) : <p className="text-sm text-zinc-400">{t.favoritesHint}</p>}
             </div>
           )}
-          {favoriteIssue && <p role="alert" className="text-sm text-red-300">{t[favoriteIssue]}</p>}
 
           {(list.length > 0 || rarity || query) && (
             <>
@@ -296,7 +270,7 @@ function ProfileCards({ ids, initialFavorites, owner, onOpenCard, onRedeem }: { 
                   {list.slice(0, limit).map((player) => (
                     <li key={player.id} className="relative">
                       <Card player={player} variant="medium" onOpen={() => onOpenCard(player.id)} />
-                      {star(player, false)}
+                      
                     </li>
                   ))}
                 </ul>

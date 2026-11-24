@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { useData } from "../lib/data";
 import { getPlayerOvr, isMainCard, teamOf, useLabel } from "../lib/cards";
 import { Card } from "../components/Card";
 import { strings, useT } from "../lib/i18n";
 import { easeOut, field, pageTitle, pill, primaryBtn } from "../lib/ui";
 import { RedeemForm } from "./Redeem";
+import { addOwned, useMyCards } from "../lib/myCards";
 import { SignInOptions } from "./Login";
 
 type Mode = "mine" | "all";
@@ -99,7 +100,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   const { teams, players, me } = useData();
   const [mode, setMode] = useState<Mode>("mine");
   // ids das cartas que a pessoa tem; null enquanto carrega
-  const [owned, setOwned] = useState<Set<string> | null>(null);
+  const { owned } = useMyCards();
   const [q, setQ] = useState("");
   const [team, setTeam] = useState("ALL");
   const [hero, setHero] = useState("ALL");
@@ -109,16 +110,6 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   const [onlySpecial, setOnlySpecial] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const query = useDeferredValue(q.trim().toLowerCase());
-
-  useEffect(() => {
-    if (!me) return;
-    let live = true;
-    fetch("/api/collection")
-      .then((r) => (r.ok ? (r.json() as Promise<string[]>) : []))
-      .catch(() => [] as string[])
-      .then((ids) => { if (live) setOwned(new Set(ids)); });
-    return () => { live = false; };
-  }, [me]);
 
   const mine = mode === "mine";
   const has = (id: string) => !!owned?.has(id);
@@ -145,7 +136,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
             </button>
           ))}
         </div>
-        {me ? <RedeemForm onRedeemed={(id) => setOwned((o) => new Set(o).add(id))} /> : mine && (
+        {me ? <RedeemForm onRedeemed={addOwned} /> : mine && (
           <div className="flex max-w-sm flex-col gap-3">
             <p className="text-sm text-zinc-300">{t.signIn}</p>
             <SignInOptions />
