@@ -6,7 +6,6 @@ import { Home } from "./views/Home";
 import { Teams } from "./views/Teams";
 import { TierList } from "./views/TierList";
 import { Collection } from "./views/Collection";
-import { Redeem } from "./views/Redeem";
 import { Spotlight } from "./components/Spotlight";
 import { Login } from "./views/Login";
 import { Account } from "./components/Account";
@@ -32,13 +31,13 @@ function GitHubIcon() {
   );
 }
 
-type Tab = "home" | "teams" | "tierlist" | "collection" | "redeem" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "settings";
-const TABS = ["teams", "tierlist", "collection", "compare", "redeem"] as const;
-const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", compare: "versus", redeem: "ticket" } as const;
+type Tab = "home" | "teams" | "tierlist" | "collection" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "settings";
+const TABS = ["teams", "tierlist", "collection", "compare"] as const;
+const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", compare: "versus" } as const;
 
 const S = strings({
   pt: {
-    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", compare: "Comparar", redeem: "Resgatar" },
+    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", compare: "Comparar" },
     mainNav: "Navegação principal",
     projectLinks: "Links do projeto",
     language: "Idioma",
@@ -55,7 +54,7 @@ const S = strings({
     rmClose: "Fechar aviso",
   },
   en: {
-    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", compare: "Compare", redeem: "Redeem" },
+    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", compare: "Compare" },
     mainNav: "Main navigation",
     projectLinks: "Project links",
     language: "Language",
@@ -72,7 +71,7 @@ const S = strings({
     rmClose: "Dismiss notice",
   },
   es: {
-    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", compare: "Comparar", redeem: "Canjear" },
+    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", compare: "Comparar" },
     mainNav: "Navegación principal",
     projectLinks: "Enlaces del proyecto",
     language: "Idioma",
@@ -308,13 +307,12 @@ function Shell() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.15, ease: easeOut }}
           >
-            {tab === "home" && <Home onOpenTeam={openTeam} onOpenCard={setSpotlight} onNavigate={go} />}
+            {tab === "home" && <Home onOpenTeam={openTeam} onOpenCard={setSpotlight} onNavigate={(a) => go(a === "redeem" ? "collection" : a)} />}
             {tab === "teams" && <Teams focusTeamId={focusTeam} onOpenCard={setSpotlight} />}
             {tab === "tierlist" && <TierList onOpenCard={setSpotlight} onOpenTeam={openTeam} />}
             {tab === "collection" && <Collection onOpenCard={setSpotlight} />}
-            {tab === "redeem" && <Redeem onOpenCard={setSpotlight} />}
             {tab === "compare" && <Compare onOpenCard={setSpotlight} />}
-            {tab === "profile" && profileId && <Profile key={profileId} userId={profileId} onOpenCard={setSpotlight} onRedeem={() => setTab("redeem")} />}
+            {tab === "profile" && profileId && <Profile key={profileId} userId={profileId} onOpenCard={setSpotlight} onRedeem={() => setTab("collection")} />}
             {tab === "settings" && me && <Settings link={linkResult} />}
             {tab === "editor" && me?.admin && <Editor editId={editId} onEditId={setEditId} />}
             {(tab === "privacy" || tab === "terms") && <Legal page={tab} />}
