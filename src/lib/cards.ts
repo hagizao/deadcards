@@ -63,7 +63,8 @@ export function getPlayerTrend(p: Player): number {
 }
 
 export function isRosterCard(players: Player[], p: Player): boolean {
-  if (p.inactive) return false;
+  // herói jogado é a mesma pessoa com outro herói: nunca entra no elenco nem na média do time
+  if (p.inactive || isAltHero(p)) return false;
   // Versão no mesmo time da carta principal é o mesmo jogador: fica fora do elenco e da média do time.
   return isMainCard(p) || !players.some((m) => m.id === p.variantOf && m.teamId === p.teamId);
 }
@@ -130,6 +131,11 @@ export function hexToRgba(hex: string, alpha = 1): string {
 
 export function isMainCard(p: Player): boolean {
   return !p.variantOf || p.variantOf === p.id;
+}
+
+/** Carta de herói jogado: versão do jogador com outro herói, fora do herói de assinatura. */
+export function isAltHero(p: Player): boolean {
+  return !isMainCard(p) && !!p.altHero;
 }
 
 export function teamOf(teams: Team[], p: Player): Team {

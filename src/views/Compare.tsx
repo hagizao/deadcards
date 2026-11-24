@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Card } from "../components/Card";
-import { STAT_KEYS, getPlayerOvr, isMainCard, teamOf, useLabel } from "../lib/cards";
+import { STAT_KEYS, getPlayerOvr, isAltHero, isMainCard, teamOf, useLabel } from "../lib/cards";
 import { useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
 import { getCardTier } from "../lib/rarity";
@@ -17,6 +17,7 @@ const S = strings({
     none: "Nenhum jogador encontrado.",
     empty: "Escolha uma carta para comparar",
     main: "Principal",
+    otherHero: "Herói jogado",
     special: "Versão especial",
     swap: "Trocar lados",
     attributes: "Atributos em confronto",
@@ -33,6 +34,7 @@ const S = strings({
     none: "No player found.",
     empty: "Pick a card to compare",
     main: "Main",
+    otherHero: "Other hero",
     special: "Special version",
     swap: "Swap sides",
     attributes: "Head to head",
@@ -49,6 +51,7 @@ const S = strings({
     none: "No se encontró ningún jugador.",
     empty: "Elige una carta para comparar",
     main: "Principal",
+    otherHero: "Héroe jugado",
     special: "Versión especial",
     swap: "Cambiar lados",
     attributes: "Atributos frente a frente",
@@ -157,7 +160,7 @@ function Picker({ label, value, onChange }: { label: string; value: string; onCh
       <input id={id} type="search" className={`${field} w-full min-w-0`} placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} />
       <select className={`${field} w-full min-w-0`} aria-label={`${label}: ${t.select}`} value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">{t.select}</option>
-        {options.map((p) => <option key={p.id} value={p.id}>{p.name} · {getPlayerOvr(p)} · {isMainCard(p) ? t.main : p.specialText || t.special} · {p.hero} · {teamOf(teams, p).tag}</option>)}
+        {options.map((p) => <option key={p.id} value={p.id}>{p.name} · {getPlayerOvr(p)} · {isMainCard(p) ? t.main : isAltHero(p) ? t.otherHero : p.specialText || t.special} · {p.hero} · {teamOf(teams, p).tag}</option>)}
       </select>
       {!matches.length && <p className="text-xs text-zinc-400" role="status">{t.none}</p>}
     </div>

@@ -23,7 +23,7 @@ export interface Env {
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art"];
+const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "altHero", "inactive", "art"];
 const ID_RE = /^[\w-]{1,64}$/;
 
 const keyOf = (url: unknown) => (typeof url === "string" && url.startsWith("/img/") ? url.slice(5) : null);
@@ -171,6 +171,8 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
         if (main.v && main.v !== b.variantOf) return bad("escolha a carta principal do jogador, não uma versão");
         if (await hasVersions()) return bad("esta carta é a principal de outras versões; troque a principal antes", 409);
       }
+      // herói jogado só existe como versão de um jogador
+      if (b.altHero !== true || b.variantOf === undefined) delete b.altHero;
       if (b.art && typeof b.art === "object") {
         const credit = artCredit((b.art as { credit?: unknown }).credit);
         if (credit === null) return bad("crédito da arte inválido: nome até 60 caracteres e link http(s)");

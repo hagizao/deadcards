@@ -41,6 +41,8 @@ export type Player = {
   specialText?: string;
   frame?: Frame;
   variantOf?: string;
+  /** Versão do mesmo jogador com outro herói que ele joga (a principal é o herói de assinatura). */
+  altHero?: boolean;
   inactive?: boolean;
   art?: { url: string; zoom?: number; x?: number; y?: number; credit?: ArtCredit };
 };
