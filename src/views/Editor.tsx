@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, useData } from "../lib/data";
-import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isMainCard } from "../lib/cards";
+import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard } from "../lib/cards";
 import { FRAME_PRESETS, getCardTier, type Tier } from "../lib/rarity";
 import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
 import { Card } from "../components/Card";
@@ -85,6 +85,8 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
   const [section, setSection] = useState<Section>("card");
   const [prevEditId, setPrevEditId] = useState(editId);
   const [versionOf, setVersionOf] = useState<string | null>(null);
+  // a nova versão é de outro herói que o jogador joga (e não um time ou carta especial)
+  const [altHero, setAltHero] = useState(false);
   if (editId !== prevEditId) {
     setPrevEditId(editId);
     if (editId) {
@@ -96,8 +98,9 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
     setVersionOf(null);
     onEditId(id);
   };
-  const newVersion = (mainId: string) => {
+  const newVersion = (mainId: string, hero = false) => {
     setVersionOf(mainId);
+    setAltHero(hero);
     onEditId(null);
   };
   return (
@@ -112,7 +115,7 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
       </div>
       <AnimatePresence mode="wait">
         <motion.div key={section} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.22 }}>
-          {section === "card" && <PlayerForm key={editId ?? (versionOf ? `new:${versionOf}` : "new")} editId={editId} onEditId={pick} versionOf={versionOf} onNewVersion={newVersion} />}
+          {section === "card" && <PlayerForm key={editId ?? (versionOf ? `new:${versionOf}:${altHero}` : "new")} editId={editId} onEditId={pick} versionOf={versionOf} altHero={altHero} onNewVersion={newVersion} />}
           {section === "teams" && <TeamsForm />}
           {section === "heroes" && <HeroesForm />}
           {section === "look" && <LookForm />}
@@ -138,13 +141,20 @@ function withHistory(p: Player, date: string, rebase: boolean): Player {
   return { ...p, ovr, history };
 }
 
-function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: string | null; onEditId: (id: string | null) => void; versionOf: string | null; onNewVersion: (mainId: string) => void }) {
+function PlayerForm({ editId, onEditId, versionOf, altHero, onNewVersion }: { editId: string | null; onEditId: (id: string | null) => void; versionOf: string | null; altHero: boolean; onNewVersion: (mainId: string, hero?: boolean) => void }) {
   const { players, teams, heroNames, heroIcon, settings, reload } = useData();
   const existing = editId ? players.find((p) => p.id === editId) : undefined;
   const base = !existing && versionOf ? players.find((p) => p.id === versionOf) : undefined;
   const [d, setD] = useState<Player>(() => {
     if (existing) return structuredClone({ ...existing, ovr: getPlayerOvr(existing) });
-    if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, history: [], inactive: undefined, special: true };
+    if (base && altHero) {
+      // herói jogado: começa um pouco abaixo da principal (pool de heróis igual), com o primeiro herói que ele ainda não tem
+      const taken = new Set(cardVersions(players, base).map((c) => c.hero));
+      const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, k === "POL" ? base.stats[k] : Math.max(1, base.stats[k] - 3)])) as Stats;
+      return { ...structuredClone(base), stats, ovr: Math.max(1, getPlayerOvr(base) - 3), hero: heroNames.find((h) => !taken.has(h)) ?? base.hero,
+        id: "", variantOf: base.id, altHero: true, history: [], inactive: undefined, special: undefined, specialText: undefined, frame: undefined, art: undefined };
+    }
+    if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, altHero: undefined, history: [], inactive: undefined, special: true };
     return blankPlayer(teams[0]?.id ?? "");
   });
   const [date, setDate] = useState(today);
@@ -177,7 +187,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <span className="rk-chip">{d.id ? "Modo Edição" : "Modo Criação"}</span>
-            <h2 className="mt-2 text-2xl font-black tracking-[0.12em] text-white uppercase">{d.id ? `Editar: ${existing?.name ?? d.name}` : base ? `Nova versão de ${base.name}` : "Criar Novo Jogador"}</h2>
+            <h2 className="mt-2 text-2xl font-black tracking-[0.12em] text-white uppercase">{d.id ? `Editar: ${existing?.name ?? d.name}` : base ? `${altHero ? "Novo herói jogado" : "Nova versão"} de ${base.name}` : "Criar Novo Jogador"}</h2>
           </div>
           <select className={`${input} min-h-11 w-auto sm:min-h-0`} value={main && isMainCard(main) ? main.id : ""} onChange={(e) => onEditId(e.target.value || null)} aria-label="Jogador">
             <option value="">+ Novo jogador</option>
@@ -191,10 +201,11 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
               const active = c.id === d.id;
               return (
                 <button key={c.id} type="button" aria-pressed={active} onClick={() => onEditId(c.id)} className={`${chip} ${active ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>
-                  {isMainCard(c) ? "Principal" : c.special ? "Especial" : "Versão"} · {tagOf(c)} · {getPlayerOvr(c)}
+                  {isMainCard(c) ? `Principal · ${c.hero}` : isAltHero(c) ? c.hero : `${c.special ? "Especial" : "Versão"} · ${tagOf(c)}`} · {getPlayerOvr(c)}
                 </button>
               );
             })}
+            <button type="button" className={`${chip} border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white`} onClick={() => onNewVersion(main.id, true)}>+ Herói jogado</button>
             <button type="button" className={`${chip} border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white`} onClick={() => onNewVersion(main.id)}>+ Nova versão</button>
           </div>
         )}
@@ -222,6 +233,12 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
               </Field>
             ) : (
               <p className="text-xs text-zinc-400">Carta principal de {cardVersions(players, d).length - 1} versões. Para trocar, abra uma versão e use Tornar principal.</p>
+            )}
+            {!isMainCard(d) && (
+              <label className="mt-2 flex items-center gap-2 text-sm text-zinc-300">
+                <input type="checkbox" checked={!!d.altHero} onChange={(e) => set({ altHero: e.target.checked || undefined })} className="accent-amber-300" />
+                Herói jogado (o mesmo jogador com outro herói; fica fora do elenco e da tier list)
+              </label>
             )}
           </div>
         </div>
