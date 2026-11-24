@@ -4,7 +4,7 @@ import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { STAT_KEYS, getPlayerHistory, getPlayerOvr, getPlayerTrend, isAltHero, isMainCard, teamOf, useLabel } from "../lib/cards";
+import { STAT_KEYS, getPlayerHistory, getPlayerOvr, getPlayerTrend, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
@@ -82,7 +82,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   if (!tier) return null;
   const history = getPlayerHistory(player);
   const groupKey = player.variantOf || player.id;
-  const versions = players.filter((p) => p.id === groupKey || p.variantOf === groupKey);
+  // herói jogado aposentado só aparece para quem tem a carta (ou quando é a carta aberta)
+  const versions = players.filter((p) => (p.id === groupKey || p.variantOf === groupKey) && (!isRetired(p) || p.id === player.id || !!owned?.has(p.id)));
   // só dá para favoritar carta que está na sua coleção
   const canFavorite = !!owned?.has(player.id);
   const fav = favorites.includes(player.id);

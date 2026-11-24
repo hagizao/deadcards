@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useDeferredValue, useState } from "react";
 import { useData } from "../lib/data";
-import { getPlayerOvr, isAltHero, isMainCard, teamOf, useLabel } from "../lib/cards";
+import { getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { Card } from "../components/Card";
 import { strings, useT } from "../lib/i18n";
 import { easeOut, field, pageTitle, pill, primaryBtn } from "../lib/ui";
@@ -119,14 +119,16 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   const mine = mode === "mine";
   const has = (id: string) => !!owned?.has(id);
 
-  const heroes = [...new Set(players.map((p) => p.hero))].sort();
-  const roles = [...new Set(players.map((p) => p.position))].sort();
+  // herói jogado aposentado só aparece para quem tem a carta
+  const cards = players.filter((p) => !isRetired(p) || has(p.id));
+  const heroes = [...new Set(cards.map((p) => p.hero))].sort();
+  const roles = [...new Set(cards.map((p) => p.position))].sort();
   const every = heroMode === "every";
   // jogadores com cartas de heróis jogados: a principal ganha a tag de assinatura quando elas aparecem junto
-  const withAlts = new Set(players.filter(isAltHero).map((p) => p.variantOf!));
-  const signatures = players.filter(isMainCard);
-  const alts = players.filter((p) => !isMainCard(p));
-  const list = players
+  const withAlts = new Set(cards.filter(isAltHero).map((p) => p.variantOf!));
+  const signatures = cards.filter(isMainCard);
+  const alts = cards.filter((p) => !isMainCard(p));
+  const list = cards
     // "só assinatura": a carta principal de cada jogador; "todos os heróis": também heróis jogados, especiais e outras versões
     .filter((p) => (!mine || has(p.id)) && (onlySpecial ? p.special : every || isMainCard(p)) && (team === "ALL" || p.teamId === team) && (hero === "ALL" || p.hero === hero) && (role === "ALL" || p.position === role))
     .filter((p) => !query || `${p.name} ${p.hero} ${p.position} ${teamOf(teams, p).name}`.toLowerCase().includes(query))

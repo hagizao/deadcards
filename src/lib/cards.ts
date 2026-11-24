@@ -141,6 +141,14 @@ export function isAltHero(p: Player): boolean {
   return !isMainCard(p) && !!p.altHero;
 }
 
+/**
+ * Herói jogado aposentado: o herói saiu da lista do jogador, mas alguém já tinha a carta.
+ * Quem tem continua com ela; para o resto ela some e não pode mais ser dada.
+ */
+export function isRetired(p: Player): boolean {
+  return isAltHero(p) && !!p.inactive;
+}
+
 export function teamOf(teams: Team[], p: Player): Team {
   return teams.find((t) => t.id === p.teamId) ?? { id: "", name: "Sem Time", tag: "FA", region: "Sem Time" };
 }

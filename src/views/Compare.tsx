@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Card } from "../components/Card";
-import { STAT_KEYS, getPlayerOvr, isAltHero, isMainCard, teamOf, useLabel } from "../lib/cards";
+import { STAT_KEYS, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
 import { getCardTier } from "../lib/rarity";
@@ -151,7 +151,7 @@ function Picker({ label, value, onChange }: { label: string; value: string; onCh
   const [query, setQuery] = useState("");
   const id = useId();
   const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const matches = players.filter((p) => normalize(`${p.name} ${p.hero} ${teamOf(teams, p).name}`).includes(normalize(query)));
+  const matches = players.filter((p) => !isRetired(p) && normalize(`${p.name} ${p.hero} ${teamOf(teams, p).name}`).includes(normalize(query)));
   const current = players.find((p) => p.id === value);
   const options = current && !matches.includes(current) ? [current, ...matches] : matches;
   return (

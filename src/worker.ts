@@ -154,7 +154,7 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
   if (del && (kind === "players" || kind === "teams")) {
     const col = kind === "players" ? "id" : "team_id";
     const owned = await db.prepare(`SELECT 1 FROM user_cards uc JOIN players p ON p.id = uc.player_id WHERE p.${col} = ? LIMIT 1`).bind(id).first();
-    if (owned) return bad("há cartas resgatadas por usuários; marque como inativo em vez de apagar", 409);
+    if (owned) return bad("há cartas resgatadas por usuários; marque como inativo em vez de apagar", 409, "owned");
   }
   if (kind === "players") {
     const hasVersions = () => db.prepare("SELECT 1 FROM players WHERE json_extract(extra_json, '$.variantOf') = ? AND id <> ? LIMIT 1").bind(id, id).first();
@@ -218,7 +218,10 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
 }
 
 // shortcut: sem limite de tentativas; o mínimo de 8 caracteres torna o chute inviável, adicionar rate limit se aparecer abuso
-const CODE_VALID = "uses < max_uses AND (starts_at IS NULL OR starts_at <= unixepoch()) AND (expires_at IS NULL OR expires_at > unixepoch())";
+// herói jogado aposentado (altHero + inactive) não é mais dado por código
+const RETIRED = "json_extract(extra_json, '$.altHero') = 1 AND json_extract(extra_json, '$.inactive') = 1";
+const CODE_VALID = `uses < max_uses AND (starts_at IS NULL OR starts_at <= unixepoch()) AND (expires_at IS NULL OR expires_at > unixepoch())
+  AND NOT EXISTS (SELECT 1 FROM players WHERE players.id = redeem_codes.player_id AND ${RETIRED})`;
 const INVALID_CODE = "código inválido, expirado ou esgotado";
 
 async function redeem(env: Env, request: Request): Promise<Response> {
@@ -260,6 +263,7 @@ async function codes(env: Env, request: Request, rest: string): Promise<Response
     if (typeof b.playerId !== "string" || !b.playerId) return bad("escolha o jogador");
     if (startsAt === undefined || expiresAt === undefined) return bad("data inválida");
     if (startsAt !== null && expiresAt !== null && expiresAt <= startsAt) return bad("a expiração deve ser depois do início");
+    if (await env.DB.prepare(`SELECT 1 FROM players WHERE id = ? AND ${RETIRED}`).bind(b.playerId).first()) return bad("esta carta de herói jogado está aposentada");
     try {
       await env.DB.prepare("INSERT INTO redeem_codes (code, player_id, max_uses, starts_at, expires_at) VALUES (?,?,?,?,?)")
         .bind(code, b.playerId, maxUses, startsAt, expiresAt).run();

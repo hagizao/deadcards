@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, useData } from "../lib/data";
-import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, ALT_HERO_DROP } from "../lib/cards";
+import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, isRetired, ALT_HERO_DROP } from "../lib/cards";
 import { FRAME_PRESETS, getCardTier, type Tier } from "../lib/rarity";
 import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
 import { Card } from "../components/Card";
@@ -155,7 +155,9 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
   // a mesma área de heróis serve para o de assinatura (1) e, na carta principal, para os heróis jogados (até MAX_PLAYED)
   const [heroTab, setHeroTab] = useState<"signature" | "played">("signature");
   const altsOf = (id: string) => players.filter((p) => p.variantOf === id && isAltHero(p));
-  const [played, setPlayed] = useState<string[]>(() => (existing && isMainCard(existing) ? altsOf(existing.id).map((c) => c.hero) : []));
+  const [played, setPlayed] = useState<string[]>(() => (existing && isMainCard(existing) ? altsOf(existing.id).filter((c) => !isRetired(c)).map((c) => c.hero) : []));
+  // heróis com carta aposentada: marcar de novo reativa a mesma carta
+  const retired = new Set(existing && isMainCard(existing) ? altsOf(existing.id).filter(isRetired).map((c) => c.hero) : []);
   const { busy, msg, run } = useSaver(reload);
   const set = (patch: Partial<Player>) => setD((p) => ({ ...p, ...patch }));
   const setStat = (k: keyof Stats, v: number) => setD((p) => { const stats = { ...p.stats, [k]: v }; return { ...p, stats, ovr: calculateOVR(stats) }; });
@@ -177,7 +179,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
     const ovr = Math.max(1, getPlayerOvr(main) - ALT_HERO_DROP);
     const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, main.stats[k] - ALT_HERO_DROP)])) as Stats;
     const have = altsOf(main.id);
-    for (const c of have) if (!played.includes(c.hero)) await api.remove("players", c.id);
+    // primeiro cria, reativa e atualiza; só depois tira as desmarcadas, para uma falha não deixar a seleção pela metade
     for (const hero of played) {
       const c = have.find((x) => x.hero === hero);
       if (!c) {
@@ -186,12 +188,23 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
           special: undefined, specialText: undefined, frame: undefined, art: undefined, inactive: undefined });
         continue;
       }
-      const same = getPlayerOvr(c) === ovr && STAT_KEYS.every((k) => c.stats[k] === stats[k]) && c.name === main.name && c.teamId === main.teamId && c.position === main.position;
+      const same = !c.inactive && getPlayerOvr(c) === ovr && STAT_KEYS.every((k) => c.stats[k] === stats[k]) && c.name === main.name && c.teamId === main.teamId && c.position === main.position;
       if (same) continue;
       const history = getPlayerOvr(c) === ovr ? c.history : [...c.history.filter((h) => h.date !== today()), { date: today(), ovr }];
-      await api.save("players", c.id, { ...c, name: main.name, teamId: main.teamId, position: main.position, stats, ovr, history });
+      await api.save("players", c.id, { ...c, name: main.name, teamId: main.teamId, position: main.position, stats, ovr, history, inactive: undefined });
+    }
+    // desmarcada: apaga; se alguém já tem a carta, aposenta (quem tem continua com ela)
+    for (const c of have) {
+      if (played.includes(c.hero) || c.inactive) continue;
+      try {
+        await api.remove("players", c.id);
+      } catch (e) {
+        if ((e as { code?: string }).code !== "owned") throw e;
+        await api.save("players", c.id, { ...c, inactive: true });
+      }
     }
   };
+  const rank = (h: string) => (played.includes(h) ? 2 : retired.has(h) ? 1 : 0);
   const pickHero = (h: string) => {
     if (heroTab === "signature") {
       set({ hero: h });
@@ -231,7 +244,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
               const active = c.id === d.id;
               return (
                 <button key={c.id} type="button" aria-pressed={active} onClick={() => onEditId(c.id)} className={`${chip} ${active ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>
-                  {isMainCard(c) ? `Principal · ${c.hero}` : isAltHero(c) ? c.hero : `${c.special ? "Especial" : "Versão"} · ${tagOf(c)}`} · {getPlayerOvr(c)}
+                  {isMainCard(c) ? `Principal · ${c.hero}` : isAltHero(c) ? `${c.hero}${c.inactive ? " (aposentada)" : ""}` : `${c.special ? "Especial" : "Versão"} · ${tagOf(c)}`} · {getPlayerOvr(c)}
                 </button>
               );
             })}
@@ -285,23 +298,29 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
           </div>
           <div className="grid max-h-44 grid-cols-6 gap-1.5 overflow-y-auto p-1 sm:grid-cols-9">
             {heroNames.filter((h) => h.toLowerCase().includes(heroQuery.toLowerCase()))
-              // nos heróis jogados, os escolhidos vêm primeiro para não sumirem no fim da lista
-              .sort((x, y) => (playedTab ? Number(played.includes(y)) - Number(played.includes(x)) : 0))
+              // nos heróis jogados, os escolhidos vêm primeiro e os aposentados logo depois, para não sumirem no fim da lista
+              .sort((x, y) => (playedTab ? rank(y) - rank(x) : 0))
               .map((h) => {
               const icon = heroIcon(h);
               const on = playedTab ? played.includes(h) : d.hero === h;
               // nos heróis jogados, o de assinatura fica travado e a seleção para em MAX_PLAYED
               const locked = playedTab && (h === d.hero || (!on && played.length >= MAX_PLAYED));
               return (
-                <button key={h} type="button" onClick={() => pickHero(h)} title={playedTab && h === d.hero ? `${h} (assinatura)` : h} aria-pressed={on} disabled={locked}
-                  className={`aspect-square cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 transition hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-25 disabled:grayscale disabled:hover:scale-100 motion-reduce:transition-none ${
+                <button key={h} type="button" onClick={() => pickHero(h)} title={playedTab && h === d.hero ? `${h} (assinatura)` : playedTab && retired.has(h) ? `${h} (carta aposentada)` : h} aria-pressed={on} disabled={locked}
+                  className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 transition hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-25 disabled:grayscale disabled:hover:scale-100 motion-reduce:transition-none ${
                     on ? (playedTab ? "border-amber-300 shadow-[0_0_12px_rgb(252_211_77/0.5)]" : "border-white shadow-[0_0_12px_rgba(255,255,255,0.5)]") : "border-zinc-200/10 opacity-70 hover:opacity-100"}`}>
                   {icon ? <img src={icon} alt={h} className="size-full object-cover" loading="lazy" /> : <span className="text-[9px] text-zinc-300">{h}</span>}
+                  {playedTab && retired.has(h) && !on && <span aria-hidden="true" className="absolute top-1 right-1 size-2 rounded-full bg-amber-300 ring-2 ring-zinc-950" />}
                 </button>
               );
             })}
           </div>
-          {playedTab && <p className="text-xs text-zinc-400">Cada herói jogado vira uma carta com tudo {ALT_HERO_DROP} abaixo da assinatura. Aplica ao salvar.</p>}
+          {playedTab && (
+            <p className="text-xs text-zinc-400">
+              Cada herói jogado vira uma carta com tudo {ALT_HERO_DROP} abaixo da assinatura. Aplica ao salvar.
+              {retired.size > 0 && <> <span className="text-amber-200">●</span> carta aposentada: alguém já tinha, então ela ficou com quem tem; marcar de novo reativa a mesma carta.</>}
+            </p>
+          )}
         </div>
 
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -654,7 +673,7 @@ function CodesForm() {
   const [msg, setMsg] = useState("");
 
   const label = (p: Player) => `${p.name} · ${p.hero} · ${teams.find((t) => t.id === p.teamId)?.tag ?? ""}`;
-  const byLabel = new Map(players.map((p) => [label(p), p.id]));
+  const byLabel = new Map(players.filter((p) => !isRetired(p)).map((p) => [label(p), p.id]));
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? id;
 
   const load = () =>
@@ -715,7 +734,7 @@ function CodesForm() {
           <Field label="2. Carta">
             <input list="codes-players" value={pick} onChange={(e) => setPick(e.target.value)} placeholder="Digite o nome do jogador…" className={input} />
             <datalist id="codes-players">
-              {[...players].sort((a, b) => a.name.localeCompare(b.name)).map((p) => <option key={p.id} value={label(p)} />)}
+              {players.filter((p) => !isRetired(p)).sort((a, b) => a.name.localeCompare(b.name)).map((p) => <option key={p.id} value={label(p)} />)}
             </datalist>
           </Field>
 
