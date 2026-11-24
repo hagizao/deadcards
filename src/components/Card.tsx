@@ -115,7 +115,7 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
             {!medium && (
               <div className={`grid grid-cols-2 gap-x-5 ${editor ? "px-5" : "px-4"} card-txt-shadow gap-y-1.5 py-1`}>
                 {STAT_ORDER.map((k) => (
-                  <div key={k} className="flex items-center justify-between leading-none">
+                  <div key={k} data-stat={k} className="flex items-center justify-between leading-none">
                     <span className={`${editor ? "text-base" : "text-sm"} font-extrabold tracking-wider text-zinc-200`}>{k}</span>
                     <span className={`${editor ? "text-xl" : "text-lg"} font-black text-white`}>{player.stats[k]}</span>
                   </div>
