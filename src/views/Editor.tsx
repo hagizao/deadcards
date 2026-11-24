@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, useData } from "../lib/data";
-import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard } from "../lib/cards";
+import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, ALT_HERO_DROP } from "../lib/cards";
 import { FRAME_PRESETS, getCardTier, type Tier } from "../lib/rarity";
 import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
 import { Card } from "../components/Card";
@@ -148,10 +148,10 @@ function PlayerForm({ editId, onEditId, versionOf, altHero, onNewVersion }: { ed
   const [d, setD] = useState<Player>(() => {
     if (existing) return structuredClone({ ...existing, ovr: getPlayerOvr(existing) });
     if (base && altHero) {
-      // herói jogado: começa um pouco abaixo da principal (pool de heróis igual), com o primeiro herói que ele ainda não tem
+      // herói jogado: tudo ALT_HERO_DROP abaixo da principal (OVR incluso), com o primeiro herói que ele ainda não tem
       const taken = new Set(cardVersions(players, base).map((c) => c.hero));
-      const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, k === "POL" ? base.stats[k] : Math.max(1, base.stats[k] - 3)])) as Stats;
-      return { ...structuredClone(base), stats, ovr: Math.max(1, getPlayerOvr(base) - 3), hero: heroNames.find((h) => !taken.has(h)) ?? base.hero,
+      const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, base.stats[k] - ALT_HERO_DROP)])) as Stats;
+      return { ...structuredClone(base), stats, ovr: Math.max(1, getPlayerOvr(base) - ALT_HERO_DROP), hero: heroNames.find((h) => !taken.has(h)) ?? base.hero,
         id: "", variantOf: base.id, altHero: true, history: [], inactive: undefined, special: undefined, specialText: undefined, frame: undefined, art: undefined };
     }
     if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, altHero: undefined, history: [], inactive: undefined, special: true };

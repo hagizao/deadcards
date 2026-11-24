@@ -335,14 +335,18 @@ function Shell() {
             <button type="button" onClick={() => setTab("terms")} className="cursor-pointer hover:text-white">{t.terms}</button>
           </nav>
         </div>
-        <p className="mx-auto max-w-7xl px-4 pb-6 text-xs text-zinc-500 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 pb-6 text-xs text-zinc-500 sm:px-6 lg:px-8">
+        <p>
           {t.managed}{" "}
           <a href="https://www.youtube.com/@hagizao" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">YouTube</a> ·{" "}
           <a href="https://www.twitch.tv/hagizao" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">Twitch</a> ·{" "}
           <a href="https://kick.com/hagizao" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">Kick</a>.{" "}
-          {t.notAffiliated}{" "}
+          {t.notAffiliated}
+        </p>
+        <p>
           {t.edl[0]} <a href="https://edl.gg" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">edl.gg</a>{t.edl[1]}
         </p>
+        </div>
       </footer>
 
       <nav className="noir-glass-strong fixed inset-x-0 bottom-0 z-40 flex border-t border-zinc-200/15 pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label={t.mainNav}>

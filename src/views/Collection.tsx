@@ -12,14 +12,14 @@ import { SignInOptions } from "./Login";
 type Mode = "mine" | "all";
 type HeroMode = "signature" | "every";
 type SortKey = "ovr" | "name" | "MIR" | "MAC" | "SUP" | "MOV" | "POL" | "CON";
-const PAGE = 24;
+const PAGE = 30;
 
 const S = strings({
   pt: {
     title: "Coleção",
     count: (n: number) => `${n} ${n === 1 ? "carta" : "cartas"}`,
     progress: (n: number, total: number) => `Assinatura: ${n} de ${total}`,
-    progressAlt: (n: number, total: number) => `Heróis jogados: ${n} de ${total}`,
+    progressAlt: (n: number, total: number) => `Outras versões: ${n} de ${total}`,
     heroMode: "Quais heróis",
     signature: "Só herói de assinatura",
     every: "Todos os heróis",
@@ -41,7 +41,6 @@ const S = strings({
     sort: "Ordenar",
     sortBy: (k: string) => `Ordenar: ${k}`,
     name: "Nome",
-    allVersions: "Todas as versões",
     onlySpecial: "Só especiais",
     more: (n: number) => `Mostrar mais (${n})`,
   },
@@ -49,7 +48,7 @@ const S = strings({
     title: "Collection",
     count: (n: number) => `${n} ${n === 1 ? "card" : "cards"}`,
     progress: (n: number, total: number) => `Signature: ${n} of ${total}`,
-    progressAlt: (n: number, total: number) => `Other heroes: ${n} of ${total}`,
+    progressAlt: (n: number, total: number) => `Other versions: ${n} of ${total}`,
     heroMode: "Which heroes",
     signature: "Signature hero only",
     every: "All heroes",
@@ -71,7 +70,6 @@ const S = strings({
     sort: "Sort",
     sortBy: (k: string) => `Sort: ${k}`,
     name: "Name",
-    allVersions: "All versions",
     onlySpecial: "Specials only",
     more: (n: number) => `Show more (${n})`,
   },
@@ -79,7 +77,7 @@ const S = strings({
     title: "Colección",
     count: (n: number) => `${n} ${n === 1 ? "carta" : "cartas"}`,
     progress: (n: number, total: number) => `Firma: ${n} de ${total}`,
-    progressAlt: (n: number, total: number) => `Otros héroes: ${n} de ${total}`,
+    progressAlt: (n: number, total: number) => `Otras versiones: ${n} de ${total}`,
     heroMode: "Qué héroes",
     signature: "Solo héroe de firma",
     every: "Todos los héroes",
@@ -101,7 +99,6 @@ const S = strings({
     sort: "Ordenar",
     sortBy: (k: string) => `Ordenar: ${k}`,
     name: "Nombre",
-    allVersions: "Todas las versiones",
     onlySpecial: "Solo especiales",
     more: (n: number) => `Mostrar más (${n})`,
   },
@@ -120,7 +117,6 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   const [hero, setHero] = useState("ALL");
   const [role, setRole] = useState("ALL");
   const [sort, setSort] = useState<SortKey>("ovr");
-  const [allVersions, setAllVersions] = useState(false);
   const [onlySpecial, setOnlySpecial] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const query = useDeferredValue(q.trim().toLowerCase());
@@ -133,13 +129,11 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   const every = heroMode === "every";
   // jogadores com cartas de heróis jogados: a principal ganha a tag de assinatura quando elas aparecem junto
   const withAlts = new Set(players.filter(isAltHero).map((p) => p.variantOf!));
-  const signatures = players.filter((p) => !isAltHero(p));
-  const alts = players.filter(isAltHero);
+  const signatures = players.filter(isMainCard);
+  const alts = players.filter((p) => !isMainCard(p));
   const list = players
-    // herói jogado só aparece em "todos os heróis"
-    .filter((p) => every || !isAltHero(p))
-    // na sua coleção entram todas as versões que você tem; em "todas", só a principal (ou as outras versões, se marcar)
-    .filter((p) => (mine ? has(p.id) && (!onlySpecial || p.special) : onlySpecial ? p.special : isMainCard(p) || isAltHero(p) || allVersions) && (team === "ALL" || p.teamId === team) && (hero === "ALL" || p.hero === hero) && (role === "ALL" || p.position === role))
+    // "só assinatura": a carta principal de cada jogador; "todos os heróis": também heróis jogados, especiais e outras versões
+    .filter((p) => (!mine || has(p.id)) && (onlySpecial ? p.special : every || isMainCard(p)) && (team === "ALL" || p.teamId === team) && (hero === "ALL" || p.hero === hero) && (role === "ALL" || p.position === role))
     .filter((p) => !query || `${p.name} ${p.hero} ${p.position} ${teamOf(teams, p).name}`.toLowerCase().includes(query))
     .sort((a, b) => (sort === "name" ? a.name.localeCompare(b.name) : sort === "ovr" ? getPlayerOvr(b) - getPlayerOvr(a) : b.stats[sort] - a.stats[sort]));
 
@@ -198,12 +192,6 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
             <option value="name">{t.sortBy(t.name)}</option>
             {(["MIR", "MAC", "SUP", "MOV", "POL", "CON"] as const).map((k) => <option key={k} value={k}>{t.sortBy(k)}</option>)}
           </select>
-          {!mine && (
-            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-zinc-300 sm:min-h-9">
-              <input type="checkbox" className="size-4 accent-zinc-100" checked={allVersions} onChange={(e) => setAllVersions(e.target.checked)} />
-              {t.allVersions}
-            </label>
-          )}
           <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-zinc-300 sm:min-h-9">
             <input type="checkbox" className="size-4 accent-amber-300" checked={onlySpecial} onChange={(e) => { setOnlySpecial(e.target.checked); setLimit(PAGE); }} />
             {t.onlySpecial}

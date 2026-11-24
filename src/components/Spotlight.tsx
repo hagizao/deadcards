@@ -33,7 +33,7 @@ const S = strings({
 export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: string; onClose: () => void; onSwitch: (id: string) => void; onEdit?: (id: string) => void }) {
   const t = useT(S);
   const label = useLabel();
-  const { teams, players, settings } = useData();
+  const { teams, players, settings, heroIcon, me } = useData();
   const player = players.find((p) => p.id === playerId);
   const cardRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
@@ -170,16 +170,23 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             <div>
               <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.versions} ({versions.length})</h3>
               <div className="flex flex-wrap gap-2">
-                {versions.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => onSwitch(v.id)}
-                    className={pill(v.id === player.id)}
-                  >
-                    {isAltHero(v) ? v.hero : `${isMainCard(v) ? t.main : v.special ? t.special : t.version} · ${isMainCard(v) && versions.some(isAltHero) ? v.hero : teamOf(teams, v).tag}`}
-                  </button>
-                ))}
+                {versions.map((v) => {
+                  const icon = heroIcon(v.hero);
+                  // herói jogado é só o rosto do herói; as outras versões mantêm o rótulo
+                  const text = isAltHero(v) ? null : `${isMainCard(v) ? t.main : v.special ? t.special : t.version}${isMainCard(v) ? "" : ` · ${teamOf(teams, v).tag}`}`;
+                  // versão que você não tem fica em preto e branco
+                  const missing = !!me && !!owned && !owned.has(v.id);
+                  return (
+                    <button key={v.id} type="button" onClick={() => onSwitch(v.id)} aria-pressed={v.id === player.id}
+                      aria-label={text ? `${text} · ${v.hero}` : v.hero} title={v.hero}
+                      className={`${pill(v.id === player.id)} ${text ? "pl-1.5" : "px-1.5"} ${missing ? "grayscale" : ""}`}>
+                      {icon
+                        ? <img src={icon} alt="" className="size-8 rounded-full bg-zinc-950/60 object-cover" />
+                        : !text && <span>{v.hero}</span>}
+                      {text}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

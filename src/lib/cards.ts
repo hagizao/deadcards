@@ -133,6 +133,9 @@ export function isMainCard(p: Player): boolean {
   return !p.variantOf || p.variantOf === p.id;
 }
 
+/** Carta de herói jogado: todos os atributos e o OVR ficam isso abaixo da carta de assinatura. */
+export const ALT_HERO_DROP = 2;
+
 /** Carta de herói jogado: versão do jogador com outro herói, fora do herói de assinatura. */
 export function isAltHero(p: Player): boolean {
   return !isMainCard(p) && !!p.altHero;
