@@ -1,6 +1,6 @@
 import { currentUser } from "./auth";
 import type { Env } from "./worker";
-import { parseProfileCard, type ProfileCard, type ProfileCardState, type PublicProfile } from "./lib/profile";
+import { MAX_FAVORITES, parseProfileCard, type ProfileCard, type ProfileCardState, type PublicProfile } from "./lib/profile";
 
 const HISTORY_LIMIT = 20;
 
@@ -54,7 +54,8 @@ export async function publicProfile(env: Env, key: string): Promise<Response> {
 }
 
 const favoritesQuery = (env: Env, userId: string) =>
-  env.DB.prepare("SELECT player_id FROM user_favorites WHERE user_id = ? ORDER BY created_at DESC").bind(userId);
+  // quem já tinha mais que o limite mostra só as mais recentes; tirar uma libera a próxima
+  env.DB.prepare("SELECT player_id FROM user_favorites WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?").bind(userId, MAX_FAVORITES);
 
 export async function favorite(env: Env, request: Request, playerId: string): Promise<Response> {
   const user = await currentUser(env, request);
@@ -66,10 +67,14 @@ export async function favorite(env: Env, request: Request, playerId: string): Pr
   if (request.method === "DELETE") {
     await env.DB.prepare("DELETE FROM user_favorites WHERE user_id = ? AND player_id = ?").bind(user.id, playerId).run();
   } else {
-    const { meta } = await env.DB.prepare("INSERT OR IGNORE INTO user_favorites (user_id, player_id) SELECT user_id, player_id FROM user_cards WHERE user_id = ? AND player_id = ?")
-      .bind(user.id, playerId).run();
+    // o limite vai na mesma instrução do insert: dois cliques ao mesmo tempo não passam de MAX_FAVORITES
+    const { meta } = await env.DB.prepare(`INSERT OR IGNORE INTO user_favorites (user_id, player_id)
+      SELECT user_id, player_id FROM user_cards WHERE user_id = ? AND player_id = ?
+      AND (SELECT COUNT(*) FROM user_favorites WHERE user_id = ?) < ?`)
+      .bind(user.id, playerId, user.id, MAX_FAVORITES).run();
     if (!meta.changes && !(await env.DB.prepare("SELECT 1 FROM user_favorites WHERE user_id = ? AND player_id = ?").bind(user.id, playerId).first())) {
-      return json({ code: "not_owned" }, 404);
+      const owned = await env.DB.prepare("SELECT 1 FROM user_cards WHERE user_id = ? AND player_id = ?").bind(user.id, playerId).first();
+      return owned ? json({ code: "limit" }, 409) : json({ code: "not_owned" }, 404);
     }
   }
   const { results } = await favoritesQuery(env, user.id).all<{ player_id: string }>();
