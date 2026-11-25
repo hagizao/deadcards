@@ -76,23 +76,17 @@
   to { transform: scale(1.6); opacity: 0; }
 }
 
-/* contorno do pack fechado: bordas serrilhadas de selagem em cima e embaixo */
-@utility pack-shape {
-  --crimp: 7px;
-  clip-path: polygon(
-    0 var(--crimp), 5% 0, 10% var(--crimp), 15% 0, 20% var(--crimp), 25% 0, 30% var(--crimp), 35% 0, 40% var(--crimp), 45% 0, 50% var(--crimp), 55% 0, 60% var(--crimp), 65% 0, 70% var(--crimp), 75% 0, 80% var(--crimp), 85% 0, 90% var(--crimp), 95% 0, 100% var(--crimp),
-    100% calc(100% - var(--crimp)), 95% 100%, 90% calc(100% - var(--crimp)), 85% 100%, 80% calc(100% - var(--crimp)), 75% 100%, 70% calc(100% - var(--crimp)), 65% 100%, 60% calc(100% - var(--crimp)), 55% 100%, 50% calc(100% - var(--crimp)), 45% 100%, 40% calc(100% - var(--crimp)), 35% 100%, 30% calc(100% - var(--crimp)), 25% 100%, 20% calc(100% - var(--crimp)), 15% 100%, 10% calc(100% - var(--crimp)), 5% 100%, 0 calc(100% - var(--crimp))
-  );
-}
-
-/* frente metalizada do pack (use junto com pack-shape) */
-@utility pack-foil {
-  background: linear-gradient(155deg, #26211b 0%, #4a4033 38%, #1d1a16 62%, #3a3229 100%);
+/* pack fechado: a maleta da abertura, de frente (couro escuro com brilho passando) */
+@utility pack-case {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgb(255 239 215 / 0.1), transparent 60%),
+    linear-gradient(180deg, #2b241d 0%, #1b1713 55%, #120f0c 100%);
+  box-shadow: inset 0 0.8cqw 0 rgb(255 239 215 / 0.08), inset 0 -1.2cqw 2cqw rgb(0 0 0 / 0.6);
   &::after {
     content: "";
     position: absolute;
     inset: -20% -60%;
-    background: linear-gradient(105deg, transparent 42%, rgb(255 239 215 / 0.28) 50%, transparent 58%);
+    background: linear-gradient(105deg, transparent 42%, rgb(255 239 215 / 0.12) 50%, transparent 58%);
     transform: translateX(-60%);
     animation: pack-shine 3.2s var(--ease-out) infinite;
     pointer-events: none;
@@ -100,6 +94,21 @@
   @media (prefers-reduced-motion: reduce) {
     &::after { animation: none; opacity: 0; }
   }
+}
+
+/* etiqueta de papel da maleta, com as marcas de picote em cima e embaixo (igual à da cena 3D) */
+@utility pack-label {
+  background:
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0.16) 0 0.7cqw, transparent 0.7cqw 1.9cqw) top / 100% 1.6cqw no-repeat,
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0.16) 0 0.7cqw, transparent 0.7cqw 1.9cqw) bottom / 100% 1.6cqw no-repeat,
+    linear-gradient(180deg, #e9d9bd, #d8c4a2);
+  box-shadow: 0 0.6cqw 1.6cqw rgb(0 0 0 / 0.5);
+}
+
+/* trava metálica */
+@utility pack-latch {
+  background: linear-gradient(180deg, #c9c2b6 0%, #8a8378 45%, #5d574e 100%);
+  box-shadow: inset 0 0.3cqw 0 rgb(255 255 255 / 0.5), 0 0.6cqw 1cqw rgb(0 0 0 / 0.6);
 }
 
 @keyframes pack-shine {
