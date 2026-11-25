@@ -5,7 +5,8 @@ import { getPlayerOvr, isAltHero, isMainCard } from "./cardKinds";
 // regras de tipo de carta e OVR ficam sem React para o worker também usar
 export { ALT_HERO_DROP, STAT_KEYS, calculateOVR, getPlayerOvr, isAltHero, isMainCard, isRetired } from "./cardKinds";
 
-export const REGIONS = ["Europa", "América do Norte", "Brasil", "América do Sul", "Ásia", "Sem Time"];
+// Brasil deixou de ser região (os times foram para América do Sul); o rótulo e a classe dele ficam para dado antigo.
+export const REGIONS = ["Europa", "América do Norte", "América do Sul", "Ásia", "Sem Time"];
 
 // Os valores de REGIONS e position são chaves salvas no banco; só o rótulo exibido muda por idioma.
 const LABELS = strings<Record<string, string>>({
