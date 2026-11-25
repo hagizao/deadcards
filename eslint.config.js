@@ -17,7 +17,7 @@ const cssClasses = [
 ].map((c) => `^${c}$`);
 
 export default tseslint.config(
-  { ignores: ["dist", ".claude", ".wrangler", "node_modules", "worker-configuration.d.ts"] },
+  { ignores: ["dist", ".claude", ".wrangler", "node_modules", "worker-configuration.d.ts", "explorations"] },
   js.configs.recommended,
   tseslint.configs.recommended,
   { rules: { "@typescript-eslint/no-explicit-any": "warn" } },
