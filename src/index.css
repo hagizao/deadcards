@@ -116,15 +116,6 @@
   background: radial-gradient(circle at 50% 45%, rgb(0 0 0 / 0.72), rgb(0 0 0 / 0.9) 70%);
 }
 
-/* bandeira da região no walkout: tecido levemente ondulado e com sombra */
-@utility pack-flag {
-  aspect-ratio: 3 / 2;
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 12px 40px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.08);
-  transform: perspective(600px) rotateY(-8deg) rotateX(4deg);
-}
-
 @utility pack-beat {
   font: 800 clamp(44px, 12vw, 96px) / 1 var(--font-display);
   letter-spacing: 0.08em;

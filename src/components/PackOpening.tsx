@@ -10,7 +10,7 @@ import type { InventoryPack, PackKind } from "../lib/packs";
 import { SOUND_PEAK, isMuted, playPackSound, playReveal, preloadPackSounds, setMuted, type RevealLevel, type SoundHandle } from "../lib/packSounds";
 import { getCardTier, levelOf } from "../lib/rarity";
 import { Card } from "./Card";
-import { RegionFlag } from "./RegionFlag";
+import { RegionIcon } from "./RegionIcon";
 import { RoleIcon } from "./RoleIcon";
 import { TeamLogo } from "./TeamLogo";
 
@@ -331,7 +331,9 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
         <div ref={walk} aria-live="polite" className="pointer-events-none invisible absolute inset-0 z-20 grid place-items-center opacity-0 pack-walk">
           <Beat label={t.region}>
             <b className="pack-beat">{label(team.region)}</b>
-            <RegionFlag region={team.region} className="pack-flag w-[clamp(132px,36vw,200px)]" />
+            <span className="grid size-[clamp(76px,20vw,108px)] place-items-center rounded-full border-3 bg-black/50 text-dl-text" style={{ borderColor: colors.c }}>
+              <RegionIcon region={team.region} className="size-3/5" />
+            </span>
           </Beat>
           <Beat label={t.position}>
             <b className="pack-beat">{label(card.position)}</b>
