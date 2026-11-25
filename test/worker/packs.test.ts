@@ -116,6 +116,30 @@ describe("Packs", () => {
     expect((await req(cookie, "/api/pack-types/final", "DELETE")).status).toBe(409);
   });
 
+  it("tipos de pack com chances por raridade: valida, guarda e o sorteio respeita", async () => {
+    const { cookie } = await login("admvicli");
+    const high = JSON.stringify({ MIR: 95, MAC: 95, SUP: 95, MOV: 95, POL: 95, CON: 95 });
+    const low = JSON.stringify({ MIR: 50, MAC: 50, SUP: 50, MOV: 50, POL: 50, CON: 50 });
+    await env.DB.batch([
+      env.DB.prepare("UPDATE players SET stats_json = ? WHERE id = 'a'").bind(high),
+      env.DB.prepare("UPDATE players SET stats_json = ? WHERE id = 'b'").bind(low),
+    ]);
+    const rarity = { eternus: 100, ascendant: 0, oracle: 0, archon: 0, arcanist: 0, initiate: 0 };
+    const body = { name: "Só Eternus", odds: { alt: 0, signature: 100, special: 0 }, teams: [], rarity };
+    expect((await req(cookie, "/api/pack-types/eternus", "PUT", { ...body, rarity: { ...rarity, initiate: 1 } })).status).toBe(400);
+    expect((await req(cookie, "/api/pack-types/eternus", "PUT", body)).status).toBe(200);
+    const list = (await (await req(cookie, "/api/pack-types")).json()) as { id: string; rarity?: unknown }[];
+    expect(list.find((t) => t.id === "eternus")?.rarity).toEqual(rarity);
+    for (let i = 0; i < 8; i++) {
+      const res = (await (await req(cookie, "/api/packs/test:eternus/open", "POST")).json()) as { cards: { id: string }[] };
+      expect(res.cards[0].id).toBe("a");
+    }
+    // salvar sem raridade volta para "mesma chance"
+    expect((await req(cookie, "/api/pack-types/eternus", "PUT", { ...body, rarity: undefined })).status).toBe(200);
+    const again = (await (await req(cookie, "/api/pack-types")).json()) as { id: string; rarity?: unknown }[];
+    expect(again.find((t) => t.id === "eternus")?.rarity).toBeUndefined();
+  });
+
   it("código: carta ou pack, nunca os dois", async () => {
     const { cookie } = await login("admvicli");
     const base = { code: "BOTH-CODE-1", maxUses: 1, startsAt: null, expiresAt: null };

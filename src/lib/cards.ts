@@ -1,9 +1,9 @@
 import type { Player, Team, TierBand, HistoryPoint } from "./types";
 import { strings, useT } from "./i18n";
-import { isAltHero, isMainCard } from "./cardKinds";
+import { getPlayerOvr, isAltHero, isMainCard } from "./cardKinds";
 
-// regras de tipo de carta ficam sem React para o worker também usar
-export { ALT_HERO_DROP, isAltHero, isMainCard, isRetired } from "./cardKinds";
+// regras de tipo de carta e OVR ficam sem React para o worker também usar
+export { ALT_HERO_DROP, STAT_KEYS, calculateOVR, getPlayerOvr, isAltHero, isMainCard, isRetired } from "./cardKinds";
 
 export const REGIONS = ["Europa", "América do Norte", "Brasil", "América do Sul", "Ásia", "Sem Time"];
 
@@ -31,18 +31,6 @@ export const DEFAULT_TIER_CONFIG: TierBand[] = [
 
 export const POSITIONS = ["Carry", "OffCarry", "Frontline", "Flex", "Suporte"];
 
-export const STAT_KEYS = ["MIR", "MAC", "SUP", "MOV", "POL", "CON"] as const;
-
-export function calculateOVR(stats: Player["stats"]): number {
-  const sum = STAT_KEYS.reduce((acc, k) => acc + (Number(stats[k]) || 0), 0);
-  return Math.round(sum / STAT_KEYS.length);
-}
-
-export function getPlayerOvr(p: Player): number {
-  const v = Number(p.ovr);
-  if (p.ovr !== undefined && p.ovr !== null && Number.isFinite(v)) return Math.min(99, Math.max(1, Math.round(v)));
-  return calculateOVR(p.stats);
-}
 
 function today(): string {
   const d = new Date();

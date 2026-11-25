@@ -1,6 +1,9 @@
 import { currentUser } from "./auth";
 import type { Env } from "./worker";
-import { DEFAULT_PACK_ODDS, PACK_NAME_MAX, drawCard, packKind, packPool, parseOdds, type InventoryPack, type PackType } from "./lib/packs";
+import { DEFAULT_PACK_ODDS, PACK_NAME_MAX, drawCard, packKind, packPool, parseOdds, parseRarityOdds, type InventoryPack, type PackType } from "./lib/packs";
+import { getPlayerOvr } from "./lib/cardKinds";
+import { rarityKeyOf } from "./lib/rarityBands";
+import type { TierBand } from "./lib/types";
 import { imgUrl, parse, playerFromRow } from "./rows";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "private, no-store" } });
@@ -9,13 +12,15 @@ const ID_RE = /^[\w-]{1,64}$/;
 /** Prefixo do pack de teste do admin: sempre no inventário, abre sem gastar e sem gravar nada. */
 export const TEST_PACK = "test:";
 
-type TypeRow = { id: string; name: string; art_key: string | null; cards: number; odds_json: string; teams_json: string };
+type TypeRow = { id: string; name: string; art_key: string | null; cards: number; odds_json: string; rarity_json: string | null; teams_json: string };
 
 function typeFromRow(r: TypeRow): PackType {
-  return {
+  const type: PackType = {
     id: r.id, name: r.name, ...(r.art_key ? { art: imgUrl(r.art_key) } : {}), cards: r.cards,
     odds: parseOdds(parse(r.odds_json, null)) ?? DEFAULT_PACK_ODDS, teams: parse<string[]>(r.teams_json, []),
   };
+  const rarity = r.rarity_json ? parseRarityOdds(parse(r.rarity_json, null)) : null;
+  return rarity ? { ...type, rarity } : type;
 }
 
 const short = (t: PackType): InventoryPack["type"] => ({ id: t.id, name: t.name, ...(t.art ? { art: t.art } : {}) });
@@ -49,13 +54,17 @@ async function open(env: Env, user: { id: string; admin: boolean }, id: string):
   if (!row) return bad("pack não encontrado", 404, "not_found");
   const type = typeFromRow(row);
 
-  const [players, owned] = await env.DB.batch([
+  const [players, owned, tiers] = await env.DB.batch([
     env.DB.prepare("SELECT * FROM players"),
     env.DB.prepare("SELECT player_id FROM user_cards WHERE user_id = ?").bind(user.id),
+    // faixas de overall do Editor: decidem a raridade de cada carta
+    env.DB.prepare("SELECT value_json FROM settings WHERE key = 'tierConfig'"),
   ]);
+  const tierRow = tiers.results[0] as { value_json: string } | undefined;
+  const tierConfig = tierRow ? parse<TierBand[]>(tierRow.value_json, []) : [];
   const pool = packPool((players.results as Record<string, string | number | null>[]).map(playerFromRow), type,
     new Set((owned.results as { player_id: string }[]).map((r) => r.player_id)));
-  const card = drawCard(pool, type.odds);
+  const card = drawCard(pool, type, (p) => rarityKeyOf(getPlayerOvr(p), Array.isArray(tierConfig) ? tierConfig : []));
   // sem repetidas: se você já tem tudo o que pode sair, o pack continua fechado
   if (!card) return bad("você já tem todas as cartas que podem sair neste pack", 409, "exhausted");
   const kind = packKind(card);
@@ -112,14 +121,17 @@ export async function packTypes(env: Env, request: Request, rest: string): Promi
   if (!name || name.length > PACK_NAME_MAX) return bad(`nome de 1 a ${PACK_NAME_MAX} letras`);
   const odds = parseOdds(b?.odds);
   if (!odds) return bad("as chances devem ser inteiros de 0 a 100 somando 100");
+  // sem chances por raridade (null), toda carta do tipo tem a mesma chance
+  const rarity = b?.rarity == null ? null : parseRarityOdds(b.rarity);
+  if (b?.rarity != null && !rarity) return bad("as chances por raridade devem ser inteiros de 0 a 100 somando 100");
   const teams = Array.isArray(b?.teams) ? b.teams : [];
   if (teams.length > 100 || !teams.every((t) => typeof t === "string" && ID_RE.test(t))) return bad("times inválidos");
   const art = b?.art;
   if (art !== undefined && art !== null && art !== "" && !(typeof art === "string" && /^\/img\/packs\/[\w.-]+$/.test(art))) return bad("arte inválida");
   const artKey = typeof art === "string" && art ? art.slice(5) : null;
   // 1 carta por pack por enquanto; o campo existe para crescer depois
-  await env.DB.prepare(`INSERT INTO pack_types (id, name, art_key, cards, odds_json, teams_json) VALUES (?, ?, ?, 1, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET name = excluded.name, art_key = excluded.art_key, odds_json = excluded.odds_json, teams_json = excluded.teams_json`)
-    .bind(id, name, artKey, JSON.stringify(odds), JSON.stringify(teams)).run();
+  await env.DB.prepare(`INSERT INTO pack_types (id, name, art_key, cards, odds_json, rarity_json, teams_json) VALUES (?, ?, ?, 1, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET name = excluded.name, art_key = excluded.art_key, odds_json = excluded.odds_json, rarity_json = excluded.rarity_json, teams_json = excluded.teams_json`)
+    .bind(id, name, artKey, JSON.stringify(odds), rarity ? JSON.stringify(rarity) : null, JSON.stringify(teams)).run();
   return json({ ok: true });
 }
