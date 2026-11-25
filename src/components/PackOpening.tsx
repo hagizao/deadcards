@@ -2,11 +2,12 @@ import gsap from "gsap";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { regionClass, teamOf, useLabel } from "../lib/cards";
+import { captureCard } from "../lib/cardImage";
 import { api, useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
-import type { CaseLevel, CardSpot, PackCase } from "../lib/packCase";
+import type { CaseLevel, CaseLook, CardSpot, PackCase } from "../lib/packCase";
 import type { InventoryPack, PackKind } from "../lib/packs";
-import { isMuted, playReveal, playRays, playSfx, playSignature, preloadPackSounds, setMuted, type RevealLevel } from "../lib/packSounds";
+import { isMuted, playPackSound, playReveal, preloadPackSounds, setMuted, type RevealLevel } from "../lib/packSounds";
 import { getCardTier, levelOf } from "../lib/rarity";
 import { Card } from "./Card";
 import { TeamLogo } from "./TeamLogo";
@@ -24,6 +25,7 @@ const S = strings({
     region: "Região",
     position: "Posição",
     team: "Time",
+    signature: "Assinatura",
     kind: { alt: "Herói jogado", signature: "Herói de assinatura", special: "Carta especial" } as Record<PackKind, string>,
     test: "Pack de teste: nada foi gravado",
     free: "Packs são grátis e nunca serão vendidos",
@@ -44,6 +46,7 @@ const S = strings({
     region: "Region",
     position: "Position",
     team: "Team",
+    signature: "Signature",
     kind: { alt: "Played hero", signature: "Signature hero", special: "Special card" },
     test: "Test pack: nothing was saved",
     free: "Packs are free and will never be sold",
@@ -64,6 +67,7 @@ const S = strings({
     region: "Región",
     position: "Posición",
     team: "Equipo",
+    signature: "Insignia",
     kind: { alt: "Héroe jugado", signature: "Héroe insignia", special: "Carta especial" },
     test: "Pack de prueba: no se guardó nada",
     free: "Los packs son gratis y nunca se venderán",
@@ -104,6 +108,8 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
   const latchBtns = useRef<(HTMLButtonElement | null)[]>([null, null]);
   const closeBtn = useRef<HTMLButtonElement>(null);
   const kase = useRef<PackCase | null>(null);
+  const shot = useRef<HTMLDivElement>(null);
+  const front = useRef<Promise<void> | null>(null);
   const server = useRef<Promise<Drawn | null> | null>(null);
 
   const card = result ? players.find((p) => p.id === result.id) : undefined;
@@ -111,6 +117,20 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
   const level = levelOf(tier);
   const colors = tier && level !== "base" ? { c: tier.c, hi: tier.hi } : NEUTRAL;
   const team = card ? teamOf(teams, card) : null;
+  const signature = result?.kind === "signature";
+
+  // assim que a carta sorteada chega, tira um PNG dela (fora da tela) para a frente da carta 3D
+  const shotKey = card && result ? `${card.id}:${result.kind}` : null;
+  useEffect(() => {
+    const node = shot.current?.querySelector<HTMLElement>(".rk-wrap");
+    if (!shotKey || !node) return;
+    front.current = captureCard(node)
+      .then(async (blob) => {
+        const url = URL.createObjectURL(blob);
+        try { await kase.current?.setFront(url); } finally { URL.revokeObjectURL(url); }
+      })
+      .catch(() => { /* sem PNG: a carta 3D gira só com o verso */ });
+  }, [shotKey]);
 
   const request = () => (server.current ??= api.openPack(pack.id).then(
     (res) => {
@@ -157,15 +177,18 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     const tr = p ? getCardTier(p, settings.tierConfig!) : null;
     const lvl = levelOf(tr);
     const lv = CASE_LV[lvl];
-    if (tr && lvl !== "base") c.setRarity(tr.c, tr.hi);
+    // especial: a luz alterna entre as duas cores da moldura
+    const look: CaseLook | null = tr && lvl !== "base" ? { c: tr.c, hi: tr.hi, alt: lvl === "special" ? { c: tr.hi, hi: tr.c } : undefined } : null;
     setStage("show");
-    if (lvl !== "base") playRays(lvl);
-    await c.crack(lv);
+    await c.crack(lv, look);
     if (lvl !== "base") await walkout(lv);
+    // assinatura vem depois de tudo: a faixa dourada se desenrola dentro da tampa
+    if (drawn.kind === "signature") await c.ribbon(t.signature);
+    // a frente 3D costuma estar pronta; se o PNG atrasar, a carta gira só com o verso
+    await Promise.race([front.current, new Promise((r) => setTimeout(r, 1500))]);
     const s = await c.rise(lv);
     place(s);
     playReveal(lvl);
-    if (drawn.kind === "signature") playSignature();
     setStage("done");
   });
 
@@ -186,7 +209,7 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
         reduce,
         latchButtons: latchBtns.current,
         onLatch: (i, r) => onLatch(i, r),
-        onSound: playSfx,
+        onSound: (id, o) => playPackSound(id, o),
       }))
       .catch(() => null)
       .then((c) => {
@@ -257,7 +280,13 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
         </div>
       )}
 
-      {card && team && (
+      {card && result && (
+        <div ref={shot} aria-hidden="true" inert className="pointer-events-none fixed top-0 left-[-9999px]">
+          <Card player={card} signature={signature} />
+        </div>
+      )}
+
+      {level !== "base" && card && team && (
         <div ref={walk} aria-live="polite" className="pointer-events-none invisible absolute inset-0 z-20 grid place-items-center opacity-0 pack-walk">
           <Beat label={t.region}>
             <b className="pack-beat">{label(team.region)}</b>

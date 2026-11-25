@@ -5,10 +5,12 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import type { PackSoundId } from "./packSounds";
 
 /** 0 = comum, 1 = rara (S ou especial), 2 = Eternus. */
 export type CaseLevel = 0 | 1 | 2;
-export type CaseSound = "clack" | "creak" | "boom" | "stamp";
+/** Cor da luz da raridade; `alt` é a segunda cor que alterna com a primeira (carta especial). */
+export type CaseLook = { c: string; hi: string; alt?: { c: string; hi: string } };
 
 export type CaseOptions = {
   name: string;
@@ -16,7 +18,8 @@ export type CaseOptions = {
   /** Botões invisíveis sobre as travas (teclado e leitor de tela); a cena reposiciona a cada quadro. */
   latchButtons: (HTMLButtonElement | null)[];
   onLatch: (index: number, remaining: number) => void;
-  onSound: (s: CaseSound) => void;
+  /** Sons pelo id do catálogo de `packSounds`. */
+  onSound: (id: PackSoundId, o?: { gain?: number; len?: number; delay?: number }) => void;
 };
 
 /** Onde a carta está na tela no momento da troca pela carta real: centro e escala para uma carta de 430 px de altura. */
@@ -25,29 +28,40 @@ export type CardSpot = { x: number; y: number; scale: number };
 export type PackCase = {
   arrive: () => Promise<void>;
   openLatch: (i: number) => void;
-  setRarity: (c: string, hi: string) => void;
-  /** Tampa: comum abre direto; rara emperra, pulsa e estoura. Resolve quando a tampa está aberta. */
-  crack: (lv: CaseLevel) => Promise<void>;
+  /** Frente da carta (PNG da carta real): o último giro mostra a frente e a troca pela carta do DOM some. */
+  setFront: (url: string) => Promise<void>;
+  /**
+   * Tampa: comum abre direto; rara emperra, pulsa com a luz neutra e, no último pulso, a luz troca para a cor
+   * da raridade e a tampa estoura. Resolve quando a tampa está aberta.
+   */
+  crack: (lv: CaseLevel, look: CaseLook | null) => Promise<void>;
   /** Walkout: a cena escurece para as pistas. */
   dim: () => void;
   beat: (i: number) => void;
-  /** A carta sobe e gira; resolve no ponto em que o verso 3D vira a carta real. */
+  /** Herói de assinatura: uma faixa dourada se desenrola por dentro da tampa aberta. */
+  ribbon: (text: string) => Promise<void>;
+  /** A carta sobe e gira; resolve no ponto em que a carta 3D vira a carta real. */
   rise: (lv: CaseLevel) => Promise<CardSpot>;
   dispose: () => void;
 };
 
 export const CAM_FOV = 34;
 
-/** Distância da câmera para a maleta (5,5 × 5 unidades) caber em qualquer proporção de tela. */
+/** Distância da câmera para a maleta (6,2 × 5,7 unidades, com folga) caber em qualquer proporção de tela. */
 export function fitDistance(aspect: number, fov = CAM_FOV): number {
   const vf = THREE.MathUtils.degToRad(fov) / 2;
   const hf = Math.atan(Math.tan(vf) * aspect);
-  return Math.max(2.75 / Math.tan(hf), 2.5 / Math.tan(vf));
+  return Math.max(3.1 / Math.tan(hf), 2.85 / Math.tan(vf));
 }
 
 const W = 4.4, D = 3.0, HB = 0.72, HL = 0.46;
 const CARD_H = 2.2, CARD_W = (CARD_H * 295) / 430;
 const NEUTRAL = "#ffefd7";
+
+/** Vibra o celular (Android; no resto não faz nada). */
+const buzz = (p: number | number[]) => {
+  try { navigator.vibrate?.(p); } catch { /* sem vibração */ }
+};
 
 const glowTex = (w: number, h: number, f: (u: number, v: number) => number) => {
   const c = document.createElement("canvas");
@@ -96,6 +110,50 @@ function labelTexture(name: string) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
+  return t;
+}
+
+function ribbonTexture(text: string) {
+  const c = document.createElement("canvas");
+  c.width = 1024;
+  c.height = 150;
+  const g = c.getContext("2d")!;
+  const grad = g.createLinearGradient(0, 0, c.width, 0);
+  [["#92400e", 0], ["#f59e0b", 0.2], ["#fde68a", 0.44], ["#fffbeb", 0.5], ["#fde68a", 0.56], ["#f59e0b", 0.8], ["#92400e", 1]]
+    .forEach(([col, at]) => grad.addColorStop(at as number, col as string));
+  g.fillStyle = grad;
+  g.fillRect(0, 8, c.width, c.height - 16);
+  g.fillStyle = "rgba(255,251,235,.75)";
+  g.fillRect(0, 8, c.width, 3);
+  g.fillRect(0, c.height - 11, c.width, 3);
+  g.fillStyle = "#1c1206";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.font = '900 76px "VALVE Pulp", sans-serif';
+  g.letterSpacing = "18px";
+  g.fillText(text.toUpperCase(), c.width / 2 + 9, c.height / 2 + 4);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+/** Nuvem de poeira: bolhas macias somadas, com borda irregular. */
+function dustTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d")!;
+  for (let i = 0; i < 26; i++) {
+    const a = Math.random() * Math.PI * 2, r = Math.random() * 30;
+    const x = 64 + Math.cos(a) * r, y = 64 + Math.sin(a) * r, s = 18 + Math.random() * 26;
+    const rg = g.createRadialGradient(x, y, 0, x, y, s);
+    rg.addColorStop(0, "rgba(255,255,255,.22)");
+    rg.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = rg;
+    g.fillRect(0, 0, 128, 128);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 
@@ -305,6 +363,18 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
   const additive = (o: THREE.MeshBasicMaterialParameters) => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, ...o });
   const tinted: { m: { color: THREE.Color }; hi: boolean }[] = [];
   const tint = <M extends { color: THREE.Color }>(m: M, hi: boolean) => { m.color.set(NEUTRAL); tinted.push({ m, hi }); return m; };
+  // tudo começa neutro; `mix` leva para a cor da raridade e, com `b`, a cor alterna entre as duas da especial
+  const pal = { mix: 0, a: [new THREE.Color(NEUTRAL), new THREE.Color(NEUTRAL)], b: null as THREE.Color[] | null };
+  const neutralC = new THREE.Color(NEUTRAL), tmpC = new THREE.Color();
+  const paint = (t: number) => {
+    const k = pal.b && !reduce ? 0.5 + 0.5 * Math.sin(t * 2.6) : 0;
+    for (const { m, hi } of tinted) {
+      const i = hi ? 1 : 0;
+      tmpC.copy(pal.a[i]);
+      if (pal.b) tmpC.lerp(pal.b[i], k);
+      m.color.copy(neutralC).lerp(tmpC, pal.mix);
+    }
+  };
 
   const seamGlow = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.2, 0.06), tint(additive({}), true));
   seamGlow.position.set(0, HB + 0.02, D / 2 + 0.03);
@@ -334,12 +404,20 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
   motes.position.y = HB;
   caseG.add(motes);
 
-  // a carta, de costas, deitada na espuma; o halo e a luz vão presos a ela
-  const card3 = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W, CARD_H), new THREE.MeshBasicMaterial({ map: backTexture(), transparent: true, color: 0xb8b8b8, side: THREE.DoubleSide }));
+  // a carta deitada na espuma, verso para cima; a frente (PNG da carta real) fica do outro lado
+  const cardGeo = new THREE.PlaneGeometry(CARD_W, CARD_H);
+  // alphaTest: o canto transparente da textura não tapa o brilho atrás nem faz sombra retangular
+  const backMat = new THREE.MeshBasicMaterial({ map: backTexture(), transparent: true, alphaTest: 0.5, color: 0xb8b8b8, side: THREE.DoubleSide });
+  const card3 = new THREE.Mesh(cardGeo, backMat);
   card3.rotation.x = -Math.PI / 2;
   card3.position.set(0, HB + 0.08, 0.1);
   card3.castShadow = true;
   caseG.add(card3);
+  const frontMat = new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.5, color: 0xf2f2f2, toneMapped: false });
+  const front = new THREE.Mesh(cardGeo, frontMat);
+  front.rotation.y = Math.PI;
+  front.visible = false;
+  card3.add(front);
   const aura = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W * 2.1, CARD_H * 1.7), tint(additive({ map: auraTex, side: THREE.DoubleSide }), false));
   aura.position.z = -0.03;
   card3.add(aura);
@@ -366,6 +444,88 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
     sparkMat.opacity = 1;
   };
 
+  // ---------- partículas com vida própria: poeira, fumaça e a coluna da Eternus ----------
+  // aditivas, cada uma some escurecendo a própria cor (vertex color), sem precisar de shader
+  const puffTex = glowTex(64, 64, (u, v) => Math.max(0, 1 - Math.hypot(u - 0.5, v - 0.5) * 2) ** 1.6);
+  const systems: { update: (dt: number) => void }[] = [];
+  const particles = (max: number, mat: THREE.PointsMaterial, drag: number, lift: number) => {
+    const pos = new Float32Array(max * 3).fill(-50), col = new Float32Array(max * 3), vel = new Float32Array(max * 3);
+    const age = new Float32Array(max), life = new Float32Array(max);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    mat.vertexColors = true;
+    const pts = new THREE.Points(geo, mat);
+    pts.frustumCulled = false;
+    scene.add(pts);
+    let next = 0, alive = 0;
+    const sys = {
+      emit(x: number, y: number, z: number, vx: number, vy: number, vz: number, l: number) {
+        if (reduce) return;
+        const i = next;
+        next = (next + 1) % max;
+        pos.set([x, y, z], i * 3);
+        vel.set([vx, vy, vz], i * 3);
+        age[i] = 0;
+        life[i] = l;
+        alive = max;
+      },
+      update(dt: number) {
+        if (!alive) return;
+        let live = 0;
+        const keep = Math.max(0, 1 - drag * dt);
+        for (let i = 0; i < max; i++) {
+          if (life[i] <= 0) continue;
+          age[i] += dt;
+          if (age[i] >= life[i]) { life[i] = 0; pos[i * 3 + 1] = -50; col.fill(0, i * 3, i * 3 + 3); continue; }
+          live++;
+          vel[i * 3] *= keep; vel[i * 3 + 1] = vel[i * 3 + 1] * keep + lift * dt; vel[i * 3 + 2] *= keep;
+          for (let k = 0; k < 3; k++) pos[i * 3 + k] += vel[i * 3 + k] * dt;
+          const f = age[i] / life[i], a = Math.min(1, f * 6) * (1 - f) ** 1.5;
+          col.fill(a, i * 3, i * 3 + 3);
+        }
+        alive = live;
+        geo.attributes.position.needsUpdate = true;
+        geo.attributes.color.needsUpdate = true;
+      },
+    };
+    systems.push(sys);
+    return sys;
+  };
+  const pointsMat = (size: number, opacity: number, map = puffTex) =>
+    new THREE.PointsMaterial({ map, size, opacity, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const smoke = particles(LOW ? 70 : 130, tint(pointsMat(1.1, 0.2), false), 1.1, 0.18);
+  const column = particles(LOW ? 90 : 180, tint(pointsMat(0.09, 0.95, sparkTex), true), 0, 0.5);
+  let smokeOn = 0, columnOn = 0, emitAcc = 0;
+
+  // sombra de contato: cresce e escurece conforme a maleta desce
+  const blob = new THREE.Mesh(new THREE.PlaneGeometry(W * 1.5, D * 1.7), new THREE.MeshBasicMaterial({
+    map: glowTex(64, 64, (u, v) => Math.max(0, 1 - Math.hypot((u - 0.5) * 2, (v - 0.5) * 2)) ** 1.5),
+    color: 0x000000, transparent: true, opacity: 0, depthWrite: false,
+  }));
+  blob.rotation.x = -Math.PI / 2;
+  blob.position.y = 0.01;
+  scene.add(blob);
+
+  // Eternus: raios girando devagar atrás da carta e onda de choque na mesa
+  const raysMat = tint(new THREE.SpriteMaterial({
+    map: glowTex(256, 256, (u, v) => {
+      const r = Math.hypot(u - 0.5, v - 0.5) * 2, a = Math.atan2(v - 0.5, u - 0.5);
+      return Math.max(0, 1 - r) ** 1.4 * (0.5 + 0.5 * Math.cos(a * 12)) ** 5 * Math.min(1, r * 4);
+    }),
+    transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false,
+  }), true);
+  const rays = new THREE.Sprite(raysMat);
+  rays.position.set(0, HB + 1.55, 0.5);
+  rays.scale.setScalar(7.5);
+  scene.add(rays);
+  const ring = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), tint(additive({
+    map: glowTex(128, 128, (u, v) => Math.exp(-(((Math.hypot(u - 0.5, v - 0.5) * 2 - 0.86) / 0.07) ** 2))),
+  }), true));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(0, 0.03, 0.2);
+  scene.add(ring);
+
   // ---------- animações: tudo registrado para morrer no dispose ----------
   const anims: gsap.core.Animation[] = [];
   const track = <A extends gsap.core.Animation>(a: A) => { anims.push(a); return a; };
@@ -381,6 +541,80 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
     for (let i = 0; i < 10; i++) { const k = 1 - i / 10; t.to(shakeO, { x: gsap.utils.random(-amt, amt) * k, y: gsap.utils.random(-amt, amt) * k, duration: d / 10, ease: "none" }); }
     t.to(shakeO, { x: 0, y: 0, duration: 0.06 });
   };
+
+  const shock = (size: number, d: number) => {
+    if (reduce) return;
+    ring.scale.setScalar(0.4);
+    tl().to(ring.scale, { x: size, y: size, duration: d, ease: "power2.out" }, 0)
+      .fromTo(ring.material, { opacity: 1 }, { opacity: 0, duration: d, ease: "power1.in" }, 0);
+  };
+
+  // poeira: nuvens que rolam rente à mesa, crescem, freiam e somem (cada uma com tamanho, giro e vida próprios)
+  const dustMap = dustTexture();
+  const puffs = Array.from({ length: LOW ? 22 : 40 }, () => {
+    const m = new THREE.SpriteMaterial({ map: dustMap, color: 0x9c8c78, transparent: true, opacity: 0, depthWrite: false });
+    const s = new THREE.Sprite(m);
+    s.visible = false;
+    scene.add(s);
+    return { s, m, vx: 0, vy: 0, vz: 0, age: 0, life: 0, s0: 1, s1: 2, spin: 0, alpha: 0 };
+  });
+  let nextPuff = 0;
+  /** Solta nuvens ao longo de um lado da maleta (nx, nz = direção para fora). */
+  const puffEdge = (nx: number, nz: number, n: number, power: number) => {
+    if (reduce) return;
+    for (let i = 0; i < n; i++) {
+      const p = puffs[nextPuff];
+      nextPuff = (nextPuff + 1) % puffs.length;
+      const along = gsap.utils.random(-0.5, 0.5);
+      const x = caseG.position.x + (nx ? nx * (W / 2) : along * W), z = caseG.position.z + (nz ? nz * (D / 2) : along * D);
+      const sp2 = gsap.utils.random(1.2, 2.6) * power;
+      p.s.position.set(x, 0.18, z);
+      p.vx = (nx + gsap.utils.random(-0.4, 0.4)) * sp2;
+      p.vz = (nz + gsap.utils.random(-0.4, 0.4)) * sp2;
+      p.vy = gsap.utils.random(0.15, 0.5) * power;
+      p.age = 0;
+      p.life = gsap.utils.random(1.1, 1.9);
+      p.s0 = gsap.utils.random(0.5, 0.9);
+      p.s1 = p.s0 * gsap.utils.random(2.6, 3.6) * Math.max(0.7, power);
+      p.spin = gsap.utils.random(-0.6, 0.6);
+      p.m.rotation = Math.random() * Math.PI * 2;
+      p.alpha = gsap.utils.random(0.35, 0.6) * Math.min(1, power);
+      p.s.visible = true;
+    }
+  };
+  const updatePuffs = (dt: number) => {
+    for (const p of puffs) {
+      if (!p.s.visible) continue;
+      p.age += dt;
+      const f = p.age / p.life;
+      if (f >= 1) { p.s.visible = false; continue; }
+      // atrito forte: sai rápido e para logo, como poeira de verdade
+      const k = Math.exp(-3.2 * p.age);
+      p.s.position.x += p.vx * k * dt;
+      p.s.position.y += p.vy * k * dt;
+      p.s.position.z += p.vz * k * dt;
+      p.s.scale.setScalar(p.s0 + (p.s1 - p.s0) * (1 - (1 - f) ** 3));
+      p.m.rotation += p.spin * dt;
+      p.m.opacity = p.alpha * Math.min(1, f * 10) * (1 - f) ** 1.6;
+    }
+  };
+  const dustAll = (n: number, power: number) => { puffEdge(1, 0, n, power); puffEdge(-1, 0, n, power); puffEdge(0, 1, n, power); puffEdge(0, -1, n, power); };
+
+  // faixa de assinatura: presa por dentro da tampa, desenrola da esquerda para a direita
+  const RIB_W = W - 0.4;
+  const ribGeo = new THREE.PlaneGeometry(RIB_W, 0.56);
+  ribGeo.translate(RIB_W / 2, 0, 0);
+  const ribMat = new THREE.MeshBasicMaterial({ transparent: true, toneMapped: false, side: THREE.DoubleSide, color: 0xe8e0d0 });
+  const ribG = new THREE.Group();
+  ribG.rotation.x = Math.PI / 2;
+  ribG.position.set(0, -0.2, 0.8);
+  hinge.add(ribG);
+  const rib = new THREE.Mesh(ribGeo, ribMat);
+  rib.rotation.z = 0.1;
+  rib.position.set((-RIB_W / 2) * Math.cos(0.1), (-RIB_W / 2) * Math.sin(0.1), 0);
+  rib.scale.x = 0.001;
+  rib.visible = false;
+  ribG.add(rib);
 
   // ---------- câmera, tamanho e laço ----------
   const host = canvas.parentElement ?? canvas;
@@ -401,13 +635,31 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
   ro.observe(host);
   resize();
 
-  const v = new THREE.Vector3();
+  const v = new THREE.Vector3(), cardDir = new THREE.Vector3(), cardPos = new THREE.Vector3();
   const project = (obj: THREE.Object3D, local = new THREE.Vector3()) => {
     v.copy(local);
     obj.localToWorld(v);
     v.project(camera);
     return { x: (v.x * 0.5 + 0.5) * host.clientWidth, y: (-v.y * 0.5 + 0.5) * host.clientHeight };
   };
+
+  // câmera viva enquanto espera as travas: segue o mouse ou a inclinação do celular
+  const sway = { x: 0, y: 0, tx: 0, ty: 0, on: false };
+  // aim: quanto a câmera olha para cima (a carta subindo); drop: altura da queda, sem contar o canto inclinado
+  const aim = { y: 0 };
+  const drop = { y: 0, on: false };
+  const onPointer = (e: PointerEvent) => {
+    if (drag) return;
+    sway.tx = (e.clientX / innerWidth) * 2 - 1;
+    sway.ty = (e.clientY / innerHeight) * 2 - 1;
+  };
+  const onTilt = (e: DeviceOrientationEvent) => {
+    if (e.gamma == null || e.beta == null) return;
+    sway.tx = gsap.utils.clamp(-1, 1, e.gamma / 25);
+    sway.ty = gsap.utils.clamp(-1, 1, (e.beta - 45) / 25);
+  };
+  window.addEventListener("pointermove", onPointer);
+  window.addEventListener("deviceorientation", onTilt);
 
   const timer = new THREE.Timer();
   timer.connect(document);
@@ -422,13 +674,25 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       if (n === 90 && sum / 80 > 0.025) { renderer.setPixelRatio(1); composer.setPixelRatio(1); bloom.enabled = false; }
     }
     if (!reduce) lamp.rotation.z = Math.sin(t * 1.1) * 0.06 + Math.sin(t * 0.37) * 0.025;
-    const d = 1 - CAM.push * 0.28;
-    camera.position.set(CAM.pos.x + shakeO.x, CAM.pos.y * d + shakeO.y, CAM.pos.z * d);
-    camera.lookAt(CAM.look);
+    const follow = Math.min(1, dt * 2.5), live = sway.on && !reduce;
+    sway.x += ((live ? sway.tx : 0) - sway.x) * follow;
+    sway.y += ((live ? sway.ty : 0) - sway.y) * follow;
+    const d = 1 - CAM.push * 0.22;
+    camera.position.set(CAM.pos.x + shakeO.x + sway.x * 0.45, CAM.pos.y * d + shakeO.y - sway.y * 0.25, CAM.pos.z * d);
+    camera.lookAt(CAM.look.x, CAM.look.y + aim.y, CAM.look.z);
+    if (drop.on) caseG.position.y = drop.y + (W / 2) * Math.abs(Math.sin(caseG.rotation.z)) + (D / 2) * Math.abs(Math.sin(caseG.rotation.x));
+    updatePuffs(dt);
+    paint(t);
+    // sombra de contato acompanha a maleta
+    const hgt = gsap.utils.clamp(0, 1, caseG.position.y / 3.2), s = 0.55 + 0.45 * (1 - hgt);
+    blob.position.set(caseG.position.x, 0.01, caseG.position.z);
+    blob.rotation.z = caseG.rotation.y;
+    blob.scale.set(s, s, 1);
+    blob.material.opacity = 0.75 * (1 - hgt) ** 2;
     // feixes sempre de frente para a câmera e tremulando um pouco
-    for (const s of shaftData) {
-      s.mesh.rotation.y = Math.atan2(camera.position.x - s.mesh.position.x, camera.position.z - s.mesh.position.z);
-      s.mesh.material.opacity = light.level * s.base * (reduce ? 1 : 0.75 + 0.25 * Math.sin(t * s.speed + s.phase));
+    for (const sh of shaftData) {
+      sh.mesh.rotation.y = Math.atan2(camera.position.x - sh.mesh.position.x, camera.position.z - sh.mesh.position.z);
+      sh.mesh.material.opacity = light.level * sh.base * (reduce ? 1 : 0.75 + 0.25 * Math.sin(t * sh.speed + sh.phase));
     }
     moteMat.opacity = light.level * 0.7;
     if (light.level > 0 && !reduce) {
@@ -440,6 +704,26 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       sparkMat.opacity = Math.max(0, sparkLife);
       for (let i = 0; i < SPARKS; i++) { sv[i * 3 + 1] -= 9.8 * dt; for (let k = 0; k < 3; k++) sp[i * 3 + k] += sv[i * 3 + k] * dt; }
       sparkGeo.attributes.position.needsUpdate = true;
+    }
+    // fumaça escapando pela fresta da frente; coluna de partículas da Eternus
+    emitAcc += dt;
+    if (emitAcc > 1 / 30) {
+      if (smokeOn) for (let i = 0; i < 2; i++) smoke.emit(gsap.utils.random(-W / 2 + 0.3, W / 2 - 0.3), HB + 0.06, D / 2 + 0.06, gsap.utils.random(-0.12, 0.12), gsap.utils.random(0.15, 0.4), gsap.utils.random(0.15, 0.35), gsap.utils.random(1.6, 2.4));
+      if (columnOn) for (let i = 0; i < 2; i++) {
+        const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.55;
+        column.emit(Math.cos(a) * r, HB + 0.1, 0.5 + Math.sin(a) * r * 0.6, 0, gsap.utils.random(2.2, 4.2), 0, gsap.utils.random(1.1, 1.8));
+      }
+      emitAcc = 0;
+    }
+    for (const sys of systems) sys.update(dt);
+    if (!reduce) raysMat.rotation += dt * 0.12;
+    // o halo e a luz ficam sempre atrás do lado que a câmera vê (verso ou frente)
+    if (card3.visible) {
+      card3.getWorldDirection(cardDir);
+      card3.getWorldPosition(cardPos);
+      const back = cardDir.dot(cardPos.sub(camera.position)) < 0;
+      aura.position.z = back ? -0.03 : 0.03;
+      inner.position.z = back ? 0.45 : -0.45;
     }
     latches.forEach((l, i) => {
       const b = opts.latchButtons[i];
@@ -501,18 +785,21 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
     gsap.killTweensOf(l.glowMat);
     to(l.glowMat, { opacity: 0, duration: 0.15 });
     to(l.pivot.rotation, { x: 1.95, duration: reduce ? 0.01 : 0.22, ease: "power3.out" });
-    sound("clack");
+    sound("latch");
+    buzz(15);
     shakeCam(0.05, 0.18);
     if (!reduce) track(gsap.fromTo(caseG.position, { y: 0.04 }, { y: 0, duration: 0.25, ease: "bounce.out" }));
     const remaining = latches.filter((x) => !x.open).length;
-    if (!remaining) armed = false;
+    if (!remaining) { armed = false; sway.on = false; }
     opts.onLatch(i, remaining);
   }
 
   const peakLight = [0.55, 0.8, 1], peakInner = [6, 10, 14];
+  let hasFront = false;
 
   function openLid(lv: CaseLevel) {
     for (const m of [shade, cord, bulb, beamCone]) m.visible = false;
+    smokeOn = 0;
     const t = tl()
       .to(hinge.rotation, { x: -1.9, duration: dur(lv ? 0.55 : 0.8), ease: lv ? "back.out(1.4)" : "power3.out" })
       .to(aura.material, { opacity: [0.6, 0.8, 1][lv], duration: dur(0.3) }, 0)
@@ -520,32 +807,80 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       .to(light, { level: peakLight[lv], duration: dur(0.7), ease: "power2.out" }, 0.05)
       .to(seamGlow.material, { opacity: 0, duration: dur(0.3) }, 0.1)
       .to(spot, { intensity: 35, duration: dur(0.6) }, 0);
-    if (lv) t.add(() => { sound("boom"); shakeCam(0.12 + lv * 0.1, 0.6); sparks(80 + lv * 70, HB + 0.3); }, 0.1);
-    else t.add(() => sound("creak"), 0);
+    if (lv) {
+      t.add(() => {
+        sound("lid-boom");
+        buzz(60);
+        shakeCam(0.12 + lv * 0.1, 0.6);
+        sparks(80 + lv * 70, HB + 0.3);
+        shock(4 + lv * 2, 0.9);
+        // a fumaça presa na fresta se espalha para todos os lados
+        for (let i = 0; i < 50; i++) {
+          const a = Math.random() * Math.PI * 2, s2 = gsap.utils.random(1, 2.4);
+          smoke.emit(Math.cos(a) * 1.6, HB + 0.15, Math.sin(a) * 1.1, Math.cos(a) * s2, gsap.utils.random(0.3, 0.9), Math.sin(a) * s2, gsap.utils.random(1.8, 2.8));
+        }
+        if (lv === 2) columnOn = 1;
+      }, 0.1);
+    } else t.add(() => sound("lid-open"), 0);
     t.to({}, { duration: dur(lv ? 1.1 : 0.7) }, 0);
     return done(t);
   }
 
   return {
     arrive() {
-      caseG.position.x = reduce ? 0 : -11;
-      caseG.rotation.y = reduce ? 0 : 0.5;
+      const arm = () => {
+        armed = true;
+        sway.on = true;
+        latches.forEach((l, i) => to(l.glowMat, { opacity: 0.5, duration: 0.7, ease: "sine.inOut", yoyo: true, repeat: -1, delay: i * 0.35 }));
+      };
+      if (reduce) {
+        caseG.position.set(0, 0, 0);
+        return done(tl().add(() => sound("arrive", { gain: 0.6 }), 0.1).add(arm, 0.2));
+      }
+      // jogada sem cuidado: entra rápido, girando; bate o canto esquerdo, o resto despenca na mesa,
+      // a tampa chacoalha, ela escorrega um pouco com atrito e para. Pesada: quase não quica.
+      caseG.position.set(-7.5, 0, -2.4);
+      caseG.rotation.set(0.32, 1.1, 0.55);
+      drop.y = 5;
+      drop.on = true;
+      const fall = 0.5, hit = 0.15 + fall, slam = hit + 0.11;
       const t = tl()
-        .to(caseG.position, { x: 0, duration: dur(1.1), ease: "power3.out" }, 0.25)
-        .to(caseG.rotation, { y: -0.05, duration: dur(1.1), ease: "power3.out" }, 0.25)
-        .add(() => { sound("stamp"); shakeCam(0.06, 0.25); }, reduce ? 0.25 : 1.2)
-        .to(caseG.rotation, { y: 0, duration: dur(0.4), ease: "power2.out" })
-        .add(() => {
-          armed = true;
-          latches.forEach((l, i) => to(l.glowMat, { opacity: 0.5, duration: 0.7, ease: "sine.inOut", yoyo: true, repeat: -1, delay: i * 0.35 }));
-        });
+        .to(caseG.position, { x: -0.8, z: 0.15, duration: fall, ease: "none" }, 0.15)
+        .to(drop, { y: 0, duration: fall, ease: "power2.in" }, 0.15)
+        .to(caseG.rotation, { x: 0, y: 0.24, z: 0.14, duration: fall, ease: "power1.in" }, 0.15)
+        .add(() => { sound("arrive", { gain: 0.55 }); shakeCam(0.08, 0.15); puffEdge(-1, 0, LOW ? 4 : 7, 0.8); }, hit)
+        .to(caseG.rotation, { z: 0, duration: slam - hit, ease: "power2.in" }, hit)
+        .add(() => { sound("arrive"); buzz([40, 30, 20]); shakeCam(0.24, 0.4); dustAll(LOW ? 4 : 7, 1); }, slam)
+        .to(hinge.rotation, { x: -0.07, duration: 0.05, ease: "power2.out" }, slam)
+        .to(hinge.rotation, { x: 0, duration: 0.3, ease: "bounce.out" }, slam + 0.05)
+        .to(drop, { y: 0.04, duration: 0.06, ease: "power2.out" }, slam)
+        .to(drop, { y: 0, duration: 0.08, ease: "power2.in" }, slam + 0.06)
+        .to(caseG.position, { x: 0, z: 0, duration: 0.5, ease: "power3.out" }, slam)
+        .to(caseG.rotation, { y: -0.04, duration: 0.5, ease: "power3.out" }, slam)
+        .add(() => puffEdge(-1, 0, LOW ? 3 : 5, 0.45), slam + 0.18)
+        .to(caseG.rotation, { y: 0, duration: 0.35, ease: "power2.inOut" }, slam + 0.5)
+        .add(() => { drop.on = false; caseG.position.y = 0; })
+        .add(arm);
       return done(t);
     },
     openLatch,
-    setRarity(c, hi) {
-      for (const { m, hi: isHi } of tinted) m.color.set(isHi ? hi : c);
+    async setFront(url) {
+      const tex = await new THREE.TextureLoader().loadAsync(url);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      frontMat.map = tex;
+      frontMat.needsUpdate = true;
+      front.visible = true;
+      backMat.side = THREE.FrontSide;
+      backMat.needsUpdate = true;
+      hasFront = true;
     },
-    async crack(lv) {
+    async crack(lv, look) {
+      if (look) {
+        pal.a = [new THREE.Color(look.c), new THREE.Color(look.hi)];
+        pal.b = look.alt ? [new THREE.Color(look.alt.c), new THREE.Color(look.alt.hi)] : null;
+      }
+      pal.mix = 0;
       const peak = [0.35, 0.6, 0.9][lv];
       const t = tl()
         .to(hinge.rotation, { x: -0.07, duration: dur(0.35), ease: "power2.out" })
@@ -554,22 +889,33 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
         .to(inner, { intensity: 3 + lv * 2, duration: dur(0.4) }, 0.1)
         .add(() => sound("creak"), 0.05);
       if (lv && !reduce) {
-        // rara: a tampa sobe um pouco e emperra; a câmera chega perto; a luz pulsa
+        // rara: a tampa sobe um pouco e emperra; a fumaça escapa; a luz neutra pulsa cada vez mais forte
+        // com o zumbido subindo; no último pulso a luz troca para a cor da raridade
+        const gap = 0.62 - lv * 0.08, pulses = 3 + lv, first = 1.2, last = first + (pulses - 1) * gap;
         t.to(hinge.rotation, { x: -0.42, duration: 0.5, ease: "power2.out" }, 0.7)
-          .to(CAM, { push: 1, duration: 1.6 + lv * 0.4, ease: "power2.inOut" }, 0.7)
-          .to(bloom, { strength: 0.45 + lv * 0.12, duration: 1.4 }, 0.7);
-        const gap = 0.62 - lv * 0.08;
-        for (let i = 0; i < 2 + lv; i++) {
-          const at = 1.2 + i * gap;
-          t.to(inner, { intensity: (6 + lv * 4) * (1 + i * 0.3), duration: 0.12, ease: "power2.out" }, at)
-            .to(aura.material, { opacity: 0.7 + i * 0.1, duration: 0.12 }, at)
+          .to(CAM, { push: 1, duration: last - 0.5, ease: "power2.inOut" }, 0.7)
+          .to(bloom, { strength: 0.45 + lv * 0.12, duration: last - 0.7 }, 0.7)
+          .add(() => { smokeOn = 1; sound("smoke", { gain: 0.5 }); sound("tension", { len: last - 0.7 }); }, 0.7);
+        for (let i = 0; i < pulses; i++) {
+          const at = first + i * gap, f = i / (pulses - 1), end = i === pulses - 1;
+          t.to(inner, { intensity: (6 + lv * 4) * (1 + f * 0.8), duration: 0.12, ease: "power2.out" }, at)
+            .to(aura.material, { opacity: 0.6 + f * 0.35, duration: 0.12 }, at)
             .to(aura.material, { opacity: 0.45, duration: 0.35 }, at + 0.12)
             .to(inner, { intensity: 3 + lv * 2, duration: 0.35, ease: "power2.in" }, at + 0.12)
-            .to(hinge.rotation, { x: -0.42 - (i + 1) * 0.03, duration: 0.1, ease: "power2.out" }, at)
-            .add(() => { shakeCam(0.05 + lv * 0.04 + i * 0.02, 0.3); sound("stamp"); }, at);
+            .to(hinge.rotation, { x: -0.42 - (i + 1) * 0.025, duration: 0.1, ease: "power2.out" }, at)
+            .add(() => {
+              shakeCam(0.05 + lv * 0.04 + f * 0.06, 0.3);
+              sound("pulse", { gain: 0.45 + f * 0.55 });
+              buzz(18 + Math.round(f * 30));
+              if (end && look) { sound("rays"); if (lv === 2) sound("bell", { gain: 0.6 }); }
+            }, at);
+          if (end && look) t.to(pal, { mix: 1, duration: 0.1, ease: "power2.out" }, at).to(seamGlow.material, { opacity: 1, duration: 0.1 }, at);
         }
-        t.to({}, { duration: 0.1 });
-      } else t.to({}, { duration: dur(0.25) });
+        t.to({}, { duration: 0.25 });
+      } else {
+        if (look) t.add(() => { pal.mix = 1; if (lv) sound("rays"); }, 0);
+        t.to({}, { duration: dur(0.25) });
+      }
       await done(t);
       await openLid(lv);
     },
@@ -577,28 +923,48 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       tl().to(light, { level: 0.25, duration: dur(0.5) }, 0).to(inner, { intensity: 2, duration: dur(0.5) }, 0);
     },
     beat(i) {
-      sound("stamp");
+      sound("beat", { gain: 0.7 + i * 0.1 });
+      buzz(20 + i * 10);
       shakeCam(0.03 + i * 0.02, 0.25);
       tl()
         .to(light, { level: 0.35 + i * 0.12, duration: dur(0.2) })
         .to(light, { level: 0.25, duration: dur(0.6) })
         .to(CAM, { push: 0.3 + i * 0.2, duration: dur(1.6), ease: "power1.inOut" }, 0);
     },
+    async ribbon(text) {
+      ribMat.map = ribbonTexture(text);
+      ribMat.needsUpdate = true;
+      rib.visible = true;
+      const t = tl()
+        .add(() => sound("signature"), 0)
+        .to(CAM, { push: 0.25, duration: dur(0.8), ease: "power2.out" }, 0)
+        .to(light, { level: 0.6, duration: dur(0.3) }, 0)
+        .to(rib.scale, { x: 1, duration: dur(0.6), ease: "power3.out" }, 0.05)
+        .fromTo(ribMat.color, { r: 2, g: 1.7, b: 1.1 }, { r: 0.91, g: 0.88, b: 0.82, duration: dur(0.7) }, 0.5)
+        .to({}, { duration: dur(1) });
+      await done(t);
+    },
     async rise(lv) {
       const turns = reduce ? 0 : [1, 2, 3][lv];
-      const top = HB + 1.9;
+      // com a frente carregada, o giro termina meia volta antes: a câmera vê a frente
+      const spin = Math.PI * (2 * turns - (hasFront ? 1 : 0));
+      const top = HB + 1.55, spinD = dur(0.5 + lv * 0.35);
       const t = tl()
         .to(inner, { intensity: peakInner[lv], duration: dur(0.3) }, 0)
         .to(light, { level: peakLight[lv], duration: dur(0.3) }, 0)
         .to(card3.position, { y: top, z: 0.9, duration: dur(0.7), ease: "power3.out" }, 0)
         .to(card3.rotation, { x: -0.55, duration: dur(0.7), ease: "power3.out" }, 0)
-        .to(CAM, { push: 0.35, duration: dur(0.8), ease: "power2.out" }, 0)
-        .to(card3.rotation, { y: Math.PI * 2 * turns, duration: dur(0.5 + lv * 0.35), ease: "power2.inOut" }, dur(0.45));
+        .to(CAM, { push: 0.2, duration: dur(0.8), ease: "power2.out" }, 0)
+        .to(aim, { y: 1.1, duration: dur(0.8), ease: "power2.out" }, 0)
+        .to(card3.rotation, { y: spin, duration: spinD, ease: "power2.inOut" }, dur(0.45))
+        .add(() => sound("spin", { len: spinD + 0.2, gain: 0.6 + lv * 0.2 }), dur(0.45));
+      if (lv === 2) t.to(raysMat, { opacity: 0.55, duration: dur(1.2) }, 0.2);
       await done(t);
       const a = project(card3, new THREE.Vector3(0, CARD_H / 2, 0)), b = project(card3, new THREE.Vector3(0, -CARD_H / 2, 0)), mid = project(card3);
       card3.visible = false;
       sparks([30, 120, 220][lv], top);
-      if (lv === 2) sound("boom");
+      buzz([[30], [50, 40, 90], [80, 50, 160]][lv]);
+      if (lv === 2) { sound("shockwave"); shock(16, 1.4); }
       shakeCam([0, 0.12, 0.25][lv], 0.5);
       to(CAM, { push: 0, duration: dur(1), ease: "power2.out" });
       to(bloom, { strength: 0.35, duration: dur(1.2) });
@@ -610,6 +976,8 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       latches.forEach((l) => gsap.killTweensOf(l.glowMat));
       renderer.setAnimationLoop(null);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pointermove", onPointer);
+      window.removeEventListener("deviceorientation", onTilt);
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointerup", onUp);

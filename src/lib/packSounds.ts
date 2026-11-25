@@ -1,82 +1,43 @@
+/// <reference types="vite/client" />
 /**
- * Sons da abertura de pack: arquivos CC0 do Kenney (kenney.nl, Casino Audio, Interface Sounds,
- * Impact Sounds e Music Jingles) em `public/sounds/`. Crédito não é obrigatório; a licença fica junto dos arquivos.
+ * Sons da abertura de pack: um catálogo só (`PACK_SOUNDS`), com o id, quando toca e o volume de cada som.
+ *
+ * Para trocar um som: salve o arquivo como `src/assets/sounds/pack/<id>.mp3` (ou .ogg/.wav). Nada mais muda:
+ * o arquivo entra no build sozinho e passa na frente do som sintetizado. Sem arquivo, toca o `synth`.
+ * Os arquivos atuais são CC0 do Kenney (kenney.nl); a licença fica junto deles.
+ *
  * Só tocam depois de um toque (o navegador exige gesto) e respeitam o mudo salvo no aparelho.
  */
 
 export type RevealLevel = "base" | "ascendant" | "eternus" | "special";
 
-type Sound = "rays" | "signature" | "reveal" | "reveal-base" | "reveal-rare" | "reveal-epic" | "bell";
-
-const MUTE_KEY = "deadcards:pack-sound-off";
-const cache = new Map<Sound, HTMLAudioElement>();
-
-export const isMuted = () => {
-  try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; }
+type PlayOpts = {
+  /** Atraso em segundos. */
+  delay?: number;
+  /** Multiplica o volume do catálogo (0–1). */
+  gain?: number;
+  /** Duração em segundos, para sons que acompanham uma animação (só o sintetizado usa; o arquivo toca inteiro). */
+  len?: number;
 };
-export const setMuted = (off: boolean) => {
-  try { localStorage.setItem(MUTE_KEY, off ? "1" : "0"); } catch { /* sem localStorage: só não lembra */ }
-};
+type Synth = (o: Required<Omit<PlayOpts, "delay">>) => (() => void) | void;
+type SoundSpec = { when: string; volume: number; synth?: Synth };
 
-const ALL: Sound[] = ["rays", "signature", "reveal", "reveal-base", "reveal-rare", "reveal-epic", "bell"];
-
-function load(name: Sound) {
-  let base = cache.get(name);
-  if (!base) {
-    base = new Audio(`/sounds/${name}.mp3`);
-    base.preload = "auto";
-    cache.set(name, base);
-  }
-  return base;
-}
-
-/** Carrega os sons antes do primeiro toque, para não atrasar a abertura. */
-export function preloadPackSounds() {
-  if (typeof Audio !== "undefined" && !isMuted()) ALL.forEach(load);
-}
-
-/** Toca um som (cópia nova, para poder sobrepor) com volume e atraso em segundos. */
-function play(name: Sound, volume = 1, delay = 0) {
-  if (isMuted() || typeof Audio === "undefined") return;
-  const a = load(name).cloneNode() as HTMLAudioElement;
-  a.volume = volume;
-  const go = () => { a.play().catch(() => { /* autoplay bloqueado: fica sem som */ }); };
-  if (delay > 0) setTimeout(go, delay * 1000); else go();
-}
-
-/** Luz saindo do pack: mais alto quanto mais rara a carta. */
-export function playRays(level: RevealLevel) {
-  play("rays", level === "base" ? 0.35 : 0.7);
-  if (level === "eternus") play("bell", 0.25, 0.15);
-}
-
-/** Herói de assinatura: sino dourado. */
-export function playSignature() {
-  play("signature", 0.6, 0.1);
-}
-
-/** Revelação: cartas abrindo + jingle. Ascendente e especial ganham jingle maior; Eternus, jingle longo e sino. */
-export function playReveal(level: RevealLevel) {
-  play("reveal", 0.8);
-  if (level === "base") return play("reveal-base", 0.7, 0.1);
-  if (level === "eternus") {
-    play("reveal-epic", 0.9, 0.1);
-    play("bell", 0.55, 0.12);
-    return;
-  }
-  play("reveal-rare", 0.85, 0.1);
-}
-
+// ---------- síntese (Web Audio), usada enquanto o som não tem arquivo ----------
 let ctx: AudioContext | null = null;
-const audio = () => (ctx ??= new AudioContext());
+const audio = () => {
+  ctx ??= new AudioContext();
+  if (ctx.state === "suspended") void ctx.resume();
+  return ctx;
+};
 
-function noise(dur: number, freq: number, gain: number, q = 1) {
+function noise(dur: number, freq: number, gain: number, q = 1, toFreq = freq) {
   const a = audio(), n = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
-  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(), t = a.currentTime;
   s.buffer = buf;
   f.type = "bandpass";
-  f.frequency.value = freq;
+  f.frequency.setValueAtTime(freq, t);
+  if (toFreq !== freq) f.frequency.exponentialRampToValueAtTime(toFreq, t + dur);
   f.Q.value = q;
   g.gain.value = gain;
   s.connect(f).connect(g).connect(a.destination);
@@ -95,15 +56,122 @@ function tone(from: number, to: number, dur: number, gain: number, kind: Oscilla
   o.stop(t + dur);
 }
 
-const SFX = {
-  clack: () => { noise(0.08, 2400, 0.9, 2); tone(180, 70, 0.12, 0.5); },
-  creak: () => tone(90, 140, 0.5, 0.12, "sawtooth"),
-  boom: () => { tone(120, 30, 0.9, 0.9); noise(0.6, 600, 0.5, 0.5); },
-  stamp: () => { tone(140, 50, 0.18, 0.8); noise(0.06, 900, 0.5, 1); },
+/** Zumbido que sobe de tom e de volume durante `len` segundos; devolve como cortar antes. */
+function riser(len: number, gain: number) {
+  const a = audio(), t = a.currentTime, out = a.createGain(), lp = a.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(300, t);
+  lp.frequency.exponentialRampToValueAtTime(2400, t + len);
+  out.gain.setValueAtTime(0.001, t);
+  out.gain.exponentialRampToValueAtTime(gain, t + len);
+  out.gain.exponentialRampToValueAtTime(0.001, t + len + 0.15);
+  lp.connect(out).connect(a.destination);
+  const oscs = [0, 7].map((detune) => {
+    const o = a.createOscillator();
+    o.type = "sawtooth";
+    o.detune.value = detune;
+    o.frequency.setValueAtTime(70, t);
+    o.frequency.exponentialRampToValueAtTime(280, t + len);
+    o.connect(lp);
+    o.start();
+    o.stop(t + len + 0.2);
+    return o;
+  });
+  return () => {
+    const now = a.currentTime;
+    out.gain.cancelScheduledValues(now);
+    out.gain.setValueAtTime(Math.max(out.gain.value, 0.001), now);
+    out.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    oscs.forEach((o) => { try { o.stop(now + 0.1); } catch { /* já parou */ } });
+  };
+}
+
+/**
+ * Todos os sons da abertura, na ordem em que aparecem. A chave é o id e o nome do arquivo.
+ * `when` diz o momento; `volume` é o volume base (0–1).
+ */
+export const PACK_SOUNDS = {
+  arrive: { when: "A maleta cai e bate na mesa", volume: 1, synth: ({ gain }) => { tone(140, 42, 0.3, 0.9 * gain); noise(0.16, 480, 0.7 * gain, 0.8); } },
+  latch: { when: "Cada trava solta (duas vezes)", volume: 1, synth: ({ gain }) => { noise(0.08, 2400, 0.9 * gain, 2); tone(180, 70, 0.12, 0.5 * gain); } },
+  creak: { when: "A tampa abre uma fresta", volume: 1, synth: ({ gain }) => tone(90, 140, 0.5, 0.12 * gain, "sawtooth") },
+  tension: { when: "Rara: zumbido subindo enquanto a luz pulsa na fresta", volume: 1, synth: ({ gain, len }) => riser(len, 0.16 * gain) },
+  pulse: { when: "Rara: cada pulso de luz na fresta (cada um mais forte)", volume: 1, synth: ({ gain }) => { tone(55 + gain * 25, 34, 0.32, 0.75 * gain); noise(0.05, 700, 0.25 * gain, 1); } },
+  rays: { when: "Rara: no último pulso a luz troca para a cor da raridade", volume: 0.7 },
+  smoke: { when: "Rara: fumaça escapando pela fresta e espalhando quando a tampa abre", volume: 1, synth: ({ gain }) => noise(1.3, 1800, 0.3 * gain, 0.5, 400) },
+  "lid-open": { when: "Comum: a tampa abre", volume: 1, synth: ({ gain }) => { tone(80, 120, 0.6, 0.12 * gain, "sawtooth"); noise(0.3, 900, 0.15 * gain, 0.6); } },
+  "lid-boom": { when: "Rara: a tampa estoura", volume: 1, synth: ({ gain }) => { tone(120, 30, 0.9, 0.9 * gain); noise(0.6, 600, 0.5 * gain, 0.5); } },
+  beat: { when: "Walkout: cada pista (região, posição, time)", volume: 1, synth: ({ gain }) => { tone(140, 50, 0.18, 0.8 * gain); noise(0.06, 900, 0.5 * gain, 1); } },
+  signature: { when: "Assinatura: a faixa dourada se desenrola dentro da tampa", volume: 0.6 },
+  spin: { when: "A carta sobe girando", volume: 1, synth: ({ gain, len }) => noise(Math.max(0.3, len), 500, 0.35 * gain, 0.7, 3000) },
+  reveal: { when: "A carta aparece (toda abertura)", volume: 0.8 },
+  "jingle-base": { when: "Jingle da carta comum, junto com reveal", volume: 0.7 },
+  "jingle-rare": { when: "Jingle da carta rara (Ascendant ou especial), junto com reveal", volume: 0.85 },
+  "jingle-epic": { when: "Jingle da Eternus, junto com reveal", volume: 0.9 },
+  bell: { when: "Eternus: sino na troca de cor e na revelação", volume: 0.5 },
+  shockwave: { when: "Eternus: onda de choque na mesa quando a carta aparece", volume: 1, synth: ({ gain }) => { tone(80, 24, 1.4, 0.9 * gain); noise(1, 300, 0.6 * gain, 0.5, 90); } },
+} satisfies Record<string, SoundSpec>;
+
+export type PackSoundId = keyof typeof PACK_SOUNDS;
+
+// arquivos que existem em src/assets/sounds/pack: id → URL do build
+const FILES: Partial<Record<PackSoundId, string>> = Object.fromEntries(
+  Object.entries(import.meta.glob<string>("../assets/sounds/pack/*.{mp3,ogg,wav}", { eager: true, query: "?url", import: "default" }))
+    .map(([path, url]) => [path.replace(/^.*\/|\.\w+$/g, ""), url]),
+);
+
+const MUTE_KEY = "deadcards:pack-sound-off";
+const cache = new Map<PackSoundId, HTMLAudioElement>();
+
+export const isMuted = () => {
+  try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; }
+};
+export const setMuted = (off: boolean) => {
+  try { localStorage.setItem(MUTE_KEY, off ? "1" : "0"); } catch { /* sem localStorage: só não lembra */ }
 };
 
-/** Sons da maleta, sintetizados na hora (trava, rangido, estouro, pancada). */
-export function playSfx(name: keyof typeof SFX) {
-  if (isMuted() || typeof AudioContext === "undefined") return;
-  try { SFX[name](); } catch { /* sem áudio: segue sem som */ }
+function load(id: PackSoundId) {
+  const url = FILES[id];
+  if (!url) return null;
+  let base = cache.get(id);
+  if (!base) {
+    base = new Audio(url);
+    base.preload = "auto";
+    cache.set(id, base);
+  }
+  return base;
+}
+
+/** Carrega os arquivos antes do primeiro toque, para não atrasar a abertura. */
+export function preloadPackSounds() {
+  if (typeof Audio !== "undefined" && !isMuted()) (Object.keys(PACK_SOUNDS) as PackSoundId[]).forEach(load);
+}
+
+/** Toca um som do catálogo (arquivo se houver, senão o sintetizado). Devolve como cortar antes do fim. */
+export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1 }: PlayOpts = {}): () => void {
+  if (isMuted()) return () => {};
+  const spec: SoundSpec = PACK_SOUNDS[id];
+  let stop: (() => void) | void;
+  let cancelled = false;
+  const go = () => {
+    if (cancelled) return;
+    const file = typeof Audio !== "undefined" ? load(id) : null;
+    if (file) {
+      const a = file.cloneNode() as HTMLAudioElement;
+      a.volume = Math.min(1, spec.volume * gain);
+      a.play().catch(() => { /* autoplay bloqueado: fica sem som */ });
+      stop = () => a.pause();
+    } else if (spec.synth && typeof AudioContext !== "undefined") {
+      try { stop = spec.synth({ gain: spec.volume * gain, len }); } catch { /* sem áudio: segue sem som */ }
+    }
+  };
+  if (delay > 0) setTimeout(go, delay * 1000); else go();
+  return () => { cancelled = true; stop?.(); };
+}
+
+/** Revelação: cartas abrindo + jingle da raridade (Eternus ganha sino). */
+export function playReveal(level: RevealLevel) {
+  playPackSound("reveal");
+  if (level === "base") playPackSound("jingle-base", { delay: 0.1 });
+  else if (level === "eternus") { playPackSound("jingle-epic", { delay: 0.1 }); playPackSound("bell", { delay: 0.12 }); }
+  else playPackSound("jingle-rare", { delay: 0.1 });
 }
