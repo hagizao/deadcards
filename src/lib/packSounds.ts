@@ -6,7 +6,7 @@
 
 export type RevealLevel = "base" | "ascendant" | "eternus" | "special";
 
-type Sound = "tear" | "tear-big" | "rays" | "stat" | "signature" | "reveal" | "reveal-base" | "reveal-rare" | "reveal-epic" | "bell";
+type Sound = "rays" | "signature" | "reveal" | "reveal-base" | "reveal-rare" | "reveal-epic" | "bell";
 
 const MUTE_KEY = "deadcards:pack-sound-off";
 const cache = new Map<Sound, HTMLAudioElement>();
@@ -18,7 +18,7 @@ export const setMuted = (off: boolean) => {
   try { localStorage.setItem(MUTE_KEY, off ? "1" : "0"); } catch { /* sem localStorage: só não lembra */ }
 };
 
-const ALL: Sound[] = ["tear", "tear-big", "rays", "stat", "signature", "reveal", "reveal-base", "reveal-rare", "reveal-epic", "bell"];
+const ALL: Sound[] = ["rays", "signature", "reveal", "reveal-base", "reveal-rare", "reveal-epic", "bell"];
 
 function load(name: Sound) {
   let base = cache.get(name);
@@ -30,7 +30,7 @@ function load(name: Sound) {
   return base;
 }
 
-/** Carrega os sons antes do primeiro toque, para não atrasar o rasgo. */
+/** Carrega os sons antes do primeiro toque, para não atrasar a abertura. */
 export function preloadPackSounds() {
   if (typeof Audio !== "undefined" && !isMuted()) ALL.forEach(load);
 }
@@ -44,20 +44,10 @@ function play(name: Sound, volume = 1, delay = 0) {
   if (delay > 0) setTimeout(go, delay * 1000); else go();
 }
 
-/** Papel rasgando. `big` é o segundo rasgo, maior. */
-export function playTear(big = false) {
-  play(big ? "tear-big" : "tear", big ? 1 : 0.9);
-}
-
 /** Luz saindo do pack: mais alto quanto mais rara a carta. */
 export function playRays(level: RevealLevel) {
   play("rays", level === "base" ? 0.35 : 0.7);
   if (level === "eternus") play("bell", 0.25, 0.15);
-}
-
-/** Atributo aparecendo. */
-export function playStat() {
-  play("stat", 0.8, 0.12);
 }
 
 /** Herói de assinatura: sino dourado. */
@@ -75,4 +65,45 @@ export function playReveal(level: RevealLevel) {
     return;
   }
   play("reveal-rare", 0.85, 0.1);
+}
+
+let ctx: AudioContext | null = null;
+const audio = () => (ctx ??= new AudioContext());
+
+function noise(dur: number, freq: number, gain: number, q = 1) {
+  const a = audio(), n = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = buf;
+  f.type = "bandpass";
+  f.frequency.value = freq;
+  f.Q.value = q;
+  g.gain.value = gain;
+  s.connect(f).connect(g).connect(a.destination);
+  s.start();
+}
+
+function tone(from: number, to: number, dur: number, gain: number, kind: OscillatorType = "sine") {
+  const a = audio(), o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
+  o.type = kind;
+  o.frequency.setValueAtTime(from, t);
+  o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g).connect(a.destination);
+  o.start();
+  o.stop(t + dur);
+}
+
+const SFX = {
+  clack: () => { noise(0.08, 2400, 0.9, 2); tone(180, 70, 0.12, 0.5); },
+  creak: () => tone(90, 140, 0.5, 0.12, "sawtooth"),
+  boom: () => { tone(120, 30, 0.9, 0.9); noise(0.6, 600, 0.5, 0.5); },
+  stamp: () => { tone(140, 50, 0.18, 0.8); noise(0.06, 900, 0.5, 1); },
+};
+
+/** Sons da maleta, sintetizados na hora (trava, rangido, estouro, pancada). */
+export function playSfx(name: keyof typeof SFX) {
+  if (isMuted() || typeof AudioContext === "undefined") return;
+  try { SFX[name](); } catch { /* sem áudio: segue sem som */ }
 }

@@ -107,18 +107,19 @@
   100% { transform: translateX(60%); }
 }
 
-/* raios de luz saindo do pack, na cor da borda da carta (--ray-c / --ray-hi) */
-@utility pack-rays {
-  border-radius: 9999px;
-  background: repeating-conic-gradient(from 0deg, var(--ray-c) 0deg var(--ray-w, 4deg), transparent var(--ray-w, 4deg) var(--ray-step, 20deg));
-  mask: radial-gradient(circle, #000 0%, rgb(0 0 0 / 0.55) 25%, rgb(0 0 0 / 0.15) 48%, transparent 66%);
-  filter: blur(1.5px);
-  animation: pack-rays-spin var(--ray-speed, 24s) linear infinite;
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
+/* maleta 3D: fundo do palco igual ao fog da cena, e o walkout escurece por cima */
+@utility pack-stage {
+  background: #050506;
 }
 
-@keyframes pack-rays-spin {
-  to { rotate: 360deg; }
+@utility pack-walk {
+  background: radial-gradient(circle at 50% 45%, rgb(0 0 0 / 0.72), rgb(0 0 0 / 0.9) 70%);
+}
+
+@utility pack-beat {
+  font: 800 clamp(44px, 12vw, 96px) / 1 var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-dl-text);
+  text-shadow: 0 4px 30px rgb(0 0 0 / 0.8);
 }

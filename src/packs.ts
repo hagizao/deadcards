@@ -69,7 +69,10 @@ async function open(env: Env, user: { id: string; admin: boolean }, id: string):
       env.DB.prepare("UPDATE user_packs SET opened_at = unixepoch() WHERE id = ? AND opened_at IS NULL").bind(id),
     ]);
   } catch (e) {
-    if (/UNIQUE|PRIMARY KEY|constraint/i.test(String(e))) return bad("esse pack já foi aberto", 409, "opened");
+    const msg = String(e);
+    if (/pack_openings/.test(msg)) return bad("esse pack já foi aberto", 409, "opened");
+    // outra abertura levou a mesma carta primeiro (user_cards): o lote desfez tudo e o pack segue fechado
+    if (/UNIQUE|PRIMARY KEY|constraint/i.test(msg)) return bad("não deu para abrir agora, tente de novo", 409, "retry");
     throw e;
   }
   return json({ cards: [{ id: card.id, kind }] });
