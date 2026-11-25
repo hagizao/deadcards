@@ -67,6 +67,23 @@ describe("Packs", () => {
     expect(((await (await req(cookie, "/api/packs")).json()) as Inv).packs.map((p) => p.id)).toEqual([packId]);
   });
 
+  it("dois packs abertos juntos para a mesma carta: um abre, o outro continua fechado", async () => {
+    await seedPackCode("PACK-RACE-1");
+    await seedPackCode("PACK-RACE-2");
+    const { cookie, userId } = await login("fan");
+    await env.DB.prepare("INSERT INTO user_cards (user_id, player_id) VALUES (?, 'a')").bind(userId).run();
+    const ids: string[] = [];
+    for (const code of ["PACK-RACE-1", "PACK-RACE-2"]) {
+      ids.push(((await (await req(cookie, "/api/redeem", "POST", { code })).json()) as { packId: string }).packId);
+    }
+    const results = await Promise.all(ids.map((id) => req(cookie, `/api/packs/${id}/open`, "POST")));
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const failed = results.find((r) => r.status === 409)!;
+    expect(["retry", "exhausted"]).toContain(((await failed.json()) as { code: string }).code);
+    const left = ((await (await req(cookie, "/api/packs")).json()) as Inv).packs.map((p) => p.id);
+    expect(left).toEqual([ids[results.indexOf(failed)]]);
+  });
+
   it("não abre pack de outra pessoa", async () => {
     await seedPackCode("PACK-WEEK-4");
     const { cookie } = await login("fan");
