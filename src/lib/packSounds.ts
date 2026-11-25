@@ -99,13 +99,13 @@ export const PACK_SOUNDS = {
   arrive: { when: "A maleta é jogada e bate na mesa (toca uma vez, no primeiro impacto)", volume: 1, synth: ({ gain }) => { tone(140, 42, 0.3, 0.9 * gain); noise(0.16, 480, 0.7 * gain, 0.8); } },
   latch: { when: "Cada trava solta (duas vezes); mais baixo, o rebite que prende a faixa de assinatura", volume: 1, synth: ({ gain }) => { noise(0.08, 2400, 0.9 * gain, 2); tone(180, 70, 0.12, 0.5 * gain); } },
   creak: { when: "Primeiro som quando a mala abre: a tampa abre uma fresta", volume: 1, synth: ({ gain }) => tone(90, 140, 0.5, 0.12 * gain, "sawtooth") },
-  "riser-eternus": { when: "Eternus: riser do começo da fresta até a revelação; o estouro (13,5 s) cai quando a carta aparece", volume: 0.9 },
-  tension: { when: "Ascendant e especial: zumbido subindo enquanto a luz pulsa na fresta", volume: 1, synth: ({ gain, len }) => riser(len, 0.16 * gain) },
-  pulse: { when: "Rara: cada pulso de luz na fresta (cada um mais forte)", volume: 1, synth: ({ gain }) => { tone(55 + gain * 25, 34, 0.32, 0.75 * gain); noise(0.05, 700, 0.25 * gain, 1); } },
+  "riser-eternus": { when: "Eternus e especial: riser do começo da fresta até a revelação; o estouro (13,5 s) cai quando a carta aparece", volume: 0.9 },
+  tension: { when: "Ascendant: tensão subindo durante o walkout; o pico (5,4 s) cai quando a carta aparece", volume: 1, synth: ({ gain, len }) => riser(len, 0.16 * gain) },
+  pulse: { when: "Rara: a luz jorra pela fresta, contínua (~1,3 s), logo antes de trocar de cor", volume: 1, synth: ({ gain }) => { tone(55 + gain * 25, 34, 0.32, 0.75 * gain); noise(0.05, 700, 0.25 * gain, 1); } },
   rays: { when: "Rara: no último pulso a luz troca para a cor da raridade", volume: 0.7 },
   smoke: { when: "Rara: fumaça escapando pela fresta e espalhando quando a tampa abre", volume: 1, synth: ({ gain }) => noise(1.3, 1800, 0.3 * gain, 0.5, 400) },
   "lid-open": { when: "Comum: a tampa abre", volume: 1, synth: ({ gain }) => { tone(80, 120, 0.6, 0.12 * gain, "sawtooth"); noise(0.3, 900, 0.15 * gain, 0.6); } },
-  "lid-boom": { when: "Rara: a tampa estoura", volume: 1, synth: ({ gain }) => { tone(120, 30, 0.9, 0.9 * gain); noise(0.6, 600, 0.5 * gain, 0.5); } },
+  "lid-boom": { when: "Rara: começa antes e estoura (0,9 s) quando a tampa pula", volume: 1, synth: ({ gain }) => { tone(120, 30, 0.9, 0.9 * gain); noise(0.6, 600, 0.5 * gain, 0.5); } },
   beat: { when: "Walkout: hit de cada pista (região, posição, time), 3 vezes", volume: 1, synth: ({ gain }) => { tone(140, 50, 0.18, 0.8 * gain); noise(0.06, 900, 0.5 * gain, 1); } },
   signature: { when: "Assinatura: a faixa dourada se estende dentro da tampa (logo depois da cor da luz)", volume: 0.6 },
   spin: { when: "A carta sobe girando", volume: 1, synth: ({ gain, len }) => noise(Math.max(0.3, len), 500, 0.35 * gain, 0.7, 3000) },
@@ -113,7 +113,7 @@ export const PACK_SOUNDS = {
   "reveal-walkout": { when: "Carta com walkout (Ascendant, especial, Eternus) aparece", volume: 0.9 },
   crowd: { when: "Plateia reagindo, junto com reveal-walkout", volume: 0.6 },
   bell: { when: "Eternus: sino na troca de cor e na revelação", volume: 0.5 },
-  shockwave: { when: "Eternus: onda de choque na mesa quando a carta aparece", volume: 1, synth: ({ gain }) => { tone(80, 24, 1.4, 0.9 * gain); noise(1, 300, 0.6 * gain, 0.5, 90); } },
+  shockwave: { when: "Eternus: onda de choque na mesa; o golpe (0,35 s) cai quando a carta aparece", volume: 1, synth: ({ gain }) => { tone(80, 24, 1.4, 0.9 * gain); noise(1, 300, 0.6 * gain, 0.5, 90); } },
 } satisfies Record<string, SoundSpec>;
 
 export type PackSoundId = keyof typeof PACK_SOUNDS;
@@ -210,8 +210,11 @@ export async function renderPackSoundWav(id: PackSoundId, sampleRate = 44100): P
   return new Blob([out], { type: "audio/wav" });
 }
 
-/** Segundo do riser da Eternus em que vem o estouro: a carta aparece nesse instante. */
-export const RISER_HIT = 13.5;
+/**
+ * Em que segundo de cada arquivo está o momento forte, para cair junto com a animação.
+ * Trocou um desses arquivos? Meça o pico de novo e atualize aqui.
+ */
+export const SOUND_PEAK = { "riser-eternus": 13.5, tension: 5.4, "lid-boom": 0.9, shockwave: 0.35 } as const;
 
 /** Revelação: comum tem o som dela; carta com walkout ganha o som final e a plateia. */
 export function playReveal(level: RevealLevel) {

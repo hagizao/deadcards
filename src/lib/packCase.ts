@@ -5,7 +5,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import type { PackSoundId } from "./packSounds";
+import { SOUND_PEAK, type PackSoundId } from "./packSounds";
 
 /** 0 = comum, 1 = rara (S ou especial), 2 = Eternus. */
 export type CaseLevel = 0 | 1 | 2;
@@ -875,7 +875,7 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       .to(spot, { intensity: 35, duration: dur(0.6) }, 0);
     if (lv) {
       t.add(() => {
-        sound("lid-boom");
+        if (reduce) sound("lid-boom");
         buzz(60);
         shakeCam(0.12 + lv * 0.1, 0.6);
         sparks(80 + lv * 70, HB + 0.3);
@@ -891,6 +891,9 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
     t.to({}, { duration: dur(lv ? 1.1 : 0.7) }, 0);
     return done(t);
   }
+
+  /** Segundos entre chamar `rise` e a carta virar a carta real (a linha do tempo de `rise`). */
+  const riseTime = (lv: CaseLevel) => (reduce ? 0 : Math.max(0.7, 0.45 + 0.5 + lv * 0.35));
 
   return {
     arrive() {
@@ -955,29 +958,41 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
         .to(inner, { intensity: 3 + lv * 2, duration: dur(0.4) }, 0.1)
         .add(() => sound("creak"), 0.05);
       if (lv && !reduce) {
-        // rara: a tampa sobe um pouco e emperra; a fumaça escapa; a luz neutra pulsa cada vez mais forte
-        // com o zumbido subindo; no último pulso a luz troca para a cor da raridade
-        const gap = 0.62 - lv * 0.08, pulses = 3 + lv, first = 1.2, last = first + (pulses - 1) * gap;
+        // rara: a tampa sobe um pouco e emperra; a fumaça escapa; a luz neutra respira na fresta (sem som);
+        // depois jorra contínua, tremendo tudo, junto com o som "pulse" (~1,3 s); no fim dele a luz troca
+        // para a cor da raridade e a tampa estoura no pico do lid-boom, que começou antes
+        const gap = 0.62 - lv * 0.08, breaths = 2 + lv, first = 1.2;
+        const surge = first + breaths * gap, SURGE = 1.25, color = surge + SURGE, pop = color + 0.25 + 0.1;
         t.to(hinge.rotation, { x: -0.42, duration: 0.5, ease: "power2.out" }, 0.7)
-          .to(CAM, { push: 1, duration: last - 0.5, ease: "power2.inOut" }, 0.7)
-          .to(bloom, { strength: 0.45 + lv * 0.12, duration: last - 0.7 }, 0.7)
-          .add(() => { smokeOn = 1; sound("smoke", { gain: 0.5 }); if (lv === 1) sound("tension", { len: last - 0.7 }); }, 0.7);
-        for (let i = 0; i < pulses; i++) {
-          const at = first + i * gap, f = i / (pulses - 1), end = i === pulses - 1;
-          t.to(inner, { intensity: (6 + lv * 4) * (1 + f * 0.8), duration: 0.12, ease: "power2.out" }, at)
-            .to(aura.material, { opacity: 0.6 + f * 0.35, duration: 0.12 }, at)
-            .to(aura.material, { opacity: 0.45, duration: 0.35 }, at + 0.12)
-            .to(inner, { intensity: 3 + lv * 2, duration: 0.35, ease: "power2.in" }, at + 0.12)
-            .to(hinge.rotation, { x: -0.42 - (i + 1) * 0.025, duration: 0.1, ease: "power2.out" }, at)
-            .add(() => {
-              shakeCam(0.05 + lv * 0.04 + f * 0.06, 0.3);
-              sound("pulse", { gain: 0.45 + f * 0.55 });
-              buzz(18 + Math.round(f * 30));
-              if (end && look) { sound("rays"); if (lv === 2) sound("bell", { gain: 0.6 }); }
-            }, at);
-          if (end && look) t.to(pal, { mix: 1, duration: 0.1, ease: "power2.out" }, at).to(seamGlow.material, { opacity: 1, duration: 0.1 }, at);
+          .to(CAM, { push: 1, duration: color - 0.7, ease: "power2.inOut" }, 0.7)
+          .to(bloom, { strength: 0.45 + lv * 0.12, duration: color - 0.7 }, 0.7)
+          .add(() => { smokeOn = 1; sound("smoke", { gain: 0.5 }); }, 0.7);
+        for (let i = 0; i < breaths; i++) {
+          const at = first + i * gap, f = (i + 1) / breaths;
+          t.to(inner, { intensity: (5 + lv * 3) * (1 + f * 0.4), duration: 0.18, ease: "sine.out" }, at)
+            .to(aura.material, { opacity: 0.5 + f * 0.15, duration: 0.18 }, at)
+            .to(aura.material, { opacity: 0.4, duration: 0.3 }, at + 0.18)
+            .to(inner, { intensity: 3 + lv * 2, duration: 0.3, ease: "sine.in" }, at + 0.18)
+            .add(() => { shakeCam(0.02 + f * 0.03, 0.2); buzz(10); }, at);
         }
-        t.to({}, { duration: 0.25 });
+        // jorro: a luz sobe e fica no alto, tremulando, com a tampa batendo e a câmera tremendo sem parar
+        t.add(() => { sound("pulse"); buzz([30, 20, 30, 20, 60]); }, surge)
+          .to(inner, { intensity: (6 + lv * 4) * 1.8, duration: 0.3, ease: "power2.out" }, surge)
+          .to(aura.material, { opacity: 0.95, duration: 0.3 }, surge)
+          .to(seamGlow.material, { opacity: 1, duration: 0.3 }, surge);
+        for (let k = 0; k < SURGE - 0.1; k += 0.12) {
+          const at = surge + 0.1 + k, f = k / SURGE;
+          t.to(inner, { intensity: (6 + lv * 4) * (1.5 + Math.random() * 0.5), duration: 0.06, ease: "none" }, at)
+            .to(hinge.rotation, { x: -0.44 - Math.random() * 0.05, duration: 0.06, ease: "power2.out" }, at)
+            .add(() => shakeCam(0.04 + lv * 0.03 + f * 0.08, 0.14), at);
+        }
+        if (look) {
+          t.add(() => { sound("rays"); if (lv === 2) sound("bell", { gain: 0.6 }); buzz(70); }, color)
+            .to(pal, { mix: 1, duration: 0.1, ease: "power2.out" }, color)
+            .to(seamGlow.material, { opacity: 1, duration: 0.1 }, color);
+        }
+        t.add(() => sound("lid-boom"), Math.max(0, pop - SOUND_PEAK["lid-boom"]))
+          .to({}, { duration: 0.01 }, color + 0.25);
       } else {
         if (look) t.add(() => { pal.mix = 1; if (lv) sound("rays"); }, 0);
         t.to({}, { duration: dur(0.25) });
@@ -995,9 +1010,7 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       if (!reduce) for (let k = 0.3; k < sec - 0.1; k += 0.3) t.add(() => shakeCam(0.015 + 0.07 * (k / sec), 0.3), k);
       return done(t);
     },
-    riseTime(lv) {
-      return reduce ? 0 : Math.max(0.7, 0.45 + 0.5 + lv * 0.35);
-    },
+    riseTime,
     dim() {
       tl().to(light, { level: 0.25, duration: dur(0.5) }, 0).to(inner, { intensity: 2, duration: dur(0.5) }, 0);
     },
@@ -1041,13 +1054,16 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
         .to(aim, { y: 1.1, duration: dur(0.8), ease: "power2.out" }, 0)
         .to(card3.rotation, { y: spin, duration: spinD, ease: "power2.inOut" }, dur(0.45))
         .add(() => sound("spin", { len: spinD + 0.2, gain: 0.6 + lv * 0.2 }), dur(0.45));
-      if (lv === 2) t.to(raysMat, { opacity: 0.55, duration: dur(1.2) }, 0.2);
+      if (lv === 2) {
+        t.to(raysMat, { opacity: 0.55, duration: dur(1.2) }, 0.2)
+          .add(() => sound("shockwave"), Math.max(0, riseTime(lv) - SOUND_PEAK.shockwave));
+      }
       await done(t);
       const a = project(card3, new THREE.Vector3(0, CARD_H / 2, 0)), b = project(card3, new THREE.Vector3(0, -CARD_H / 2, 0)), mid = project(card3);
       card3.visible = false;
       sparks([30, 120, 220][lv], top);
       buzz([[30], [50, 40, 90], [80, 50, 160]][lv]);
-      if (lv === 2) { sound("shockwave"); shock(16, 1.4); }
+      if (lv === 2) shock(16, 1.4);
       shakeCam([0, 0.12, 0.25][lv], 0.5);
       to(CAM, { push: 0, duration: dur(1), ease: "power2.out" });
       to(bloom, { strength: 0.35, duration: dur(1.2) });

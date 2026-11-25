@@ -7,7 +7,7 @@ import { api, useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
 import type { CaseLevel, CaseLook, CardSpot, PackCase } from "../lib/packCase";
 import type { InventoryPack, PackKind } from "../lib/packs";
-import { RISER_HIT, isMuted, playPackSound, playReveal, preloadPackSounds, setMuted, type RevealLevel, type SoundHandle } from "../lib/packSounds";
+import { SOUND_PEAK, isMuted, playPackSound, playReveal, preloadPackSounds, setMuted, type RevealLevel, type SoundHandle } from "../lib/packSounds";
 import { getCardTier, levelOf } from "../lib/rarity";
 import { Card } from "./Card";
 import { TeamLogo } from "./TeamLogo";
@@ -153,6 +153,8 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     },
   ));
 
+  /** Segundos do walkout (mesma conta da linha do tempo abaixo). */
+  const walkoutTime = (lv: CaseLevel) => 0.45 + (walk.current?.children.length ?? 0) * (1.75 - lv * 0.1);
   const walkout = (lv: CaseLevel) => new Promise<void>((resolve) => {
     const el = walk.current;
     if (!el) return resolve();
@@ -187,19 +189,32 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     // especial: a luz alterna entre as duas cores da moldura
     const look: CaseLook | null = tr && lvl !== "base" ? { c: tr.c, hi: tr.hi, alt: lvl === "special" ? { c: tr.hi, hi: tr.c } : undefined } : null;
     setStage("show");
-    // Eternus: o riser começa com a fresta e o estouro dele cai na hora em que a carta aparece
-    const t0 = performance.now();
-    if (lvl === "eternus") riser.current = playPackSound("riser-eternus");
+    // Eternus e especial: o riser começa com a fresta e o estouro dele cai na hora em que a carta aparece
+    // (com a faixa de assinatura a abertura fica mais longa: o riser começa um pouco depois)
+    const sig = drawn.kind === "signature";
+    let t0 = performance.now() + (sig ? 1000 : 0);
+    let peak = 0;
+    if (lvl === "eternus" || lvl === "special") {
+      riser.current = playPackSound("riser-eternus", { delay: sig ? 1 : 0 });
+      peak = SOUND_PEAK["riser-eternus"];
+    }
     await c.crack(lv, look);
     // assinatura logo depois da cor da luz: a faixa dourada se estende dentro da tampa
     if (drawn.kind === "signature") await c.ribbon(t.signature);
+    // Ascendant: a tensão sobe durante o walkout e o pico cai na revelação
+    if (lvl === "ascendant") {
+      const delay = Math.max(0, walkoutTime(lv) + 0.3 - (SOUND_PEAK.tension - c.riseTime(lv)));
+      riser.current = playPackSound("tension", { delay });
+      t0 = performance.now() + delay * 1000;
+      peak = SOUND_PEAK.tension;
+    }
     if (lvl !== "base") await walkout(lv);
     // a frente 3D costuma estar pronta; se o PNG atrasar, a carta gira só com o verso
     await Promise.race([front.current, new Promise((r) => setTimeout(r, 1500))]);
-    if (lvl === "eternus") {
+    if (peak) {
       // posição real do áudio (cobre o atraso para começar); sem som, o relógio
       const at = riser.current?.position() ?? (performance.now() - t0) / 1000;
-      const left = RISER_HIT - c.riseTime(lv) - at;
+      const left = peak - c.riseTime(lv) - at;
       if (left > 0.05) await c.charge(left);
     }
     const s = await c.rise(lv);
