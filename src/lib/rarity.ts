@@ -292,5 +292,6 @@ export function particleSpecs(t: Tier): Particle[] {
 }
 
 /** Nível da abertura de pack: S, SS e especiais ganham o walkout; o resto abre direto. */
-export const levelOf = (tier: Tier | null | undefined): RevealLevel =>
-  !tier ? "base" : tier.custom ? "special" : tier.key === "eternus" ? "eternus" : tier.key === "ascendant" ? "ascendant" : "base";
+/** Nível da abertura: Ascendant, Eternus e qualquer carta especial (com ou sem moldura) têm walkout. */
+export const levelOf = (tier: Tier | null | undefined, special = false): RevealLevel =>
+  !tier ? "base" : tier.custom || special ? "special" : tier.key === "eternus" ? "eternus" : tier.key === "ascendant" ? "ascendant" : "base";

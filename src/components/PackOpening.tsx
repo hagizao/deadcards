@@ -124,7 +124,7 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
 
   const card = result ? players.find((p) => p.id === result.id) : undefined;
   const tier = card ? getCardTier(card, settings.tierConfig!) : null;
-  const level = levelOf(tier);
+  const level = levelOf(tier, !!card?.special);
   const colors = tier && level !== "base" ? { c: tier.c, hi: tier.hi } : NEUTRAL;
   const team = card ? teamOf(teams, card) : null;
   const signature = result?.kind === "signature";
@@ -187,7 +187,7 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     if (!drawn || !c) return;
     const p = players.find((x) => x.id === drawn.id);
     const tr = p ? getCardTier(p, settings.tierConfig!) : null;
-    const lvl = levelOf(tr);
+    const lvl = levelOf(tr, !!p?.special);
     const lv = CASE_LV[lvl];
     // especial: a luz alterna entre as duas cores da moldura
     const look: CaseLook | null = tr && lvl !== "base" ? { c: tr.c, hi: tr.hi, alt: lvl === "special" ? { c: tr.hi, hi: tr.c } : undefined } : null;
@@ -274,7 +274,7 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     const drawn = await request();
     if (!drawn) return;
     const p = players.find((x) => x.id === drawn.id);
-    const lvl = levelOf(p && getCardTier(p, settings.tierConfig!));
+    const lvl = levelOf(p && getCardTier(p, settings.tierConfig!), !!p?.special);
     const r = root.current?.getBoundingClientRect();
     place({ x: (r?.width ?? 0) / 2, y: ((r?.height ?? 0) - BOTTOM) / 2, scale: 0.6 });
     playReveal(lvl);

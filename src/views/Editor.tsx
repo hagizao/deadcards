@@ -604,6 +604,9 @@ function LookForm() {
   const [tiers, setTiers] = useState<TierBand[]>(() => structuredClone(settings.tierConfig ?? DEFAULT_TIER_CONFIG));
   const { busy, msg, run } = useSaver(reload);
   const setTier = (i: number, patch: Partial<TierBand>) => setTiers((t) => t.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  // mínimo e máximo andam juntos com a faixa vizinha: sem buraco nem sobreposição entre letras
+  const setMin = (i: number, min: number) => setTiers((t) => t.map((x, j) => (j === i ? { ...x, min } : j === i + 1 ? { ...x, max: min - 1 } : x)));
+  const setMax = (i: number, max: number) => setTiers((t) => t.map((x, j) => (j === i ? { ...x, max } : j === i - 1 ? { ...x, min: max + 1 } : x)));
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-2">
@@ -641,8 +644,8 @@ function LookForm() {
         {tiers.map((t, i) => (
           <div key={t.key} className="grid grid-cols-[3rem_1fr_1fr_2.5rem_2.5rem] items-center gap-2">
             <span className="flex h-9 items-center justify-center rounded-lg font-black" style={{ background: t.bg, color: t.text }}>{t.key}</span>
-            <input type="number" className={input} value={t.min} aria-label={`Mínimo ${t.key}`} onChange={(e) => setTier(i, { min: Number(e.target.value) })} />
-            <input type="number" className={input} value={t.max} aria-label={`Máximo ${t.key}`} onChange={(e) => setTier(i, { max: Number(e.target.value) })} />
+            <input type="number" className={input} value={t.min} aria-label={`Mínimo ${t.key}`} onChange={(e) => setMin(i, Number(e.target.value))} />
+            <input type="number" className={input} value={t.max} aria-label={`Máximo ${t.key}`} onChange={(e) => setMax(i, Number(e.target.value))} />
             <input type="color" className="h-9 w-full cursor-pointer rounded-sm bg-transparent" value={t.bg} aria-label={`Cor ${t.key}`} onChange={(e) => setTier(i, { bg: e.target.value })} />
             <input type="color" className="h-9 w-full cursor-pointer rounded-sm bg-transparent" value={t.text} aria-label={`Texto ${t.key}`} onChange={(e) => setTier(i, { text: e.target.value })} />
           </div>
