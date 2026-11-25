@@ -92,7 +92,7 @@ function riser(len: number, gain: number) {
  */
 export const PACK_SOUNDS = {
   arrive: { when: "A maleta cai e bate na mesa", volume: 1, synth: ({ gain }) => { tone(140, 42, 0.3, 0.9 * gain); noise(0.16, 480, 0.7 * gain, 0.8); } },
-  latch: { when: "Cada trava solta (duas vezes)", volume: 1, synth: ({ gain }) => { noise(0.08, 2400, 0.9 * gain, 2); tone(180, 70, 0.12, 0.5 * gain); } },
+  latch: { when: "Cada trava solta (duas vezes); mais baixo, o rebite que prende a faixa de assinatura", volume: 1, synth: ({ gain }) => { noise(0.08, 2400, 0.9 * gain, 2); tone(180, 70, 0.12, 0.5 * gain); } },
   creak: { when: "A tampa abre uma fresta", volume: 1, synth: ({ gain }) => tone(90, 140, 0.5, 0.12 * gain, "sawtooth") },
   tension: { when: "Rara: zumbido subindo enquanto a luz pulsa na fresta", volume: 1, synth: ({ gain, len }) => riser(len, 0.16 * gain) },
   pulse: { when: "Rara: cada pulso de luz na fresta (cada um mais forte)", volume: 1, synth: ({ gain }) => { tone(55 + gain * 25, 34, 0.32, 0.75 * gain); noise(0.05, 700, 0.25 * gain, 1); } },
@@ -101,7 +101,7 @@ export const PACK_SOUNDS = {
   "lid-open": { when: "Comum: a tampa abre", volume: 1, synth: ({ gain }) => { tone(80, 120, 0.6, 0.12 * gain, "sawtooth"); noise(0.3, 900, 0.15 * gain, 0.6); } },
   "lid-boom": { when: "Rara: a tampa estoura", volume: 1, synth: ({ gain }) => { tone(120, 30, 0.9, 0.9 * gain); noise(0.6, 600, 0.5 * gain, 0.5); } },
   beat: { when: "Walkout: cada pista (região, posição, time)", volume: 1, synth: ({ gain }) => { tone(140, 50, 0.18, 0.8 * gain); noise(0.06, 900, 0.5 * gain, 1); } },
-  signature: { when: "Assinatura: a faixa dourada se desenrola dentro da tampa", volume: 0.6 },
+  signature: { when: "Assinatura: a faixa dourada se estende dentro da tampa (logo depois da cor da luz)", volume: 0.6 },
   spin: { when: "A carta sobe girando", volume: 1, synth: ({ gain, len }) => noise(Math.max(0.3, len), 500, 0.35 * gain, 0.7, 3000) },
   reveal: { when: "A carta aparece (toda abertura)", volume: 0.8 },
   "jingle-base": { when: "Jingle da carta comum, junto com reveal", volume: 0.7 },

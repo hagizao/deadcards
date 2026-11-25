@@ -113,25 +113,70 @@ function labelTexture(name: string) {
   return t;
 }
 
+/**
+ * Faixa de assinatura: cetim dourado velho, costurado nas bordas, com o texto gravado (baixo-relevo),
+ * arranhões e pontas cortadas em V. O mesmo canvas serve de relevo (bumpMap): o texto escuro afunda.
+ */
 function ribbonTexture(text: string) {
   const c = document.createElement("canvas");
   c.width = 1024;
-  c.height = 150;
+  c.height = 160;
   const g = c.getContext("2d")!;
-  const grad = g.createLinearGradient(0, 0, c.width, 0);
-  [["#92400e", 0], ["#f59e0b", 0.2], ["#fde68a", 0.44], ["#fffbeb", 0.5], ["#fde68a", 0.56], ["#f59e0b", 0.8], ["#92400e", 1]]
+  const top = 14, h = c.height - 28;
+  const grad = g.createLinearGradient(0, top, 0, top + h);
+  [["#5e4314", 0], ["#b8913f", 0.18], ["#e2c678", 0.42], ["#d4b25e", 0.6], ["#a07a2c", 0.84], ["#4f3810", 1]]
     .forEach(([col, at]) => grad.addColorStop(at as number, col as string));
   g.fillStyle = grad;
-  g.fillRect(0, 8, c.width, c.height - 16);
-  g.fillStyle = "rgba(255,251,235,.75)";
-  g.fillRect(0, 8, c.width, 3);
-  g.fillRect(0, c.height - 11, c.width, 3);
-  g.fillStyle = "#1c1206";
+  g.fillRect(0, top, c.width, h);
+  // trama do tecido e manchas de uso
+  for (let y = top; y < top + h; y += 3) { g.fillStyle = `rgba(40,25,5,${0.05 + Math.random() * 0.05})`; g.fillRect(0, y, c.width, 1); }
+  for (let i = 0; i < 40; i++) {
+    const x = Math.random() * c.width, y = top + Math.random() * h, r = 20 + Math.random() * 60;
+    const rg = g.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, `rgba(${Math.random() < 0.5 ? "60,40,10" : "255,235,180"},.12)`);
+    rg.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = rg;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // costura: pontos escuros com brilho embaixo
+  for (const y of [top + 12, top + h - 12]) {
+    for (let x = 30; x < c.width - 30; x += 22) {
+      g.fillStyle = "rgba(50,32,8,.85)";
+      g.fillRect(x, y - 1.5, 12, 3);
+      g.fillStyle = "rgba(255,236,180,.35)";
+      g.fillRect(x, y + 1.5, 12, 1);
+    }
+  }
+  // texto gravado: sombra escura em cima, luz embaixo
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.font = '900 76px "VALVE Pulp", sans-serif';
-  g.letterSpacing = "18px";
-  g.fillText(text.toUpperCase(), c.width / 2 + 9, c.height / 2 + 4);
+  g.font = '900 70px "VALVE Pulp", sans-serif';
+  g.letterSpacing = "16px";
+  const label = text.toUpperCase(), cx = c.width / 2 + 8, cy = c.height / 2 + 3;
+  g.fillStyle = "rgba(255,240,200,.45)";
+  g.fillText(label, cx, cy + 2.5);
+  g.fillStyle = "#3a2507";
+  g.fillText(label, cx, cy);
+  // arranhões
+  for (let i = 0; i < 70; i++) {
+    const x = Math.random() * c.width, y = top + Math.random() * h, l = 6 + Math.random() * 30, a = (Math.random() - 0.5) * 0.6;
+    g.strokeStyle = `rgba(${Math.random() < 0.6 ? "255,240,200" : "40,25,5"},${0.12 + Math.random() * 0.2})`;
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+    g.stroke();
+  }
+  // pontas em V
+  g.globalCompositeOperation = "destination-out";
+  for (const [x0, dir] of [[0, 1], [c.width, -1]] as const) {
+    g.beginPath();
+    g.moveTo(x0, top - 2);
+    g.lineTo(x0 + dir * 46, c.height / 2);
+    g.lineTo(x0, top + h + 2);
+    g.closePath();
+    g.fill();
+  }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
@@ -601,20 +646,37 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
   const dustAll = (n: number, power: number) => { puffEdge(1, 0, n, power); puffEdge(-1, 0, n, power); puffEdge(0, 1, n, power); puffEdge(0, -1, n, power); };
 
   // faixa de assinatura: presa por dentro da tampa, desenrola da esquerda para a direita
-  const RIB_W = W - 0.4;
-  const ribGeo = new THREE.PlaneGeometry(RIB_W, 0.56);
+  // tecido de verdade: recebe a luz da carta, ondula um pouco e tem relevo; um rebite de latão em cada ponta
+  const RIB_W = W - 0.4, RIB_TILT = 0.1;
+  const ribGeo = new THREE.PlaneGeometry(RIB_W, 0.5, 64, 1);
   ribGeo.translate(RIB_W / 2, 0, 0);
-  const ribMat = new THREE.MeshBasicMaterial({ transparent: true, toneMapped: false, side: THREE.DoubleSide, color: 0xe8e0d0 });
+  const rp = ribGeo.attributes.position;
+  for (let i = 0; i < rp.count; i++) rp.setZ(i, 0.022 * Math.sin(rp.getX(i) * 6.5) + 0.01 * Math.sin(rp.getX(i) * 17 + rp.getY(i) * 4));
+  ribGeo.computeVertexNormals();
+  const ribMat = new THREE.MeshStandardMaterial({
+    transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, metalness: 0.45, roughness: 0.5,
+    bumpScale: 2.5, emissive: 0xffffff, emissiveIntensity: 0.32,
+  });
+  const brass = new THREE.MeshStandardMaterial({ color: 0xb08d3c, metalness: 1, roughness: 0.32 });
+  const along = (x: number) => [-RIB_W / 2 + x * Math.cos(RIB_TILT), (-RIB_W / 2) * Math.sin(RIB_TILT) + x * Math.sin(RIB_TILT)] as const;
+  const rivets = [0.2, RIB_W - 0.2].map((x) => {
+    const r = shadowed(new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 10), brass));
+    r.scale.z = 0.45;
+    const [px, py] = along(x);
+    r.position.set(px, py, 0.03);
+    r.visible = false;
+    return r;
+  });
   const ribG = new THREE.Group();
   ribG.rotation.x = Math.PI / 2;
   ribG.position.set(0, -0.2, 0.8);
   hinge.add(ribG);
   const rib = new THREE.Mesh(ribGeo, ribMat);
-  rib.rotation.z = 0.1;
-  rib.position.set((-RIB_W / 2) * Math.cos(0.1), (-RIB_W / 2) * Math.sin(0.1), 0);
+  rib.rotation.z = RIB_TILT;
+  rib.position.set(...along(0), 0);
   rib.scale.x = 0.001;
   rib.visible = false;
-  ribG.add(rib);
+  ribG.add(rib, ...rivets);
 
   // ---------- câmera, tamanho e laço ----------
   const host = canvas.parentElement ?? canvas;
@@ -932,16 +994,20 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
         .to(CAM, { push: 0.3 + i * 0.2, duration: dur(1.6), ease: "power1.inOut" }, 0);
     },
     async ribbon(text) {
-      ribMat.map = ribbonTexture(text);
+      const tex = ribbonTexture(text);
+      ribMat.map = ribMat.bumpMap = ribMat.emissiveMap = tex;
       ribMat.needsUpdate = true;
       rib.visible = true;
+      rivets[0].visible = true;
+      // presa no rebite da esquerda, a faixa é puxada até o outro lado e pregada com um clique
       const t = tl()
         .add(() => sound("signature"), 0)
         .to(CAM, { push: 0.25, duration: dur(0.8), ease: "power2.out" }, 0)
-        .to(light, { level: 0.6, duration: dur(0.3) }, 0)
-        .to(rib.scale, { x: 1, duration: dur(0.6), ease: "power3.out" }, 0.05)
-        .fromTo(ribMat.color, { r: 2, g: 1.7, b: 1.1 }, { r: 0.91, g: 0.88, b: 0.82, duration: dur(0.7) }, 0.5)
-        .to({}, { duration: dur(1) });
+        .to(rib.scale, { x: 1, duration: dur(0.65), ease: "power3.out" }, 0.1)
+        .fromTo(rib.rotation, { z: RIB_TILT + 0.07 }, { z: RIB_TILT, duration: dur(0.9), ease: "elastic.out(1, 0.5)" }, 0.1)
+        .add(() => { rivets[1].visible = true; sound("latch", { gain: 0.5 }); buzz(15); }, dur(0.6))
+        .fromTo(rivets[1].scale, { x: 0, y: 0 }, { x: 1, y: 1, duration: dur(0.15), ease: "back.out(3)" }, dur(0.6))
+        .to({}, { duration: dur(1.1) });
       await done(t);
     },
     async rise(lv) {

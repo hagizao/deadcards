@@ -22,6 +22,7 @@ const S = strings({
     latch: ["Soltar trava esquerda", "Soltar trava direita"],
     open: "Abrir o pack",
     close: "Fechar",
+    keep: "Guardar na sua coleção",
     region: "Região",
     position: "Posição",
     team: "Time",
@@ -43,6 +44,7 @@ const S = strings({
     latch: ["Release left latch", "Release right latch"],
     open: "Open the pack",
     close: "Close",
+    keep: "Add to your collection",
     region: "Region",
     position: "Position",
     team: "Team",
@@ -64,6 +66,7 @@ const S = strings({
     latch: ["Soltar cierre izquierdo", "Soltar cierre derecho"],
     open: "Abrir el pack",
     close: "Cerrar",
+    keep: "Guardar en tu colección",
     region: "Región",
     position: "Posición",
     team: "Equipo",
@@ -102,6 +105,8 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
   const [error, setError] = useState("");
   const [spot, setSpot] = useState<(CardSpot & { w: number; h: number }) | null>(null);
   const [muted, setMutedState] = useState(isMuted);
+  // "guardar": para onde a carta voa (centro da aba Coleção, relativo ao centro da carta)
+  const [stash, setStash] = useState<{ x: number; y: number } | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const walk = useRef<HTMLDivElement>(null);
@@ -181,9 +186,9 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     const look: CaseLook | null = tr && lvl !== "base" ? { c: tr.c, hi: tr.hi, alt: lvl === "special" ? { c: tr.hi, hi: tr.c } : undefined } : null;
     setStage("show");
     await c.crack(lv, look);
-    if (lvl !== "base") await walkout(lv);
-    // assinatura vem depois de tudo: a faixa dourada se desenrola dentro da tampa
+    // assinatura logo depois da cor da luz: a faixa dourada se estende dentro da tampa
     if (drawn.kind === "signature") await c.ribbon(t.signature);
+    if (lvl !== "base") await walkout(lv);
     // a frente 3D costuma estar pronta; se o PNG atrasar, a carta gira só com o verso
     await Promise.race([front.current, new Promise((r) => setTimeout(r, 1500))]);
     const s = await c.rise(lv);
@@ -253,6 +258,14 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     return () => window.removeEventListener("keydown", onKey);
   }, [closable, onClose]);
 
+  const navTab = () => [...document.querySelectorAll<HTMLElement>('[data-nav="collection"]')].find((el) => el.getBoundingClientRect().width > 0);
+  const keep = () => {
+    const r = root.current?.getBoundingClientRect();
+    const tab = navTab()?.getBoundingClientRect();
+    if (reduce || !r || !tab) return onClose();
+    setStash({ x: tab.left + tab.width / 2 - r.width / 2, y: tab.top + tab.height / 2 - (r.height - BOTTOM) / 2 });
+  };
+
   const toggleSound = () => { setMuted(!muted); setMutedState(!muted); };
   const hint = stage === "loading" ? t.loading : stage === "latches" ? (opened.some(Boolean) ? t.other : reduce ? t.tap : t.drag) : stage === "waiting" ? "…" : "";
 
@@ -262,8 +275,8 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
 
   return (
     <motion.div ref={root} role="dialog" aria-modal="true" aria-label={t.dialog(pack.type.name)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-50 overflow-hidden pack-stage">
-      <canvas ref={canvas} aria-hidden="true" className="absolute inset-0 block size-full touch-none" />
+      className="fixed inset-0 z-50 overflow-hidden transition-colors duration-500 pack-stage" style={stash ? { background: "transparent" } : undefined}>
+      <canvas ref={canvas} aria-hidden="true" className="absolute inset-0 block size-full touch-none transition-opacity duration-300" style={stash ? { opacity: 0 } : undefined} />
 
       {[0, 1].map((i) => (
         <button key={i} ref={(b) => { latchBtns.current[i] = b; }} type="button" aria-label={t.latch[i]} disabled={stage !== "latches" || opened[i]}
@@ -309,15 +322,22 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
               initial={{ opacity: 0 }} animate={{ opacity: [0, level === "eternus" ? 0.95 : 0.65, 0] }} transition={{ duration: level === "eternus" ? 1.1 : 0.7, times: [0, 0.15, 1] }} />
           )}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-center" style={{ bottom: BOTTOM }}>
-            <motion.div className="pointer-events-auto" initial={reduce ? { opacity: 0, scale: fit } : { ...from, opacity: 1 }} animate={{ x: 0, y: 0, scale: fit, opacity: 1 }}
-              transition={reduce ? { duration: 0.2 } : { type: "spring", stiffness: 170, damping: 17 }}>
+            <motion.div className="pointer-events-auto" initial={reduce ? { opacity: 0, scale: fit } : { ...from, opacity: 1 }}
+              animate={stash ? { x: stash.x, y: stash.y, scale: 0.06, rotate: -10, opacity: [1, 1, 0] } : { x: 0, y: 0, scale: fit, opacity: 1 }}
+              transition={stash ? { duration: 0.7, ease: [0.45, 0, 0.7, 0.4], opacity: { duration: 0.7, times: [0, 0.92, 1], ease: "linear" } } : reduce ? { duration: 0.2 } : { type: "spring", stiffness: 170, damping: 17 }}
+              onAnimationComplete={() => {
+                if (!stash) return;
+                // a aba Coleção "recebe" a carta com um pulo rápido
+                navTab()?.animate([{ transform: "scale(1)" }, { transform: "scale(1.25)" }, { transform: "scale(1)" }], { duration: 280, easing: "ease-out" });
+                onClose();
+              }}>
               <Card player={card} signature={result.kind === "signature"} />
             </motion.div>
           </div>
         </>
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex flex-col items-center gap-3 p-4 text-center">
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-40 flex flex-col items-center gap-3 p-4 text-center transition-opacity duration-200 ${stash ? "opacity-0" : ""}`}>
         {stage === "done" && card && tier && result && (
           <motion.div className="flex flex-col items-center gap-1" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduce ? 0 : 0.5, duration: 0.3 }}>
             <span className="font-display text-lg font-extrabold tracking-[0.25em] uppercase" style={{ color: level === "base" ? NEUTRAL.hi : tier.hi }}>{level === "special" ? t.kind.special : tier.name}</span>
@@ -327,7 +347,13 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
         )}
         {stage === "error" && <p role="alert" className="max-w-sm text-sm text-red-300">{error}</p>}
         {hint && <p aria-live="polite" className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase">{hint}</p>}
-        {(stage === "done" || stage === "error") && (
+        {stage === "done" && (
+          <button ref={closeBtn} type="button" onClick={keep} disabled={!!stash}
+            className="pointer-events-auto min-h-11 cursor-pointer rounded-full bg-dl-text px-6 text-xs font-extrabold tracking-[0.2em] text-dl-black uppercase transition hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:scale-97 disabled:cursor-default disabled:opacity-60">
+            {t.keep}
+          </button>
+        )}
+        {stage === "error" && (
           <button ref={closeBtn} type="button" onClick={onClose}
             className="pointer-events-auto min-h-11 cursor-pointer rounded-full bg-zinc-800/80 px-6 text-xs font-extrabold tracking-[0.2em] text-zinc-100 uppercase transition hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:scale-97">
             {t.close}

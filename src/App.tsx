@@ -290,6 +290,7 @@ function Shell() {
               <button
                 key={id}
                 type="button"
+                data-nav={id}
                 onClick={() => go(id)}
                 aria-current={tab === id ? "page" : undefined}
                 className={`relative flex min-h-10 cursor-pointer items-center rounded-lg px-3 text-sm font-bold tracking-widest whitespace-nowrap uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 xl:px-4 ${tab === id ? "text-dl-black" : "text-zinc-300 hover:bg-zinc-100/10 hover:text-white"}`}
@@ -359,6 +360,7 @@ function Shell() {
           <button
             key={id}
             type="button"
+            data-nav={id}
             onClick={() => go(id)}
             aria-current={tab === id ? "page" : undefined}
             className={`flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 text-[10px] font-bold tracking-wider uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 ${tab === id ? "text-dl-text" : "text-zinc-400 hover:text-zinc-100"}`}
