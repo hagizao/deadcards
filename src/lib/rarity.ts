@@ -1,3 +1,4 @@
+import type { RevealLevel } from "./packSounds";
 import type { Player, TierBand } from "./types";
 import { getPlayerOvr, hexToRgba } from "./cards";
 
@@ -290,3 +291,7 @@ export function particleSpecs(t: Tier): Particle[] {
   }
   return (FX_CACHE[ck] = specs);
 }
+
+/** Nível da abertura de pack: S, SS e especiais ganham o walkout; o resto abre direto. */
+export const levelOf = (tier: Tier | null | undefined): RevealLevel =>
+  !tier ? "base" : tier.custom ? "special" : tier.key === "eternus" ? "eternus" : tier.key === "ascendant" ? "ascendant" : "base";
