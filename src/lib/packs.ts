@@ -114,28 +114,18 @@ export function drawCard(pool: Player[], type: Pick<PackType, "odds" | "rarity">
   return last;
 }
 
-/** Valida as chances vindas do Editor: inteiros de 0 a 100 somando 100. */
-export function parseOdds(v: unknown): PackOdds | null {
+/** Valida chances vindas do Editor: uma por chave, inteiros de 0 a 100 somando 100. */
+function parsePercents<K extends string>(v: unknown, keys: readonly K[]): Record<K, number> | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
-  const out = {} as PackOdds;
-  for (const k of PACK_KINDS) {
+  const out = {} as Record<K, number>;
+  for (const k of keys) {
     const n = o[k];
     if (typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > 100) return null;
     out[k] = n;
   }
-  return PACK_KINDS.reduce((a, k) => a + out[k], 0) === 100 ? out : null;
+  return keys.reduce((a, k) => a + out[k], 0) === 100 ? out : null;
 }
 
-/** Valida as chances por raridade vindas do Editor: inteiros de 0 a 100 somando 100. */
-export function parseRarityOdds(v: unknown): RarityOdds | null {
-  if (!v || typeof v !== "object") return null;
-  const o = v as Record<string, unknown>;
-  const out = {} as RarityOdds;
-  for (const k of RARITY_KEYS) {
-    const n = o[k];
-    if (typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > 100) return null;
-    out[k] = n;
-  }
-  return RARITY_KEYS.reduce((a, k) => a + out[k], 0) === 100 ? out : null;
-}
+export const parseOdds = (v: unknown): PackOdds | null => parsePercents(v, PACK_KINDS);
+export const parseRarityOdds = (v: unknown): RarityOdds | null => parsePercents(v, RARITY_KEYS);
