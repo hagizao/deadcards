@@ -18,13 +18,18 @@ type PlayOpts = {
   gain?: number;
   /** Duração em segundos, para sons que acompanham uma animação (só o sintetizado usa; o arquivo toca inteiro). */
   len?: number;
+  /** Toca mesmo com o mudo ligado (prévia do Editor). */
+  force?: boolean;
 };
-type Synth = (o: Required<Omit<PlayOpts, "delay">>) => (() => void) | void;
+type Synth = (o: { gain: number; len: number }) => (() => void) | void;
 type SoundSpec = { when: string; volume: number; synth?: Synth };
 
 // ---------- síntese (Web Audio), usada enquanto o som não tem arquivo ----------
 let ctx: AudioContext | null = null;
-const audio = () => {
+// enquanto renderiza um som para arquivo, a síntese vai para este contexto em vez dos alto-falantes
+let offline: OfflineAudioContext | null = null;
+const audio = (): BaseAudioContext => {
+  if (offline) return offline;
   ctx ??= new AudioContext();
   if (ctx.state === "suspended") void ctx.resume();
   return ctx;
@@ -150,8 +155,8 @@ export function preloadPackSounds() {
 export type SoundHandle = { stop: () => void; position: () => number | null };
 
 /** Toca um som do catálogo (arquivo se houver, senão o sintetizado). */
-export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1 }: PlayOpts = {}): SoundHandle {
-  if (isMuted()) return { stop: () => {}, position: () => null };
+export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1, force = false }: PlayOpts = {}): SoundHandle {
+  if (isMuted() && !force) return { stop: () => {}, position: () => null };
   const spec: SoundSpec = PACK_SOUNDS[id];
   let stop: (() => void) | void;
   let el: HTMLAudioElement | null = null;
@@ -170,6 +175,39 @@ export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1 }:
   };
   if (delay > 0) setTimeout(go, delay * 1000); else go();
   return { stop: () => { cancelled = true; stop?.(); }, position: () => (el && !el.paused ? el.currentTime : null) };
+}
+
+// ---------- prévia no Editor ----------
+/** Duração típica dos sons que acompanham uma animação, para ouvir fora da abertura. */
+const PREVIEW_LEN: Partial<Record<PackSoundId, number>> = { tension: 2.1, spin: 1.05 };
+
+export const hasPackFile = (id: PackSoundId) => !!FILES[id];
+
+/** Toca um som como na abertura (ignora o mudo). */
+export const previewPackSound = (id: PackSoundId) => playPackSound(id, { len: PREVIEW_LEN[id] ?? 1, force: true });
+
+/** Renderiza um som sintetizado para WAV (mono, 16 bits). Null se o som não é sintetizado. */
+export async function renderPackSoundWav(id: PackSoundId, sampleRate = 44100): Promise<Blob | null> {
+  const spec: SoundSpec = PACK_SOUNDS[id];
+  if (!spec.synth || typeof OfflineAudioContext === "undefined") return null;
+  const len = PREVIEW_LEN[id] ?? 1;
+  const off = new OfflineAudioContext(1, Math.ceil(sampleRate * (len + 1.6)), sampleRate);
+  offline = off;
+  try { spec.synth({ gain: spec.volume, len }); } finally { offline = null; }
+  const buf = await off.startRendering();
+  // corta o silêncio do fim
+  const data = buf.getChannelData(0);
+  let end = data.length;
+  while (end > 1 && Math.abs(data[end - 1]) < 1e-4) end--;
+  const n = Math.min(data.length, end + Math.round(sampleRate * 0.05));
+  const out = new DataView(new ArrayBuffer(44 + n * 2));
+  const str = (o: number, s: string) => [...s].forEach((ch, i) => out.setUint8(o + i, ch.charCodeAt(0)));
+  str(0, "RIFF"); out.setUint32(4, 36 + n * 2, true); str(8, "WAVEfmt ");
+  out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, sampleRate, true); out.setUint32(28, sampleRate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+  str(36, "data"); out.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, data[i])) * 0x7fff, true);
+  return new Blob([out], { type: "audio/wav" });
 }
 
 /** Segundo do riser da Eternus em que vem o estouro: a carta aparece nesse instante. */

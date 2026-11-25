@@ -10,6 +10,8 @@ import { TeamLogo } from "../components/TeamLogo";
 import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
 import { PackArt } from "../components/Pack";
+import { downloadBlob } from "../lib/cardImage";
+import { PACK_SOUNDS, hasPackFile, previewPackSound, renderPackSoundWav, type PackSoundId, type SoundHandle } from "../lib/packSounds";
 import { DEFAULT_PACK_ODDS, DEFAULT_RARITY_ODDS, PACK_KINDS, PACK_NAME_MAX, cardChances, chanceSummary, drawCard, packKind, packPool, type PackKind, type PackType, type RarityOf } from "../lib/packs";
 
 const SECTIONS = [
@@ -19,6 +21,7 @@ const SECTIONS = [
   { id: "look", label: "Aparência" },
   { id: "packs", label: "Packs" },
   { id: "codes", label: "Códigos" },
+  { id: "sounds", label: "Sons" },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
 
@@ -124,6 +127,7 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
           {section === "look" && <LookForm />}
           {section === "packs" && <PacksForm />}
           {section === "codes" && <CodesForm />}
+          {section === "sounds" && <SoundsForm />}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -1013,6 +1017,52 @@ function CodesForm() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Todos os sons da abertura de pack, para ouvir um por um e baixar os que ainda são gerados no navegador. */
+function SoundsForm() {
+  const ids = Object.keys(PACK_SOUNDS) as PackSoundId[];
+  const [msg, setMsg] = useState("");
+  // um som por vez: tocar outro (ou sair da aba) corta o anterior, como o riser de 17 s
+  const playing = useRef<SoundHandle | null>(null);
+  useEffect(() => () => playing.current?.stop(), []);
+  const play = (id: PackSoundId) => { playing.current?.stop(); playing.current = previewPackSound(id); };
+  const download = async (id: PackSoundId) => {
+    const wav = await renderPackSoundWav(id).catch(() => null);
+    if (wav) downloadBlob(wav, `${id}.wav`);
+    else setMsg(`Erro: não deu para gerar ${id}.wav`);
+  };
+  return (
+    <div className="noir-glass space-y-5 rounded-3xl p-5 sm:p-7">
+      <div className="space-y-1.5">
+        <h2 className="text-lg font-extrabold tracking-[0.12em] text-zinc-100 uppercase">Sons da abertura de pack</h2>
+        <p className="text-sm text-zinc-400">
+          Na ordem em que tocam. Para trocar um som, o arquivo vai em <code className="text-zinc-200">src/assets/sounds/pack/&lt;id&gt;.mp3</code>. Toca mesmo com o mudo ligado.
+        </p>
+      </div>
+      <ul className="grid gap-2">
+        {ids.map((id) => {
+          const file = hasPackFile(id);
+          return (
+            <li key={id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-zinc-950/50 p-3">
+              <button type="button" onClick={() => play(id)} aria-label={`Tocar ${id}`} className={`${chip} bg-zinc-100 text-zinc-950 hover:bg-white`}>Tocar</button>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="text-sm font-bold text-zinc-100">{id}</code>
+                  <span className={`text-[11px] font-bold tracking-wider uppercase ${file ? "text-emerald-300" : "text-amber-300"}`}>{file ? "arquivo" : "gerado no navegador"}</span>
+                </div>
+                <p className="text-xs text-zinc-400">{PACK_SOUNDS[id].when}</p>
+              </div>
+              {!file && (
+                <button type="button" onClick={() => void download(id)} className={`${chip} border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white`}>Baixar WAV</button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <Toast msg={msg} />
     </div>
   );
 }
