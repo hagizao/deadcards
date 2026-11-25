@@ -90,7 +90,8 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
           {signature && <div className="sig-ribbon"><span>{t.signature}</span></div>}
 
           <div className="relative z-10 flex items-start justify-between gap-2">
-            <div className="flex flex-col items-start">
+            {/* data-zone: áreas que a abertura de pack nunca pode mostrar antes da hora */}
+            <div data-zone="ovr" className="flex flex-col items-start">
               <div className="flex items-center gap-1.5">
                 <span data-ovr className={`${editor ? "text-6xl" : medium ? "text-4xl" : "text-5xl"} leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]`}>{ovr}</span>
                 <TrendBadge delta={getPlayerTrend(player)} size={editor ? "editor" : "card"} />
@@ -107,7 +108,7 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
           </div>
 
           <div className={`relative z-10 mt-auto ${medium ? "pb-5" : editor ? "pb-9" : "pb-8"}`}>
-            <div className={`mb-2 border-b border-zinc-200/45 pb-1.5 text-center ${medium ? "" : "mx-2"}`}>
+            <div data-zone="name" className={`mb-2 border-b border-zinc-200/45 pb-1.5 text-center ${medium ? "" : "mx-2"}`}>
               <h3 className={`${editor ? "text-2xl" : medium ? "text-lg" : "text-xl"} truncate font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]`}>
                 {player.name}
               </h3>
