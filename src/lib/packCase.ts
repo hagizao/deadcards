@@ -1029,13 +1029,13 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       ribMat.needsUpdate = true;
       rib.visible = true;
       rivets[0].visible = true;
-      // presa no rebite da esquerda, a faixa é puxada até o outro lado e pregada com um clique
+      // presa no rebite da esquerda, a faixa é puxada até o outro lado e pregada (só vibração, sem som próprio)
       const t = tl()
         .add(() => sound("signature"), 0)
         .to(CAM, { push: 0.25, duration: dur(0.8), ease: "power2.out" }, 0)
         .to(rib.scale, { x: 1, duration: dur(0.65), ease: "power3.out" }, 0.1)
         .fromTo(rib.rotation, { z: RIB_TILT + 0.07 }, { z: RIB_TILT, duration: dur(0.9), ease: "elastic.out(1, 0.5)" }, 0.1)
-        .add(() => { rivets[1].visible = true; sound("latch", { gain: 0.5 }); buzz(15); }, dur(0.6))
+        .add(() => { rivets[1].visible = true; buzz(15); }, dur(0.6))
         .fromTo(rivets[1].scale, { x: 0, y: 0 }, { x: 1, y: 1, duration: dur(0.15), ease: "back.out(3)" }, dur(0.6))
         .to({}, { duration: dur(1.1) });
       await done(t);

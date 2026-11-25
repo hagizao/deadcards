@@ -97,7 +97,7 @@ function riser(len: number, gain: number) {
  */
 export const PACK_SOUNDS = {
   arrive: { when: "A maleta é jogada e bate na mesa (toca uma vez, no primeiro impacto)", volume: 1, synth: ({ gain }) => { tone(140, 42, 0.3, 0.9 * gain); noise(0.16, 480, 0.7 * gain, 0.8); } },
-  latch: { when: "Cada trava solta (duas vezes); mais baixo, o rebite que prende a faixa de assinatura", volume: 1, synth: ({ gain }) => { noise(0.08, 2400, 0.9 * gain, 2); tone(180, 70, 0.12, 0.5 * gain); } },
+  latch: { when: "Cada trava solta (duas vezes)", volume: 1, synth: ({ gain }) => { noise(0.08, 2400, 0.9 * gain, 2); tone(180, 70, 0.12, 0.5 * gain); } },
   creak: { when: "Primeiro som quando a mala abre: a tampa abre uma fresta", volume: 1, synth: ({ gain }) => tone(90, 140, 0.5, 0.12 * gain, "sawtooth") },
   "riser-eternus": { when: "Eternus e especial: riser do começo da fresta até a revelação; o estouro (13,5 s) cai quando a carta aparece", volume: 0.9 },
   tension: { when: "Ascendant: tensão subindo durante o walkout; o pico (5,4 s) cai quando a carta aparece", volume: 1, synth: ({ gain, len }) => riser(len, 0.16 * gain) },
