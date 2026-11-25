@@ -654,6 +654,9 @@ const KIND_LABEL: Record<PackKind, string> = { alt: "Herói jogado", signature: 
 const pct = (n: number) => `${(n * 100).toLocaleString("pt-BR", { maximumFractionDigits: n < 0.01 ? 2 : 1 })}%`;
 
 /** Tipos de pack: nome, arte, chances por tipo de carta e times do pool, com a prévia das chances reais. */
+// pack salvo sem chances por raridade abre com as padrão (salvar passa a gravá-las)
+const editable = (t: PackType | undefined): PackType | null => (t ? { ...structuredClone(t), rarity: t.rarity ? { ...t.rarity } : { ...DEFAULT_RARITY_ODDS } } : null);
+
 function PacksForm() {
   const { players, teams, settings } = useData();
   const [types, setTypes] = useState<PackType[]>([]);
@@ -663,11 +666,11 @@ function PacksForm() {
   const [msg, setMsg] = useState("");
   const load = (pick?: string) => api.packTypes().then((t) => {
     setTypes(t);
-    setD((cur) => structuredClone(t.find((x) => x.id === (pick ?? cur?.id)) ?? t[0] ?? null));
+    setD((cur) => editable(t.find((x) => x.id === (pick ?? cur?.id)) ?? t[0]));
   }).catch((e: Error) => setMsg(`Erro: ${e.message}`));
   useEffect(() => { load(); }, []);
 
-  const blank = (): PackType => ({ id: newId("pack"), name: "Novo pack", cards: 1, odds: { ...DEFAULT_PACK_ODDS }, teams: [] });
+  const blank = (): PackType => ({ id: newId("pack"), name: "Novo pack", cards: 1, odds: { ...DEFAULT_PACK_ODDS }, rarity: { ...DEFAULT_RARITY_ODDS }, teams: [] });
   const set = (patch: Partial<PackType>) => { setD((p) => (p ? { ...p, ...patch } : p)); setSim(null); };
   const run = async (fn: () => Promise<unknown>, ok: string, pick?: string) => {
     setBusy(true);
@@ -681,8 +684,10 @@ function PacksForm() {
   const chances = d ? chanceSummary(pool, cardChances(pool, d, rarityOf), rarityOf) : null;
   const inPool = Object.fromEntries(RARITY_KEYS.map((r) => [r, pool.filter((p) => rarityOf(p) === r).length])) as Record<RarityKey, number>;
   const sum = d ? PACK_KINDS.reduce((a, k) => a + d.odds[k], 0) : 0;
-  const raritySum = d?.rarity ? RARITY_KEYS.reduce((a, r) => a + d.rarity![r], 0) : 100;
+  const rarity = d?.rarity ?? DEFAULT_RARITY_ODDS;
+  const raritySum = RARITY_KEYS.reduce((a, r) => a + rarity[r], 0);
   const valid = sum === 100 && raritySum === 100;
+  const isDefault = !!d && PACK_KINDS.every((k) => d.odds[k] === DEFAULT_PACK_ODDS[k]) && RARITY_KEYS.every((r) => rarity[r] === DEFAULT_RARITY_ODDS[r]);
   const simulate = () => {
     if (!d) return;
     const kind = { alt: 0, signature: 0, special: 0 } as Record<PackKind, number>;
@@ -705,7 +710,7 @@ function PacksForm() {
       <div className="noir-glass space-y-6 rounded-3xl p-5 sm:p-7">
         <div className="flex flex-wrap items-center gap-2">
           {types.map((t) => (
-            <button key={t.id} type="button" aria-pressed={d?.id === t.id} onClick={() => { setD(structuredClone(t)); setSim(null); }}
+            <button key={t.id} type="button" aria-pressed={d?.id === t.id} onClick={() => { setD(editable(t)); setSim(null); }}
               className={`${chip} ${d?.id === t.id ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>{t.name}</button>
           ))}
           <button type="button" onClick={() => { setD(blank()); setSim(null); }} className={`${chip} border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white`}>+ Novo pack</button>
@@ -725,9 +730,15 @@ function PacksForm() {
             </div>
 
             <div className="space-y-2">
-              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
-                Chances por tipo de carta <span className={sum === 100 ? "text-emerald-300" : "text-red-300"}>{sum}/100</span>
-              </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+                  Chances por tipo de carta <span className={sum === 100 ? "text-emerald-300" : "text-red-300"}>{sum}/100</span>
+                </span>
+                <button type="button" className={`${ghost} min-h-11 sm:min-h-0`} disabled={isDefault} title="Volta tipo e raridade para as chances padrão"
+                  onClick={() => set({ odds: { ...DEFAULT_PACK_ODDS }, rarity: { ...DEFAULT_RARITY_ODDS } })}>
+                  Restaurar % padrão
+                </button>
+              </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 {PACK_KINDS.map((k) => (
                   <Field key={k} label={KIND_LABEL[k]}>
@@ -738,33 +749,21 @@ function PacksForm() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
-                  Chances por raridade {d.rarity && <span className={raritySum === 100 ? "text-emerald-300" : "text-red-300"}>{raritySum}/100</span>}
-                </span>
-                {(["off", "on"] as const).map((m) => (
-                  <button key={m} type="button" aria-pressed={(m === "on") === !!d.rarity} onClick={() => set({ rarity: m === "on" ? { ...DEFAULT_RARITY_ODDS, ...d.rarity } : undefined })}
-                    className={`${chip} ${(m === "on") === !!d.rarity ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>
-                    {m === "on" ? "Definir" : "Mesma chance"}
-                  </button>
-                ))}
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+                Chances por raridade <span className={raritySum === 100 ? "text-emerald-300" : "text-red-300"}>{raritySum}/100</span>
+              </span>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {RARITY_TIERS.map((tier) => {
+                  const r = tier.key as RarityKey;
+                  return (
+                    <Field key={r} label={`${tier.name} (${inPool[r]})`}>
+                      <input type="number" min={0} max={100} className={input} value={rarity[r]} style={{ borderColor: tier.c }}
+                        onChange={(e) => set({ rarity: { ...rarity, [r]: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) } })} />
+                    </Field>
+                  );
+                })}
               </div>
-              {d.rarity ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {RARITY_TIERS.map((tier) => {
-                    const r = tier.key as RarityKey;
-                    return (
-                      <Field key={r} label={`${tier.name} (${inPool[r]})`}>
-                        <input type="number" min={0} max={100} className={input} value={d.rarity![r]} style={{ borderColor: tier.c }}
-                          onChange={(e) => set({ rarity: { ...d.rarity!, [r]: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) } })} />
-                      </Field>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-zinc-400">Dentro de cada tipo, toda carta tem a mesma chance. Em "Definir" você escolhe a % de cada raridade.</p>
-              )}
-              {d.rarity && <p className="text-xs text-zinc-500">Vale dentro do tipo sorteado. Raridade sem carta naquele tipo sai da conta e divide a chance entre as outras; 0 = nunca sai.</p>}
+              <p className="text-xs text-zinc-500">Vale dentro do tipo sorteado. Raridade sem carta naquele tipo sai da conta e divide a chance entre as outras; 0 = nunca sai.</p>
             </div>
 
             <div className="space-y-2">
