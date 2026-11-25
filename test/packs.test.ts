@@ -29,6 +29,11 @@ describe("packs", () => {
     expect(packPool(all, { teams: ["t2"] }, new Set()).map((p) => p.id)).toEqual(["other"]);
   });
 
+  it("carta exclusiva nunca entra no pool", () => {
+    const pool = packPool([main, card("vip", { exclusive: true })], { teams: [] }, new Set());
+    expect(pool.map((p) => p.id)).toEqual(["main"]);
+  });
+
   it("tipo sem carta divide a chance entre os outros", () => {
     const c = kindChances([main, alt], DEFAULT_PACK_ODDS);
     expect(c.special.chance).toBe(0);

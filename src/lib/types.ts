@@ -44,6 +44,8 @@ export type Player = {
   /** Versão do mesmo jogador com outro herói que ele joga (a principal é o herói de assinatura). */
   altHero?: boolean;
   inactive?: boolean;
+  /** Carta exclusiva: nunca sai em pack (só por código ou outro meio). */
+  exclusive?: boolean;
   art?: { url: string; zoom?: number; x?: number; y?: number; credit?: ArtCredit };
 };
 

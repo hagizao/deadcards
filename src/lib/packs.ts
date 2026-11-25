@@ -39,7 +39,7 @@ export function packKind(p: Player): PackKind {
 
 /** Cartas que podem sair: ativas, dos times do pack e que a pessoa ainda não tem (sem repetidas). */
 export function packPool(players: Player[], type: Pick<PackType, "teams">, owned: Set<string>): Player[] {
-  return players.filter((p) => !p.inactive && !owned.has(p.id) && (!type.teams.length || type.teams.includes(p.teamId)));
+  return players.filter((p) => !p.inactive && !p.exclusive && !owned.has(p.id) && (!type.teams.length || type.teams.includes(p.teamId)));
 }
 
 /**

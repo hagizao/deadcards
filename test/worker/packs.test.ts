@@ -92,6 +92,15 @@ describe("Packs", () => {
     expect((await req(other, `/api/packs/${packId}/open`, "POST")).status).toBe(404);
   });
 
+  it("carta exclusiva não sai em pack", async () => {
+    const { cookie } = await login("admvicli");
+    await env.DB.prepare("UPDATE players SET extra_json = '{\"exclusive\":true}' WHERE id = 'a'").run();
+    for (let i = 0; i < 8; i++) {
+      const res = (await (await req(cookie, "/api/packs/test:pack-semanal/open", "POST")).json()) as { cards: { id: string }[] };
+      expect(res.cards[0].id).toBe("b");
+    }
+  });
+
   it("admin sempre tem pack de teste, que abre sem gravar", async () => {
     const { cookie, userId } = await login("admvicli");
     const inv = (await (await req(cookie, "/api/packs")).json()) as Inv;

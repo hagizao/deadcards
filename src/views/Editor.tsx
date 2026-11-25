@@ -151,7 +151,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
   const base = !existing && versionOf ? players.find((p) => p.id === versionOf) : undefined;
   const [d, setD] = useState<Player>(() => {
     if (existing) return structuredClone({ ...existing, ovr: getPlayerOvr(existing) });
-    if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, altHero: undefined, history: [], inactive: undefined, special: true };
+    if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, altHero: undefined, history: [], inactive: undefined, exclusive: undefined, special: true };
     return blankPlayer(teams[0]?.id ?? "");
   });
   const [date, setDate] = useState(today);
@@ -190,7 +190,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
       if (!c) {
         const id = newId("p");
         await api.save("players", id, { ...structuredClone(main), id, hero, stats, ovr, variantOf: main.id, altHero: true, history: [{ date: today(), ovr, base: true }],
-          special: undefined, specialText: undefined, frame: undefined, art: undefined, inactive: undefined });
+          special: undefined, specialText: undefined, frame: undefined, art: undefined, inactive: undefined, exclusive: undefined });
         continue;
       }
       const same = !c.inactive && getPlayerOvr(c) === ovr && STAT_KEYS.every((k) => c.stats[k] === stats[k]) && c.name === main.name && c.teamId === main.teamId && c.position === main.position;
@@ -249,7 +249,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
               const active = c.id === d.id;
               return (
                 <button key={c.id} type="button" aria-pressed={active} onClick={() => onEditId(c.id)} className={`${chip} ${active ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>
-                  {isMainCard(c) ? `Principal · ${c.hero}` : isAltHero(c) ? `${c.hero}${c.inactive ? " (aposentada)" : ""}` : `${c.special ? "Especial" : "Versão"} · ${tagOf(c)}`} · {getPlayerOvr(c)}
+                  {isMainCard(c) ? `Principal · ${c.hero}` : isAltHero(c) ? `${c.hero}${c.inactive ? " (aposentada)" : ""}` : `${c.special ? "Especial" : "Versão"} · ${tagOf(c)}`} · {getPlayerOvr(c)}{c.exclusive && " · exclusiva"}
                 </button>
               );
             })}
@@ -408,6 +408,10 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
           <button type="button" className={primary} disabled={busy} onClick={save}>{busy ? "Salvando…" : "Salvar carta"}</button>
           {d.id && <HoldButton className={danger} disabled={busy} onConfirm={remove} label={`Excluir a carta de ${d.name}`}>Segure p/ excluir</HoldButton>}
           {d.id && !isMainCard(d) && <button type="button" className={ghost} disabled={busy} onClick={() => run(async () => { await api.promote(d.id); await reload(); set({ variantOf: undefined, inactive: undefined }); onEditId(d.id); }, `${d.name} agora é a carta principal.`)}>Tornar principal</button>}
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-zinc-300 sm:min-h-0">
+            <input type="checkbox" checked={!!d.exclusive} onChange={(e) => set({ exclusive: e.target.checked || undefined })} className="accent-zinc-100" />
+            Carta exclusiva (não sai em packs)
+          </label>
           {d.id && isMainCard(d) && <label className="flex items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={!!d.inactive} onChange={(e) => set({ inactive: e.target.checked || undefined })} className="accent-zinc-100" />Fora do elenco (versão guardada)</label>}
           <Toast msg={msg} />
         </div>
