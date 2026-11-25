@@ -1,7 +1,7 @@
 import gsap from "gsap";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
-import { regionClass, teamOf, useLabel } from "../lib/cards";
+import { teamOf, useLabel } from "../lib/cards";
 import { captureCard } from "../lib/cardImage";
 import { api, useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
@@ -10,6 +10,8 @@ import type { InventoryPack, PackKind } from "../lib/packs";
 import { SOUND_PEAK, isMuted, playPackSound, playReveal, preloadPackSounds, setMuted, type RevealLevel, type SoundHandle } from "../lib/packSounds";
 import { getCardTier, levelOf } from "../lib/rarity";
 import { Card } from "./Card";
+import { RegionFlag } from "./RegionFlag";
+import { RoleIcon } from "./RoleIcon";
 import { TeamLogo } from "./TeamLogo";
 
 const S = strings({
@@ -329,11 +331,16 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
         <div ref={walk} aria-live="polite" className="pointer-events-none invisible absolute inset-0 z-20 grid place-items-center opacity-0 pack-walk">
           <Beat label={t.region}>
             <b className="pack-beat">{label(team.region)}</b>
-            <span className={`h-2 w-20 rounded-full border ${regionClass(team.region)}`} />
+            <RegionFlag region={team.region} className="pack-flag w-[clamp(132px,36vw,200px)]" />
           </Beat>
-          <Beat label={t.position}><b className="pack-beat">{label(card.position)}</b></Beat>
+          <Beat label={t.position}>
+            <b className="pack-beat">{label(card.position)}</b>
+            <span className="grid size-[clamp(76px,20vw,108px)] place-items-center rounded-full border-3 bg-black/50 text-dl-text" style={{ borderColor: colors.c }}>
+              <RoleIcon position={card.position} className="size-1/2" />
+            </span>
+          </Beat>
           <Beat label={t.team}>
-            <span className="grid size-[clamp(110px,28vw,160px)] place-items-center overflow-hidden rounded-full border-3 bg-black/50 font-display text-[clamp(40px,11vw,64px)] font-extrabold tracking-wider text-dl-text"
+            <span className="grid size-[clamp(154px,39vw,224px)] place-items-center overflow-hidden rounded-full border-3 bg-black/50 font-display text-[clamp(56px,15vw,90px)] font-extrabold tracking-wider text-dl-text"
               style={{ borderColor: colors.c }}>
               <TeamLogo team={team} />
             </span>
