@@ -1,5 +1,7 @@
+import type { RevealLevel } from "./packSounds";
 import type { Player, TierBand } from "./types";
 import { getPlayerOvr, hexToRgba } from "./cards";
+import { RARITY_BANDS, rarityKeyOf } from "./rarityBands";
 
 type Pt = [number, number];
 
@@ -44,14 +46,16 @@ export type Tier = {
   fx?: FxSpec | null;
 };
 
-export const RARITY_TIERS: Tier[] = [
-  { key: "eternus", tierKey: "SS", name: "Eternus", min: 93, lvl: 4, c: "#38e8ff", hi: "#e8fdff", lo: "#0b6f9e" },
-  { key: "ascendant", tierKey: "S", name: "Ascendant", min: 88, lvl: 3, c: "#f5b82e", hi: "#fff3c4", lo: "#8f5e08" },
-  { key: "oracle", tierKey: "A", name: "Oracle", min: 83, lvl: 2, c: "#ff6a26", hi: "#ffd6bf", lo: "#992b05" },
-  { key: "archon", tierKey: "B", name: "Archon", min: 77, lvl: 1, c: "#b26bff", hi: "#f0dcff", lo: "#4a1a8f" },
-  { key: "arcanist", tierKey: "C", name: "Arcanist", min: 70, lvl: 1, c: "#2dd47a", hi: "#d1fae5", lo: "#0b6636" },
-  { key: "initiate", tierKey: "D", name: "Initiate", min: 1, lvl: 0, c: "#b5533a", hi: "#f0a58f", lo: "#5c2214" },
-];
+const LOOK: Record<string, Pick<Tier, "lvl" | "c" | "hi" | "lo">> = {
+  eternus: { lvl: 4, c: "#38e8ff", hi: "#e8fdff", lo: "#0b6f9e" },
+  ascendant: { lvl: 3, c: "#f5b82e", hi: "#fff3c4", lo: "#8f5e08" },
+  oracle: { lvl: 2, c: "#ff6a26", hi: "#ffd6bf", lo: "#992b05" },
+  archon: { lvl: 1, c: "#b26bff", hi: "#f0dcff", lo: "#4a1a8f" },
+  arcanist: { lvl: 1, c: "#2dd47a", hi: "#d1fae5", lo: "#0b6636" },
+  initiate: { lvl: 0, c: "#b5533a", hi: "#f0a58f", lo: "#5c2214" },
+};
+// faixas (nome e overall mínimo) em rarityBands.ts, que o worker também usa; aqui só o visual
+export const RARITY_TIERS: Tier[] = RARITY_BANDS.map((b) => ({ ...b, ...LOOK[b.key] }));
 
 const RARITY_FX: Record<string, FxSpec> = {
   archon: { twinkle: 4 },
@@ -192,13 +196,9 @@ export const FRAME_PRESETS: Record<string, FramePreset> = {
     bg: (t) => `linear-gradient(145deg, ${hexToRgba(t.c, 0.6)}, #17171c 40%, ${hexToRgba(t.hi, 0.5)})`, bgH: (t) => `linear-gradient(145deg, ${t.c}, #26262c 40%, ${t.hi})`, orn: frameOrbit },
 };
 
-function rarityMin(tier: Tier, cfg: TierBand[]): number {
-  const tc = cfg.find((x) => x.key === tier.tierKey);
-  return tc && Number.isFinite(tc.min) ? tc.min : tier.min;
-}
-
 export function getRarity(ovr: number, cfg: TierBand[]): Tier {
-  return RARITY_TIERS.find((t) => ovr >= rarityMin(t, cfg)) ?? RARITY_TIERS[RARITY_TIERS.length - 1];
+  const key = rarityKeyOf(ovr, cfg);
+  return RARITY_TIERS.find((t) => t.key === key) ?? RARITY_TIERS[RARITY_TIERS.length - 1];
 }
 
 export function getCardTier(p: Player, cfg: TierBand[]): Tier {
@@ -290,3 +290,8 @@ export function particleSpecs(t: Tier): Particle[] {
   }
   return (FX_CACHE[ck] = specs);
 }
+
+/** Nível da abertura de pack: S, SS e especiais ganham o walkout; o resto abre direto. */
+/** Nível da abertura: Ascendant, Eternus e qualquer carta especial (com ou sem moldura) têm walkout. */
+export const levelOf = (tier: Tier | null | undefined, special = false): RevealLevel =>
+  !tier ? "base" : tier.custom || special ? "special" : tier.key === "eternus" ? "eternus" : tier.key === "ascendant" ? "ascendant" : "base";

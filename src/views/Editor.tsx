@@ -1,20 +1,28 @@
 import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, useData } from "../lib/data";
-import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isMainCard } from "../lib/cards";
-import { FRAME_PRESETS, getCardTier, type Tier } from "../lib/rarity";
+import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, isRetired, ALT_HERO_DROP } from "../lib/cards";
+import { FRAME_PRESETS, RARITY_TIERS, getCardTier, type Tier } from "../lib/rarity";
+import { RARITY_KEYS, rarityKeyOf, type RarityKey } from "../lib/rarityBands";
 import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
 import { Card } from "../components/Card";
 import { TeamLogo } from "../components/TeamLogo";
 import { HoldButton } from "../components/HoldButton";
+import { Icon } from "../components/Icon";
 import { Range } from "../components/Range";
+import { PackArt } from "../components/Pack";
+import { downloadBlob } from "../lib/cardImage";
+import { PACK_SOUNDS, hasPackFile, previewPackSound, renderPackSoundWav, type PackSoundId, type SoundHandle } from "../lib/packSounds";
+import { DEFAULT_PACK_ODDS, DEFAULT_RARITY_ODDS, PACK_KINDS, PACK_NAME_MAX, cardChances, chanceSummary, drawCard, packKind, packPool, type PackKind, type PackType, type RarityOf } from "../lib/packs";
 
 const SECTIONS = [
   { id: "card", label: "Carta" },
   { id: "teams", label: "Times" },
   { id: "heroes", label: "Heróis" },
   { id: "look", label: "Aparência" },
+  { id: "packs", label: "Packs" },
   { id: "codes", label: "Códigos" },
+  { id: "sounds", label: "Sons" },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
 
@@ -25,6 +33,8 @@ const ghost = `${btn} border border-zinc-200/20 text-zinc-300 hover:text-white b
 const chip = `${btn} min-h-11 sm:min-h-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:opacity-80`;
 const danger = `${btn} bg-red-600/90 hover:bg-red-500 text-white`;
 const today = () => new Date().toISOString().slice(0, 10);
+// heróis jogados além do de assinatura: cada um vira uma carta com tudo ALT_HERO_DROP abaixo
+const MAX_PLAYED = 5;
 const newId = (p: string) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -116,7 +126,9 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
           {section === "teams" && <TeamsForm />}
           {section === "heroes" && <HeroesForm />}
           {section === "look" && <LookForm />}
+          {section === "packs" && <PacksForm />}
           {section === "codes" && <CodesForm />}
+          {section === "sounds" && <SoundsForm />}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -144,12 +156,18 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
   const base = !existing && versionOf ? players.find((p) => p.id === versionOf) : undefined;
   const [d, setD] = useState<Player>(() => {
     if (existing) return structuredClone({ ...existing, ovr: getPlayerOvr(existing) });
-    if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, history: [], inactive: undefined, special: true };
+    if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, altHero: undefined, history: [], inactive: undefined, exclusive: undefined, special: true };
     return blankPlayer(teams[0]?.id ?? "");
   });
   const [date, setDate] = useState(today);
   const [rebase, setRebase] = useState(false);
   const [heroQuery, setHeroQuery] = useState("");
+  // a mesma área de heróis serve para o de assinatura (1) e, na carta principal, para os heróis jogados (até MAX_PLAYED)
+  const [heroTab, setHeroTab] = useState<"signature" | "played">("signature");
+  const altsOf = (id: string) => players.filter((p) => p.variantOf === id && isAltHero(p));
+  const [played, setPlayed] = useState<string[]>(() => (existing && isMainCard(existing) ? altsOf(existing.id).filter((c) => !isRetired(c)).map((c) => c.hero) : []));
+  // heróis com carta aposentada: marcar de novo reativa a mesma carta
+  const retired = new Set(existing && isMainCard(existing) ? altsOf(existing.id).filter(isRetired).map((c) => c.hero) : []);
   const { busy, msg, run } = useSaver(reload);
   const set = (patch: Partial<Player>) => setD((p) => ({ ...p, ...patch }));
   const setStat = (k: keyof Stats, v: number) => setD((p) => { const stats = { ...p.stats, [k]: v }; return { ...p, stats, ovr: calculateOVR(stats) }; });
@@ -159,12 +177,57 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
   const save = () => {
     const id = d.id || newId("p");
     const body = { ...preview, id, name: d.name.trim() || "NOVO JOGADOR", footer: d.footer?.trim().slice(0, 30), specialText: d.special ? d.specialText?.trim().slice(0, 400) : undefined, frame: d.special ? frame : undefined };
-    run(async () => { await api.save("players", id, body); await reload(); onEditId(id); }, `Carta de "${body.name}" salva!`);
+    run(async () => {
+      await api.save("players", id, body);
+      if (isMainCard(body)) await syncPlayed(body);
+      await reload();
+      onEditId(id);
+    }, `Carta de "${body.name}" salva!`);
+  };
+  // cria, apaga e atualiza as cartas de heróis jogados para ficarem iguais à seleção, tudo ALT_HERO_DROP abaixo da principal
+  const syncPlayed = async (main: Player) => {
+    const ovr = Math.max(1, getPlayerOvr(main) - ALT_HERO_DROP);
+    const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, main.stats[k] - ALT_HERO_DROP)])) as Stats;
+    const have = altsOf(main.id);
+    // primeiro cria, reativa e atualiza; só depois tira as desmarcadas, para uma falha não deixar a seleção pela metade
+    for (const hero of played) {
+      const c = have.find((x) => x.hero === hero);
+      if (!c) {
+        const id = newId("p");
+        await api.save("players", id, { ...structuredClone(main), id, hero, stats, ovr, variantOf: main.id, altHero: true, history: [{ date: today(), ovr, base: true }],
+          special: undefined, specialText: undefined, frame: undefined, art: undefined, inactive: undefined, exclusive: undefined });
+        continue;
+      }
+      const same = !c.inactive && getPlayerOvr(c) === ovr && STAT_KEYS.every((k) => c.stats[k] === stats[k]) && c.name === main.name && c.teamId === main.teamId && c.position === main.position;
+      if (same) continue;
+      const history = getPlayerOvr(c) === ovr ? c.history : [...c.history.filter((h) => h.date !== today()), { date: today(), ovr }];
+      await api.save("players", c.id, { ...c, name: main.name, teamId: main.teamId, position: main.position, stats, ovr, history, inactive: undefined });
+    }
+    // desmarcada: apaga; se alguém já tem a carta, aposenta (quem tem continua com ela)
+    for (const c of have) {
+      if (played.includes(c.hero) || c.inactive) continue;
+      try {
+        await api.remove("players", c.id);
+      } catch (e) {
+        if ((e as { code?: string }).code !== "owned") throw e;
+        await api.save("players", c.id, { ...c, inactive: true });
+      }
+    }
+  };
+  const rank = (h: string) => (played.includes(h) ? 2 : retired.has(h) ? 1 : 0);
+  const pickHero = (h: string) => {
+    if (heroTab === "signature") {
+      set({ hero: h });
+      setPlayed((list) => list.filter((x) => x !== h));
+    } else {
+      setPlayed((list) => (list.includes(h) ? list.filter((x) => x !== h) : list.length < MAX_PLAYED ? [...list, h] : list));
+    }
   };
   const remove = () => {
     if (!d.id) return;
     run(async () => { await api.remove("players", d.id); onEditId(null); }, "Carta excluída.");
   };
+  const playedTab = heroTab === "played" && isMainCard(d);
   const main = existing ? players.find((p) => p.id === (existing.variantOf || existing.id)) ?? existing : base;
   const versions = main ? cardVersions(players, main) : [];
   const tagOf = (p: Player) => teams.find((t) => t.id === p.teamId)?.tag ?? "?";
@@ -191,7 +254,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
               const active = c.id === d.id;
               return (
                 <button key={c.id} type="button" aria-pressed={active} onClick={() => onEditId(c.id)} className={`${chip} ${active ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>
-                  {isMainCard(c) ? "Principal" : c.special ? "Especial" : "Versão"} · {tagOf(c)} · {getPlayerOvr(c)}
+                  {isMainCard(c) ? `Principal · ${c.hero}` : isAltHero(c) ? `${c.hero}${c.inactive ? " (aposentada)" : ""}` : `${c.special ? "Especial" : "Versão"} · ${tagOf(c)}`} · {getPlayerOvr(c)}{c.exclusive && " · exclusiva"}
                 </button>
               );
             })}
@@ -227,21 +290,47 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Herói: <span className="text-zinc-100">{d.hero}</span></span>
-            <input className={`${input} max-w-48 py-1.5`} placeholder="Buscar herói" value={heroQuery} onChange={(e) => setHeroQuery(e.target.value)} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+              {playedTab
+                ? <>Heróis jogados <span className="text-amber-200">{played.length}/{MAX_PLAYED}</span></>
+                : <>Herói de assinatura: <span className="text-zinc-100">{d.hero}</span></>}
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {isMainCard(d) && (
+                <button type="button" aria-pressed={playedTab} onClick={() => setHeroTab(playedTab ? "signature" : "played")}
+                  className={`${chip} ${playedTab ? "bg-amber-300 text-zinc-950 hover:bg-amber-200" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>
+                  {playedTab ? "Voltar ao herói de assinatura" : `Heróis jogados (${played.length}/${MAX_PLAYED})`}
+                </button>
+              )}
+              <input className={`${input} max-w-48 py-1.5`} placeholder="Buscar herói" aria-label="Buscar herói" value={heroQuery} onChange={(e) => setHeroQuery(e.target.value)} />
+            </div>
           </div>
-          <div className="grid max-h-44 grid-cols-6 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-9">
-            {heroNames.filter((h) => h.toLowerCase().includes(heroQuery.toLowerCase())).map((h) => {
+          <div className="grid max-h-44 grid-cols-6 gap-1.5 overflow-y-auto p-1 sm:grid-cols-9">
+            {heroNames.filter((h) => h.toLowerCase().includes(heroQuery.toLowerCase()))
+              // nos heróis jogados, os escolhidos vêm primeiro e os aposentados logo depois, para não sumirem no fim da lista
+              .sort((x, y) => (playedTab ? rank(y) - rank(x) : 0))
+              .map((h) => {
               const icon = heroIcon(h);
+              const on = playedTab ? played.includes(h) : d.hero === h;
+              // nos heróis jogados, o de assinatura fica travado e a seleção para em MAX_PLAYED
+              const locked = playedTab && (h === d.hero || (!on && played.length >= MAX_PLAYED));
               return (
-                <motion.button key={h} type="button" whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }} onClick={() => set({ hero: h })} title={h} aria-pressed={d.hero === h}
-                  className={`aspect-square cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 ${d.hero === h ? "border-white shadow-[0_0_12px_rgba(255,255,255,0.5)]" : "border-zinc-200/10 opacity-70 hover:opacity-100"}`}>
+                <button key={h} type="button" onClick={() => pickHero(h)} title={playedTab && h === d.hero ? `${h} (assinatura)` : playedTab && retired.has(h) ? `${h} (carta aposentada)` : h} aria-pressed={on} disabled={locked}
+                  className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 transition hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-25 disabled:grayscale disabled:hover:scale-100 motion-reduce:transition-none ${
+                    on ? (playedTab ? "border-amber-300 shadow-[0_0_12px_rgb(252_211_77/0.5)]" : "border-white shadow-[0_0_12px_rgba(255,255,255,0.5)]") : "border-zinc-200/10 opacity-70 hover:opacity-100"}`}>
                   {icon ? <img src={icon} alt={h} className="size-full object-cover" loading="lazy" /> : <span className="text-[9px] text-zinc-300">{h}</span>}
-                </motion.button>
+                  {playedTab && retired.has(h) && !on && <span aria-hidden="true" className="absolute top-1 right-1 size-2 rounded-full bg-amber-300 ring-2 ring-zinc-950" />}
+                </button>
               );
             })}
           </div>
+          {playedTab && (
+            <p className="text-xs text-zinc-400">
+              Cada herói jogado vira uma carta com tudo {ALT_HERO_DROP} abaixo da assinatura. Aplica ao salvar.
+              {retired.size > 0 && <> <span className="text-amber-200">●</span> carta aposentada: alguém já tinha, então ela ficou com quem tem; marcar de novo reativa a mesma carta.</>}
+            </p>
+          )}
         </div>
 
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -324,6 +413,10 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
           <button type="button" className={primary} disabled={busy} onClick={save}>{busy ? "Salvando…" : "Salvar carta"}</button>
           {d.id && <HoldButton className={danger} disabled={busy} onConfirm={remove} label={`Excluir a carta de ${d.name}`}>Segure p/ excluir</HoldButton>}
           {d.id && !isMainCard(d) && <button type="button" className={ghost} disabled={busy} onClick={() => run(async () => { await api.promote(d.id); await reload(); set({ variantOf: undefined, inactive: undefined }); onEditId(d.id); }, `${d.name} agora é a carta principal.`)}>Tornar principal</button>}
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-zinc-300 sm:min-h-0">
+            <input type="checkbox" checked={!!d.exclusive} onChange={(e) => set({ exclusive: e.target.checked || undefined })} className="accent-zinc-100" />
+            Carta exclusiva (não sai em packs)
+          </label>
           {d.id && isMainCard(d) && <label className="flex items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={!!d.inactive} onChange={(e) => set({ inactive: e.target.checked || undefined })} className="accent-zinc-100" />Fora do elenco (versão guardada)</label>}
           <Toast msg={msg} />
         </div>
@@ -512,6 +605,9 @@ function LookForm() {
   const [tiers, setTiers] = useState<TierBand[]>(() => structuredClone(settings.tierConfig ?? DEFAULT_TIER_CONFIG));
   const { busy, msg, run } = useSaver(reload);
   const setTier = (i: number, patch: Partial<TierBand>) => setTiers((t) => t.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  // mínimo e máximo andam juntos com a faixa vizinha: sem buraco nem sobreposição entre letras
+  const setMin = (i: number, min: number) => setTiers((t) => t.map((x, j) => (j === i ? { ...x, min } : j === i + 1 ? { ...x, max: min - 1 } : x)));
+  const setMax = (i: number, max: number) => setTiers((t) => t.map((x, j) => (j === i ? { ...x, max } : j === i - 1 ? { ...x, min: max + 1 } : x)));
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-2">
@@ -549,8 +645,8 @@ function LookForm() {
         {tiers.map((t, i) => (
           <div key={t.key} className="grid grid-cols-[3rem_1fr_1fr_2.5rem_2.5rem] items-center gap-2">
             <span className="flex h-9 items-center justify-center rounded-lg font-black" style={{ background: t.bg, color: t.text }}>{t.key}</span>
-            <input type="number" className={input} value={t.min} aria-label={`Mínimo ${t.key}`} onChange={(e) => setTier(i, { min: Number(e.target.value) })} />
-            <input type="number" className={input} value={t.max} aria-label={`Máximo ${t.key}`} onChange={(e) => setTier(i, { max: Number(e.target.value) })} />
+            <input type="number" className={input} value={t.min} aria-label={`Mínimo ${t.key}`} onChange={(e) => setMin(i, Number(e.target.value))} />
+            <input type="number" className={input} value={t.max} aria-label={`Máximo ${t.key}`} onChange={(e) => setMax(i, Number(e.target.value))} />
             <input type="color" className="h-9 w-full cursor-pointer rounded-sm bg-transparent" value={t.bg} aria-label={`Cor ${t.key}`} onChange={(e) => setTier(i, { bg: e.target.value })} />
             <input type="color" className="h-9 w-full cursor-pointer rounded-sm bg-transparent" value={t.text} aria-label={`Texto ${t.key}`} onChange={(e) => setTier(i, { text: e.target.value })} />
           </div>
@@ -566,7 +662,325 @@ function LookForm() {
   );
 }
 
-type Code = { code: string; player_id: string; max_uses: number; uses: number; starts_at: number | null; expires_at: number | null };
+const KIND_LABEL: Record<PackKind, string> = { alt: "Herói jogado", signature: "Herói de assinatura", special: "Especial e outras versões" };
+const pct = (n: number) => `${(n * 100).toLocaleString("pt-BR", { maximumFractionDigits: n < 0.01 ? 2 : 1 })}%`;
+
+const KIND_SHORT: Record<PackKind, string> = { alt: "Herói jogado", signature: "Assinatura", special: "Especial" };
+const filterChip = (on: boolean) => `${chip} shrink-0 whitespace-nowrap ${on ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`;
+
+/** Grade de cartas para escolher a dedo o que sai no pack: busca, filtros e um toque para marcar. */
+function CardPicker({ value, onChange, rarityOf }: { value: string[]; onChange: (ids: string[]) => void; rarityOf: RarityOf }) {
+  const { players, teams, heroArt } = useData();
+  const [q, setQ] = useState("");
+  const [kind, setKind] = useState<PackKind | null>(null);
+  const [rar, setRar] = useState<RarityKey | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
+  const on = new Set(value);
+  const tagOf = (p: Player) => teams.find((t) => t.id === p.teamId)?.tag ?? "";
+  const term = q.trim().toLowerCase();
+  // escolhida aparece mesmo inativa, para dar para desmarcar
+  const visible = players.filter((p) => (showInactive || !p.inactive || on.has(p.id)) && (!kind || packKind(p) === kind) && (!rar || rarityOf(p) === rar)
+    && (!term || `${p.name} ${p.hero} ${tagOf(p)}`.toLowerCase().includes(term)));
+  const pickable = visible.filter((p) => !isRetired(p) && !on.has(p.id));
+  const missing = value.filter((id) => !players.some((p) => p.id === id));
+  const inactive = players.filter((p) => p.inactive).length;
+  const clear = () => { setQ(""); setKind(null); setRar(null); };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="search" className={`${input} min-h-11 sm:max-w-xs`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nome, herói ou time" aria-label="Buscar carta" />
+        <span className="flex-1 text-sm text-zinc-300" aria-live="polite"><b className="text-zinc-100">{value.length - missing.length}</b> escolhidas</span>
+        <button type="button" className={`${ghost} min-h-11 sm:min-h-0`} disabled={!pickable.length} onClick={() => onChange([...value, ...pickable.map((p) => p.id)])}>
+          Marcar visíveis ({pickable.length})
+        </button>
+        <HoldButton className={`${ghost} min-h-11 sm:min-h-0`} disabled={!value.length} onConfirm={() => onChange([])} label="Segure para desmarcar todas">Desmarcar todas</HoldButton>
+      </div>
+
+      <div className="flex shrink-0 gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" role="group" aria-label="Filtros">
+        {PACK_KINDS.map((k) => <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(kind === k ? null : k)} className={filterChip(kind === k)}>{KIND_SHORT[k]}</button>)}
+        {RARITY_TIERS.map((tier) => {
+          const r = tier.key as RarityKey;
+          return (
+            <button key={r} type="button" aria-pressed={rar === r} onClick={() => setRar(rar === r ? null : r)} className={`${filterChip(rar === r)} flex items-center gap-1.5`}>
+              <span aria-hidden="true" className="size-2 rounded-full" style={{ background: tier.c }} />{tier.name}
+            </button>
+          );
+        })}
+        {inactive > 0 && <button type="button" aria-pressed={showInactive} onClick={() => setShowInactive(!showInactive)} className={filterChip(showInactive)}>Mostrar inativas ({inactive})</button>}
+      </div>
+
+      {missing.length > 0 && (
+        <p className="flex flex-wrap items-center gap-2 text-xs text-amber-300">
+          {missing.length === 1 ? "1 carta escolhida foi apagada." : `${missing.length} cartas escolhidas foram apagadas.`}
+          <button type="button" className="cursor-pointer font-bold underline hover:text-amber-200" onClick={() => onChange(value.filter((id) => !missing.includes(id)))}>Tirar da lista</button>
+        </p>
+      )}
+      {value.length === 0 && <p className="text-sm text-amber-300">Nenhuma carta escolhida: toque nas cartas abaixo para colocar no pack.</p>}
+
+      {/* quem rola é o contêiner: grade com altura limitada espreme as linhas e os blocos se sobrepõem */}
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl bg-zinc-950/40 p-2">
+      <div role="group" aria-label="Cartas" className="grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2">
+        {visible.map((p) => {
+          const sel = on.has(p.id);
+          const retired = isRetired(p);
+          const tier = RARITY_TIERS.find((x) => x.key === rarityOf(p))!;
+          const art = p.art?.url ? { url: p.art.url, x: p.art.x ?? 50, y: p.art.y ?? 50 } : heroArt(p.hero);
+          const tag = retired ? "aposentada" : p.exclusive ? "exclusiva" : p.inactive ? "inativa" : null;
+          return (
+            <button key={p.id} type="button" aria-pressed={sel} disabled={retired && !sel} onClick={() => onChange(sel ? value.filter((x) => x !== p.id) : [...value, p.id])}
+              title={`${p.name} · ${p.hero} · ${tagOf(p)}${retired ? " · herói aposentado, não sai em pack" : ""}`}
+              className={`relative flex aspect-4/5 cursor-pointer flex-col justify-end overflow-hidden rounded-xl bg-zinc-900 text-left transition duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-30 ${sel ? "ring-2 ring-zinc-100" : "opacity-60 hover:opacity-100"}`}>
+              {art && <img src={art.url} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${art.x}% ${art.y}%` }} />}
+              <span aria-hidden="true" className="absolute inset-0 bg-linear-to-t from-zinc-950 via-zinc-950/50 to-transparent" />
+              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1" style={{ background: tier.c }} />
+              {tag && <span className="absolute top-2 left-2 rounded-md bg-zinc-950/80 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-amber-200 uppercase">{tag}</span>}
+              {sel && <span className="absolute top-2 right-2 grid size-6 place-items-center rounded-full bg-zinc-100 text-zinc-950"><Icon name="check" className="size-4" /></span>}
+              <span className="relative flex min-w-0 flex-col gap-0.5 p-2.5 pb-3">
+                <span className="flex items-baseline gap-1.5">
+                  <span className="font-display text-2xl leading-none" style={{ color: tier.c }}>{getPlayerOvr(p)}</span>
+                  <span className="text-[10px] font-bold tracking-wider text-zinc-300 uppercase">{tier.name}</span>
+                </span>
+                <span className="truncate text-sm font-bold text-zinc-100">{p.name}</span>
+                <span className="truncate text-xs text-zinc-400">{p.hero} · {KIND_SHORT[packKind(p)]} · {tagOf(p)}</span>
+              </span>
+            </button>
+          );
+        })}
+        {!visible.length && (
+          <div className="col-span-full flex flex-col items-center gap-3 p-8 text-center text-sm text-zinc-400">
+            Nenhuma carta com esses filtros.
+            <button type="button" className={ghost} onClick={clear}>Limpar filtros</button>
+          </div>
+        )}
+      </div>
+      </div>
+    </div>
+  );
+}
+
+/** Tipos de pack: nome, arte, chances por tipo de carta e times do pool, com a prévia das chances reais. */
+// pack salvo sem chances por raridade abre com as padrão (salvar passa a gravá-las)
+const editable = (t: PackType | undefined): PackType | null => (t ? { ...structuredClone(t), rarity: t.rarity ? { ...t.rarity } : { ...DEFAULT_RARITY_ODDS } } : null);
+
+function PacksForm() {
+  const { players, teams, settings } = useData();
+  const [types, setTypes] = useState<PackType[]>([]);
+  const [d, setD] = useState<PackType | null>(null);
+  const picker = useRef<HTMLDialogElement>(null);
+  const [sim, setSim] = useState<{ kind: Record<PackKind, number>; rarity: Record<RarityKey, number>; top: [string, number][] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const load = (pick?: string) => api.packTypes().then((t) => {
+    setTypes(t);
+    setD((cur) => editable(t.find((x) => x.id === (pick ?? cur?.id)) ?? t[0]));
+  }).catch((e: Error) => setMsg(`Erro: ${e.message}`));
+  useEffect(() => { load(); }, []);
+
+  const blank = (): PackType => ({ id: newId("pack"), name: "Novo pack", cards: 1, odds: { ...DEFAULT_PACK_ODDS }, rarity: { ...DEFAULT_RARITY_ODDS }, teams: [] });
+  const set = (patch: Partial<PackType>) => { setD((p) => (p ? { ...p, ...patch } : p)); setSim(null); };
+  const run = async (fn: () => Promise<unknown>, ok: string, pick?: string) => {
+    setBusy(true);
+    setMsg("");
+    try { await fn(); await load(pick); setMsg(ok); } catch (e) { setMsg(`Erro: ${(e as Error).message}`); } finally { setBusy(false); }
+  };
+
+  // prévia para quem ainda não tem nenhuma carta do pool; raridade pelas faixas de overall do Editor
+  const rarityOf: RarityOf = (p) => rarityKeyOf(getPlayerOvr(p), settings.tierConfig ?? []);
+  const pool = d ? packPool(players, d, new Set()) : [];
+  const chances = d ? chanceSummary(pool, cardChances(pool, d, rarityOf), rarityOf) : null;
+  const inPool = Object.fromEntries(RARITY_KEYS.map((r) => [r, pool.filter((p) => rarityOf(p) === r).length])) as Record<RarityKey, number>;
+  const sum = d ? PACK_KINDS.reduce((a, k) => a + d.odds[k], 0) : 0;
+  const rarity = d?.rarity ?? DEFAULT_RARITY_ODDS;
+  const raritySum = RARITY_KEYS.reduce((a, r) => a + rarity[r], 0);
+  const valid = sum === 100 && raritySum === 100;
+  const isDefault = !!d && PACK_KINDS.every((k) => d.odds[k] === DEFAULT_PACK_ODDS[k]) && RARITY_KEYS.every((r) => rarity[r] === DEFAULT_RARITY_ODDS[r]);
+  const simulate = () => {
+    if (!d) return;
+    const kind = { alt: 0, signature: 0, special: 0 } as Record<PackKind, number>;
+    const rarity = Object.fromEntries(RARITY_KEYS.map((r) => [r, 0])) as Record<RarityKey, number>;
+    const hits = new Map<string, number>();
+    const N = 1000;
+    for (let i = 0; i < N; i++) {
+      const c = drawCard(pool, d, rarityOf);
+      if (!c) break;
+      kind[packKind(c)]++;
+      rarity[rarityOf(c)]++;
+      hits.set(c.id, (hits.get(c.id) ?? 0) + 1);
+    }
+    const name = (id: string) => { const p = players.find((x) => x.id === id); return p ? `${p.name} · ${p.hero}` : id; };
+    setSim({ kind, rarity, top: [...hits].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, n]) => [name(id), n]) });
+  };
+
+  return (
+    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="noir-glass space-y-6 rounded-3xl p-5 sm:p-7">
+        <div className="flex flex-wrap items-center gap-2">
+          {types.map((t) => (
+            <button key={t.id} type="button" aria-pressed={d?.id === t.id} onClick={() => { setD(editable(t)); setSim(null); }}
+              className={`${chip} ${d?.id === t.id ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>{t.name}</button>
+          ))}
+          <button type="button" onClick={() => { setD(blank()); setSim(null); }} className={`${chip} border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white`}>+ Novo pack</button>
+        </div>
+
+        {d && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Nome"><input className={input} value={d.name} maxLength={PACK_NAME_MAX} onChange={(e) => set({ name: e.target.value })} /></Field>
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Arte da embalagem</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <ImagePick folder="packs" onUrl={(url) => set({ art: url })} />
+                  {d.art && <button type="button" className={ghost} onClick={() => set({ art: undefined })}>Usar padrão</button>}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+                  Chances por tipo de carta <span className={sum === 100 ? "text-emerald-300" : "text-red-300"}>{sum}/100</span>
+                </span>
+                <button type="button" className={`${ghost} min-h-11 sm:min-h-0`} disabled={isDefault} title="Volta tipo e raridade para as chances padrão"
+                  onClick={() => set({ odds: { ...DEFAULT_PACK_ODDS }, rarity: { ...DEFAULT_RARITY_ODDS } })}>
+                  Restaurar % padrão
+                </button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {PACK_KINDS.map((k) => (
+                  <Field key={k} label={KIND_LABEL[k]}>
+                    <input type="number" min={0} max={100} className={input} value={d.odds[k]} onChange={(e) => set({ odds: { ...d.odds, [k]: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) } })} />
+                  </Field>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">
+                Chances por raridade <span className={raritySum === 100 ? "text-emerald-300" : "text-red-300"}>{raritySum}/100</span>
+              </span>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {RARITY_TIERS.map((tier) => {
+                  const r = tier.key as RarityKey;
+                  return (
+                    <Field key={r} label={`${tier.name} (${inPool[r]})`}>
+                      <input type="number" min={0} max={100} className={input} value={rarity[r]} style={{ borderColor: tier.c }}
+                        onChange={(e) => set({ rarity: { ...rarity, [r]: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) } })} />
+                    </Field>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-zinc-500">Vale dentro do tipo sorteado. Raridade sem carta naquele tipo sai da conta e divide a chance entre as outras; 0 = nunca sai.</p>
+            </div>
+
+            <div className="space-y-3">
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Cartas que podem sair</span>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Como escolher as cartas">
+                <button type="button" aria-pressed={!d.players} onClick={() => set({ players: undefined })} className={filterChip(!d.players)}>Por time</button>
+                {/* começa com o pool que já saía por time, para nada mudar até você mexer */}
+                <button type="button" aria-pressed={!!d.players} onClick={() => d.players || set({ players: pool.map((p) => p.id) })} className={filterChip(!!d.players)}>Cartas escolhidas</button>
+              </div>
+              {d.players ? (
+                <>
+                  <p className="text-xs text-zinc-500">Só as cartas marcadas saem neste pack, até exclusivas e inativas. Os times deixam de valer.</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button type="button" className={ghost} onClick={() => picker.current?.showModal()}>Escolher cartas</button>
+                    <span className="text-sm text-zinc-300"><b className="text-zinc-100">{pool.length}</b> {pool.length === 1 ? "carta pode sair" : "cartas podem sair"}</span>
+                  </div>
+                  <dialog ref={picker} aria-labelledby="pick-title" closedby="any"
+                    className="m-auto h-[min(52rem,calc(100dvh-2rem))] w-[min(80rem,calc(100%-2rem))] max-w-none rounded-3xl bg-zinc-900 p-0 text-zinc-100 backdrop:bg-zinc-950/80">
+                    <div className="flex h-full flex-col gap-4 p-4 sm:p-6">
+                      <div className="flex items-center gap-3">
+                        <h2 id="pick-title" className="flex-1 truncate text-lg font-extrabold tracking-[0.12em] uppercase">Cartas de {d.name || "pack"}</h2>
+                        <button type="button" className={primary} onClick={() => picker.current?.close()}>Pronto</button>
+                      </div>
+                      <CardPicker value={d.players} onChange={(players) => set({ players })} rarityOf={rarityOf} />
+                    </div>
+                  </dialog>
+                </>
+              ) : (
+                <>
+                  <span className="block text-xs text-zinc-500">Times do pool {d.teams.length === 0 && <span className="text-zinc-100">· todos</span>}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {teams.map((t) => {
+                      const on = d.teams.includes(t.id);
+                      return (
+                        <button key={t.id} type="button" aria-pressed={on} onClick={() => set({ teams: on ? d.teams.filter((x) => x !== t.id) : [...d.teams, t.id] })}
+                          className={`${chip} ${on ? "bg-amber-300 text-zinc-950 hover:bg-amber-200" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>{t.tag}</button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {chances && (
+              <div className="space-y-2 rounded-2xl bg-zinc-950/40 p-4">
+                <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Chances reais para quem não tem nenhuma carta · {pool.length} cartas no pool</span>
+                {pool.length === 1 && <p className="text-xs text-amber-300">Só uma carta: quem já tem ela não consegue abrir este pack.</p>}
+                <span className="block pt-1 text-[11px] font-bold tracking-[0.18em] text-zinc-500 uppercase">Por tipo</span>
+                <ul className="grid gap-1 text-sm text-zinc-200">
+                  {PACK_KINDS.map((k) => {
+                    const c = chances.kind[k];
+                    return (
+                      <li key={k} className="flex flex-wrap justify-between gap-2">
+                        <span>{KIND_LABEL[k]} <span className="text-zinc-500">({c.cards})</span></span>
+                        <span className="font-bold">{pct(c.chance)}{c.cards > 0 && !d.rarity && <span className="font-normal text-zinc-400"> · cada carta {pct(c.chance / c.cards)}</span>}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <span className="block pt-2 text-[11px] font-bold tracking-[0.18em] text-zinc-500 uppercase">Por raridade</span>
+                <ul className="grid gap-1 text-sm text-zinc-200">
+                  {RARITY_TIERS.map((tier) => {
+                    const c = chances.rarity[tier.key as RarityKey];
+                    return (
+                      <li key={tier.key} className="flex flex-wrap justify-between gap-2">
+                        <span className="flex items-center gap-2"><span aria-hidden="true" className="size-2.5 rounded-full" style={{ background: tier.c }} />{tier.name} <span className="text-zinc-500">({c.cards})</span></span>
+                        <span className="font-bold">{pct(c.chance)}{c.cards > 0 && <span className="font-normal text-zinc-400"> · cada carta {pct(c.chance / c.cards)}</span>}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button type="button" onClick={simulate} disabled={!pool.length || !valid} className={ghost}>Simular 1000 aberturas</button>
+                  {sim && (
+                    <p className="text-xs text-zinc-300">
+                      {PACK_KINDS.map((k) => `${KIND_LABEL[k]}: ${sim.kind[k]}`).join(" · ")}
+                      <span className="block">{RARITY_TIERS.map((tier) => `${tier.name}: ${sim.rarity[tier.key as RarityKey]}`).join(" · ")}</span>
+                      <span className="block text-zinc-500">Mais saíram: {sim.top.map(([n, c]) => `${n} (${c})`).join(", ")}</span>
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500">Quem já tem cartas do pool não tira repetida: a chance delas passa para as outras. O pack de teste fica no seu inventário na aba Resgatar.</p>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" className={primary} disabled={busy || !valid || !d.name.trim() || !pool.length}
+                onClick={() => run(() => api.savePackType(d.id, { name: d.name.trim(), art: d.art, odds: d.odds, rarity: d.rarity, teams: d.teams, players: d.players }), `Pack "${d.name.trim()}" salvo!`, d.id)}>Salvar pack</button>
+              {!pool.length && <span className="text-xs text-amber-300">Nenhuma carta pode sair: escolha cartas ou times.</span>}
+              {types.some((t) => t.id === d.id) && (
+                <button type="button" className={danger} disabled={busy}
+                  onClick={() => { if (confirm(`Apagar o pack "${d.name}"?`)) run(() => api.removePackType(d.id), "Pack apagado.", ""); }}>Apagar</button>
+              )}
+              <Toast msg={msg} />
+            </div>
+          </>
+        )}
+        {!d && <Toast msg={msg} />}
+      </div>
+      {d && (
+        <div className="flex flex-col items-center gap-3 lg:sticky lg:top-24">
+          <PackArt name={d.name || "Pack"} art={d.art} size="lg" />
+          <span className="text-xs text-zinc-400">1 carta por pack</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type Code = { code: string; player_id: string | null; pack_type_id: string | null; max_uses: number; uses: number; starts_at: number | null; expires_at: number | null };
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => ALPHABET[b % ALPHABET.length]).join("");
@@ -587,6 +1001,10 @@ function CodesForm() {
   const [now, setNow] = useState(0);
   const [code, setCode] = useState(randomCode);
   const [pick, setPick] = useState("");
+  // o código dá uma carta ou um pack (que vai fechado para o inventário)
+  const [gives, setGives] = useState<"card" | "pack">("card");
+  const [packTypes, setPackTypes] = useState<PackType[]>([]);
+  const [packPick, setPackPick] = useState("");
   const [maxUses, setMaxUses] = useState(1);
   const [startsAt, setStartsAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -594,8 +1012,9 @@ function CodesForm() {
   const [msg, setMsg] = useState("");
 
   const label = (p: Player) => `${p.name} · ${p.hero} · ${teams.find((t) => t.id === p.teamId)?.tag ?? ""}`;
-  const byLabel = new Map(players.map((p) => [label(p), p.id]));
+  const byLabel = new Map(players.filter((p) => !isRetired(p)).map((p) => [label(p), p.id]));
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? id;
+  const giftOf = (c: Code) => (c.pack_type_id ? `Pack · ${packTypes.find((t) => t.id === c.pack_type_id)?.name ?? c.pack_type_id}` : nameOf(c.player_id ?? ""));
 
   const load = () =>
     fetch("/api/codes")
@@ -603,17 +1022,21 @@ function CodesForm() {
       .then((c) => { setCodes(c); setNow(Math.floor(Date.now() / 1000)); })
       .catch((e: Error) => setMsg(`Erro: ${e.message}`));
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.packTypes().then((t) => { setPackTypes(t); setPackPick((cur) => cur || t[0]?.id || ""); }).catch(() => setPackTypes([]));
+  }, []);
 
   const expireIn = (ms: number | null) => setExpiresAt(ms === null ? "" : localInput(new Date(Date.now() + ms)));
 
   const create = async () => {
-    const playerId = byLabel.get(pick);
-    if (!playerId) return setMsg("Erro: escolha uma carta da lista");
+    const playerId = gives === "card" ? byLabel.get(pick) : undefined;
+    if (gives === "card" && !playerId) return setMsg("Erro: escolha uma carta da lista");
+    if (gives === "pack" && !packPick) return setMsg("Erro: crie um pack na seção Packs");
     setBusy(true);
     setMsg("");
     try {
-      await api.createCode({ code, playerId, maxUses, startsAt: toTs(startsAt), expiresAt: toTs(expiresAt) });
+      await api.createCode({ code, ...(gives === "card" ? { playerId } : { packTypeId: packPick }), maxUses, startsAt: toTs(startsAt), expiresAt: toTs(expiresAt) });
       setMsg(`Código ${code} criado`);
       setCode(randomCode());
       await load();
@@ -641,7 +1064,7 @@ function CodesForm() {
       <div className="noir-glass space-y-6 rounded-3xl p-5 sm:p-7">
         <div>
           <h2 className="text-lg font-extrabold tracking-[0.12em] text-zinc-100 uppercase">Novo código</h2>
-          <p className="mt-1 text-xs text-zinc-400">Quem digitar o código na aba Resgatar ganha a carta escolhida.</p>
+          <p className="mt-1 text-xs text-zinc-400">Quem digitar o código na aba Resgatar ganha a carta escolhida, ou o pack, que fica fechado no inventário até a pessoa abrir.</p>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
@@ -652,12 +1075,28 @@ function CodesForm() {
             </div>
           </Field>
 
-          <Field label="2. Carta">
-            <input list="codes-players" value={pick} onChange={(e) => setPick(e.target.value)} placeholder="Digite o nome do jogador…" className={input} />
-            <datalist id="codes-players">
-              {[...players].sort((a, b) => a.name.localeCompare(b.name)).map((p) => <option key={p.id} value={label(p)} />)}
-            </datalist>
-          </Field>
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">2. Dá</span>
+              {(["card", "pack"] as const).map((g) => (
+                <button key={g} type="button" aria-pressed={gives === g} onClick={() => setGives(g)}
+                  className={`${quick} ${gives === g ? "border-zinc-100 bg-zinc-100 text-zinc-950 hover:text-zinc-950" : ""}`}>{g === "card" ? "Carta" : "Pack"}</button>
+              ))}
+            </div>
+            {gives === "card" ? (
+              <>
+                <input list="codes-players" value={pick} onChange={(e) => setPick(e.target.value)} placeholder="Digite o nome do jogador…" aria-label="Carta" className={input} />
+                <datalist id="codes-players">
+                  {players.filter((p) => !isRetired(p)).sort((a, b) => a.name.localeCompare(b.name)).map((p) => <option key={p.id} value={label(p)} />)}
+                </datalist>
+              </>
+            ) : (
+              <select value={packPick} onChange={(e) => setPackPick(e.target.value)} aria-label="Pack" className={input}>
+                {packTypes.length === 0 && <option value="">Nenhum pack: crie na seção Packs</option>}
+                {packTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            )}
+          </div>
 
           <Field label="3. Quantas pessoas podem resgatar">
             <div className="flex items-center gap-2">
@@ -685,7 +1124,7 @@ function CodesForm() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <button type="button" onClick={create} disabled={busy || !code || !pick} className={primary}>{busy ? "Criando…" : "Criar código"}</button>
+          <button type="button" onClick={create} disabled={busy || !code || (gives === "card" ? !pick : !packPick)} className={primary}>{busy ? "Criando…" : "Criar código"}</button>
           <Toast msg={msg} />
         </div>
       </div>
@@ -698,7 +1137,7 @@ function CodesForm() {
           return (
             <div key={c.code} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-zinc-200/10 bg-zinc-900/60 px-4 py-3 text-xs text-zinc-200">
               <span className="font-extrabold tracking-[0.15em] text-zinc-100">{c.code}</span>
-              <span className="max-w-48 truncate">{nameOf(c.player_id)}</span>
+              <span className="max-w-48 truncate">{giftOf(c)}</span>
               <span>{c.uses}/{c.max_uses} usos</span>
               <span className="text-zinc-400">{fmtTs(c.starts_at)} → {fmtTs(c.expires_at)}</span>
               <span className={`font-bold tracking-wider uppercase ${st.cls}`}>{st.label}</span>
@@ -707,6 +1146,52 @@ function CodesForm() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Todos os sons da abertura de pack, para ouvir um por um e baixar os que ainda são gerados no navegador. */
+function SoundsForm() {
+  const ids = Object.keys(PACK_SOUNDS) as PackSoundId[];
+  const [msg, setMsg] = useState("");
+  // um som por vez: tocar outro (ou sair da aba) corta o anterior, como o riser de 17 s
+  const playing = useRef<SoundHandle | null>(null);
+  useEffect(() => () => playing.current?.stop(), []);
+  const play = (id: PackSoundId) => { playing.current?.stop(); playing.current = previewPackSound(id); };
+  const download = async (id: PackSoundId) => {
+    const wav = await renderPackSoundWav(id).catch(() => null);
+    if (wav) downloadBlob(wav, `${id}.wav`);
+    else setMsg(`Erro: não deu para gerar ${id}.wav`);
+  };
+  return (
+    <div className="noir-glass space-y-5 rounded-3xl p-5 sm:p-7">
+      <div className="space-y-1.5">
+        <h2 className="text-lg font-extrabold tracking-[0.12em] text-zinc-100 uppercase">Sons da abertura de pack</h2>
+        <p className="text-sm text-zinc-400">
+          Na ordem em que tocam. Para trocar um som, o arquivo vai em <code className="text-zinc-200">src/assets/sounds/pack/&lt;id&gt;.mp3</code>. Toca mesmo com o mudo ligado.
+        </p>
+      </div>
+      <ul className="grid gap-2">
+        {ids.map((id) => {
+          const file = hasPackFile(id);
+          return (
+            <li key={id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-zinc-950/50 p-3">
+              <button type="button" onClick={() => play(id)} aria-label={`Tocar ${id}`} className={`${chip} bg-zinc-100 text-zinc-950 hover:bg-white`}>Tocar</button>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="text-sm font-bold text-zinc-100">{id}</code>
+                  <span className={`text-[11px] font-bold tracking-wider uppercase ${file ? "text-emerald-300" : "text-amber-300"}`}>{file ? "arquivo" : "gerado no navegador"}</span>
+                </div>
+                <p className="text-xs text-zinc-400">{PACK_SOUNDS[id].when}</p>
+              </div>
+              {!file && (
+                <button type="button" onClick={() => void download(id)} className={`${chip} border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white`}>Baixar WAV</button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <Toast msg={msg} />
     </div>
   );
 }

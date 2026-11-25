@@ -43,8 +43,20 @@ Fonte do design system: `src/index.css` (tokens `@theme`, `noir-glass`, `noir-gl
 - 2026-11-17 — Header = opção A: abaixo de `lg` as 5 áreas ficam numa barra fixa embaixo (ícone + nome) e o topo mostra só marca, idioma e conta; a partir de `lg` as áreas são abas de texto e só a ativa tem a pílula clara — no celular todas as áreas ficam visíveis e ao alcance do polegar, e no desktop sobra um único destaque. Escolhida entre 3 direções (B: menu em folha; C: abas em formato de carta).
 - 2026-11-17 — A marca aparece sempre como "Cardslock" (o "CL" do celular saiu) e o Editor saiu das abas para o menu da conta — é ferramenta de admin e libera espaço para as áreas.
 - 2026-11-17 — Ícones novos no `Icon`: `shield` (Times), `bars` (Tier List), `cards` (Coleção), `versus` (Comparar), `ticket` (Resgatar).
+- 2026-11-24 — Pack = maleta de contrabando, aberta em estágios (chegada → 2 travas arrastadas → tampa → dossiê → carta) — respostas do dono: suspense do FIFA, arrastar, rara longa e comum curta, explosão nas raras, som caprichado, pensado para a stream.
+- 2026-11-24 — Walkout só para 88+ (S e SS), corte fixo — bate com as faixas de raridade.
+- 2026-11-24 — Walkout igual ao FIFA: a cena escurece e entra uma pista por vez, com fade (região → posição → time), antes da carta — pedido do usuário; substitui o dossiê com carimbos.
+- 2026-11-24 — Cada tipo de pack tem cor/material próprios e o nome grande na fita da tampa — resposta 3A/4A do dono.
+- 2026-11-24 — Nada de dinheiro, ficha ou moeda na maleta, e um aviso "Packs são grátis e nunca serão vendidos" — "contrabando" não pode virar cassino.
+- 2026-11-24 — Na maleta, a luz da raridade sai da carta (halo, feixes e poeira); o interior e a espuma ficam pretos — o plano de luz chapado deixava tudo branco.
+- 2026-11-24 — Maleta em 3D (three.js) aprovada e no app (`src/lib/packCase.ts`, carregado só ao abrir um pack) — o conceito em `explorations/packs/d-maleta-3d.html` agradou; sem WebGL2 a carta abre direto, e máquina lenta perde o bloom.
+- 2026-11-25 — Pack tem dois modos de pool: "Por time" ou "Cartas escolhidas"; no segundo só as marcadas saem e os times deixam de valer — resposta 1A do dono, é o modelo mais fácil de entender e a prévia de chances continua exata.
+- 2026-11-25 — Carta exclusiva e carta inativa (fora do elenco) entram no pack só se marcadas a dedo; herói jogado aposentado nunca — resposta 2 do dono; aposentado já não pode ser dado por código.
+- 2026-11-25 — Escolha de cartas abre num modal (`<dialog>` nativo, fecha com Esc, clique fora ou "Pronto") com uma grade de blocos clicáveis (arte, OVR na cor da raridade, nome, herói · tipo · time, check quando marcada), com busca, chips de tipo e raridade e "Mostrar inativas" — pedido do dono: nada de `<select>` nativo, e o modal porque a grade dentro do formulário ficava apertada (quem rola é o contêiner, não a grade, senão as linhas se sobrepõem). Ao trocar para "Cartas escolhidas" a grade já vem com o pool que saía por time, para nada mudar até mexer.
+- 2026-11-25 — Ícone novo no `Icon`: `check`.
 
 ## Perguntas abertas
+- Celular fraco aguenta a maleta 3D? Hoje ela cai para 1x pixel e sem bloom quando os primeiros quadros passam de 25 ms; falta testar num aparelho real.
 - A tarefa principal é achar e mostrar a sua carta ou a do streamer? (assumido) A Home ainda não personaliza nada para quem está logado ("sua carta").
 - A maioria acessa pelo celular (vindo do chat da Twitch) ou pelo desktop (com a stream aberta)?
 - Do FIFA, evitar os menus do FUT? (assumido)

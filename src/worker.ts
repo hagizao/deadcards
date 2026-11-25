@@ -5,6 +5,8 @@ import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
 import { HOME_FEATURED_MAX, type ArtCredit } from "./lib/types";
+import { imgUrl, parse, playerFromRow } from "./rows";
+import { packTypes, packs } from "./packs";
 
 export interface Env {
   DB: D1Database;
@@ -21,12 +23,13 @@ export interface Env {
 }
 
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
-const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home"];
+const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home", "packs"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "inactive", "art"];
+const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "altHero", "inactive", "exclusive", "art"];
 const ID_RE = /^[\w-]{1,64}$/;
 
 const keyOf = (url: unknown) => (typeof url === "string" && url.startsWith("/img/") ? url.slice(5) : null);
+const decode = (s: string) => { try { return decodeURIComponent(s); } catch { return null; } };
 const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
 // `code` é opcional: rotas que o front traduz mandam um código estável além da mensagem em pt.
 const bad = (msg: string, status = 400, code?: string) => Response.json({ error: msg, code }, { status });
@@ -49,11 +52,6 @@ function artCredit(v: unknown): ArtCredit | null | undefined {
   } catch { return null; }
 }
 
-const imgUrl = (key: string | null) => (key ? `/img/${key}` : undefined);
-const parse = <T>(s: string | null, fallback: T): T => {
-  if (!s) return fallback;
-  try { return JSON.parse(s) as T; } catch { return fallback; }
-};
 
 async function cachedFetch(env: Env, path: string): Promise<Response> {
   const now = Math.floor(Date.now() / 1000);
@@ -95,12 +93,7 @@ async function appData(env: Env): Promise<Response> {
       const tbg = parse<Record<string, unknown> | null>(t.bg_json, null);
       return { id: t.id, name: t.name, tag: t.tag, region: t.region, logo: imgUrl(t.logo_key), ...(tbg ? { bg: tbg } : {}) };
     }),
-    players: (players.results as Record<string, string | number | null>[]).map((p) => ({
-      ...parse(p.extra_json as string, {}),
-      id: p.id, teamId: p.team_id, name: p.name, position: p.position, hero: p.hero,
-      stats: parse(p.stats_json as string, {}), ...(p.ovr !== null ? { ovr: p.ovr } : {}),
-      c1: p.c1, c2: p.c2, history: parse(p.history_json as string, []),
-    })),
+    players: (players.results as Record<string, string | number | null>[]).map(playerFromRow),
     heroes: Object.fromEntries((heroes.results as { name: string; image_key: string; zoom: number; x: number; y: number }[])
       .map((h) => [h.name, { name: h.name, url: imgUrl(h.image_key), zoom: h.zoom, x: h.x, y: h.y }])),
     settings: {
@@ -154,7 +147,15 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
   if (del && (kind === "players" || kind === "teams")) {
     const col = kind === "players" ? "id" : "team_id";
     const owned = await db.prepare(`SELECT 1 FROM user_cards uc JOIN players p ON p.id = uc.player_id WHERE p.${col} = ? LIMIT 1`).bind(id).first();
-    if (owned) return bad("há cartas resgatadas por usuários; marque como inativo em vez de apagar", 409);
+    if (owned) return bad("há cartas resgatadas por usuários; marque como inativo em vez de apagar", 409, "owned");
+  }
+  if (del && kind === "teams") {
+    const [versions, packs] = await db.batch([
+      db.prepare("SELECT 1 FROM players WHERE team_id <> ?1 AND json_extract(extra_json, '$.variantOf') IN (SELECT id FROM players WHERE team_id = ?1) LIMIT 1").bind(id),
+      db.prepare("SELECT 1 FROM pack_types, json_each(pack_types.teams_json) WHERE json_each.value = ? LIMIT 1").bind(id),
+    ]);
+    if (versions.results.length) return bad("jogadores deste time têm versões em outro time; apague ou mova as versões antes", 409, "versions");
+    if (packs.results.length) return bad("este time está em um tipo de pack; tire ele do pack antes", 409, "in_pack");
   }
   if (kind === "players") {
     const hasVersions = () => db.prepare("SELECT 1 FROM players WHERE json_extract(extra_json, '$.variantOf') = ? AND id <> ? LIMIT 1").bind(id, id).first();
@@ -171,6 +172,10 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
         if (main.v && main.v !== b.variantOf) return bad("escolha a carta principal do jogador, não uma versão");
         if (await hasVersions()) return bad("esta carta é a principal de outras versões; troque a principal antes", 409);
       }
+      // herói jogado só existe como versão de um jogador
+      if (b.altHero !== true || b.variantOf === undefined) delete b.altHero;
+      // exclusiva (fora dos packs) só com true; qualquer outro valor some
+      if (b.exclusive !== true) delete b.exclusive;
       if (b.art && typeof b.art === "object") {
         const credit = artCredit((b.art as { credit?: unknown }).credit);
         if (credit === null) return bad("crédito da arte inválido: nome até 60 caracteres e link http(s)");
@@ -202,7 +207,11 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
     }
   } else if (kind === "settings" && !del) {
     const rows: Record<string, unknown> = {};
-    if (b.tierConfig !== undefined) rows.tierConfig = b.tierConfig;
+    if (b.tierConfig !== undefined) {
+      const tc = b.tierConfig;
+      if (!Array.isArray(tc) || tc.length > 10 || !tc.every((x) => x && typeof x === "object" && typeof x.key === "string" && Number.isFinite(x.min))) return bad("faixas de raridade inválidas");
+      rows.tierConfig = tc;
+    }
     if (b.bg !== undefined) { const bg = b.bg as Record<string, unknown> | null; rows.bg = bg ? { ...bg, imageUrl: "" } : null; rows.bgImageKey = keyOf(bg?.imageUrl); }
     if (b.homeHero !== undefined) rows.homeHeroKey = keyOf(b.homeHero);
     if (b.homeFeatured !== undefined) {
@@ -216,7 +225,10 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
 }
 
 // shortcut: sem limite de tentativas; o mínimo de 8 caracteres torna o chute inviável, adicionar rate limit se aparecer abuso
-const CODE_VALID = "uses < max_uses AND (starts_at IS NULL OR starts_at <= unixepoch()) AND (expires_at IS NULL OR expires_at > unixepoch())";
+// herói jogado aposentado (altHero + inactive) não é mais dado por código
+const RETIRED = "json_extract(extra_json, '$.altHero') = 1 AND json_extract(extra_json, '$.inactive') = 1";
+const CODE_VALID = `uses < max_uses AND (starts_at IS NULL OR starts_at <= unixepoch()) AND (expires_at IS NULL OR expires_at > unixepoch())
+  AND NOT EXISTS (SELECT 1 FROM players WHERE players.id = redeem_codes.player_id AND ${RETIRED})`;
 const INVALID_CODE = "código inválido, expirado ou esgotado";
 
 async function redeem(env: Env, request: Request): Promise<Response> {
@@ -225,11 +237,28 @@ async function redeem(env: Env, request: Request): Promise<Response> {
   const body = (await request.json().catch(() => null)) as { code?: unknown } | null;
   const code = typeof body?.code === "string" ? body.code.trim().toUpperCase() : "";
   if (!code) return bad("código vazio", 400, "empty");
-  const row = await env.DB.prepare(`SELECT player_id FROM redeem_codes WHERE code = ? AND ${CODE_VALID}`).bind(code).first<{ player_id: string }>();
+  const row = await env.DB.prepare(`SELECT player_id, pack_type_id FROM redeem_codes WHERE code = ? AND ${CODE_VALID}`).bind(code)
+    .first<{ player_id: string | null; pack_type_id: string | null }>();
   if (!row) return bad(INVALID_CODE, 404, "invalid");
+  // código de pack: o pack vai para o inventário fechado, e a pessoa abre quando quiser
+  if (row.pack_type_id) {
+    const packId = `pk-${crypto.randomUUID()}`;
+    try {
+      const [, consume] = await env.DB.batch([
+        env.DB.prepare(`INSERT INTO user_packs (id, user_id, pack_type_id, code) SELECT ?, ?, pack_type_id, code FROM redeem_codes WHERE code = ? AND pack_type_id IS NOT NULL AND ${CODE_VALID}`)
+          .bind(packId, user.id, code),
+        env.DB.prepare(`UPDATE redeem_codes SET uses = uses + 1 WHERE code = ? AND ${CODE_VALID}`).bind(code),
+      ]);
+      if (!consume.meta.changes) return bad(INVALID_CODE, 404, "invalid");
+    } catch (e) {
+      if (String(e).includes("UNIQUE")) return bad("você já resgatou este pack", 409, "pack_owned");
+      throw e;
+    }
+    return Response.json({ packId, packTypeId: row.pack_type_id });
+  }
   try {
     const [, consume] = await env.DB.batch([
-      env.DB.prepare(`INSERT INTO user_cards (user_id, player_id) SELECT ?, player_id FROM redeem_codes WHERE code = ? AND ${CODE_VALID}`).bind(user.id, code),
+      env.DB.prepare(`INSERT INTO user_cards (user_id, player_id) SELECT ?, player_id FROM redeem_codes WHERE code = ? AND player_id IS NOT NULL AND ${CODE_VALID}`).bind(user.id, code),
       env.DB.prepare(`UPDATE redeem_codes SET uses = uses + 1 WHERE code = ? AND ${CODE_VALID}`).bind(code),
     ]);
     if (!consume.meta.changes) return bad(INVALID_CODE, 404, "invalid");
@@ -244,7 +273,7 @@ const timestamp = (v: unknown) => (v == null ? null : Number.isInteger(v) ? (v a
 
 async function codes(env: Env, request: Request, rest: string): Promise<Response> {
   if (request.method === "GET" && !rest) {
-    const rows = await env.DB.prepare("SELECT code, player_id, max_uses, uses, starts_at, expires_at FROM redeem_codes ORDER BY code").all();
+    const rows = await env.DB.prepare("SELECT code, player_id, pack_type_id, max_uses, uses, starts_at, expires_at FROM redeem_codes ORDER BY code").all();
     return Response.json(rows.results);
   }
   if (request.method === "POST" && !rest) {
@@ -255,21 +284,27 @@ async function codes(env: Env, request: Request, rest: string): Promise<Response
     const expiresAt = timestamp(b.expiresAt);
     if (!/^[A-Z0-9-]{8,64}$/.test(code)) return bad("código deve ter de 8 a 64 letras, números ou hífen");
     if (!maxUses) return bad("máximo de usos inválido");
-    if (typeof b.playerId !== "string" || !b.playerId) return bad("escolha o jogador");
+    // o código dá uma carta ou um pack, nunca os dois
+    const playerId = typeof b.playerId === "string" && b.playerId ? b.playerId : null;
+    const packTypeId = typeof b.packTypeId === "string" && b.packTypeId ? b.packTypeId : null;
+    if (!playerId === !packTypeId) return bad("escolha uma carta ou um pack");
     if (startsAt === undefined || expiresAt === undefined) return bad("data inválida");
     if (startsAt !== null && expiresAt !== null && expiresAt <= startsAt) return bad("a expiração deve ser depois do início");
+    if (playerId && await env.DB.prepare(`SELECT 1 FROM players WHERE id = ? AND ${RETIRED}`).bind(playerId).first()) return bad("esta carta de herói jogado está aposentada");
     try {
-      await env.DB.prepare("INSERT INTO redeem_codes (code, player_id, max_uses, starts_at, expires_at) VALUES (?,?,?,?,?)")
-        .bind(code, b.playerId, maxUses, startsAt, expiresAt).run();
+      await env.DB.prepare("INSERT INTO redeem_codes (code, player_id, pack_type_id, max_uses, starts_at, expires_at) VALUES (?,?,?,?,?,?)")
+        .bind(code, playerId, packTypeId, maxUses, startsAt, expiresAt).run();
     } catch (e) {
       if (String(e).includes("UNIQUE")) return bad("esse código já existe", 409);
-      if (String(e).includes("FOREIGN")) return bad("jogador não existe", 404);
+      if (String(e).includes("FOREIGN")) return bad(playerId ? "jogador não existe" : "pack não existe", 404);
       throw e;
     }
     return Response.json({ ok: true });
   }
   if (request.method === "DELETE" && rest) {
-    await env.DB.prepare("DELETE FROM redeem_codes WHERE code = ?").bind(decodeURIComponent(rest)).run();
+    const code = decode(rest);
+    if (code === null) return bad("código inválido");
+    await env.DB.prepare("DELETE FROM redeem_codes WHERE code = ?").bind(code).run();
     return Response.json({ ok: true });
   }
   return bad("rota inválida", 404);
@@ -323,20 +358,17 @@ export default {
     if (url.pathname.startsWith("/api/account/link/")) return accountLink(env, request, url.pathname.slice("/api/account/link/".length));
     if (url.pathname === PROFILE_CARD_PATH) return profileCard(env, request);
     const fav = url.pathname.match(/^\/api\/favorites\/([^/]+)$/);
-    if (fav) {
-      let id = "";
-      try { id = decodeURIComponent(fav[1]); } catch { /* malformed escape: no card has this id */ }
-      return favorite(env, request, id);
-    }
+    if (fav) return favorite(env, request, decode(fav[1]) ?? "");
     const profileUser = url.pathname.match(/^\/api\/users\/([^/]+)$/);
-    if (profileUser && request.method === "GET") {
-      let key = "";
-      try { key = decodeURIComponent(profileUser[1]); } catch { /* malformed escape: treat as not found */ }
-      return publicProfile(env, key);
-    }
+    if (profileUser && request.method === "GET") return publicProfile(env, decode(profileUser[1]) ?? "");
     if (url.pathname === "/api/codes" || url.pathname.startsWith("/api/codes/")) {
       if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
       return codes(env, request, url.pathname.slice("/api/codes/".length));
+    }
+    if (url.pathname === "/api/packs" || url.pathname.startsWith("/api/packs/")) return packs(env, request, url.pathname.slice("/api/packs/".length));
+    if (url.pathname === "/api/pack-types" || url.pathname.startsWith("/api/pack-types/")) {
+      if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
+      return packTypes(env, request, url.pathname.slice("/api/pack-types/".length));
     }
     if (url.pathname === "/api/feedback") return request.method === "POST" ? feedback(env, request) : bad("método não suportado", 405);
     if (url.pathname === "/api/redeem") return request.method === "POST" ? redeem(env, request) : bad("método não suportado", 405);
@@ -350,14 +382,15 @@ export default {
     if (promoteMatch) {
       if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
       if (request.method !== "POST") return bad("método não suportado", 405);
-      const id = decodeURIComponent(promoteMatch[1]);
-      if (!ID_RE.test(id)) return bad("id inválido");
+      const id = decode(promoteMatch[1]);
+      if (id === null || !ID_RE.test(id)) return bad("id inválido");
       return promote(env, id);
     }
     const admin = url.pathname.match(/^\/api\/(players|teams|heroes|settings|upload)\/([^/]+)$/);
     if (admin) {
       if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
-      const id = decodeURIComponent(admin[2]);
+      const id = decode(admin[2]);
+      if (id === null) return bad("id inválido");
       if (admin[1] === "upload") return request.method === "POST" ? upload(env, request, id) : bad("método não suportado", 405);
       if (admin[1] !== "heroes" && !ID_RE.test(id)) return bad("id inválido");
       return write(env, request, admin[1], id);
@@ -372,8 +405,8 @@ export default {
       return cachedFetch(env, path);
     }
     if (url.pathname.startsWith("/img/")) {
-      const key = decodeURIComponent(url.pathname.slice(5));
-      if (!/^[a-z0-9/_.-]+$/i.test(key) || key.includes("..")) return new Response("bad key", { status: 400 });
+      const key = decode(url.pathname.slice(5));
+      if (key === null || !/^[a-z0-9/_.-]+$/i.test(key) || key.includes("..")) return new Response("bad key", { status: 400 });
       return serveImage(env, key);
     }
     return env.ASSETS.fetch(request);

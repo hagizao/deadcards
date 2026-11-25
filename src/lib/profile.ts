@@ -5,6 +5,8 @@ import type { Player, Stats, TierBand } from "./types";
 export const PROFILE_CARD_PATH = "/api/profile/card";
 export const PROFILE_NAME_MAX = 24;
 export const favoritePath = (playerId: string) => `/api/favorites/${encodeURIComponent(playerId)}`;
+/** Favoritas por perfil: sobem para o topo da coleção, em destaque. */
+export const MAX_FAVORITES = 3;
 
 export type ProfileCard = { name: string; hero: string; position?: string; stats: Stats };
 

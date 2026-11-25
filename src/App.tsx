@@ -33,12 +33,12 @@ function GitHubIcon() {
 }
 
 type Tab = "home" | "teams" | "tierlist" | "collection" | "redeem" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "settings";
-const TABS = ["teams", "tierlist", "collection", "compare", "redeem"] as const;
-const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", compare: "versus", redeem: "ticket" } as const;
+const TABS = ["teams", "tierlist", "collection", "redeem", "compare"] as const;
+const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", redeem: "ticket", compare: "versus" } as const;
 
 const S = strings({
   pt: {
-    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", compare: "Comparar", redeem: "Resgatar" },
+    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", redeem: "Resgatar", compare: "Comparar" },
     mainNav: "Navegação principal",
     projectLinks: "Links do projeto",
     language: "Idioma",
@@ -49,13 +49,15 @@ const S = strings({
     terms: "Termos",
     managed: "Projeto 4fun gerenciado pelo Hagizao:",
     notAffiliated: "Não afiliado à Valve.",
+    freePacks: "Packs são grátis e nunca serão vendidos.",
+    edl: ["Heróis jogados pelos jogadores com dados do", ", sem relação oficial com o site."],
     rmBefore: "Seu sistema está com ",
     rmBold: "movimento reduzido",
     rmAfter: " ativado, então as animações das cartas estão desligadas. Para vê-las, desative essa opção nas configurações de acessibilidade do seu sistema.",
     rmClose: "Fechar aviso",
   },
   en: {
-    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", compare: "Compare", redeem: "Redeem" },
+    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", redeem: "Redeem", compare: "Compare" },
     mainNav: "Main navigation",
     projectLinks: "Project links",
     language: "Language",
@@ -66,13 +68,15 @@ const S = strings({
     terms: "Terms",
     managed: "4fun project run by Hagizao:",
     notAffiliated: "Not affiliated with Valve.",
+    freePacks: "Packs are free and will never be sold.",
+    edl: ["Players' other heroes based on data from", ", with no official affiliation."],
     rmBefore: "Your system has ",
     rmBold: "reduced motion",
     rmAfter: " turned on, so the card animations are off. To see them, turn off that option in your system's accessibility settings.",
     rmClose: "Dismiss notice",
   },
   es: {
-    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", compare: "Comparar", redeem: "Canjear" },
+    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", redeem: "Canjear", compare: "Comparar" },
     mainNav: "Navegación principal",
     projectLinks: "Enlaces del proyecto",
     language: "Idioma",
@@ -83,6 +87,8 @@ const S = strings({
     terms: "Términos",
     managed: "Proyecto 4fun administrado por Hagizao:",
     notAffiliated: "No afiliado a Valve.",
+    freePacks: "Los packs son gratis y nunca se venderán.",
+    edl: ["Héroes jugados por los jugadores con datos de", ", sin relación oficial con el sitio."],
     rmBefore: "Tu sistema tiene activado el ",
     rmBold: "movimiento reducido",
     rmAfter: ", así que las animaciones de las cartas están desactivadas. Para verlas, desactiva esa opción en los ajustes de accesibilidad de tu sistema.",
@@ -284,6 +290,7 @@ function Shell() {
               <button
                 key={id}
                 type="button"
+                data-nav={id}
                 onClick={() => go(id)}
                 aria-current={tab === id ? "page" : undefined}
                 className={`relative flex min-h-10 cursor-pointer items-center rounded-lg px-3 text-sm font-bold tracking-widest whitespace-nowrap uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 xl:px-4 ${tab === id ? "text-dl-black" : "text-zinc-300 hover:bg-zinc-100/10 hover:text-white"}`}
@@ -334,13 +341,18 @@ function Shell() {
             <button type="button" onClick={() => setTab("terms")} className="cursor-pointer hover:text-white">{t.terms}</button>
           </nav>
         </div>
-        <p className="mx-auto max-w-7xl px-4 pb-6 text-xs text-zinc-500 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 pb-6 text-xs text-zinc-500 sm:px-6 lg:px-8">
+        <p>
           {t.managed}{" "}
           <a href="https://www.youtube.com/@hagizao" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">YouTube</a> ·{" "}
           <a href="https://www.twitch.tv/hagizao" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">Twitch</a> ·{" "}
           <a href="https://kick.com/hagizao" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">Kick</a>.{" "}
-          {t.notAffiliated}
+          {t.notAffiliated} {t.freePacks}
         </p>
+        <p>
+          {t.edl[0]} <a href="https://edl.gg" target="_blank" rel="noreferrer" className="text-zinc-300 hover:text-white">edl.gg</a>{t.edl[1]}
+        </p>
+        </div>
       </footer>
 
       <nav className="noir-glass-strong fixed inset-x-0 bottom-0 z-40 flex border-t border-zinc-200/15 pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label={t.mainNav}>
@@ -348,6 +360,7 @@ function Shell() {
           <button
             key={id}
             type="button"
+            data-nav={id}
             onClick={() => go(id)}
             aria-current={tab === id ? "page" : undefined}
             className={`flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 text-[10px] font-bold tracking-wider uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 ${tab === id ? "text-dl-text" : "text-zinc-400 hover:text-zinc-100"}`}

@@ -32,6 +32,17 @@ describe("Versões de carta", () => {
     expect((await put(cookie, "vmain", { variantOf: "vself" })).status).toBe(409);
   });
 
+  it("herói jogado só fica marcado em versão", async () => {
+    const { cookie } = await login("admvicli");
+    await put(cookie, "hmain");
+    expect((await put(cookie, "hmina", { variantOf: "hmain", hero: "Mina", altHero: true })).status).toBe(200);
+    expect((await stored("hmina")).altHero).toBe(true);
+    expect((await put(cookie, "hsolo", { altHero: true })).status).toBe(200);
+    expect((await stored("hsolo")).altHero).toBeUndefined();
+    expect((await put(cookie, "hstr", { variantOf: "hmain", altHero: "sim" })).status).toBe(200);
+    expect((await stored("hstr")).altHero).toBeUndefined();
+  });
+
   it("bloqueia apagar principal com versões", async () => {
     const { cookie } = await login("admvicli");
     await put(cookie, "dmain");

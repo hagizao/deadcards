@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeRoster, cardVersions, isRosterCard } from "../src/lib/cards";
+import { activeRoster, cardVersions, isAltHero, isRosterCard } from "../src/lib/cards";
 import type { Player } from "../src/lib/types";
 
 const card = (id: string, teamId: string, extra: Partial<Player> = {}) =>
@@ -31,6 +31,18 @@ describe("Elenco do time", () => {
     expect(roster("special")).toBe(false);
     expect(roster("national")).toBe(true);
     expect(roster("old")).toBe(false);
+  });
+
+  it("herói jogado nunca entra no elenco, nem se o time mudar", () => {
+    const players = [
+      card("main", "lev"),
+      card("mina", "bra", { variantOf: "main", hero: "Mina", altHero: true }),
+      card("loose", "bra", { altHero: true }),
+    ];
+    expect(isAltHero(players[1])).toBe(true);
+    // marca sem ser versão não vale: é uma carta principal
+    expect(isAltHero(players[2])).toBe(false);
+    expect(activeRoster(players, "bra").map((p) => p.id)).toEqual(["loose"]);
   });
 });
 

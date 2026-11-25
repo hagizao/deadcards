@@ -11,14 +11,15 @@ import { TrendBadge } from "./TrendBadge";
 type Variant = "team" | "medium" | "editor";
 
 const S = strings({
-  pt: { view: "Visualizar Carta", viewOf: (name: string) => `Visualizar carta de ${name}` },
-  en: { view: "View Card", viewOf: (name: string) => `View ${name}'s card` },
-  es: { view: "Ver Carta", viewOf: (name: string) => `Ver la carta de ${name}` },
+  pt: { view: "Visualizar Carta", viewOf: (name: string) => `Visualizar carta de ${name}`, signature: "Assinatura" },
+  en: { view: "View Card", viewOf: (name: string) => `View ${name}'s card`, signature: "Signature" },
+  es: { view: "Ver Carta", viewOf: (name: string) => `Ver la carta de ${name}`, signature: "Firma" },
 });
 
 const STAT_ORDER = ["MIR", "MOV", "MAC", "POL", "SUP", "CON"] as const;
 
-export function Card({ player, variant = "team", onOpen }: { player: Player; variant?: Variant; onOpen?: () => void }) {
+/** `signature`: mostra a tag de herói de assinatura (onde as cartas de heróis jogados aparecem junto). */
+export function Card({ player, variant = "team", onOpen, signature }: { player: Player; variant?: Variant; onOpen?: () => void; signature?: boolean }) {
   const { teams, settings, heroArt } = useData();
   const t = useT(S);
   const label = useLabel();
@@ -85,8 +86,12 @@ export function Card({ player, variant = "team", onOpen }: { player: Player; var
           <Particles tierKey={rk} />
           {player.special && !rk.noSweep && <div className="sp-card-fx" />}
 
+          {/* herói de assinatura: faixa dourada na diagonal do canto superior direito */}
+          {signature && <div className="sig-ribbon"><span>{t.signature}</span></div>}
+
           <div className="relative z-10 flex items-start justify-between gap-2">
-            <div className="flex flex-col items-start">
+            {/* data-zone: áreas que a abertura de pack nunca pode mostrar antes da hora */}
+            <div data-zone="ovr" className="flex flex-col items-start">
               <div className="flex items-center gap-1.5">
                 <span data-ovr className={`${editor ? "text-6xl" : medium ? "text-4xl" : "text-5xl"} leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]`}>{ovr}</span>
                 <TrendBadge delta={getPlayerTrend(player)} size={editor ? "editor" : "card"} />
@@ -103,7 +108,7 @@ export function Card({ player, variant = "team", onOpen }: { player: Player; var
           </div>
 
           <div className={`relative z-10 mt-auto ${medium ? "pb-5" : editor ? "pb-9" : "pb-8"}`}>
-            <div className={`mb-2 border-b border-zinc-200/45 pb-1.5 text-center ${medium ? "" : "mx-2"}`}>
+            <div data-zone="name" className={`mb-2 border-b border-zinc-200/45 pb-1.5 text-center ${medium ? "" : "mx-2"}`}>
               <h3 className={`${editor ? "text-2xl" : medium ? "text-lg" : "text-xl"} truncate font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]`}>
                 {player.name}
               </h3>
@@ -111,7 +116,7 @@ export function Card({ player, variant = "team", onOpen }: { player: Player; var
             {!medium && (
               <div className={`grid grid-cols-2 gap-x-5 ${editor ? "px-5" : "px-4"} card-txt-shadow gap-y-1.5 py-1`}>
                 {STAT_ORDER.map((k) => (
-                  <div key={k} className="flex items-center justify-between leading-none">
+                  <div key={k} data-stat={k} className="flex items-center justify-between leading-none">
                     <span className={`${editor ? "text-base" : "text-sm"} font-extrabold tracking-wider text-zinc-200`}>{k}</span>
                     <span className={`${editor ? "text-xl" : "text-lg"} font-black text-white`}>{player.stats[k]}</span>
                   </div>

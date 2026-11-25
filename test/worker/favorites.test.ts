@@ -36,4 +36,33 @@ describe("Favoritos", () => {
     expect(await (await fav("DELETE", "p1", cookie)).json()).toEqual({ favorites: [] });
     expect(await (await fav("DELETE", "p1", cookie)).json()).toEqual({ favorites: [] });
   });
+
+  it("no máximo 3 favoritas: a quarta é recusada até tirar uma", async () => {
+    const { cookie, userId } = await login("fan");
+    for (const id of ["f1", "f2", "f3", "f4"]) {
+      await seedPlayer(id);
+      await env.DB.prepare("INSERT INTO user_cards (user_id, player_id) VALUES (?, ?)").bind(userId, id).run();
+    }
+    for (const id of ["f1", "f2", "f3"]) expect((await fav("PUT", id, cookie)).status).toBe(200);
+    const full = await fav("PUT", "f4", cookie);
+    expect(full.status).toBe(409);
+    expect(await full.json()).toEqual({ code: "limit" });
+    // repetir uma que já é favorita continua valendo
+    expect((await fav("PUT", "f2", cookie)).status).toBe(200);
+    await fav("DELETE", "f1", cookie);
+    expect((await fav("PUT", "f4", cookie)).status).toBe(200);
+    const profile = await (await SELF.fetch(`http://test/api/users/${userId}`)).json<PublicProfile>();
+    expect([...profile.favorites].sort()).toEqual(["f2", "f3", "f4"]);
+  });
+
+  it("quem já tinha mais de 3 favoritas mostra só 3 no perfil", async () => {
+    const { userId } = await login("fan");
+    for (const id of ["g1", "g2", "g3", "g4", "g5"]) {
+      await seedPlayer(id);
+      await env.DB.prepare("INSERT INTO user_cards (user_id, player_id) VALUES (?, ?)").bind(userId, id).run();
+      await env.DB.prepare("INSERT INTO user_favorites (user_id, player_id) VALUES (?, ?)").bind(userId, id).run();
+    }
+    const profile = await (await SELF.fetch(`http://test/api/users/${userId}`)).json<PublicProfile>();
+    expect(profile.favorites).toHaveLength(3);
+  });
 });

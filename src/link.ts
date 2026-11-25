@@ -88,6 +88,9 @@ export async function accountLink(env: Env, request: Request, step: string): Pro
     env.DB.prepare(`UPDATE profile_card_history SET user_id = ?1 WHERE user_id = ?2 AND ${noCard}`).bind(target, source),
     env.DB.prepare(`UPDATE profile_cards SET user_id = ?1 WHERE user_id = ?2 AND ${noCard}`).bind(target, source),
     env.DB.prepare("UPDATE profile_handles SET user_id = ?1 WHERE user_id = ?2 AND NOT EXISTS (SELECT 1 FROM profile_handles WHERE user_id = ?1)").bind(target, source),
+    // um pack por código por pessoa: o repetido fica na conta apagada e some com ela
+    env.DB.prepare("UPDATE OR IGNORE user_packs SET user_id = ?1 WHERE user_id = ?2").bind(target, source),
+    env.DB.prepare("UPDATE pack_openings SET user_id = ?1 WHERE user_id = ?2").bind(target, source),
     env.DB.prepare(`DELETE FROM "user" WHERE id = ?`).bind(source),
   ]);
   return json(

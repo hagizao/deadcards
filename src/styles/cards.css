@@ -780,3 +780,38 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #71717a;
     }
+
+    /* herói de assinatura: faixa dourada na diagonal do canto superior direito.
+       O quadrado guarda a faixa; o clip-path da .deadlock-card-inner corta o resto no formato da carta. */
+    .sig-ribbon {
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 12;
+      width: 54%;
+      aspect-ratio: 1;
+      overflow: hidden;
+      pointer-events: none;
+      container-type: inline-size;
+    }
+
+    .sig-ribbon > span {
+      position: absolute;
+      top: 38%;
+      right: -38%;
+      width: 150%;
+      padding: 3cqw 0;
+      transform: translateY(-50%) rotate(45deg);
+      background: linear-gradient(90deg, #92400e, #f59e0b 22%, #fde68a 44%, #fffbeb 50%, #fde68a 56%, #f59e0b 78%, #92400e);
+      border-block: 1px solid rgb(255 251 235 / 0.7);
+      box-shadow: 0 3px 10px rgb(0 0 0 / 0.6), 0 0 16px rgb(252 211 77 / 0.45);
+      color: #1c1206;
+      font-size: 7.5cqw;
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      line-height: 1;
+      text-align: center;
+      text-transform: uppercase;
+      text-shadow: 0 1px 0 rgb(255 255 255 / 0.45);
+    }
+
