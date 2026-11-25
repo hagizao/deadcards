@@ -109,7 +109,7 @@ export const PACK_SOUNDS = {
   beat: { when: "Walkout: hit de cada pista (região, posição, time), 3 vezes", volume: 1, synth: ({ gain }) => { tone(140, 50, 0.18, 0.8 * gain); noise(0.06, 900, 0.5 * gain, 1); } },
   signature: { when: "Assinatura: a faixa dourada se estende dentro da tampa (logo depois da cor da luz)", volume: 0.6 },
   spin: { when: "A carta sobe girando", volume: 1, synth: ({ gain, len }) => noise(Math.max(0.3, len), 500, 0.35 * gain, 0.7, 3000) },
-  reveal: { when: "Carta sem walkout (comum) aparece", volume: 0.9 },
+  reveal: { when: "Fora de uso: a carta comum (Initiate, Arcanist) aparece sem som", volume: 0.9 },
   "reveal-walkout": { when: "Carta com walkout (Ascendant, especial, Eternus) aparece", volume: 0.9 },
   crowd: { when: "Plateia reagindo, junto com reveal-walkout", volume: 0.6 },
   bell: { when: "Eternus: sino na troca de cor e na revelação", volume: 0.5 },
@@ -216,9 +216,9 @@ export async function renderPackSoundWav(id: PackSoundId, sampleRate = 44100): P
  */
 export const SOUND_PEAK = { "riser-eternus": 13.5, tension: 5.4, "lid-boom": 0.9, shockwave: 0.35 } as const;
 
-/** Revelação: comum tem o som dela; carta com walkout ganha o som final e a plateia. */
+/** Revelação: comum (Initiate, Arcanist) aparece em silêncio; carta com walkout ganha o som final e a plateia. */
 export function playReveal(level: RevealLevel) {
-  if (level === "base") return playPackSound("reveal");
+  if (level === "base") return;
   playPackSound("reveal-walkout");
   playPackSound("crowd", { delay: 0.25 });
 }
