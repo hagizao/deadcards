@@ -7,7 +7,7 @@ import { api, useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
 import type { CaseLevel, CaseLook, CardSpot, PackCase } from "../lib/packCase";
 import type { InventoryPack, PackKind } from "../lib/packs";
-import { SOUND_PEAK, isMuted, playPackSound, playReveal, preloadPackSounds, setMuted, type RevealLevel, type SoundHandle } from "../lib/packSounds";
+import { CROWD_DELAY, SOUND_PEAK, isMuted, playPackSound, playReveal, preloadPackSounds, setMuted, type RevealLevel, type SoundHandle } from "../lib/packSounds";
 import { getCardTier, levelOf } from "../lib/rarity";
 import { Card } from "./Card";
 import { RegionIcon } from "./RegionIcon";
@@ -118,7 +118,8 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
   const shot = useRef<HTMLDivElement>(null);
   const front = useRef<Promise<void> | null>(null);
   const riser = useRef<SoundHandle | null>(null);
-  useEffect(() => () => riser.current?.stop(), []);
+  const music = useRef<SoundHandle | null>(null);
+  useEffect(() => () => { riser.current?.stop(); music.current?.stop(); }, []);
   const server = useRef<Promise<Drawn | null> | null>(null);
 
   const card = result ? players.find((p) => p.id === result.id) : undefined;
@@ -200,7 +201,8 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
       riser.current = playPackSound("riser-eternus", { delay: sig ? 1 : 0 });
       peak = SOUND_PEAK["riser-eternus"];
     }
-    await c.crack(lv, look);
+    // Ascendant: música de fundo da troca de cor da luz até a plateia entrar
+    await c.crack(lv, look, lvl === "ascendant" ? () => { music.current = playPackSound("music-ascendant", { loop: true }); } : undefined);
     // assinatura logo depois da cor da luz: a faixa dourada se estende dentro da tampa
     if (drawn.kind === "signature") await c.ribbon(t.signature);
     // Ascendant: a tensão sobe durante o walkout e o pico cai na revelação
@@ -222,6 +224,11 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     const s = await c.rise(lv);
     place(s);
     playReveal(lvl);
+    if (music.current) {
+      const m = music.current;
+      music.current = null;
+      setTimeout(() => m.stop(0.8), CROWD_DELAY * 1000);
+    }
     setStage("done");
   });
 
@@ -294,7 +301,11 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     setStash({ x: tab.left + tab.width / 2 - r.width / 2, y: tab.top + tab.height / 2 - (r.height - BOTTOM) / 2 });
   };
 
-  const toggleSound = () => { setMuted(!muted); setMutedState(!muted); };
+  const toggleSound = () => {
+    // mudo no meio da abertura: corta também os sons longos que já estão tocando
+    if (!muted) { riser.current?.stop(); music.current?.stop(); }
+    setMuted(!muted); setMutedState(!muted);
+  };
   const hint = stage === "loading" ? t.loading : stage === "latches" ? (opened.some(Boolean) ? t.other : reduce ? t.tap : t.drag) : stage === "waiting" ? "…" : "";
 
   // a carta real nasce onde o verso 3D estava e vai para o centro, no tamanho que cabe

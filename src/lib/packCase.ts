@@ -32,9 +32,9 @@ export type PackCase = {
   setFront: (url: string) => Promise<void>;
   /**
    * Tampa: comum abre direto; rara emperra, pulsa com a luz neutra e, no último pulso, a luz troca para a cor
-   * da raridade e a tampa estoura. Resolve quando a tampa está aberta.
+   * da raridade e a tampa estoura. Resolve quando a tampa está aberta; `onColor` avisa na troca de cor.
    */
-  crack: (lv: CaseLevel, look: CaseLook | null) => Promise<void>;
+  crack: (lv: CaseLevel, look: CaseLook | null, onColor?: () => void) => Promise<void>;
   /** Walkout: a cena escurece para as pistas. */
   dim: () => void;
   beat: (i: number) => void;
@@ -944,7 +944,7 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       backMat.needsUpdate = true;
       hasFront = true;
     },
-    async crack(lv, look) {
+    async crack(lv, look, onColor) {
       if (look) {
         pal.a = [new THREE.Color(look.c), new THREE.Color(look.hi)];
         pal.b = look.alt ? [new THREE.Color(look.alt.c), new THREE.Color(look.alt.hi)] : null;
@@ -987,14 +987,14 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
             .add(() => shakeCam(0.04 + lv * 0.03 + f * 0.08, 0.14), at);
         }
         if (look) {
-          t.add(() => { sound("rays"); if (lv === 2) sound("bell", { gain: 0.6 }); buzz(70); }, color)
+          t.add(() => { sound("rays"); if (lv === 2) sound("bell", { gain: 0.6 }); buzz(70); onColor?.(); }, color)
             .to(pal, { mix: 1, duration: 0.1, ease: "power2.out" }, color)
             .to(seamGlow.material, { opacity: 1, duration: 0.1 }, color);
         }
         t.add(() => sound("lid-boom"), Math.max(0, pop - SOUND_PEAK["lid-boom"]))
           .to({}, { duration: 0.01 }, color + 0.25);
       } else {
-        if (look) t.add(() => { pal.mix = 1; if (lv) sound("rays"); }, 0);
+        if (look) t.add(() => { pal.mix = 1; if (lv) sound("rays"); onColor?.(); }, 0);
         t.to({}, { duration: dur(0.25) });
       }
       await done(t);

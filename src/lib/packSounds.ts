@@ -20,6 +20,8 @@ type PlayOpts = {
   len?: number;
   /** Toca mesmo com o mudo ligado (prévia do Editor). */
   force?: boolean;
+  /** Repete o arquivo até alguém chamar `stop` (música de fundo). */
+  loop?: boolean;
 };
 type Synth = (o: { gain: number; len: number }) => (() => void) | void;
 type SoundSpec = { when: string; volume: number; synth?: Synth };
@@ -112,6 +114,7 @@ export const PACK_SOUNDS = {
   reveal: { when: "Fora de uso: a carta comum (Initiate, Arcanist) aparece sem som", volume: 0.9 },
   "reveal-walkout": { when: "Carta com walkout (Ascendant, especial, Eternus) aparece", volume: 0.9 },
   crowd: { when: "Plateia reagindo, junto com reveal-walkout", volume: 0.6 },
+  "music-ascendant": { when: "Ascendant: música de fundo em loop, da troca de cor da luz até a plateia (some em fade quando o crowd entra)", volume: 0.45 },
   bell: { when: "Eternus: sino na troca de cor e na revelação", volume: 0.5 },
   shockwave: { when: "Eternus: onda de choque na mesa; o golpe (0,35 s) cai quando a carta aparece", volume: 1, synth: ({ gain }) => { tone(80, 24, 1.4, 0.9 * gain); noise(1, 300, 0.6 * gain, 0.5, 90); } },
 } satisfies Record<string, SoundSpec>;
@@ -152,13 +155,13 @@ export function preloadPackSounds() {
 }
 
 /** Som tocando: `stop` corta; `position` diz em que segundo do arquivo está (null sem arquivo ou antes de começar). */
-export type SoundHandle = { stop: () => void; position: () => number | null };
+export type SoundHandle = { stop: (fade?: number) => void; position: () => number | null };
 
 /** Toca um som do catálogo (arquivo se houver, senão o sintetizado). */
-export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1, force = false }: PlayOpts = {}): SoundHandle {
+export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1, force = false, loop = false }: PlayOpts = {}): SoundHandle {
   if (isMuted() && !force) return { stop: () => {}, position: () => null };
   const spec: SoundSpec = PACK_SOUNDS[id];
-  let stop: (() => void) | void;
+  let stop: ((fade?: number) => void) | void;
   let el: HTMLAudioElement | null = null;
   let cancelled = false;
   const go = () => {
@@ -167,14 +170,24 @@ export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1, f
     if (file) {
       const a = file.cloneNode() as HTMLAudioElement;
       a.volume = Math.min(1, spec.volume * gain);
+      a.loop = loop;
       a.play().then(() => { el = a; }, () => { /* autoplay bloqueado: fica sem som */ });
-      stop = () => a.pause();
+      stop = (fade = 0) => {
+        if (fade <= 0 || a.paused) return a.pause();
+        // abaixa o volume aos poucos e só então pausa
+        const from = a.volume, t0 = performance.now();
+        const iv = setInterval(() => {
+          const k = Math.min(1, (performance.now() - t0) / (fade * 1000));
+          a.volume = from * (1 - k);
+          if (k >= 1) { clearInterval(iv); a.pause(); }
+        }, 30);
+      };
     } else if (spec.synth && typeof AudioContext !== "undefined") {
       try { stop = spec.synth({ gain: spec.volume * gain, len }); } catch { /* sem áudio: segue sem som */ }
     }
   };
   if (delay > 0) setTimeout(go, delay * 1000); else go();
-  return { stop: () => { cancelled = true; stop?.(); }, position: () => (el && !el.paused ? el.currentTime : null) };
+  return { stop: (fade) => { cancelled = true; stop?.(fade); }, position: () => (el && !el.paused ? el.currentTime : null) };
 }
 
 // ---------- prévia no Editor ----------
@@ -216,9 +229,12 @@ export async function renderPackSoundWav(id: PackSoundId, sampleRate = 44100): P
  */
 export const SOUND_PEAK = { "riser-eternus": 13.5, tension: 5.4, "lid-boom": 0.9, shockwave: 0.35 } as const;
 
+/** Segundos depois da revelação em que a plateia (crowd) entra. */
+export const CROWD_DELAY = 0.25;
+
 /** Revelação: comum (Initiate, Arcanist) aparece em silêncio; carta com walkout ganha o som final e a plateia. */
 export function playReveal(level: RevealLevel) {
   if (level === "base") return;
   playPackSound("reveal-walkout");
-  playPackSound("crowd", { delay: 0.25 });
+  playPackSound("crowd", { delay: CROWD_DELAY });
 }
