@@ -9,10 +9,11 @@ import { imgUrl, parse, playerFromRow } from "./rows";
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "private, no-store" } });
 const bad = (error: string, status = 400, code?: string) => json({ error, code }, status);
 const ID_RE = /^[\w-]{1,64}$/;
+const PACK_PLAYERS_MAX = 2000;
 /** Prefixo do pack de teste do admin: sempre no inventário, abre sem gastar e sem gravar nada. */
 export const TEST_PACK = "test:";
 
-type TypeRow = { id: string; name: string; art_key: string | null; cards: number; odds_json: string; rarity_json: string | null; teams_json: string };
+type TypeRow = { id: string; name: string; art_key: string | null; cards: number; odds_json: string; rarity_json: string | null; players_json: string | null; teams_json: string };
 
 function typeFromRow(r: TypeRow): PackType {
   const type: PackType = {
@@ -20,7 +21,8 @@ function typeFromRow(r: TypeRow): PackType {
     odds: parseOdds(parse(r.odds_json, null)) ?? DEFAULT_PACK_ODDS, teams: parse<string[]>(r.teams_json, []),
   };
   const rarity = r.rarity_json ? parseRarityOdds(parse(r.rarity_json, null)) : null;
-  return rarity ? { ...type, rarity } : type;
+  const players = parse<unknown>(r.players_json, null);
+  return { ...type, ...(rarity ? { rarity } : {}), ...(Array.isArray(players) ? { players: players.filter((x): x is string => typeof x === "string") } : {}) };
 }
 
 const short = (t: PackType): InventoryPack["type"] => ({ id: t.id, name: t.name, ...(t.art ? { art: t.art } : {}) });
@@ -124,14 +126,18 @@ export async function packTypes(env: Env, request: Request, rest: string): Promi
   // sem chances por raridade (null), toda carta do tipo tem a mesma chance
   const rarity = b?.rarity == null ? null : parseRarityOdds(b.rarity);
   if (b?.rarity != null && !rarity) return bad("as chances por raridade devem ser inteiros de 0 a 100 somando 100");
+  // cartas escolhidas a dedo; null = o pool vem dos times
+  const players = b?.players == null ? null : b.players;
+  if (players !== null && (!Array.isArray(players) || players.length > PACK_PLAYERS_MAX || !players.every((p) => typeof p === "string" && ID_RE.test(p)))) return bad("cartas inválidas");
   const teams = Array.isArray(b?.teams) ? b.teams : [];
   if (teams.length > 100 || !teams.every((t) => typeof t === "string" && ID_RE.test(t))) return bad("times inválidos");
   const art = b?.art;
   if (art !== undefined && art !== null && art !== "" && !(typeof art === "string" && /^\/img\/packs\/[\w.-]+$/.test(art))) return bad("arte inválida");
   const artKey = typeof art === "string" && art ? art.slice(5) : null;
   // 1 carta por pack por enquanto; o campo existe para crescer depois
-  await env.DB.prepare(`INSERT INTO pack_types (id, name, art_key, cards, odds_json, rarity_json, teams_json) VALUES (?, ?, ?, 1, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET name = excluded.name, art_key = excluded.art_key, odds_json = excluded.odds_json, rarity_json = excluded.rarity_json, teams_json = excluded.teams_json`)
-    .bind(id, name, artKey, JSON.stringify(odds), rarity ? JSON.stringify(rarity) : null, JSON.stringify(teams)).run();
+  await env.DB.prepare(`INSERT INTO pack_types (id, name, art_key, cards, odds_json, rarity_json, players_json, teams_json) VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET name = excluded.name, art_key = excluded.art_key, odds_json = excluded.odds_json, rarity_json = excluded.rarity_json,
+      players_json = excluded.players_json, teams_json = excluded.teams_json`)
+    .bind(id, name, artKey, JSON.stringify(odds), rarity ? JSON.stringify(rarity) : null, players ? JSON.stringify([...new Set(players)]) : null, JSON.stringify(teams)).run();
   return json({ ok: true });
 }

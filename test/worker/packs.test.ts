@@ -125,6 +125,24 @@ describe("Packs", () => {
     expect((await req(cookie, "/api/pack-types/final", "DELETE")).status).toBe(409);
   });
 
+  it("cartas escolhidas: valida, guarda e só elas saem, até exclusiva", async () => {
+    const { cookie } = await login("admvicli");
+    await env.DB.prepare("UPDATE players SET extra_json = '{\"exclusive\":true}' WHERE id = 'a'").run();
+    const body = { name: "Só A", odds: { alt: 80, signature: 15, special: 5 }, teams: [], players: ["a"] };
+    for (const players of ["a", [1], ["../x"]]) expect((await req(cookie, "/api/pack-types/so-a", "PUT", { ...body, players })).status).toBe(400);
+    expect((await req(cookie, "/api/pack-types/so-a", "PUT", body)).status).toBe(200);
+    const list = (await (await req(cookie, "/api/pack-types")).json()) as { id: string; players?: string[] }[];
+    expect(list.find((t) => t.id === "so-a")?.players).toEqual(["a"]);
+    for (let i = 0; i < 8; i++) {
+      const res = (await (await req(cookie, "/api/packs/test:so-a/open", "POST")).json()) as { cards: { id: string }[] };
+      expect(res.cards[0].id).toBe("a");
+    }
+    // salvar sem cartas volta para o pool por time
+    expect((await req(cookie, "/api/pack-types/so-a", "PUT", { ...body, players: undefined })).status).toBe(200);
+    const again = (await (await req(cookie, "/api/pack-types")).json()) as { id: string; players?: string[] }[];
+    expect(again.find((t) => t.id === "so-a")?.players).toBeUndefined();
+  });
+
   it("tipos de pack com chances por raridade: valida, guarda e o sorteio respeita", async () => {
     const { cookie } = await login("admvicli");
     const high = JSON.stringify({ MIR: 95, MAC: 95, SUP: 95, MOV: 95, POL: 95, CON: 95 });

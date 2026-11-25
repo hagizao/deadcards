@@ -1,4 +1,4 @@
-import { isAltHero, isMainCard } from "./cardKinds";
+import { isAltHero, isMainCard, isRetired } from "./cardKinds";
 import { RARITY_KEYS, type RarityKey } from "./rarityBands";
 import type { Player } from "./types";
 
@@ -27,6 +27,8 @@ export type PackType = {
   rarity?: RarityOdds;
   /** Times do pool; vazio = todos os times. */
   teams: string[];
+  /** Cartas escolhidas a dedo: só elas saem, até exclusiva e inativa, e os times deixam de valer. */
+  players?: string[];
 };
 
 /** Pack no inventário do usuário. `test` é o pack de teste do admin: abre sem gastar e sem gravar. */
@@ -37,9 +39,15 @@ export function packKind(p: Player): PackKind {
   return isMainCard(p) && !p.special ? "signature" : "special";
 }
 
-/** Cartas que podem sair: ativas, dos times do pack e que a pessoa ainda não tem (sem repetidas). */
-export function packPool(players: Player[], type: Pick<PackType, "teams">, owned: Set<string>): Player[] {
-  return players.filter((p) => !p.inactive && !p.exclusive && !owned.has(p.id) && (!type.teams.length || type.teams.includes(p.teamId)));
+/**
+ * Cartas que podem sair e que a pessoa ainda não tem (sem repetidas): as escolhidas a dedo
+ * (menos herói aposentado, que não pode mais ser dado) ou as ativas e não exclusivas dos times do pack.
+ */
+export function packPool(players: Player[], type: Pick<PackType, "teams" | "players">, owned: Set<string>): Player[] {
+  const picked = type.players && new Set(type.players);
+  return players.filter((p) => !owned.has(p.id) && (picked
+    ? picked.has(p.id) && !isRetired(p)
+    : !p.inactive && !p.exclusive && (!type.teams.length || type.teams.includes(p.teamId))));
 }
 
 /**
