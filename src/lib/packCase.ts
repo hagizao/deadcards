@@ -38,6 +38,10 @@ export type PackCase = {
   /** Walkout: a cena escurece para as pistas. */
   dim: () => void;
   beat: (i: number) => void;
+  /** Suspense antes da carta subir (luz, câmera e tremor crescendo) por `sec` segundos: sincroniza com o riser. */
+  charge: (sec: number) => Promise<void>;
+  /** Segundos entre chamar `rise` e a carta virar a carta real. */
+  riseTime: (lv: CaseLevel) => number;
   /** Herói de assinatura: uma faixa dourada se desenrola por dentro da tampa aberta. */
   ribbon: (text: string) => Promise<void>;
   /** A carta sobe e gira; resolve no ponto em que a carta 3D vira a carta real. */
@@ -910,9 +914,9 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
         .to(caseG.position, { x: -0.8, z: 0.15, duration: fall, ease: "none" }, 0.15)
         .to(drop, { y: 0, duration: fall, ease: "power2.in" }, 0.15)
         .to(caseG.rotation, { x: 0, y: 0.24, z: 0.14, duration: fall, ease: "power1.in" }, 0.15)
-        .add(() => { sound("arrive", { gain: 0.55 }); shakeCam(0.08, 0.15); puffEdge(-1, 0, LOW ? 4 : 7, 0.8); }, hit)
+        .add(() => { sound("arrive"); shakeCam(0.08, 0.15); puffEdge(-1, 0, LOW ? 4 : 7, 0.8); }, hit)
         .to(caseG.rotation, { z: 0, duration: slam - hit, ease: "power2.in" }, hit)
-        .add(() => { sound("arrive"); buzz([40, 30, 20]); shakeCam(0.24, 0.4); dustAll(LOW ? 4 : 7, 1); }, slam)
+        .add(() => { buzz([40, 30, 20]); shakeCam(0.24, 0.4); dustAll(LOW ? 4 : 7, 1); }, slam)
         .to(hinge.rotation, { x: -0.07, duration: 0.05, ease: "power2.out" }, slam)
         .to(hinge.rotation, { x: 0, duration: 0.3, ease: "bounce.out" }, slam + 0.05)
         .to(drop, { y: 0.04, duration: 0.06, ease: "power2.out" }, slam)
@@ -957,7 +961,7 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
         t.to(hinge.rotation, { x: -0.42, duration: 0.5, ease: "power2.out" }, 0.7)
           .to(CAM, { push: 1, duration: last - 0.5, ease: "power2.inOut" }, 0.7)
           .to(bloom, { strength: 0.45 + lv * 0.12, duration: last - 0.7 }, 0.7)
-          .add(() => { smokeOn = 1; sound("smoke", { gain: 0.5 }); sound("tension", { len: last - 0.7 }); }, 0.7);
+          .add(() => { smokeOn = 1; sound("smoke", { gain: 0.5 }); if (lv === 1) sound("tension", { len: last - 0.7 }); }, 0.7);
         for (let i = 0; i < pulses; i++) {
           const at = first + i * gap, f = i / (pulses - 1), end = i === pulses - 1;
           t.to(inner, { intensity: (6 + lv * 4) * (1 + f * 0.8), duration: 0.12, ease: "power2.out" }, at)
@@ -980,6 +984,19 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
       }
       await done(t);
       await openLid(lv);
+    },
+    charge(sec) {
+      const t = tl()
+        .to(light, { level: peakLight[2], duration: sec, ease: "power2.in" }, 0)
+        .to(inner, { intensity: peakInner[2], duration: sec, ease: "power2.in" }, 0)
+        .to(CAM, { push: 0.7, duration: sec, ease: "power1.in" }, 0)
+        .to(bloom, { strength: 0.75, duration: sec, ease: "power2.in" }, 0)
+        .to({}, { duration: sec }, 0);
+      if (!reduce) for (let k = 0.3; k < sec - 0.1; k += 0.3) t.add(() => shakeCam(0.015 + 0.07 * (k / sec), 0.3), k);
+      return done(t);
+    },
+    riseTime(lv) {
+      return reduce ? 0 : Math.max(0.7, 0.45 + 0.5 + lv * 0.35);
     },
     dim() {
       tl().to(light, { level: 0.25, duration: dur(0.5) }, 0).to(inner, { intensity: 2, duration: dur(0.5) }, 0);

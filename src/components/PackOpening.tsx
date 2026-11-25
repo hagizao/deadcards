@@ -7,7 +7,7 @@ import { api, useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
 import type { CaseLevel, CaseLook, CardSpot, PackCase } from "../lib/packCase";
 import type { InventoryPack, PackKind } from "../lib/packs";
-import { isMuted, playPackSound, playReveal, preloadPackSounds, setMuted, type RevealLevel } from "../lib/packSounds";
+import { RISER_HIT, isMuted, playPackSound, playReveal, preloadPackSounds, setMuted, type RevealLevel, type SoundHandle } from "../lib/packSounds";
 import { getCardTier, levelOf } from "../lib/rarity";
 import { Card } from "./Card";
 import { TeamLogo } from "./TeamLogo";
@@ -115,6 +115,8 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
   const kase = useRef<PackCase | null>(null);
   const shot = useRef<HTMLDivElement>(null);
   const front = useRef<Promise<void> | null>(null);
+  const riser = useRef<SoundHandle | null>(null);
+  useEffect(() => () => riser.current?.stop(), []);
   const server = useRef<Promise<Drawn | null> | null>(null);
 
   const card = result ? players.find((p) => p.id === result.id) : undefined;
@@ -185,12 +187,21 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     // especial: a luz alterna entre as duas cores da moldura
     const look: CaseLook | null = tr && lvl !== "base" ? { c: tr.c, hi: tr.hi, alt: lvl === "special" ? { c: tr.hi, hi: tr.c } : undefined } : null;
     setStage("show");
+    // Eternus: o riser começa com a fresta e o estouro dele cai na hora em que a carta aparece
+    const t0 = performance.now();
+    if (lvl === "eternus") riser.current = playPackSound("riser-eternus");
     await c.crack(lv, look);
     // assinatura logo depois da cor da luz: a faixa dourada se estende dentro da tampa
     if (drawn.kind === "signature") await c.ribbon(t.signature);
     if (lvl !== "base") await walkout(lv);
     // a frente 3D costuma estar pronta; se o PNG atrasar, a carta gira só com o verso
     await Promise.race([front.current, new Promise((r) => setTimeout(r, 1500))]);
+    if (lvl === "eternus") {
+      // posição real do áudio (cobre o atraso para começar); sem som, o relógio
+      const at = riser.current?.position() ?? (performance.now() - t0) / 1000;
+      const left = RISER_HIT - c.riseTime(lv) - at;
+      if (left > 0.05) await c.charge(left);
+    }
     const s = await c.rise(lv);
     place(s);
     playReveal(lvl);
@@ -214,7 +225,7 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
         reduce,
         latchButtons: latchBtns.current,
         onLatch: (i, r) => onLatch(i, r),
-        onSound: (id, o) => playPackSound(id, o),
+        onSound: (id, o) => { playPackSound(id, o); },
       }))
       .catch(() => null)
       .then((c) => {

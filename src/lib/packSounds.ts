@@ -4,7 +4,7 @@
  *
  * Para trocar um som: salve o arquivo como `src/assets/sounds/pack/<id>.mp3` (ou .ogg/.wav). Nada mais muda:
  * o arquivo entra no build sozinho e passa na frente do som sintetizado. Sem arquivo, toca o `synth`.
- * Os arquivos atuais são CC0 do Kenney (kenney.nl); a licença fica junto deles.
+ * Os sons com arquivo vieram do Hagizao; rays e bell ainda são CC0 do Kenney (kenney.nl, licença junto deles).
  *
  * Só tocam depois de um toque (o navegador exige gesto) e respeitam o mudo salvo no aparelho.
  */
@@ -91,22 +91,22 @@ function riser(len: number, gain: number) {
  * `when` diz o momento; `volume` é o volume base (0–1).
  */
 export const PACK_SOUNDS = {
-  arrive: { when: "A maleta cai e bate na mesa", volume: 1, synth: ({ gain }) => { tone(140, 42, 0.3, 0.9 * gain); noise(0.16, 480, 0.7 * gain, 0.8); } },
+  arrive: { when: "A maleta é jogada e bate na mesa (toca uma vez, no primeiro impacto)", volume: 1, synth: ({ gain }) => { tone(140, 42, 0.3, 0.9 * gain); noise(0.16, 480, 0.7 * gain, 0.8); } },
   latch: { when: "Cada trava solta (duas vezes); mais baixo, o rebite que prende a faixa de assinatura", volume: 1, synth: ({ gain }) => { noise(0.08, 2400, 0.9 * gain, 2); tone(180, 70, 0.12, 0.5 * gain); } },
-  creak: { when: "A tampa abre uma fresta", volume: 1, synth: ({ gain }) => tone(90, 140, 0.5, 0.12 * gain, "sawtooth") },
-  tension: { when: "Rara: zumbido subindo enquanto a luz pulsa na fresta", volume: 1, synth: ({ gain, len }) => riser(len, 0.16 * gain) },
+  creak: { when: "Primeiro som quando a mala abre: a tampa abre uma fresta", volume: 1, synth: ({ gain }) => tone(90, 140, 0.5, 0.12 * gain, "sawtooth") },
+  "riser-eternus": { when: "Eternus: riser do começo da fresta até a revelação; o estouro (13,5 s) cai quando a carta aparece", volume: 0.9 },
+  tension: { when: "Ascendant e especial: zumbido subindo enquanto a luz pulsa na fresta", volume: 1, synth: ({ gain, len }) => riser(len, 0.16 * gain) },
   pulse: { when: "Rara: cada pulso de luz na fresta (cada um mais forte)", volume: 1, synth: ({ gain }) => { tone(55 + gain * 25, 34, 0.32, 0.75 * gain); noise(0.05, 700, 0.25 * gain, 1); } },
   rays: { when: "Rara: no último pulso a luz troca para a cor da raridade", volume: 0.7 },
   smoke: { when: "Rara: fumaça escapando pela fresta e espalhando quando a tampa abre", volume: 1, synth: ({ gain }) => noise(1.3, 1800, 0.3 * gain, 0.5, 400) },
   "lid-open": { when: "Comum: a tampa abre", volume: 1, synth: ({ gain }) => { tone(80, 120, 0.6, 0.12 * gain, "sawtooth"); noise(0.3, 900, 0.15 * gain, 0.6); } },
   "lid-boom": { when: "Rara: a tampa estoura", volume: 1, synth: ({ gain }) => { tone(120, 30, 0.9, 0.9 * gain); noise(0.6, 600, 0.5 * gain, 0.5); } },
-  beat: { when: "Walkout: cada pista (região, posição, time)", volume: 1, synth: ({ gain }) => { tone(140, 50, 0.18, 0.8 * gain); noise(0.06, 900, 0.5 * gain, 1); } },
+  beat: { when: "Walkout: hit de cada pista (região, posição, time), 3 vezes", volume: 1, synth: ({ gain }) => { tone(140, 50, 0.18, 0.8 * gain); noise(0.06, 900, 0.5 * gain, 1); } },
   signature: { when: "Assinatura: a faixa dourada se estende dentro da tampa (logo depois da cor da luz)", volume: 0.6 },
   spin: { when: "A carta sobe girando", volume: 1, synth: ({ gain, len }) => noise(Math.max(0.3, len), 500, 0.35 * gain, 0.7, 3000) },
-  reveal: { when: "A carta aparece (toda abertura)", volume: 0.8 },
-  "jingle-base": { when: "Jingle da carta comum, junto com reveal", volume: 0.7 },
-  "jingle-rare": { when: "Jingle da carta rara (Ascendant ou especial), junto com reveal", volume: 0.85 },
-  "jingle-epic": { when: "Jingle da Eternus, junto com reveal", volume: 0.9 },
+  reveal: { when: "Carta sem walkout (comum) aparece", volume: 0.9 },
+  "reveal-walkout": { when: "Carta com walkout (Ascendant, especial, Eternus) aparece", volume: 0.9 },
+  crowd: { when: "Plateia reagindo, junto com reveal-walkout", volume: 0.6 },
   bell: { when: "Eternus: sino na troca de cor e na revelação", volume: 0.5 },
   shockwave: { when: "Eternus: onda de choque na mesa quando a carta aparece", volume: 1, synth: ({ gain }) => { tone(80, 24, 1.4, 0.9 * gain); noise(1, 300, 0.6 * gain, 0.5, 90); } },
 } satisfies Record<string, SoundSpec>;
@@ -146,11 +146,15 @@ export function preloadPackSounds() {
   if (typeof Audio !== "undefined" && !isMuted()) (Object.keys(PACK_SOUNDS) as PackSoundId[]).forEach(load);
 }
 
-/** Toca um som do catálogo (arquivo se houver, senão o sintetizado). Devolve como cortar antes do fim. */
-export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1 }: PlayOpts = {}): () => void {
-  if (isMuted()) return () => {};
+/** Som tocando: `stop` corta; `position` diz em que segundo do arquivo está (null sem arquivo ou antes de começar). */
+export type SoundHandle = { stop: () => void; position: () => number | null };
+
+/** Toca um som do catálogo (arquivo se houver, senão o sintetizado). */
+export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1 }: PlayOpts = {}): SoundHandle {
+  if (isMuted()) return { stop: () => {}, position: () => null };
   const spec: SoundSpec = PACK_SOUNDS[id];
   let stop: (() => void) | void;
+  let el: HTMLAudioElement | null = null;
   let cancelled = false;
   const go = () => {
     if (cancelled) return;
@@ -158,20 +162,22 @@ export function playPackSound(id: PackSoundId, { delay = 0, gain = 1, len = 1 }:
     if (file) {
       const a = file.cloneNode() as HTMLAudioElement;
       a.volume = Math.min(1, spec.volume * gain);
-      a.play().catch(() => { /* autoplay bloqueado: fica sem som */ });
+      a.play().then(() => { el = a; }, () => { /* autoplay bloqueado: fica sem som */ });
       stop = () => a.pause();
     } else if (spec.synth && typeof AudioContext !== "undefined") {
       try { stop = spec.synth({ gain: spec.volume * gain, len }); } catch { /* sem áudio: segue sem som */ }
     }
   };
   if (delay > 0) setTimeout(go, delay * 1000); else go();
-  return () => { cancelled = true; stop?.(); };
+  return { stop: () => { cancelled = true; stop?.(); }, position: () => (el && !el.paused ? el.currentTime : null) };
 }
 
-/** Revelação: cartas abrindo + jingle da raridade (Eternus ganha sino). */
+/** Segundo do riser da Eternus em que vem o estouro: a carta aparece nesse instante. */
+export const RISER_HIT = 13.5;
+
+/** Revelação: comum tem o som dela; carta com walkout ganha o som final e a plateia. */
 export function playReveal(level: RevealLevel) {
-  playPackSound("reveal");
-  if (level === "base") playPackSound("jingle-base", { delay: 0.1 });
-  else if (level === "eternus") { playPackSound("jingle-epic", { delay: 0.1 }); playPackSound("bell", { delay: 0.12 }); }
-  else playPackSound("jingle-rare", { delay: 0.1 });
+  if (level === "base") return playPackSound("reveal");
+  playPackSound("reveal-walkout");
+  playPackSound("crowd", { delay: 0.25 });
 }
