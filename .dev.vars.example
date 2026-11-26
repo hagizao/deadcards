@@ -1,4 +1,5 @@
-BETTER_AUTH_SECRET=troque-por-uma-string-aleatoria-de-32-ou-mais-caracteres
+# gere com: openssl rand -base64 32 (o worker recusa segredo vazio ou com menos de 32 caracteres)
+BETTER_AUTH_SECRET=
 TWITCH_CLIENT_ID=
 TWITCH_CLIENT_SECRET=
 GOOGLE_CLIENT_ID=

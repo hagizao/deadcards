@@ -3,15 +3,17 @@ import type { Env } from "./worker";
 import { syncHandle } from "./handles";
 
 export function createAuth(env: Env, request: Request) {
+  if ((env.BETTER_AUTH_SECRET ?? "").length < 32) throw new Error("BETTER_AUTH_SECRET ausente ou com menos de 32 caracteres");
   return betterAuth({
     baseURL: new URL(request.url).origin,
     secret: env.BETTER_AUTH_SECRET,
     database: env.DB,
     // nome e e-mail vêm do provedor de login; o usuário não edita
     disabledPaths: ["/update-user", "/change-email", "/link-social"],
+    // só o fluxo com redirect: o login por idToken guardaria um accessToken que o cliente escolhe
     socialProviders: {
-      twitch: { clientId: env.TWITCH_CLIENT_ID, clientSecret: env.TWITCH_CLIENT_SECRET },
-      google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET },
+      twitch: { clientId: env.TWITCH_CLIENT_ID, clientSecret: env.TWITCH_CLIENT_SECRET, disableIdTokenSignIn: true },
+      google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET, disableIdTokenSignIn: true },
     },
     databaseHooks: {
       account: {
