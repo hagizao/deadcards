@@ -1,5 +1,5 @@
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "motion/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { DataProvider, useData } from "./lib/data";
 import { hexToRgba } from "./lib/cards";
 import { Home } from "./views/Home";
@@ -21,6 +21,8 @@ import { Profile } from "./views/Profile";
 import { easeOut } from "./lib/ui";
 import { Settings } from "./views/Settings";
 import { profileUrl } from "./lib/profile";
+import { Intro } from "./views/Intro";
+import { markIntroSeen, shouldShowIntro } from "./lib/intro";
 
 const REPO = "https://github.com/hagizao/deadcards";
 
@@ -226,11 +228,18 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <LangProvider>
         <DataProvider>
-          {location.pathname === "/login" ? <><Background /><Login /></> : <Shell />}
+          {location.pathname === "/login" ? <><Background /><Login /></> : <><Shell /><EntryGate /></>}
         </DataProvider>
       </LangProvider>
     </MotionConfig>
   );
+}
+
+/** Tela de entrada por cima do site (que carrega por baixo); some com fade e não volta na mesma sessão. */
+function EntryGate() {
+  const [open, setOpen] = useState(shouldShowIntro);
+  const done = useCallback(() => { markIntroSeen(); setOpen(false); }, []);
+  return open ? <Intro onDone={done} /> : null;
 }
 
 function Background() {
