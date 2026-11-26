@@ -11,7 +11,7 @@ export default defineConfig(async () => ({
           TEST_MIGRATIONS: await readD1Migrations(path.join(__dirname, "migrations")),
           BETTER_AUTH_SECRET: "test-secret-test-secret-test-secret",
           TWITCH_CLIENT_ID: "x", TWITCH_CLIENT_SECRET: "x", GOOGLE_CLIENT_ID: "x", GOOGLE_CLIENT_SECRET: "x",
-          ADMINS: "admvicli",
+          ADMINS: "190835130",
         },
       },
     }),

@@ -13,14 +13,14 @@ async function savePlayer(cookie: string, fg: unknown) {
 
 describe("Camadas da arte", () => {
   it("salva a camada da frente do R2", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     expect((await savePlayer(cookie, { url: "/img/players/fg.png", zoom: 120, x: 40, y: 60 })).status).toBe(200);
     const row = await env.DB.prepare("SELECT extra_json FROM players WHERE id = 'p1'").first<{ extra_json: string }>();
     expect(JSON.parse(row!.extra_json).art.fg).toEqual({ url: "/img/players/fg.png", zoom: 120, x: 40, y: 60 });
   });
 
   it("recusa camada fora do R2", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     expect((await savePlayer(cookie, { url: "https://evil.example/x.png" })).status).toBe(400);
     expect((await savePlayer(cookie, "x")).status).toBe(400);
   });

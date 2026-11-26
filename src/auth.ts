@@ -7,7 +7,7 @@ export function createAuth(env: Env, request: Request) {
     baseURL: new URL(request.url).origin,
     secret: env.BETTER_AUTH_SECRET,
     database: env.DB,
-    // admin depende do nome vindo do Twitch, então o usuário não pode trocar o nome
+    // nome e e-mail vêm do provedor de login; o usuário não edita
     disabledPaths: ["/update-user", "/change-email", "/link-social"],
     socialProviders: {
       twitch: { clientId: env.TWITCH_CLIENT_ID, clientSecret: env.TWITCH_CLIENT_SECRET },
@@ -28,10 +28,11 @@ export function createAuth(env: Env, request: Request) {
 export async function currentUser(env: Env, request: Request) {
   const session = await createAuth(env, request).api.getSession({ headers: request.headers });
   if (!session) return null;
-  const admins = env.ADMINS.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const admins = env.ADMINS.split(",").map((s) => s.trim()).filter(Boolean);
   const { id, name, image } = session.user;
-  // contas com o mesmo e-mail se ligam, então só vale o nome de quem foi criado pelo Twitch (o nome vem de lá)
-  const admin = admins.includes(name.toLowerCase()) &&
-    (await env.DB.prepare("SELECT providerId FROM account WHERE userId = ? ORDER BY createdAt LIMIT 1").bind(id).first<string>("providerId")) === "twitch";
+  // ADMINS guarda ids do Twitch: nome e ordem das contas o usuário controla (nome do Google, unlink)
+  const admin = admins.length > 0 && !!(await env.DB.prepare(
+    `SELECT 1 FROM account WHERE userId = ? AND providerId = 'twitch' AND accountId IN (${admins.map(() => "?").join(",")})`,
+  ).bind(id, ...admins).first());
   return { id, name, image: image ?? null, admin };
 }

@@ -20,7 +20,7 @@ async function seedTeams() {
 
 describe("guardas do admin", () => {
   it("não apaga time com versões de jogador em outro time", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     await seedTeams();
     const res = await req(cookie, "/api/teams/ta", "DELETE");
     expect(res.status).toBe(409);
@@ -29,7 +29,7 @@ describe("guardas do admin", () => {
   });
 
   it("não apaga time que está em um tipo de pack", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     await env.DB.prepare("INSERT INTO teams (id, name, tag) VALUES ('tp', 'P', 'PP')").run();
     await env.DB.prepare("INSERT INTO pack_types (id, name, odds_json, teams_json) VALUES ('only-tp', 'Só P', '{\"alt\":80,\"signature\":15,\"special\":5}', '[\"tp\"]')").run();
     const res = await req(cookie, "/api/teams/tp", "DELETE");
@@ -38,7 +38,7 @@ describe("guardas do admin", () => {
   });
 
   it("recusa faixas de raridade malformadas e aceita as válidas", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     for (const tierConfig of [[null], "x", [{ key: "S" }], [{ key: "S", min: "88" }]]) {
       expect((await req(cookie, "/api/settings/app", "PUT", { tierConfig })).status).toBe(400);
     }
@@ -46,7 +46,7 @@ describe("guardas do admin", () => {
   });
 
   it("URL com escape malformado dá 400, não 500", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     expect((await SELF.fetch("http://test/img/%E0")).status).toBe(400);
     expect((await req(cookie, "/api/players/%E0", "PUT", {})).status).toBe(400);
     expect((await req(cookie, "/api/players/%E0/promote", "POST")).status).toBe(400);

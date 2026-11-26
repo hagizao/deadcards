@@ -99,7 +99,7 @@ O visual é o produto. Mudança de UI segue estas regras; código antigo que nã
 
 ## Backend e dados
 
-- Toda rota que altera dados exige admin via `currentUser(...).admin`. Admins são definidos em `ADMINS` no `wrangler.jsonc`.
+- Toda rota que altera dados exige admin via `currentUser(...).admin`. Admins são definidos em `ADMINS` no `wrangler.jsonc`, pelo id numérico do Twitch (nunca pelo nome).
 - Valide entrada em toda API de escrita e upload.
 - SQL sempre com bind (`prepare(...).bind(...)`), nunca concatenando valores.
 - Schema muda só por migration nova em `migrations/` (`000N_descricao.sql`). Nunca edite migration já aplicada.
