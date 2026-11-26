@@ -207,7 +207,7 @@ function ArtCreditLine({ credit, label }: { credit: ArtCredit; label: string }) 
   return (
     <p className="mt-1 text-xs text-zinc-400">
       {label}{" "}
-      {credit.url ? (
+      {credit.url && /^https?:\/\//i.test(credit.url) ? (
         <a href={credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm font-bold text-zinc-100 underline decoration-zinc-500 underline-offset-2 transition hover:decoration-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">
           {credit.name}
         </a>
