@@ -28,11 +28,20 @@ const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "altHero", "inactive", "exclusive", "art"];
 const ID_RE = /^[\w-]{1,64}$/;
 
-const keyOf = (url: unknown) => (typeof url === "string" && url.startsWith("/img/") ? url.slice(5) : null);
+const IMG_KEY = /^[a-z0-9/_.-]+$/i;
+const validKey = (key: string) => IMG_KEY.test(key) && !key.includes("..");
+const keyOf = (url: unknown) => (typeof url === "string" && url.startsWith("/img/") && validKey(url.slice(5)) ? url.slice(5) : null);
 const decode = (s: string) => { try { return decodeURIComponent(s); } catch { return null; } };
 const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
 // `code` é opcional: rotas que o front traduz mandam um código estável além da mensagem em pt.
 const bad = (msg: string, status = 400, code?: string) => Response.json({ error: msg, code }, { status });
+
+function crossSite(request: Request, url: URL) {
+  if (request.method === "GET" || request.method === "HEAD") return false;
+  const origin = request.headers.get("origin");
+  if (origin) return origin !== url.origin;
+  return request.headers.get("sec-fetch-site") === "cross-site";
+}
 
 const CACHE_TTL_SECONDS = 60 * 60 * 6;
 const ALLOWED_PATHS = ["/v1/assets/heroes", "/v1/analytics/hero-stats", "/v1/patches"];
@@ -64,7 +73,7 @@ async function cachedFetch(env: Env, path: string): Promise<Response> {
   const upstream = await fetch(env.DEADLOCK_API_BASE + path);
   if (!upstream.ok) {
     if (row) return new Response(row.body, { headers: { "content-type": "application/json", "x-cache": "stale" } });
-    return upstream;
+    return Response.json({ error: "upstream unavailable" }, { status: 502 });
   }
   const body = await upstream.text();
   await env.DB.prepare(UPSERT_CACHE).bind(path, body, now).run();
@@ -73,9 +82,13 @@ async function cachedFetch(env: Env, path: string): Promise<Response> {
 
 async function syncFromDeadlockApi(env: Env): Promise<void> {
   for (const path of ALLOWED_PATHS) {
-    const res = await fetch(env.DEADLOCK_API_BASE + path);
-    if (!res.ok) continue;
-    await env.DB.prepare(UPSERT_CACHE).bind(path, await res.text(), Math.floor(Date.now() / 1000)).run();
+    try {
+      const res = await fetch(env.DEADLOCK_API_BASE + path);
+      if (!res.ok) continue;
+      await env.DB.prepare(UPSERT_CACHE).bind(path, await res.text(), Math.floor(Date.now() / 1000)).run();
+    } catch (e) {
+      console.error("deadlock sync failed", path, e);
+    }
   }
 }
 
@@ -112,6 +125,7 @@ async function serveImage(env: Env, key: string): Promise<Response> {
   obj.writeHttpMetadata(headers);
   headers.set("etag", obj.httpEtag);
   headers.set("cache-control", "public, max-age=86400");
+  headers.set("x-content-type-options", "nosniff");
   return new Response(obj.body, { headers });
 }
 
@@ -351,6 +365,8 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/auth/")) return createAuth(env, request).handler(request);
+    // não depende do SameSite padrão do Better Auth; sem Origin nem Sec-Fetch-Site não é navegador, logo não é CSRF
+    if (url.pathname.startsWith("/api/") && crossSite(request, url)) return bad("origem inválida", 403, "origin");
     if (url.pathname === "/api/me") {
       const user = await currentUser(env, request);
       if (!user) return Response.json(null);
@@ -408,7 +424,7 @@ export default {
     }
     if (url.pathname.startsWith("/img/")) {
       const key = decode(url.pathname.slice(5));
-      if (key === null || !/^[a-z0-9/_.-]+$/i.test(key) || key.includes("..")) return new Response("bad key", { status: 400 });
+      if (key === null || !validKey(key)) return new Response("bad key", { status: 400 });
       return serveImage(env, key);
     }
     return env.ASSETS.fetch(request);

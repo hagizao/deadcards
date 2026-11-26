@@ -17,15 +17,17 @@ export async function profileCard(env: Env, request: Request): Promise<Response>
   if (!user) return json({ code: "login" }, 401);
   if (request.method === "GET") return json(await readProfile(env, user.id));
   if (request.method !== "PUT") return json({ code: "method" }, 405);
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return json({ code: "origin" }, 403);
 
   const card = parseProfileCard(await request.json().catch(() => null));
   if (!card) return json({ code: "invalid_card" }, 400);
-  await env.DB.prepare(`INSERT INTO profile_cards (user_id, snapshot, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT(user_id) DO UPDATE SET snapshot = excluded.snapshot, updated_at = excluded.updated_at
-    WHERE profile_cards.snapshot <> excluded.snapshot`)
-    .bind(user.id, JSON.stringify(card), Date.now()).run();
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO profile_cards (user_id, snapshot, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET snapshot = excluded.snapshot, updated_at = excluded.updated_at
+      WHERE profile_cards.snapshot <> excluded.snapshot`).bind(user.id, JSON.stringify(card), Date.now()),
+    // o histórico só mostra as últimas HISTORY_LIMIT; o resto não fica crescendo no D1
+    env.DB.prepare(`DELETE FROM profile_card_history WHERE user_id = ?1
+      AND id NOT IN (SELECT id FROM profile_card_history WHERE user_id = ?1 ORDER BY id DESC LIMIT ?2)`).bind(user.id, HISTORY_LIMIT),
+  ]);
   return json(await readProfile(env, user.id));
 }
 
@@ -61,8 +63,6 @@ export async function favorite(env: Env, request: Request, playerId: string): Pr
   const user = await currentUser(env, request);
   if (!user) return json({ code: "login" }, 401);
   if (request.method !== "PUT" && request.method !== "DELETE") return json({ code: "method" }, 405);
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return json({ code: "origin" }, 403);
 
   if (request.method === "DELETE") {
     await env.DB.prepare("DELETE FROM user_favorites WHERE user_id = ? AND player_id = ?").bind(user.id, playerId).run();
