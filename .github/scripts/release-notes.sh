@@ -23,7 +23,7 @@ done < <(git log "$range" --no-merges --format='%H%x09%ae%x09%an%x09%s')
 [ "$count" -gt 0 ] || echo "- Sem commits novos"
 
 issues=$(gh issue list --state closed --limit 100 --search "closed:>$since reason:completed" \
-  --json number,title,author --jq '.[] | "- #\(.number) \(.title) (reportada por @\(.author.login))"')
+  --json number,title,author --jq '.[] | "- #\(.number) \(.title | gsub("@"; "@​") | gsub("[\\[\\]<>]"; "")) (reportada por @\(.author.login))"')
 if [ -n "$issues" ]; then
   echo
   echo "## Issues resolvidas"
