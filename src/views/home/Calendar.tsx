@@ -8,6 +8,7 @@ import { Reveal } from "../../components/Motion";
 import { Icon } from "../../components/Icon";
 import { TournamentLogo } from "../../components/TournamentLogo";
 import type { ScheduleEntry, Tournament } from "../../lib/types";
+import { dateOf, dayKey as keyOf, dayOf, groupByDay, monthCells, sameDay, weekdayNames, type Day } from "../../lib/calendar";
 
 const S = strings({
   pt: {
@@ -31,12 +32,6 @@ const S = strings({
 });
 
 type Ev = ScheduleEntry & { t: Tournament };
-type Day = { y: number; m: number; d: number };
-/** Dia no fuso de quem visita: o mesmo campeonato pode cair em dias diferentes para cada pessoa. */
-const dayOf = (date: Date): Day => ({ y: date.getFullYear(), m: date.getMonth(), d: date.getDate() });
-const keyOf = ({ y, m, d }: Day) => `${y}-${m}-${d}`;
-const dateOf = ({ y, m, d }: Day) => new Date(y, m, d);
-const sameDay = (a: Day, b: Day) => a.y === b.y && a.m === b.m && a.d === b.d;
 // até 3 logos por dia no quadro, uma por campeonato; o resto vira "+n" (o painel do dia mostra cada edição)
 const LOGOS = 3;
 /** Nome por extenso da edição: "Deadlock Night Shift" + "EU #67". */
@@ -66,23 +61,16 @@ export function Calendar() {
   const events: Ev[] = schedule
     .flatMap((s) => { const tr = tournaments.find((x) => x.id === s.tournamentId); return tr ? [{ ...s, t: tr }] : []; })
     .sort((a, b) => a.startsAt - b.startsAt);
-  const byDay = new Map<string, Ev[]>();
-  for (const ev of events) {
-    const k = keyOf(dayOf(new Date(ev.startsAt * 1000)));
-    byDay.set(k, [...(byDay.get(k) ?? []), ev]);
-  }
+  const byDay = groupByDay(events);
 
   const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
   const monthName = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(new Date(month.y, month.m, 1));
   const longDay = new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long" });
   const shortDay = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" });
-  // 29/11/2026 é um domingo: daí saem os nomes dos dias da semana, começando no domingo
-  const weekdays = Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(locale, { weekday: "short" }).format(new Date(2026, 10, 29 + i)));
+  const weekdays = weekdayNames(locale);
 
   const first = new Date(month.y, month.m, 1);
-  const lead = first.getDay();
-  const weeks = Math.ceil((lead + new Date(month.y, month.m + 1, 0).getDate()) / 7);
-  const cells = Array.from({ length: weeks * 7 }, (_, i) => dayOf(new Date(month.y, month.m, 1 - lead + i)));
+  const cells = monthCells(month.y, month.m);
 
   const shift = (dir: number) => setMonth(({ y, m }) => { const d = new Date(y, m + dir, 1); return { y: d.getFullYear(), m: d.getMonth(), dir }; });
   const pick = (day: Day) => {
@@ -167,7 +155,7 @@ export function Calendar() {
             </div>
           </div>
           <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold tracking-wider text-zinc-500 uppercase" aria-hidden="true">
-            {weekdays.map((w) => <span key={w}>{w.replace(".", "")}</span>)}
+            {weekdays.map((w) => <span key={w}>{w}</span>)}
           </div>
           <AnimatePresence mode="wait" initial={false} custom={month.dir}>
             <motion.div
