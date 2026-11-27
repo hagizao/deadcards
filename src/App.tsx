@@ -303,8 +303,10 @@ function Shell() {
       </header>
 
       <ReducedMotionNotice />
-      {/* clip no eixo x: a tela que entra deslizando de lado não pode criar rolagem horizontal no celular */}
-      <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 sm:px-6 sm:py-10 lg:px-8" style={areaStyle(TAB_AREA[tab])}>
+      {/* clip no eixo x na largura da janela (não na do conteúdo): a tela que entra deslizando de lado não cria rolagem
+          horizontal no celular, e brilhos e névoas que passam da coluna somem no fade deles em vez de num corte reto */}
+      <div className="overflow-x-clip">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8" style={areaStyle(TAB_AREA[tab])}>
         <motion.div
             key={tab}
             initial={{ opacity: 0, x: shown.dir * 24 }}
@@ -324,6 +326,7 @@ function Shell() {
             {tab === "feedback" && <Feedback />}
           </motion.div>
       </main>
+      </div>
 
       <footer className="mt-6 border-t border-zinc-200/10 pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-zinc-400 sm:px-6 lg:px-8">
