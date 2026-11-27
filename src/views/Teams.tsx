@@ -7,7 +7,7 @@ import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
 import type { Team } from "../lib/types";
 import { Card } from "../components/Card";
-import { easeOut, pill, sectionTitle } from "../lib/ui";
+import { easeOut, pageTitle, pill, sectionTitle } from "../lib/ui";
 import { Icon } from "../components/Icon";
 import { cascade, useSettled } from "../lib/motion";
 import { useRail } from "../lib/rail";
@@ -83,8 +83,7 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
     <section className="flex flex-col gap-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-col gap-1.5">
-          {/* pageTitle 50% maior nesta tela */}
-          <h1 className="font-display text-4xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-5xl">{t.title}</h1>
+          <h1 className={pageTitle}>{t.title}</h1>
           <p className="text-xs text-zinc-400 sm:text-sm">{t.hint}</p>
         </div>
         <button type="button" className={pill(size === "medium")} aria-pressed={size === "medium"} onClick={() => setSize((s) => (s === "team" ? "medium" : "team"))}>
@@ -117,7 +116,8 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
                   </div>
                   <AnimatePresence initial={false}>
                     {open && (
-                      <motion.div id={`region-${i}`} className="overflow-y-clip [overflow-clip-margin:6px]" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      // corta só enquanto abre e fecha; parado, o brilho do logo escolhido passa livre
+                      <motion.div id={`region-${i}`} initial={{ height: 0, opacity: 0, overflowY: "clip" }} animate={{ height: "auto", opacity: 1, transitionEnd: { overflowY: "visible" } }} exit={{ height: 0, opacity: 0, overflowY: "clip" }}
                         transition={still ? { duration: 0 } : { duration: 0.22, ease: easeOut }}>
                         {list.length
                           ? <ul className="flex flex-wrap gap-1">{list.map(logo)}</ul>
@@ -175,7 +175,7 @@ function TeamPanel({ team, ovr, size, onOpenCard }: { team: Team; ovr: { rounded
   return (
     <motion.section
       aria-labelledby={`team-${team.id}`}
-      className={`${regionAccentClass(team.region)} flex flex-col gap-6`}
+      className={`${regionAccentClass(team.region)} flex flex-col gap-2`}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
@@ -196,8 +196,8 @@ function TeamPanel({ team, ovr, size, onOpenCard }: { team: Team; ovr: { rounded
         <RailArrows rail={rail} prev={t.prevCards} next={t.nextCards} />
       </div>
       {roster.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{t.emptyRoster}</p>}
-      {/* corta só na horizontal: a carta sobe e brilha no hover sem ser cortada em cima e embaixo */}
-      <div ref={setRowEl} className={`${rail.fade} overflow-x-clip pt-2 pb-6`}>
+      {/* o fade das pontas é uma máscara e corta tudo fora da caixa: o padding em volta dá lugar ao brilho e à subida do hover (useRail mede só a área de dentro) */}
+      <div ref={setRowEl} className={`${rail.fadeStrong} overflow-x-clip px-6 pt-6 pb-10`}>
         <motion.ul className="flex gap-6" {...rail.track}>
           {roster.map((p, i) => (
             <motion.li key={p.id} className="shrink-0" inert={rail.hidden(i) || undefined} initial={{ opacity: 0, y: 12, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: Math.min(i, 5) * 0.04, duration: 0.25, ease: easeOut }}>

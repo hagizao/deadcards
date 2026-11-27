@@ -1,9 +1,8 @@
 import { motion } from "motion/react";
 import type { Team } from "../lib/types";
 import { useData } from "../lib/data";
-import { getPlayerOvr, isMainCard, regionClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
+import { getPlayerOvr, isMainCard, regionAccentClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
-import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
 import { Icon, type IconName } from "../components/Icon";
@@ -104,7 +103,8 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
           {ranked.length > RANKING && <button type="button" className={pill(false)} onClick={() => onNavigate("teams")}>{t.allTeams(ranked.length)}</button>}
         </Reveal>
         {ranked.length === 0 && <div className="py-6 text-sm text-zinc-300">{t.none}</div>}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {/* sem caixas: linhas separadas por divisória fina, como no Explore; a cor da região fica no traço sob o número */}
+        <div className="grid grid-cols-1 divide-y divide-zinc-200/10 lg:grid-cols-2 lg:gap-x-8 lg:divide-y-0 lg:[&>*:nth-child(n+3)]:border-t lg:[&>*:nth-child(n+3)]:border-zinc-200/10">
           {ranked.slice(0, RANKING).map((r, idx) => (
             <TeamRow
               key={r.team.id}
@@ -173,16 +173,15 @@ function TeamRow({ r, idx, tier, meta, onOpen }: {
       transition={{ delay: Math.min(idx, 8) * 0.05, duration: 0.25, ease: easeOut }}
       whileHover="hover"
       variants={{ hover: { y: -2 } }}
-      className={`home-team-box noir-glass team-region-card ${regionClass(r.team.region)} relative flex cursor-pointer items-center gap-4 overflow-hidden rounded-2xl p-4 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 sm:gap-5 sm:px-5`}
+      className={`${regionAccentClass(r.team.region)} flex min-h-28 cursor-pointer items-center gap-4 rounded-xl p-4 text-left transition-colors hover:bg-zinc-100/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10 sm:gap-5 sm:px-5`}
     >
-      <RegionBackdrop region={r.team.region} />
-      <span className="relative z-10 w-9 shrink-0 text-center text-xl font-black text-zinc-300 tabular-nums sm:text-2xl">#{idx + 1}</span>
+      <span className="w-9 shrink-0 border-b-2 border-(--team-accent) pb-0.5 text-center text-xl font-black text-zinc-300 tabular-nums sm:text-2xl">#{idx + 1}</span>
       <TeamLogo3D team={r.team} className="size-14 sm:size-16" radius={12} tilt={{ rotateX, rotateY }} />
-      <div className="relative z-10 min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="line-clamp-2 font-display text-base/tight font-extrabold tracking-wider text-balance text-dl-text uppercase sm:text-xl/tight">{r.team.name}</div>
-        <div className="mt-1 text-[14px] font-bold tracking-wider text-zinc-300 uppercase">{meta}</div>
+        <div className="text-[14px] font-bold tracking-wider text-zinc-300 uppercase">{meta}</div>
       </div>
-      <div className="relative z-10 flex shrink-0 flex-col items-center gap-1">
+      <div className="flex shrink-0 flex-col items-center gap-1">
         <div className="team-ovr-chip team-ovr-chip--stack">
           <span className="team-ovr-num">{r.count ? r.rounded : "--"}</span>
           <span className="team-ovr-lbl">OVR</span>

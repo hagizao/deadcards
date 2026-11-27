@@ -163,11 +163,11 @@ export function Achievements({ ids, profileCard, favorites, collapsible = false,
     <section aria-labelledby="achievements-title" className="flex min-w-0 flex-1 flex-col gap-5 border-t border-zinc-200/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
       <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
         <div className="flex items-baseline gap-3">
-          <h2 id="achievements-title" className="font-display text-[1.6875rem] font-black text-area title-depth">{t.heading}</h2>
+          <h2 id="achievements-title" className="font-display text-4xl font-black text-area title-depth">{t.heading}</h2>
           <span className="text-[1.3125rem] whitespace-nowrap text-zinc-300 tabular-nums">{t.done(done, all.length)}</span>
         </div>
         <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="text-[1.3125rem] font-extrabold whitespace-nowrap text-dl-text tabular-nums">{t.collection(pct)}</span>
+          <span className="text-[1.75rem] font-extrabold whitespace-nowrap text-dl-text tabular-nums">{t.collection(pct)}</span>
           <span className="text-[1.3125rem] whitespace-nowrap text-zinc-400 tabular-nums">{t.cards(mine, players.length)}</span>
           <div role="progressbar" aria-label={t.collection(pct)} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="h-2 max-w-60 min-w-24 flex-1 rounded-full bg-zinc-800">
             <FillBar pct={pct} delay={0.2} className="h-full rounded-full" barClassName="bg-dl-text" />

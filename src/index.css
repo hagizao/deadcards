@@ -41,9 +41,8 @@
 @property --fade-r { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @utility rail-fade {
   mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
-  /* a máscara se repete na vertical e não corta fora da caixa: o brilho e o salto do hover passam por cima e por baixo */
-  mask-repeat: repeat-y;
-  mask-clip: no-clip;
+  /* a máscara corta o que sai da caixa: quem usa deixa espaço (padding) em cima e embaixo para o brilho e o salto do hover.
+     mask-clip: no-clip quebra a pintura das cartas com 3D no Chrome, por isso não é usado */
   transition: --fade-l 200ms ease-out, --fade-r 200ms ease-out;
   @media (prefers-reduced-motion: reduce) {
     transition: none;

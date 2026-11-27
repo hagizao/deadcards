@@ -19,5 +19,5 @@ export const field = `min-h-11 sm:min-h-9 px-1 bg-transparent border-0 border-b 
 export const primaryBtn = `min-h-11 sm:min-h-9 inline-flex items-center justify-center px-5 rounded-lg bg-dl-text text-xs font-extrabold uppercase tracking-widest text-dl-black cursor-pointer transition hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed ${focus}`;
 
 /** Títulos levam a cor da área (lib/areas.ts) e volume (title-depth no index.css); o resto do site fica no branco. */
-export const pageTitle = "font-display text-2xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-3xl";
+export const pageTitle = "font-display text-4xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-5xl";
 export const sectionTitle = "font-display text-xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-2xl";

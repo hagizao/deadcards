@@ -38,6 +38,8 @@ export function useRail(el: HTMLElement | null, count: number, { item, gap, max 
     },
     /** Classes do elemento que corta a faixa: esmaece as pontas que ainda têm itens escondidos. */
     fade: `rail-fade ${at > 0 ? "[--fade-l:4rem]" : ""} ${at < last ? "[--fade-r:4rem]" : ""}`,
+    /** Igual a `fade`, mais longo: para faixas de cartas grandes, em que a ponta cortada fica mais aparente. */
+    fadeStrong: `rail-fade ${at > 0 ? "[--fade-l:10rem]" : ""} ${at < last ? "[--fade-r:10rem]" : ""}`,
     /** Item fora da vista sai do Tab e do leitor de tela. */
     hidden: (i: number) => i < at || i >= at + visible,
   };
