@@ -33,6 +33,8 @@ function GitHubIcon() {
 }
 
 type Tab = "home" | "teams" | "tierlist" | "collection" | "redeem" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "settings";
+// ordem da navegação: a tela nova entra pelo lado de quem está à frente ou atrás no menu
+const TAB_ORDER: Tab[] = ["home", "teams", "tierlist", "collection", "redeem", "compare", "profile", "settings", "editor", "feedback", "privacy", "terms"];
 const TABS = ["teams", "tierlist", "collection", "redeem", "compare"] as const;
 const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", redeem: "ticket", compare: "versus" } as const;
 
@@ -256,6 +258,9 @@ const sharedProfile = () => /^\/u\/((?:@|%40)?[A-Za-z0-9._-]{1,64})$/.exec(locat
 function Shell() {
   const [profileId, setProfileId] = useState(sharedProfile);
   const [tab, setTab] = useState<Tab>(() => profileId ? "profile" : location.pathname === "/privacy" ? "privacy" : location.pathname === "/terms" ? "terms" : "home");
+  // direção da troca de aba, derivada durante a renderização (padrão do React para "valor anterior")
+  const [shown, setShown] = useState({ tab, dir: 0 });
+  if (shown.tab !== tab) setShown({ tab, dir: Math.sign(TAB_ORDER.indexOf(tab) - TAB_ORDER.indexOf(shown.tab)) });
   const [focusTeam, setFocusTeam] = useState<string>();
   const [spotlight, setSpotlight] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -308,12 +313,13 @@ function Shell() {
       </header>
 
       <ReducedMotionNotice />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
+      {/* clip no eixo x: a tela que entra deslizando de lado não pode criar rolagem horizontal no celular */}
+      <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
         <motion.div
             key={tab}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.15, ease: easeOut }}
+            initial={{ opacity: 0, x: shown.dir * 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, ease: easeOut }}
           >
             {tab === "home" && <Home onOpenTeam={openTeam} onOpenCard={setSpotlight} onNavigate={go} />}
             {tab === "teams" && <Teams focusTeamId={focusTeam} onOpenCard={setSpotlight} />}
