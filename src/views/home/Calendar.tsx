@@ -115,10 +115,10 @@ export function Calendar() {
                       </p>
                       {ev.brazil && <BrazilTag text={t.brazil} />}
                       {ev.t.description && <p className="text-xs text-zinc-400">{ev.t.description}</p>}
-                      {(ev.t.stream || ev.t.watch) && (
+                      {(ev.stream || ev.watch) && (
                         <span className="flex flex-wrap gap-1.5">
-                          {ev.t.stream && <WatchLink href={ev.t.stream} icon="play" text={t.stream} />}
-                          {ev.t.watch && <WatchLink href={ev.t.watch} icon="users" text={t.watch} />}
+                          {ev.stream && <WatchLink href={ev.stream} icon="play" text={t.stream} />}
+                          {ev.watch && <WatchLink href={ev.watch} icon="users" text={t.watch} />}
                         </span>
                       )}
                     </div>
