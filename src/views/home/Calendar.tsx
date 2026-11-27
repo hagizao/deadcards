@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useData } from "../../lib/data";
 import { strings, useLocale, useT } from "../../lib/i18n";
 import { enter } from "../../lib/motion";
@@ -14,16 +14,19 @@ const S = strings({
     title: "Calendário", lead: "Quando o competitivo joga. Escolha um dia para ver o que tem; os horários estão no seu fuso.",
     prev: "Mês anterior", next: "Próximo mês", today: "Hoje", nothing: "Nada marcado neste dia.",
     upNext: "Próximo", more: "Ver no site do campeonato", events: (n: number) => `${n} ${n === 1 ? "campeonato" : "campeonatos"}`,
+    startsIn: "Começa em", started: "Já começou",
   },
   en: {
     title: "Calendar", lead: "When the competitive scene plays. Pick a day to see what's on; times are in your time zone.",
     prev: "Previous month", next: "Next month", today: "Today", nothing: "Nothing scheduled on this day.",
     upNext: "Up next", more: "See on the tournament site", events: (n: number) => `${n} ${n === 1 ? "tournament" : "tournaments"}`,
+    startsIn: "Starts in", started: "Already started",
   },
   es: {
     title: "Calendario", lead: "Cuándo juega el competitivo. Elige un día para ver qué hay; los horarios están en tu zona horaria.",
     prev: "Mes anterior", next: "Mes siguiente", today: "Hoy", nothing: "Nada programado este día.",
     upNext: "Próximo", more: "Ver en el sitio del torneo", events: (n: number) => `${n} ${n === 1 ? "torneo" : "torneos"}`,
+    startsIn: "Empieza en", started: "Ya empezó",
   },
 });
 
@@ -34,8 +37,20 @@ const dayOf = (date: Date): Day => ({ y: date.getFullYear(), m: date.getMonth(),
 const keyOf = ({ y, m, d }: Day) => `${y}-${m}-${d}`;
 const dateOf = ({ y, m, d }: Day) => new Date(y, m, d);
 const sameDay = (a: Day, b: Day) => a.y === b.y && a.m === b.m && a.d === b.d;
-// até 3 logos por dia no quadro; o resto vira "+n" (o painel do dia mostra todos)
+// até 3 logos por dia no quadro, uma por campeonato; o resto vira "+n" (o painel do dia mostra cada edição)
 const LOGOS = 3;
+/** Nome por extenso da edição: "Deadlock Night Shift" + "EU #67". */
+const fullName = (ev: Ev) => (ev.label ? `${ev.t.name} ${ev.label}` : ev.t.name);
+
+/** Quanto falta para o jogo, em dias, horas e minutos; anda sozinho enquanto o balão está aberto. */
+function Countdown({ at, startsIn, started }: { at: number; startsIn: string; started: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 15_000); return () => clearInterval(id); }, []);
+  const left = Math.floor((at * 1000 - now) / 60_000);
+  if (left < 0) return <span className="font-bold text-area">{started}</span>;
+  const d = Math.floor(left / 1440), h = Math.floor((left % 1440) / 60), m = left % 60;
+  return <>{startsIn} <span className="font-bold text-area tabular-nums">{d > 0 && `${d}d `}{(d > 0 || h > 0) && `${h}h `}{m}m</span></>;
+}
 
 export function Calendar() {
   const { tournaments, schedule } = useData();
@@ -100,7 +115,7 @@ export function Calendar() {
                   <TournamentLogo t={ev.t} className="size-12 text-base" />
                   <div className="flex min-w-0 flex-col gap-1.5">
                     <p className="font-display text-base/tight font-extrabold tracking-wide text-white uppercase">
-                      {ev.t.name}{ev.label && <span className="text-area"> · {ev.label}</span>}
+                      {ev.t.name}{ev.label && <span className="text-area"> {ev.label}</span>}
                     </p>
                     <p className="text-xs font-bold text-zinc-200 tabular-nums">{time.format(new Date(ev.startsAt * 1000))}</p>
                     {ev.t.description && <p className="text-xs text-zinc-400">{ev.t.description}</p>}
@@ -122,7 +137,7 @@ export function Calendar() {
                   <TournamentLogo t={upcoming.t} className="size-10 text-sm" />
                   <span className="flex flex-col">
                     <span className="text-xs font-bold tracking-widest text-area uppercase">{t.upNext}</span>
-                    <span className="text-sm font-bold text-white">{upcoming.t.name}{upcoming.label && ` · ${upcoming.label}`}</span>
+                    <span className="text-sm font-bold text-white">{fullName(upcoming)}</span>
                     <span className="text-xs text-zinc-400 tabular-nums first-letter:uppercase">{shortDay.format(new Date(upcoming.startsAt * 1000))} · {time.format(new Date(upcoming.startsAt * 1000))}</span>
                   </span>
                   <Icon name="chevron-right" className="size-4 text-zinc-500 transition-transform group-hover:translate-x-0.5" />
@@ -159,7 +174,8 @@ export function Calendar() {
                 const out = day.m !== month.m;
                 const isToday = sameDay(day, today);
                 const isSel = sameDay(day, selected);
-                const tip = hot?.cell === k ? evs.find((ev) => ev.t.id === hot.id) : undefined;
+                const logos = [...new Map(evs.map((ev) => [ev.t.id, ev.t])).values()];
+                const tip = hot?.cell === k ? evs.filter((ev) => ev.t.id === hot.id) : [];
                 const col = i % 7;
                 return (
                   <div key={k} className="relative">
@@ -170,32 +186,34 @@ export function Calendar() {
                       onBlur={() => setHot(null)}
                       aria-pressed={isSel}
                       aria-current={isToday ? "date" : undefined}
-                      aria-label={[longDay.format(dateOf(day)), ...evs.map((ev) => `${ev.t.name}${ev.label ? ` ${ev.label}` : ""}, ${time.format(new Date(ev.startsAt * 1000))}`)].join(". ")}
-                      aria-describedby={tip ? `cal-tip-${k}` : undefined}
-                      className={`flex min-h-14 w-full cursor-pointer flex-col items-center gap-1 rounded-lg px-0.5 pt-1.5 pb-1 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-zinc-100 active:bg-zinc-100/10 sm:min-h-20 ${
+                      aria-label={[longDay.format(dateOf(day)), ...evs.map((ev) => `${fullName(ev)}, ${time.format(new Date(ev.startsAt * 1000))}`)].join(". ")}
+                      aria-describedby={tip.length ? `cal-tip-${k}` : undefined}
+                      className={`flex min-h-14 w-full cursor-pointer flex-col items-center gap-1 rounded-lg px-0.5 py-1 ${logos.length ? "justify-center" : "pt-1.5"} transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-zinc-100 active:bg-zinc-100/10 sm:min-h-20 ${
                         isSel ? "bg-zinc-100/10 shadow-[inset_0_-2px_0_var(--color-area)]" : "hover:bg-zinc-100/5"}`}
                     >
-                      <span className={`flex size-6 items-center justify-center rounded-full text-sm tabular-nums sm:size-7 ${
-                        isToday ? "bg-area font-black text-dl-black" : out ? "text-zinc-600" : evs.length ? "font-bold text-white" : "text-zinc-400"}`}>{day.d}</span>
-                      {evs.length > 0 && (
-                        <span className="flex flex-wrap items-center justify-center gap-px sm:gap-0.5">
-                          {evs.slice(0, LOGOS).map((ev) => (
+                      {/* dia com campeonato mostra só a logo; o número fica no rótulo para leitor de tela */}
+                      {logos.length ? (
+                        <span className={`flex flex-wrap items-center justify-center gap-px rounded-lg sm:gap-0.5 ${isToday ? "ring-2 ring-area ring-offset-2 ring-offset-zinc-950" : ""}`}>
+                          {logos.slice(0, LOGOS).map((tr) => (
                             <span
-                              key={ev.id}
-                              onPointerEnter={() => setHot({ id: ev.t.id, cell: k })}
+                              key={tr.id}
+                              onPointerEnter={() => setHot({ id: tr.id, cell: k })}
                               onPointerLeave={() => setHot(null)}
                               className={`transition-[scale,opacity,filter] duration-200 motion-reduce:transition-none ${
-                                !hot ? "" : hot.id === ev.t.id ? "scale-115 drop-shadow-[0_0_8px_var(--color-area)]" : "opacity-35"}`}
+                                !hot ? "" : hot.id === tr.id ? "scale-115 drop-shadow-[0_0_8px_var(--color-area)]" : "opacity-35"}`}
                             >
-                              <TournamentLogo t={ev.t} className="size-5 text-[8px] sm:size-8 sm:text-[11px]" />
+                              <TournamentLogo t={tr} className={logos.length > 1 ? "size-5 text-[8px] sm:size-8 sm:text-[11px]" : "size-9 text-[11px] sm:size-14 sm:text-base"} />
                             </span>
                           ))}
-                          {evs.length > LOGOS && <span className="text-[10px] font-bold text-zinc-400">+{evs.length - LOGOS}</span>}
+                          {logos.length > LOGOS && <span className="text-[10px] font-bold text-zinc-400">+{logos.length - LOGOS}</span>}
                         </span>
+                      ) : (
+                        <span className={`flex size-6 items-center justify-center rounded-full text-sm tabular-nums sm:size-7 ${
+                          isToday ? "bg-area font-black text-dl-black" : out ? "text-zinc-600" : "text-zinc-400"}`}>{day.d}</span>
                       )}
                     </button>
                     <AnimatePresence>
-                      {tip && (
+                      {tip.length > 0 && (
                         <motion.div
                           id={`cal-tip-${k}`}
                           role="tooltip"
@@ -203,14 +221,15 @@ export function Calendar() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: 4 }}
                           transition={{ duration: 0.15 }}
-                          className={`pointer-events-none absolute bottom-[calc(100%+0.5rem)] z-30 flex w-64 flex-col gap-1.5 rounded-xl bg-zinc-950 p-3 text-left shadow-[0_12px_32px_rgba(0,0,0,0.65)] ${
+                          className={`pointer-events-none absolute bottom-[calc(100%+0.5rem)] z-30 flex w-max max-w-72 flex-col gap-3 rounded-xl bg-zinc-950 p-3 text-left shadow-[0_12px_32px_rgba(0,0,0,0.65)] sm:max-w-80 ${
                             col < 2 ? "left-0" : col > 4 ? "right-0" : "left-1/2 -translate-x-1/2"}`}
                         >
-                          <span className="font-display text-base/tight font-extrabold tracking-wide text-white uppercase">
-                            {tip.t.name}{tip.label && <span className="text-area"> · {tip.label}</span>}
-                          </span>
-                          <span className="text-xs font-bold text-zinc-300 tabular-nums">{time.format(new Date(tip.startsAt * 1000))}</span>
-                          {tip.t.description && <span className="text-xs text-zinc-400">{tip.t.description}</span>}
+                          {tip.map((ev) => (
+                            <span key={ev.id} className="flex flex-col gap-1">
+                              <span className="font-display text-base/tight font-extrabold tracking-wide text-white uppercase">{fullName(ev)}</span>
+                              <span className="text-xs text-zinc-400"><Countdown at={ev.startsAt} startsIn={t.startsIn} started={t.started} /></span>
+                            </span>
+                          ))}
                         </motion.div>
                       )}
                     </AnimatePresence>
