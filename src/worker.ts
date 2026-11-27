@@ -7,6 +7,8 @@ import { PROFILE_CARD_PATH } from "./lib/profile";
 import { HOME_FEATURED_MAX, SCHEDULE_LABEL_MAX, TOURNAMENT_DESC_MAX, TOURNAMENT_NAME_MAX, type ArtCredit } from "./lib/types";
 import { imgUrl, parse, playerFromRow } from "./rows";
 import { packTypes, packs } from "./packs";
+import { artSubmissions } from "./artSubmissions";
+import { ART_SUBMISSIONS_PATH } from "./lib/artSubmissions";
 
 export interface Env {
   DB: D1Database;
@@ -457,6 +459,7 @@ export default {
       if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
       return packTypes(env, request, url.pathname.slice("/api/pack-types/".length));
     }
+    if (url.pathname === ART_SUBMISSIONS_PATH || url.pathname.startsWith(`${ART_SUBMISSIONS_PATH}/`)) return artSubmissions(env, request, url.pathname.slice(ART_SUBMISSIONS_PATH.length + 1));
     if (url.pathname === "/api/feedback") return request.method === "POST" ? feedback(env, request) : bad("método não suportado", 405);
     if (url.pathname === "/api/redeem") return request.method === "POST" ? redeem(env, request) : bad("método não suportado", 405);
     if (url.pathname === "/api/collection") {
@@ -515,6 +518,8 @@ export default {
     if (url.pathname.startsWith("/img/")) {
       const key = decode(url.pathname.slice(5));
       if (key === null || !validKey(key)) return new Response("bad key", { status: 400 });
+      // artes enviadas para o banco são privadas: só abrem por /api/art-submissions, para quem enviou e admins
+      if (key.startsWith("submissions/")) return new Response("not found", { status: 404 });
       return serveImage(env, key);
     }
     return env.ASSETS.fetch(request);
