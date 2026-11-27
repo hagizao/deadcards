@@ -878,3 +878,29 @@
       text-shadow: 0 1px 0 rgb(255 255 255 / 0.45);
     }
 
+
+/* "Como ler uma carta" (Home): a parte apontada cresce e salta, o resto da carta escurece.
+   O CardGuide marca com data-guide-* a parte, os ancestrais dela e a zona (z-10) que a contém. */
+.guide-card :where(.deadlock-card-inner *) { transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 200ms ease-out; }
+.guide-card .deadlock-card-inner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  background: rgb(0 0 0 / 0.55);
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+.guide-card[data-guiding] .deadlock-card-inner::after { opacity: 1; }
+.guide-card [data-guide-zone] { z-index: 30; }
+/* dentro da zona, só o caminho até a parte fica aceso */
+.guide-card :is([data-guide-zone], [data-guide-path]) > :not([data-guide-path], [data-guide-part]) { filter: brightness(0.4); }
+.guide-card [data-guide-part] {
+  transform: scale(1.18) translateY(-3px);
+  filter: drop-shadow(0 6px 12px rgb(0 0 0 / 0.75)) drop-shadow(0 0 10px rgb(255 239 215 / 0.35));
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-card :where(.deadlock-card-inner *) { transition: filter 200ms ease-out; }
+  .guide-card [data-guide-part] { transform: none; }
+}

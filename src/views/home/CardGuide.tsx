@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Player, TierBand } from "../../lib/types";
 import { useData } from "../../lib/data";
 import { STAT_KEYS } from "../../lib/cards";
+import { ALT_HERO_DROP } from "../../lib/cardKinds";
 import { strings, useT } from "../../lib/i18n";
 import { RARITY_TIERS, getRarity } from "../../lib/rarity";
 import { STAT_NAMES } from "../../lib/statNames";
@@ -25,6 +26,9 @@ const S = strings({
       stats: ["Atributos", "Seis notas que mostram no que ele é bom:"],
     },
     stats: { MIR: "precisão dos tiros", MAC: "decisões no mapa: farm, objetivos e rotações", SUP: "o quanto ajuda e protege o time", MOV: "mobilidade e posicionamento", POL: "quantos heróis joga bem", CON: "rende bem partida após partida" },
+    heroes: "Dois tipos de herói",
+    sigTitle: "Herói de assinatura", sigText: "O herói que o jogador mais joga. É a carta principal dele: quando aparece junto das outras, ganha a faixa Assinatura.",
+    playedTitle: "Herói jogado", playedText: (n: number) => `Outro herói que ele também joga. É uma carta à parte, com o OVR e os atributos ${n} pontos abaixo da carta de assinatura.`,
     point: (part: string) => `Destacar ${part} na carta`, rarity: "Raridade", rarityLead: "A moldura muda com o OVR. Quanto mais rara, mais ela brilha.",
   },
   en: {
@@ -37,6 +41,9 @@ const S = strings({
       stats: ["Attributes", "Six ratings that show what they're good at:"],
     },
     stats: { MIR: "shot accuracy", MAC: "map decisions: farming, objectives and rotations", SUP: "how much they help and protect the team", MOV: "mobility and positioning", POL: "how many heroes they play well", CON: "performs well match after match" },
+    heroes: "Two kinds of hero",
+    sigTitle: "Signature hero", sigText: "The hero the player plays the most. It's their main card: shown next to the others, it gets the Signature ribbon.",
+    playedTitle: "Played hero", playedText: (n: number) => `Another hero they also play. It's a separate card, with OVR and attributes ${n} points below the signature card.`,
     point: (part: string) => `Highlight ${part} on the card`, rarity: "Rarity", rarityLead: "The frame changes with the OVR. The rarer, the more it shines.",
   },
   es: {
@@ -49,6 +56,9 @@ const S = strings({
       stats: ["Atributos", "Seis notas que muestran en qué es bueno:"],
     },
     stats: { MIR: "precisión de los disparos", MAC: "decisiones en el mapa: farmeo, objetivos y rotaciones", SUP: "cuánto ayuda y protege al equipo", MOV: "movilidad y posicionamiento", POL: "cuántos héroes juega bien", CON: "rinde bien partida tras partida" },
+    heroes: "Dos tipos de héroe",
+    sigTitle: "Héroe insignia", sigText: "El héroe que el jugador más juega. Es su carta principal: junto a las otras, lleva la cinta Firma.",
+    playedTitle: "Héroe jugado", playedText: (n: number) => `Otro héroe que también juega. Es una carta aparte, con el OVR y los atributos ${n} puntos por debajo de la carta insignia.`,
     point: (part: string) => `Resaltar ${part} en la carta`, rarity: "Rareza", rarityLead: "El marco cambia con el OVR. Cuanto más rara, más brilla.",
   },
 });
@@ -121,7 +131,26 @@ export function CardGuide({ sample }: { sample: Player }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, [sample.id]);
-  const ring = hot && boxes?.[hot];
+
+  // destaque da parte: marca a parte, o caminho até ela e a zona dela; o CSS (cards.css, .guide-card) faz o resto
+  useEffect(() => {
+    const root = cardRef.current;
+    const part = hot && root ? partEl(root, hot) : null;
+    if (!root || !part) return;
+    const zone = part.closest(".deadlock-card-inner > *");
+    const path: Element[] = [];
+    for (let e = part.parentElement; e && e !== zone; e = e.parentElement) path.push(e);
+    root.dataset.guiding = "";
+    part.setAttribute("data-guide-part", "");
+    zone?.setAttribute("data-guide-zone", "");
+    path.forEach((e) => e.setAttribute("data-guide-path", ""));
+    return () => {
+      delete root.dataset.guiding;
+      part.removeAttribute("data-guide-part");
+      zone?.removeAttribute("data-guide-zone");
+      path.forEach((e) => e.removeAttribute("data-guide-path"));
+    };
+  }, [hot]);
 
   return (
     <section aria-labelledby="home-guide" className="flex flex-col gap-6">
@@ -132,18 +161,9 @@ export function CardGuide({ sample }: { sample: Player }) {
 
       <div className="flex flex-col items-center gap-8 lg:flex-row lg:items-start">
         <Reveal className="w-fit max-w-full shrink-0">
-          <div ref={cardRef} className="relative">
+          {/* isolate: os números e o anel ficam presos ao bloco da carta e não passam por cima do cabeçalho fixo */}
+          <div ref={cardRef} className="guide-card relative isolate">
             <Card player={sample} />
-            {/* anel que pula para a parte destacada */}
-            {ring && (
-              <motion.span
-                aria-hidden="true"
-                className="pointer-events-none absolute z-30 rounded-lg border-2 border-dl-text shadow-[0_0_18px_rgb(255_239_215/0.55),inset_0_0_12px_rgb(255_239_215/0.25)]"
-                initial={false}
-                animate={{ left: ring.x - 6, top: ring.y - 5, width: ring.w + 12, height: ring.h + 10, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 420, damping: 34 }}
-              />
-            )}
             {boxes && PARTS.map((part, i) => (
               <button
                 key={part}
@@ -186,6 +206,18 @@ export function CardGuide({ sample }: { sample: Player }) {
               </motion.li>
             ))}
           </ol>
+
+          <Reveal className="flex flex-col gap-3">
+            <span className="font-extrabold text-dl-text">{t.heroes}</span>
+            <dl className="flex flex-col gap-3">
+              {[{ term: t.sigTitle, text: t.sigText }, { term: t.playedTitle, text: t.playedText(ALT_HERO_DROP) }].map(({ term, text }) => (
+                <div key={term} className="flex flex-col gap-0.5">
+                  <dt className="font-semibold text-zinc-100">{term}</dt>
+                  <dd className="text-sm text-pretty text-zinc-300">{text}</dd>
+                </div>
+              ))}
+            </dl>
+          </Reveal>
 
           <Reveal className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
