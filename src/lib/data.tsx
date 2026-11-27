@@ -47,10 +47,10 @@ async function post<T>(path: string): Promise<T> {
 }
 
 export const api = {
-  save: (kind: "players" | "teams" | "heroes" | "settings", id: string, body: unknown) =>
+  save: (kind: "players" | "teams" | "heroes" | "settings" | "tournaments" | "schedule", id: string, body: unknown) =>
     call(`/api/${kind}/${encodeURIComponent(id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   promote: (id: string) => call(`/api/players/${encodeURIComponent(id)}/promote`, { method: "POST" }),
-  remove: (kind: "players" | "teams" | "heroes", id: string) => call(`/api/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  remove: (kind: "players" | "teams" | "heroes" | "tournaments" | "schedule", id: string) => call(`/api/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
   createCode: (body: { code: string; playerId?: string; packTypeId?: string; maxUses: number; startsAt: number | null; expiresAt: number | null }) =>
     call("/api/codes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   removeCode: (code: string) => call(`/api/codes/${encodeURIComponent(code)}`, { method: "DELETE" }),
@@ -61,7 +61,7 @@ export const api = {
   removePackType: (id: string) => call(`/api/pack-types/${encodeURIComponent(id)}`, { method: "DELETE" }),
   inventory: () => get<{ packs: InventoryPack[] }>("/api/packs"),
   openPack: (id: string) => post<{ cards: { id: string; kind: PackKind }[]; test?: boolean }>(`/api/packs/${encodeURIComponent(id)}/open`),
-  upload: async (folder: "players" | "teams" | "heroes" | "bg" | "home" | "packs", file: File) =>
+  upload: async (folder: "players" | "teams" | "heroes" | "bg" | "home" | "packs" | "events", file: File) =>
     (await call(`/api/upload/${folder}`, { method: "POST", headers: { "content-type": file.type }, body: file })).url!,
 };
 
