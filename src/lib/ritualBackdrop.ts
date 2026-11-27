@@ -280,6 +280,17 @@ export class RitualBackdrop {
     L.fillStyle = lg; L.fillRect(0, 0, W, H);
     if (flash > 0) { L.globalCompositeOperation = "source-atop"; L.fillStyle = rgba(mix(tint, WHITE, 0.5), flash * 0.12); L.fillRect(0, 0, W, H); }
     ctx.drawImage(this.city.lit, 0, 0, W, H);
+    // névoa na cor da aba na altura dos prédios: uma faixa e alguns bancos de névoa que passam devagar
+    const fog = ctx.createLinearGradient(0, H * 0.6, 0, H);
+    fog.addColorStop(0, rgba(tint, 0)); fog.addColorStop(0.55, rgba(tint, 0.25)); fog.addColorStop(1, rgba(tint, 0.12));
+    ctx.fillStyle = fog; ctx.fillRect(0, H * 0.6, W, H * 0.4);
+    for (let i = 0; i < 4; i++) {
+      const r = W * 0.28, span = W + r * 2, x = ((i * span) / 4 + t * (6 + i * 3)) % span - r, y = H * (0.8 + (i % 2) * 0.08);
+      const bank = ctx.createRadialGradient(x, y, 0, x, y, r);
+      bank.addColorStop(0, rgba(tint, 0.18)); bank.addColorStop(1, rgba(tint, 0));
+      ctx.save(); ctx.translate(x, y); ctx.scale(1, 0.25); ctx.translate(-x, -y);
+      ctx.fillStyle = bank; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.restore();
+    }
     ctx.fillStyle = "#ffcf87";
     for (const w of this.city.windows) { ctx.globalAlpha = 0.55 * (0.5 + 0.5 * Math.sin(t * w.sp + w.ph)); ctx.fillRect(w.x, w.y, 1.5, 2.5); }
     ctx.globalAlpha = 1;
