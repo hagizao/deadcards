@@ -7,7 +7,7 @@ import { strings, useT } from "../../lib/i18n";
 import { getCardTier } from "../../lib/rarity";
 import { STAT_NAMES } from "../../lib/statNames";
 import { enter, springSoft } from "../../lib/motion";
-import { pageTitle, pill, primaryBtn } from "../../lib/ui";
+import { pill, primaryBtn } from "../../lib/ui";
 import { Card } from "../../components/Card";
 import { FillBar } from "../../components/Motion";
 import { Icon } from "../../components/Icon";
@@ -16,17 +16,17 @@ import { ROLE_TEXT, isRole } from "./roleText";
 
 const S = strings({
   pt: {
-    title: "Conheça o competitivo do Deadlock", carousel: "Jogadores em destaque", strengths: "Pontos fortes", signature: "Herói de assinatura",
+    title: ["Conheça o competitivo do ", "Deadlock", ""], carousel: "Jogadores em destaque", strengths: "Pontos fortes", signature: "Herói de assinatura",
     open: "Ver carta", team: "Conhecer o time", prev: "Jogador anterior", next: "Próximo jogador", show: (name: string) => `Mostrar ${name}`,
     slide: (i: number, n: number) => `${i} de ${n}`,
   },
   en: {
-    title: "Meet the Deadlock competitive scene", carousel: "Featured players", strengths: "Strengths", signature: "Signature hero",
+    title: ["Meet the ", "Deadlock", " competitive scene"], carousel: "Featured players", strengths: "Strengths", signature: "Signature hero",
     open: "View card", team: "Meet the team", prev: "Previous player", next: "Next player", show: (name: string) => `Show ${name}`,
     slide: (i: number, n: number) => `${i} of ${n}`,
   },
   es: {
-    title: "Conoce el competitivo de Deadlock", carousel: "Jugadores destacados", strengths: "Puntos fuertes", signature: "Héroe insignia",
+    title: ["Conoce el competitivo de ", "Deadlock", ""], carousel: "Jugadores destacados", strengths: "Puntos fuertes", signature: "Héroe insignia",
     open: "Ver carta", team: "Conocer el equipo", prev: "Jugador anterior", next: "Siguiente jugador", show: (name: string) => `Mostrar ${name}`,
     slide: (i: number, n: number) => `${i} de ${n}`,
   },
@@ -102,7 +102,10 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
 
       <div className="flex flex-col gap-2 py-2 lg:flex-row lg:items-center lg:gap-8">
         <div className="relative z-20 order-2 flex flex-col gap-5 lg:order-1 lg:w-[40%] lg:shrink-0">
-          <h1 id="home-stage" className={pageTitle}>{t.title}</h1>
+          {/* título da Home: maior que o das abas, em branco, com o nome do jogo na cor da área */}
+          <h1 id="home-stage" className="font-display text-3xl/tight font-extrabold tracking-widest text-balance text-dl-text uppercase title-depth sm:text-4xl/tight">
+            {t.title[0]}<span className="text-area">{t.title[1]}</span>{t.title[2]}
+          </h1>
 
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={p.id} className="flex flex-col gap-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={enter}>
@@ -118,7 +121,7 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
 
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-lg bg-dl-text px-3 py-1.5 text-xs font-extrabold tracking-widest text-dl-black uppercase">{label(p.position || "Flex")}</span>
-                <span className="flex items-center gap-2 rounded-lg bg-zinc-900/80 py-1 pr-3 pl-1 text-xs font-bold text-zinc-200">
+                <span className="flex items-center gap-2 text-xs font-bold text-zinc-200">
                   {hero ? <img src={hero} alt="" className="size-7 rounded-md object-cover" /> : <Icon name="star" className="size-4" />}
                   <span className="flex flex-col leading-tight">
                     <span className="text-[13px] tracking-widest text-zinc-400 uppercase">{t.signature}</span>
