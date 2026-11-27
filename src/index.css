@@ -38,7 +38,7 @@
   --color-br-yellow: #ffd400;
 }
 
-/* moldura listrada de verde e amarelo: dia em que o Brasil joga (calendário da Home e a legenda dele) */
+/* moldura em degradê verde e amarelo: dia em que o Brasil joga (calendário da Home e a legenda dele) */
 @utility br-frame {
   position: relative;
   box-shadow: 0 0 14px color-mix(in oklab, var(--color-br-green) 45%, transparent);
@@ -48,7 +48,7 @@
     inset: 0;
     padding: 3px;
     border-radius: inherit;
-    background: repeating-linear-gradient(135deg, var(--color-br-green) 0 6px, var(--color-br-yellow) 6px 12px);
+    background: linear-gradient(135deg, var(--color-br-green), var(--color-br-yellow));
     mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
     pointer-events: none;
   }

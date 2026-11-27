@@ -146,6 +146,12 @@ export function Calendar() {
               )}
             </div>
           )}
+          {events.some((ev) => ev.brazil) && (
+            <p className="flex w-fit items-center gap-4 rounded-xl bg-br-green/20 py-3 pr-5 pl-3 font-display text-base/tight font-extrabold tracking-wide text-br-yellow uppercase sm:text-lg/tight">
+              <span aria-hidden="true" className="br-frame size-10 shrink-0 rounded-lg" />
+              {t.legend}
+            </p>
+          )}
         </div>
 
         {/* o mês: cada dia com as logos dos campeonatos; passar o mouse numa logo acende o campeonato e abre o balão */}
@@ -240,19 +246,13 @@ export function Calendar() {
               })}
             </motion.div>
           </AnimatePresence>
-          {events.some((ev) => ev.brazil) && (
-            <p className="flex w-fit items-center gap-4 rounded-xl bg-br-green/20 py-3 pr-5 pl-3 font-display text-base/tight font-extrabold tracking-wide text-br-yellow uppercase sm:text-lg/tight">
-              <span aria-hidden="true" className="br-frame size-10 shrink-0 rounded-lg" />
-              {t.legend}
-            </p>
-          )}
         </div>
       </div>
     </section>
   );
 }
 
-/** Selo do evento em que um time brasileiro joga, com a mesma listra verde e amarela da borda do dia. */
+/** Selo do evento em que um time brasileiro joga, com o mesmo degradê verde e amarelo da borda do dia. */
 function BrazilTag({ text }: { text: string }) {
   return (
     <span className="flex w-fit items-center gap-2 rounded-md bg-br-green/15 py-1 pr-2 pl-1 text-xs font-extrabold tracking-wide text-br-yellow uppercase">
