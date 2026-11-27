@@ -642,7 +642,7 @@ function LookForm() {
           </div>
         </div>
         <fieldset className="space-y-3 border-l border-zinc-200/15 pl-4">
-          <legend className="px-1 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Conheça os jogadores (Home)</legend>
+          <legend className="px-1 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Conheça o competitivo (Home)</legend>
           <p className="text-xs text-zinc-400">As cartas do palco no topo da Home, na ordem em que giram. Sem nenhuma escolhida, a Home mostra as maiores OVR.</p>
           {featured.map((id, i) => (
             <select key={i} className={input} value={id} aria-label={`Destaque ${i + 1}`} onChange={(e) => setFeatured((f) => f.map((x, j) => (j === i ? e.target.value : x)))}>

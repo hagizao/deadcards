@@ -16,17 +16,17 @@ import { ROLE_TEXT, isRole } from "./roleText";
 
 const S = strings({
   pt: {
-    title: "Conheça os jogadores", carousel: "Jogadores em destaque", strengths: "Pontos fortes", signature: "Herói de assinatura",
+    title: "Conheça o competitivo do Deadlock", carousel: "Jogadores em destaque", strengths: "Pontos fortes", signature: "Herói de assinatura",
     open: "Ver carta", team: "Conhecer o time", prev: "Jogador anterior", next: "Próximo jogador", show: (name: string) => `Mostrar ${name}`,
     slide: (i: number, n: number) => `${i} de ${n}`,
   },
   en: {
-    title: "Meet the players", carousel: "Featured players", strengths: "Strengths", signature: "Signature hero",
+    title: "Meet the Deadlock competitive scene", carousel: "Featured players", strengths: "Strengths", signature: "Signature hero",
     open: "View card", team: "Meet the team", prev: "Previous player", next: "Next player", show: (name: string) => `Show ${name}`,
     slide: (i: number, n: number) => `${i} of ${n}`,
   },
   es: {
-    title: "Conoce a los jugadores", carousel: "Jugadores destacados", strengths: "Puntos fuertes", signature: "Héroe insignia",
+    title: "Conoce el competitivo de Deadlock", carousel: "Jugadores destacados", strengths: "Puntos fuertes", signature: "Héroe insignia",
     open: "Ver carta", team: "Conocer el equipo", prev: "Jugador anterior", next: "Siguiente jugador", show: (name: string) => `Mostrar ${name}`,
     slide: (i: number, n: number) => `${i} de ${n}`,
   },
