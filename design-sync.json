@@ -8,6 +8,8 @@
     "--color-dl-text": "#ffefd7",
     "--color-area": "#ffefd7 (por aba: teams eternus, tierlist ascendant, collection oracle, compare archon, redeem arcanist; src/lib/areas.ts)",
     "--color-dl-black": "#10130d",
+    "--color-br-green": "#00b84a (br-frame: dia em que o Brasil joga no calendário)",
+    "--color-br-yellow": "#ffd400",
     "--color-dl-bevel-from": "#373d45",
     "--color-dl-bevel-to": "#4d5860",
     "--color-dl-bevel-hover-from": "#4c5561",
