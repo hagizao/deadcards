@@ -6,9 +6,10 @@ import { asPlayedHero, playedStats } from "../lib/cardKinds";
 import { UniversalCollection } from "../components/UniversalCollection";
 import { FRAME_PRESETS, RARITY_TIERS, getCardTier, type Tier } from "../lib/rarity";
 import { RARITY_KEYS, rarityKeyOf, type RarityKey } from "../lib/rarityBands";
-import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
+import { HOME_FEATURED_MAX, SCHEDULE_LABEL_MAX, TOURNAMENT_DESC_MAX, TOURNAMENT_NAME_MAX, type ScheduleEntry, type Tournament, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
 import { Card } from "../components/Card";
 import { TeamLogo } from "../components/TeamLogo";
+import { TournamentLogo } from "../components/TournamentLogo";
 import { HoldButton } from "../components/HoldButton";
 import { Icon } from "../components/Icon";
 import { Range } from "../components/Range";
@@ -22,6 +23,8 @@ const SECTIONS = [
   { id: "teams", label: "Times" },
   { id: "heroes", label: "Heróis" },
   { id: "look", label: "Aparência" },
+  { id: "tournaments", label: "Torneios" },
+  { id: "calendar", label: "Calendário" },
   { id: "packs", label: "Packs" },
   { id: "codes", label: "Códigos" },
   { id: "universal", label: "Coleção universal" },
@@ -129,6 +132,8 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
           {section === "teams" && <TeamsForm />}
           {section === "heroes" && <HeroesForm />}
           {section === "look" && <LookForm />}
+          {section === "tournaments" && <TournamentsForm />}
+          {section === "calendar" && <CalendarForm />}
           {section === "packs" && <PacksForm />}
           {section === "codes" && <CodesForm />}
           {section === "universal" && <UniversalCollection onEdit={pick} />}
@@ -1221,6 +1226,147 @@ function SoundsForm() {
         })}
       </ul>
       <Toast msg={msg} />
+    </div>
+  );
+}
+
+/** <input type="datetime-local"> trabalha no fuso de quem edita; o banco guarda segundos UTC. */
+const toLocalInput = (sec: number) => {
+  const d = new Date(sec * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const fromLocalInput = (v: string) => { const t = new Date(v).getTime(); return v && Number.isFinite(t) ? Math.round(t / 1000) : null; };
+
+/** Torneios: nome, logo, descrição (o balão do calendário) e link. Os dias ficam na aba Calendário. */
+function TournamentsForm() {
+  const { tournaments, schedule, reload } = useData();
+  const [d, setD] = useState<Tournament | null>(null);
+  const { busy, msg, run } = useSaver(reload);
+  const set = (patch: Partial<Tournament>) => setD((t) => (t ? { ...t, ...patch } : t));
+  const [now] = useState(() => Date.now() / 1000);
+  const upcoming = (id: string) => schedule.filter((s) => s.tournamentId === id && s.startsAt >= now - 86400).length;
+
+  const save = () => {
+    if (!d || !d.name.trim()) return;
+    const id = d.id || newId("tour");
+    run(async () => { await api.save("tournaments", id, { ...d, id }); setD(null); }, `Torneio "${d.name.trim()}" salvo!`);
+  };
+
+  return (
+    <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="space-y-2">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Torneios ({tournaments.length})</h2>
+          <button type="button" className={primary} onClick={() => setD({ id: "", name: "", description: "" })}>+ Novo torneio</button>
+        </div>
+        <p className="text-sm text-zinc-400">Crie o torneio uma vez, com logo e descrição; depois, na aba Calendário, é só marcar os dias.</p>
+        {tournaments.map((t) => (
+          <motion.div layout key={t.id} className="flex items-center gap-3 rounded-xl border border-zinc-200/10 bg-zinc-950/50 p-2.5">
+            <TournamentLogo t={t} className="size-10 text-sm" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-bold text-zinc-100">{t.name}</p>
+              <p className="text-xs text-zinc-400">{upcoming(t.id)} {upcoming(t.id) === 1 ? "dia marcado" : "dias marcados"} daqui em diante</p>
+            </div>
+            <button type="button" className={ghost} onClick={() => setD(structuredClone(t))}>Editar</button>
+            <HoldButton className={danger} disabled={busy} onConfirm={() => run(async () => { await api.remove("tournaments", t.id); if (d?.id === t.id) setD(null); }, "Torneio e dias excluídos.")} label={`Excluir ${t.name} e todos os dias dele`}>✕</HoldButton>
+          </motion.div>
+        ))}
+      </div>
+
+      <AnimatePresence>
+        {d && (
+          <motion.div key={d.id || "new"} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="space-y-4 border-t border-zinc-200/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+            <h3 className="text-lg font-black tracking-[0.12em] text-white uppercase">{d.id ? `Editar ${d.name}` : "Novo torneio"}</h3>
+            <Field label="Nome"><input className={input} value={d.name} maxLength={TOURNAMENT_NAME_MAX} onChange={(e) => set({ name: e.target.value })} /></Field>
+            <div className="flex flex-wrap items-end gap-3">
+              <TournamentLogo t={d} className="size-16 text-lg" />
+              <ImagePick folder="events" label={d.logo ? "Trocar logo" : "Enviar logo"} onUrl={(logo) => set({ logo })} />
+              {d.logo && <button type="button" className={ghost} onClick={() => set({ logo: undefined })}>Remover</button>}
+            </div>
+            <Field label={`Descrição: aparece no balão do calendário (${d.description.length}/${TOURNAMENT_DESC_MAX})`}>
+              <textarea className={input} rows={3} maxLength={TOURNAMENT_DESC_MAX} value={d.description} onChange={(e) => set({ description: e.target.value })} />
+            </Field>
+            <Field label="Link (opcional)"><input className={input} type="url" placeholder="https://" value={d.url ?? ""} maxLength={200} onChange={(e) => set({ url: e.target.value || undefined })} /></Field>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" className={primary} disabled={busy || !d.name.trim()} onClick={save}>{busy ? "Salvando…" : "Salvar torneio"}</button>
+              <button type="button" className={ghost} onClick={() => setD(null)}>Cancelar</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <div className="lg:col-span-2"><Toast msg={msg} /></div>
+    </div>
+  );
+}
+
+/** Calendário: marca um torneio já criado num dia e hora. A logo e a descrição vêm do torneio. */
+function CalendarForm() {
+  const { tournaments, schedule, reload } = useData();
+  const { busy, msg, run } = useSaver(reload);
+  const [tour, setTour] = useState("");
+  const [when, setWhen] = useState("");
+  const [label, setLabel] = useState("");
+  const tournamentId = tour || tournaments[0]?.id || "";
+  const at = fromLocalInput(when);
+  const add = () => {
+    if (at === null || !tournamentId) return;
+    run(async () => { await api.save("schedule", newId("day"), { tournamentId, startsAt: at, label: label.trim() }); setWhen(""); setLabel(""); }, "Dia marcado.");
+  };
+  const monthName = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
+  const months = new Map<string, ScheduleEntry[]>();
+  for (const s of schedule) {
+    const m = monthName.format(new Date(s.startsAt * 1000));
+    months.set(m, [...(months.get(m) ?? []), s]);
+  }
+
+  if (!tournaments.length) return <p className="text-sm text-zinc-400">Crie um torneio na aba Torneios para marcar dias no calendário.</p>;
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Marcar um dia</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="Torneio">
+            <select className={input} value={tournamentId} onChange={(e) => setTour(e.target.value)}>
+              {tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Dia e hora (no seu fuso)"><input className={input} type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></Field>
+          <Field label="Edição (opcional, ex.: 67 EU)"><input className={input} value={label} maxLength={SCHEDULE_LABEL_MAX} onChange={(e) => setLabel(e.target.value)} /></Field>
+          <button type="button" className={primary} disabled={busy || at === null} onClick={add}>+ Marcar</button>
+        </div>
+        <p className="text-xs text-zinc-400">Cada visitante vê no fuso dele. Dias de mais de um mês atrás saem da lista e do site.</p>
+      </div>
+      {[...months].map(([m, days]) => (
+        <div key={m} className="space-y-2 border-t border-zinc-200/15 pt-4">
+          <h3 className="text-sm font-black tracking-[0.12em] text-white uppercase">{m}</h3>
+          {days.map((s) => <ScheduleRow key={`${s.id}:${s.startsAt}:${s.label}:${s.tournamentId}`} entry={s} tournaments={tournaments} />)}
+        </div>
+      ))}
+      <Toast msg={msg} />
+    </div>
+  );
+}
+
+function ScheduleRow({ entry, tournaments }: { entry: ScheduleEntry; tournaments: Tournament[] }) {
+  const { reload } = useData();
+  const { busy, run } = useSaver(reload);
+  const [tour, setTour] = useState(entry.tournamentId);
+  const [when, setWhen] = useState(() => toLocalInput(entry.startsAt));
+  const [label, setLabel] = useState(entry.label);
+  const at = fromLocalInput(when);
+  const changed = tour !== entry.tournamentId || at !== entry.startsAt || label.trim() !== entry.label;
+  const t = tournaments.find((x) => x.id === tour);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {t && <TournamentLogo t={t} className="size-9 text-xs" />}
+      <select aria-label="Torneio" className={`${input} w-auto`} value={tour} onChange={(e) => setTour(e.target.value)}>
+        {tournaments.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+      </select>
+      <input aria-label="Dia e hora" className={`${input} w-auto`} type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+      <input aria-label="Edição" className={`${input} w-28`} value={label} maxLength={SCHEDULE_LABEL_MAX} onChange={(e) => setLabel(e.target.value)} />
+      <button type="button" className={ghost} disabled={busy || !changed || at === null} onClick={() => run(() => api.save("schedule", entry.id, { tournamentId: tour, startsAt: at, label: label.trim() }), "Dia atualizado.")}>Salvar</button>
+      <HoldButton className={danger} disabled={busy} onConfirm={() => run(() => api.remove("schedule", entry.id), "Dia excluído.")} label="Excluir este dia">✕</HoldButton>
     </div>
   );
 }
