@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { ProfileSkeleton } from "../components/Skeleton";
 import { Achievements } from "../components/Achievements";
 import { Card } from "../components/Card";
@@ -20,7 +20,7 @@ import { CountUp, FillBar } from "../components/Motion";
 const S = strings({
   pt: {
     favorites: "Favoritas", favoritesHint: `Abra uma carta e toque em Favoritar: até ${MAX_FAVORITES} ficam em destaque aqui.`,
-    progress: "Progresso", best: "Maior OVR", catalog: (owned: number, total: number) => `${owned} de ${total} cartas`,
+    progress: "Almas recolhidas", best: "Maior OVR", catalog: (owned: number, total: number) => `${owned} de ${total} cartas`,
     rarity: "Filtrar por raridade", all: "Todas", search: "Buscar cartas", searchPlaceholder: "Jogador, herói ou time…",
     noResults: "Nenhuma carta corresponde aos filtros.", more: (n: number) => `Mostrar mais (${n})`,
     name: "Nome na carta", hero: "Herói", role: "Função", stats: "Atributos",
@@ -28,13 +28,14 @@ const S = strings({
     save: "Salvar carta", saving: "Salvando…", cancel: "Cancelar", unsaved: "Alterações não salvas.",
     loading: "Carregando perfil…", history: "Histórico de versões",
     edit: "Editar minha carta", create: "Montar minha carta", share: "Copiar link", copied: "Link copiado.", copyFailed: "Não foi possível copiar o link.",
+    file: "Ficha nº", stamp: "Arquivado",
     noCard: "Ainda não montou uma carta.", cards: "Coleção", noCards: "Nenhuma carta na coleção ainda.", redeem: "Resgatar carta",
     not_found: "Perfil não encontrado.",
     invalid_card: "Confira o nome, o herói e os atributos.", unavailable: "Não foi possível carregar agora.", login: "Entre para editar sua carta.",
   },
   en: {
     favorites: "Favorites", favoritesHint: `Open a card and tap Favorite: up to ${MAX_FAVORITES} are featured here.`,
-    progress: "Progress", best: "Highest OVR", catalog: (owned: number, total: number) => `${owned} of ${total} cards`,
+    progress: "Souls collected", best: "Highest OVR", catalog: (owned: number, total: number) => `${owned} of ${total} cards`,
     rarity: "Filter by rarity", all: "All", search: "Search cards", searchPlaceholder: "Player, hero or team…",
     noResults: "No cards match your filters.", more: (n: number) => `Show more (${n})`,
     name: "Name on card", hero: "Hero", role: "Role", stats: "Attributes",
@@ -42,13 +43,14 @@ const S = strings({
     save: "Save card", saving: "Saving…", cancel: "Cancel", unsaved: "Unsaved changes.",
     loading: "Loading profile…", history: "Version history",
     edit: "Edit my card", create: "Build my card", share: "Copy link", copied: "Link copied.", copyFailed: "Could not copy the link.",
+    file: "File no.", stamp: "On file",
     noCard: "No card built yet.", cards: "Collection", noCards: "No cards in the collection yet.", redeem: "Redeem a card",
     not_found: "Profile not found.",
     invalid_card: "Check the name, hero and attributes.", unavailable: "Could not load right now.", login: "Sign in to edit your card.",
   },
   es: {
     favorites: "Favoritas", favoritesHint: `Abre una carta y toca Marcar favorita: hasta ${MAX_FAVORITES} se destacan aquí.`,
-    progress: "Progreso", best: "OVR más alto", catalog: (owned: number, total: number) => `${owned} de ${total} cartas`,
+    progress: "Almas recogidas", best: "OVR más alto", catalog: (owned: number, total: number) => `${owned} de ${total} cartas`,
     rarity: "Filtrar por rareza", all: "Todas", search: "Buscar cartas", searchPlaceholder: "Jugador, héroe o equipo…",
     noResults: "Ninguna carta coincide con los filtros.", more: (n: number) => `Mostrar más (${n})`,
     name: "Nombre en la carta", hero: "Héroe", role: "Rol", stats: "Atributos",
@@ -56,11 +58,19 @@ const S = strings({
     save: "Guardar carta", saving: "Guardando…", cancel: "Cancelar", unsaved: "Cambios sin guardar.",
     loading: "Cargando perfil…", history: "Historial de versiones",
     edit: "Editar mi carta", create: "Armar mi carta", share: "Copiar enlace", copied: "Enlace copiado.", copyFailed: "No se pudo copiar el enlace.",
+    file: "Ficha n.º", stamp: "Archivado",
     noCard: "Todavía no armó una carta.", cards: "Colección", noCards: "Todavía no hay cartas en la colección.", redeem: "Canjear carta",
     not_found: "Perfil no encontrado.",
     invalid_card: "Revisa el nombre, el héroe y los atributos.", unavailable: "No se pudo cargar ahora.", login: "Inicia sesión para editar tu carta.",
   },
 });
+
+/** Número da ficha do dossiê: sai do id da conta, então é sempre o mesmo para a mesma pessoa. */
+const fileNo = (id: string) => {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return String(h % 10000).padStart(4, "0");
+};
 
 type Issue = "invalid_card" | "unavailable" | "login" | "not_found";
 
@@ -78,7 +88,7 @@ function issueOf(error: unknown): Issue {
 
 export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOpenCard: (id: string) => void; onRedeem: () => void }) {
   const t = useT(S);
-  const { me, settings } = useData();
+  const { me, settings, heroArt } = useData();
   const [profile, setProfile] = useState<PublicProfile>();
   const [error, setError] = useState<Issue>();
   const [editing, setEditing] = useState(false);
@@ -107,12 +117,18 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
   const owner = me?.id === profile.id;
   const card = profile.card;
   const tier = card && getCardTier(profilePlayer(card), settings.tierConfig!);
+  const art = card && heroArt(card.hero);
+  // ficha do dossiê: foto 3×4 com carimbo, número da ficha à máquina de escrever, nome em destaque
   const identity = (
-    <div className="flex min-w-0 items-center gap-3">
-      {profile.image
-        ? <img src={profile.image} alt="" className="size-12 shrink-0 rounded-xl object-cover sm:size-14" />
-        : <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-xl font-black text-dl-text sm:size-14">{profile.name.charAt(0).toUpperCase()}</span>}
+    <div className="flex min-w-0 items-center gap-4">
+      <div className="relative shrink-0 -rotate-2 bg-dl-text p-1 pb-3 shadow-[0_8px_20px_rgb(0_0_0/0.5)]">
+        {profile.image
+          ? <img src={profile.image} alt="" className="aspect-3/4 w-16 object-cover grayscale-[0.35] sm:w-20" />
+          : <span aria-hidden="true" className="flex aspect-3/4 w-16 items-center justify-center bg-zinc-800 font-display text-2xl font-black text-dl-text sm:w-20">{profile.name.charAt(0).toUpperCase()}</span>}
+        <span aria-hidden="true" className="dossier-stamp absolute -right-4 bottom-1 rotate-[-14deg]">{t.stamp}</span>
+      </div>
       <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="font-typewriter text-xs tracking-[0.2em] text-zinc-300 uppercase">{t.file} {fileNo(profile.id)}</span>
         {/* nome do perfil um terço menor que o título das abas (pageTitle) */}
         <h1 id="profile-title" className="truncate font-display text-2xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-[2rem]">{profile.name}</h1>
         {profile.handle && <p className="truncate text-sm font-semibold text-zinc-300">@{profile.handle}</p>}
@@ -132,8 +148,14 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
           />
         </>
       ) : (
-        // carta do perfil à esquerda (só a carta, sem os atributos detalhados) e conquistas ocupando o resto da largura
-        <div className="flex flex-col gap-6 lg:flex-row">
+        // carta do perfil à esquerda (só a carta, sem os atributos detalhados) e conquistas ocupando o resto da largura;
+        // atrás, a arte do herói da carta, grande e na cor da raridade dela
+        <div className="relative isolate flex flex-col gap-6 lg:flex-row">
+          {art && tier && (
+            <div aria-hidden="true" className="dossier-hero pointer-events-none absolute -top-28 -left-56 -z-10 size-176" style={{ "--hero-c": tier.c } as CSSProperties}>
+              <img src={art.url} alt="" className="size-full object-cover object-top" />
+            </div>
+          )}
           <div className="flex flex-col items-center gap-5 lg:w-fit lg:shrink-0">
             <div className="w-full lg:max-w-80">{identity}</div>
             {card && <div ref={cardRef} className="w-fit max-w-full"><Card player={profilePlayer(card)} /></div>}
@@ -195,7 +217,8 @@ function ProfileFavorites({ ids, profileFavorites, owner, onOpenCard }: { ids: s
         <span className="text-sm text-zinc-400 tabular-nums">{pinned.length}/{MAX_FAVORITES}</span>
       </h2>
       {pinned.length ? (
-        <ul className="flex flex-wrap justify-center gap-6">
+        // vitrine: um cone de luz âmbar de cima e um reflexo no chão, como numa estante iluminada
+        <ul className="dossier-showcase relative isolate flex flex-wrap justify-center gap-6 px-2 pt-6 pb-8">
           {/* marcar ou desmarcar uma favorita no destaque faz a carta pular para cá (ou sair) e as outras abrirem espaço */}
           <AnimatePresence mode="popLayout">
             {pinned.map((player) => (
