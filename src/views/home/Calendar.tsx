@@ -101,51 +101,53 @@ export function Calendar() {
       </Reveal>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-10">
-        {/* o dia escolhido: tudo o que tem nele, com hora, descrição e link */}
-        <div className="order-2 flex flex-col gap-5 border-t border-zinc-200/15 pt-6 lg:order-1 lg:border-t-0 lg:border-r lg:pt-0 lg:pr-10" aria-live="polite">
-          <div className="flex flex-col gap-1">
-            {sameDay(selected, today) && <span className="text-xs font-bold tracking-widest text-area uppercase">{t.today}</span>}
-            <h3 className="font-display text-2xl font-extrabold tracking-wide text-white title-depth first-letter:uppercase">{longDay.format(dateOf(selected))}</h3>
-            {dayEvents.length > 0 && <span className="text-xs text-zinc-400">{t.events(dayEvents.length)}</span>}
-          </div>
-          {dayEvents.length ? (
-            <ul className="flex flex-col gap-5">
-              {dayEvents.map((ev) => (
-                <li key={ev.id} className="flex gap-4">
-                  <TournamentLogo t={ev.t} className="size-12 text-base" />
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <p className="font-display text-base/tight font-extrabold tracking-wide text-white uppercase">
-                      {ev.t.name}{ev.label && <span className="text-area"> {ev.label}</span>}
-                    </p>
-                    <p className="text-xs font-bold text-zinc-200 tabular-nums">{time.format(new Date(ev.startsAt * 1000))}</p>
-                    {ev.brazil && <BrazilTag text={t.brazil} />}
-                    {ev.t.description && <p className="text-xs text-zinc-400">{ev.t.description}</p>}
-                    {ev.t.url && (
-                      <a href={ev.t.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-fit items-center gap-1 rounded-md text-xs font-bold text-dl-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:min-h-0">
-                        {t.more}<Icon name="chevron-right" className="size-4" />
-                      </a>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-zinc-400">{t.nothing}</p>
-              {upcoming && (
-                <button type="button" onClick={() => pick(dayOf(new Date(upcoming.startsAt * 1000)))}
-                  className="group flex min-h-11 w-fit cursor-pointer items-center gap-3 rounded-xl py-2 pr-3 text-left transition-colors hover:bg-zinc-100/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10">
-                  <TournamentLogo t={upcoming.t} className="size-10 text-sm" />
-                  <span className="flex flex-col">
-                    <span className="text-xs font-bold tracking-widest text-area uppercase">{t.upNext}</span>
-                    <span className="text-sm font-bold text-white">{fullName(upcoming)}</span>
-                    <span className="text-xs text-zinc-400 tabular-nums first-letter:uppercase">{shortDay.format(new Date(upcoming.startsAt * 1000))} · {time.format(new Date(upcoming.startsAt * 1000))}</span>
-                  </span>
-                  <Icon name="chevron-right" className="size-4 text-zinc-500 transition-transform group-hover:translate-x-0.5" />
-                </button>
-              )}
+        {/* o dia escolhido: tudo o que tem nele, com hora, descrição e link; a legenda fica no pé, na altura da última semana */}
+        <div className="order-2 flex flex-col justify-between gap-8 border-t border-zinc-200/15 pt-6 lg:order-1 lg:border-t-0 lg:border-r lg:pt-0 lg:pr-10">
+          <div className="flex flex-col gap-5" aria-live="polite">
+            <div className="flex flex-col gap-1">
+              {sameDay(selected, today) && <span className="text-xs font-bold tracking-widest text-area uppercase">{t.today}</span>}
+              <h3 className="font-display text-2xl font-extrabold tracking-wide text-white title-depth first-letter:uppercase">{longDay.format(dateOf(selected))}</h3>
+              {dayEvents.length > 0 && <span className="text-xs text-zinc-400">{t.events(dayEvents.length)}</span>}
             </div>
-          )}
+            {dayEvents.length ? (
+              <ul className="flex flex-col gap-5">
+                {dayEvents.map((ev) => (
+                  <li key={ev.id} className="flex gap-4">
+                    <TournamentLogo t={ev.t} className="size-12 text-base" />
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <p className="font-display text-base/tight font-extrabold tracking-wide text-white uppercase">
+                        {ev.t.name}{ev.label && <span className="text-area"> {ev.label}</span>}
+                      </p>
+                      <p className="text-xs font-bold text-zinc-200 tabular-nums">{time.format(new Date(ev.startsAt * 1000))}</p>
+                      {ev.brazil && <BrazilTag text={t.brazil} />}
+                      {ev.t.description && <p className="text-xs text-zinc-400">{ev.t.description}</p>}
+                      {ev.t.url && (
+                        <a href={ev.t.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-fit items-center gap-1 rounded-md text-xs font-bold text-dl-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:min-h-0">
+                          {t.more}<Icon name="chevron-right" className="size-4" />
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-zinc-400">{t.nothing}</p>
+                {upcoming && (
+                  <button type="button" onClick={() => pick(dayOf(new Date(upcoming.startsAt * 1000)))}
+                    className="group flex min-h-11 w-fit cursor-pointer items-center gap-3 rounded-xl py-2 pr-3 text-left transition-colors hover:bg-zinc-100/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10">
+                    <TournamentLogo t={upcoming.t} className="size-10 text-sm" />
+                    <span className="flex flex-col">
+                      <span className="text-xs font-bold tracking-widest text-area uppercase">{t.upNext}</span>
+                      <span className="text-sm font-bold text-white">{fullName(upcoming)}</span>
+                      <span className="text-xs text-zinc-400 tabular-nums first-letter:uppercase">{shortDay.format(new Date(upcoming.startsAt * 1000))} · {time.format(new Date(upcoming.startsAt * 1000))}</span>
+                    </span>
+                    <Icon name="chevron-right" className="size-4 text-zinc-500 transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           {events.some((ev) => ev.brazil) && (
             <p className="flex w-fit items-center gap-3 rounded-xl bg-br-green/20 py-2.5 pr-4 pl-2.5 font-display text-sm/tight font-extrabold tracking-wide text-br-yellow uppercase">
               <span aria-hidden="true" className="br-frame size-6 shrink-0 rounded-md" />
