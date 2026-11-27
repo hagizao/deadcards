@@ -8,13 +8,13 @@ import { Icon } from "./Icon";
 
 type Text = { title: string; desc: (goal: number) => string };
 type Texts = {
-  heading: string; done: (n: number, total: number) => string; all: string; unlocked: string; locked: string;
+  heading: string; done: (n: number, total: number) => string; all: string; unlocked: string; locked: string; showAll: (n: number) => string; showLess: string;
   rarities: Record<AchievementRarity, string>; items: Record<AchievementId, Text>;
 };
 
 const S = strings<Texts>({
   pt: {
-    heading: "Conquistas", done: (n, total) => `${n} de ${total}`, all: "Todas", unlocked: "Desbloqueada", locked: "Bloqueada",
+    heading: "Conquistas", done: (n, total) => `${n} de ${total}`, all: "Todas", unlocked: "Desbloqueada", locked: "Bloqueada", showAll: (n) => `Ver todas (${n})`, showLess: "Mostrar menos",
     rarities: { bronze: "Bronze", silver: "Prata", gold: "Ouro", diamond: "Diamante" },
     items: {
       "first-card": { title: "Primeira carta", desc: () => "Tenha sua primeira carta." },
@@ -46,7 +46,7 @@ const S = strings<Texts>({
     },
   },
   en: {
-    heading: "Achievements", done: (n, total) => `${n} of ${total}`, all: "All", unlocked: "Unlocked", locked: "Locked",
+    heading: "Achievements", done: (n, total) => `${n} of ${total}`, all: "All", unlocked: "Unlocked", locked: "Locked", showAll: (n) => `Show all (${n})`, showLess: "Show less",
     rarities: { bronze: "Bronze", silver: "Silver", gold: "Gold", diamond: "Diamond" },
     items: {
       "first-card": { title: "First card", desc: () => "Get your first card." },
@@ -78,7 +78,7 @@ const S = strings<Texts>({
     },
   },
   es: {
-    heading: "Logros", done: (n, total) => `${n} de ${total}`, all: "Todos", unlocked: "Desbloqueado", locked: "Bloqueado",
+    heading: "Logros", done: (n, total) => `${n} de ${total}`, all: "Todos", unlocked: "Desbloqueado", locked: "Bloqueado", showAll: (n) => `Ver todos (${n})`, showLess: "Mostrar menos",
     rarities: { bronze: "Bronce", silver: "Plata", gold: "Oro", diamond: "Diamante" },
     items: {
       "first-card": { title: "Primera carta", desc: () => "Consigue tu primera carta." },
@@ -115,12 +115,17 @@ const S = strings<Texts>({
 const TILE: Record<AchievementRarity, string> = { bronze: "ach-tile ach-bronze", silver: "ach-tile ach-silver", gold: "ach-tile ach-gold", diamond: "ach-tile ach-diamond" };
 const ICON = { bronze: "medal", silver: "star", gold: "trophy", diamond: "gem" } as const;
 const COLOR: Record<AchievementRarity, string> = { bronze: "text-ach-bronze", silver: "text-ach-silver", gold: "text-ach-gold", diamond: "text-ach-diamond" };
+// recolhida, a seção mostra só as primeiras (desbloqueadas e as mais perto de sair)
+const COLLAPSED = 12;
+// no celular a coluna é única: recolhida mostra menos para as favoritas não ficarem lá embaixo
+const COLLAPSED_SMALL = 4;
 const RANK: Record<AchievementRarity, number> = { bronze: 0, silver: 1, gold: 2, diamond: 3 };
 
-export function Achievements({ ids, profileCard, favorites }: { ids: string[]; profileCard: boolean; favorites: number }) {
+export function Achievements({ ids, profileCard, favorites, collapsible = false }: { ids: string[]; profileCard: boolean; favorites: number; collapsible?: boolean }) {
   const t = useT(S);
   const { players, teams } = useData();
   const [rarity, setRarity] = useState<AchievementRarity>();
+  const [open, setOpen] = useState(!collapsible);
   const all = achievementsFor(players, teams, ids, { profileCard, favorites: Math.min(favorites, MAX_FAVORITES) });
   const done = all.filter((a) => a.done).length;
   // desbloqueadas primeiro (as mais raras na frente); depois as mais perto de sair
@@ -132,7 +137,7 @@ export function Achievements({ ids, profileCard, favorites }: { ids: string[]; p
     .map(({ a }) => a);
 
   return (
-    <section aria-labelledby="achievements-title" className="noir-glass flex flex-col gap-5 rounded-2xl p-4 sm:p-6">
+    <section aria-labelledby="achievements-title" className="noir-glass flex min-w-0 flex-1 flex-col gap-5 rounded-2xl p-4 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 id="achievements-title" className="font-display text-lg font-black text-dl-text">{t.heading}</h2>
         <span className="text-sm text-zinc-400 tabular-nums">{t.done(done, all.length)}</span>
@@ -150,18 +155,24 @@ export function Achievements({ ids, profileCard, favorites }: { ids: string[]; p
           );
         })}
       </div>
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {shown.map((a) => <AchievementTile key={a.id} a={a} t={t} />)}
+      <ul id="achievements-list" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {(open ? shown : shown.slice(0, COLLAPSED)).map((a, i) => <AchievementTile key={a.id} a={a} t={t} hide={!open && i >= COLLAPSED_SMALL} />)}
       </ul>
+      {collapsible && shown.length > COLLAPSED_SMALL && (
+        <button type="button" aria-expanded={open} aria-controls="achievements-list" onClick={() => setOpen((o) => !o)} className={`${pill(false)} self-center ${!open && shown.length <= COLLAPSED ? "lg:hidden" : ""}`}>
+          {open ? t.showLess : t.showAll(shown.length)}
+          <Icon name={open ? "chevron-up" : "chevron-down"} className="size-4" />
+        </button>
+      )}
     </section>
   );
 }
 
-function AchievementTile({ a, t }: { a: Achievement; t: Texts }) {
+function AchievementTile({ a, t, hide }: { a: Achievement; t: Texts; hide: boolean }) {
   const text = t.items[a.id];
   const pct = Math.round((a.value / a.goal) * 100);
   return (
-    <li data-locked={a.done ? undefined : ""} className={`${TILE[a.rarity]} flex items-center gap-3 rounded-xl p-3`}>
+    <li data-locked={a.done ? undefined : ""} className={`${TILE[a.rarity]} ${hide ? "max-lg:hidden" : ""} flex items-center gap-3 rounded-xl p-3`}>
       <span className="ach-medal relative flex size-12 shrink-0 items-center justify-center rounded-full bg-zinc-950">
         <Icon name={ICON[a.rarity]} className="size-6" />
         {!a.done && (
