@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { Player, TierBand } from "../../lib/types";
 import { useData } from "../../lib/data";
 import { STAT_KEYS } from "../../lib/cards";
@@ -13,14 +13,6 @@ import { Reveal } from "../../components/Motion";
 type Part = "ovr" | "role" | "team" | "name" | "stats";
 const PARTS: Part[] = ["ovr", "role", "team", "name", "stats"];
 
-// onde fica cada número sobre a carta (porcentagem da carta de 295 x 430)
-const SPOT: Record<Part, { left: string; top: string }> = {
-  ovr: { left: "36%", top: "8%" },
-  role: { left: "30%", top: "17%" },
-  team: { left: "30%", top: "25%" },
-  name: { left: "74%", top: "43.5%" },
-  stats: { left: "-3%", top: "62%" },
-};
 
 const S = strings({
   pt: {
@@ -33,7 +25,7 @@ const S = strings({
       stats: ["Atributos", "Seis notas que mostram no que ele é bom:"],
     },
     stats: { MIR: "precisão dos tiros", MAC: "decisões no mapa: farm, objetivos e rotações", SUP: "o quanto ajuda e protege o time", MOV: "mobilidade e posicionamento", POL: "quantos heróis joga bem", CON: "rende bem partida após partida" },
-    rarity: "Raridade", rarityLead: "A moldura muda com o OVR. Quanto mais rara, mais ela brilha.",
+    point: (part: string) => `Destacar ${part} na carta`, rarity: "Raridade", rarityLead: "A moldura muda com o OVR. Quanto mais rara, mais ela brilha.",
   },
   en: {
     title: "How to read a card", lead: "Each card sums up a player from the Deadlock competitive scene. You'll get all of them in 30 seconds.",
@@ -45,7 +37,7 @@ const S = strings({
       stats: ["Attributes", "Six ratings that show what they're good at:"],
     },
     stats: { MIR: "shot accuracy", MAC: "map decisions: farming, objectives and rotations", SUP: "how much they help and protect the team", MOV: "mobility and positioning", POL: "how many heroes they play well", CON: "performs well match after match" },
-    rarity: "Rarity", rarityLead: "The frame changes with the OVR. The rarer, the more it shines.",
+    point: (part: string) => `Highlight ${part} on the card`, rarity: "Rarity", rarityLead: "The frame changes with the OVR. The rarer, the more it shines.",
   },
   es: {
     title: "Cómo leer una carta", lead: "Cada carta resume a un jugador del competitivo de Deadlock. En 30 segundos las entiendes todas.",
@@ -57,7 +49,7 @@ const S = strings({
       stats: ["Atributos", "Seis notas que muestran en qué es bueno:"],
     },
     stats: { MIR: "precisión de los disparos", MAC: "decisiones en el mapa: farmeo, objetivos y rotaciones", SUP: "cuánto ayuda y protege al equipo", MOV: "movilidad y posicionamiento", POL: "cuántos héroes juega bien", CON: "rinde bien partida tras partida" },
-    rarity: "Rareza", rarityLead: "El marco cambia con el OVR. Cuanto más rara, más brilla.",
+    point: (part: string) => `Resaltar ${part} en la carta`, rarity: "Rareza", rarityLead: "El marco cambia con el OVR. Cuanto más rara, más brilla.",
   },
 });
 
@@ -75,9 +67,41 @@ function rarityRanges(cfg: TierBand[]) {
   });
 }
 
-const Marker = ({ n, className, style }: { n: number; className?: string; style?: CSSProperties }) => (
-  <span aria-hidden="true" style={style} className={`flex size-7 shrink-0 items-center justify-center rounded-full bg-dl-text text-sm font-black text-dl-black shadow-[0_0_0_3px_rgb(16_19_13/0.8)] ${className ?? ""}`}>{n}</span>
-);
+const MARK = "flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-black shadow-[0_0_0_3px_rgb(16_19_13/0.8)] transition-[scale,background-color] duration-150";
+const markTone = (on: boolean) => (on ? "scale-115 bg-white text-dl-black" : "bg-dl-text text-dl-black");
+
+type Box = { x: number; y: number; w: number; h: number };
+
+// cada parte é achada pelo que a carta já marca no DOM (data-ovr, data-zone, data-stat), então os números seguem a carta de verdade
+function partEl(root: HTMLElement, part: Part): Element | null {
+  const ovr = root.querySelector("[data-ovr]");
+  if (part === "ovr") return ovr;
+  if (part === "role") return ovr?.nextElementSibling ?? null;
+  if (part === "team") return ovr?.nextElementSibling?.nextElementSibling ?? null;
+  if (part === "name") return root.querySelector('[data-zone="name"] h3');
+  return root.querySelector("[data-stat]")?.parentElement ?? null;
+}
+
+function measure(root: HTMLElement): Record<Part, Box> | null {
+  const base = root.getBoundingClientRect();
+  const out = {} as Record<Part, Box>;
+  for (const part of PARTS) {
+    const el = partEl(root, part);
+    if (!el) return null;
+    // o nome é um bloco da largura da carta: mede só o texto, para o número ficar colado nele
+    let r = el.getBoundingClientRect();
+    if (part === "name") { const range = document.createRange(); range.selectNodeContents(el); r = range.getBoundingClientRect(); }
+    out[part] = { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+  }
+  return out;
+}
+
+const MARK_SIZE = 28;
+// onde o número fica em relação à parte: à direita dela, menos nos atributos, que ganham o número à esquerda
+const markAt = (part: Part, b: Box) => ({
+  left: part === "stats" ? b.x - MARK_SIZE - 10 : b.x + b.w + 8,
+  top: b.y + b.h / 2 - MARK_SIZE / 2,
+});
 
 /** "Como ler uma carta": uma carta de verdade com números em cima e a explicação de cada parte ao lado. */
 export function CardGuide({ sample }: { sample: Player }) {
@@ -85,6 +109,19 @@ export function CardGuide({ sample }: { sample: Player }) {
   const statNames = useT(STAT_NAMES);
   const { settings } = useData();
   const rarities = rarityRanges(settings.tierConfig!);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [boxes, setBoxes] = useState<Record<Part, Box> | null>(null);
+  const [hot, setHot] = useState<Part | null>(null);
+
+  // mede as partes quando a carta aparece e sempre que muda de tamanho (celular, troca de carta)
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBoxes(measure(el)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sample.id]);
+  const ring = hot && boxes?.[hot];
 
   return (
     <section aria-labelledby="home-guide" className="flex flex-col gap-6">
@@ -94,18 +131,46 @@ export function CardGuide({ sample }: { sample: Player }) {
       </Reveal>
 
       <div className="flex flex-col items-center gap-8 lg:flex-row lg:items-start">
-        <Reveal className="relative w-fit max-w-full shrink-0">
-          <Card player={sample} />
-          {PARTS.map((part, i) => <Marker key={part} n={i + 1} className="pointer-events-none absolute z-30" style={SPOT[part]} />)}
+        <Reveal className="w-fit max-w-full shrink-0">
+          <div ref={cardRef} className="relative">
+            <Card player={sample} />
+            {/* anel que pula para a parte destacada */}
+            {ring && (
+              <motion.span
+                aria-hidden="true"
+                className="pointer-events-none absolute z-30 rounded-lg border-2 border-dl-text shadow-[0_0_18px_rgb(255_239_215/0.55),inset_0_0_12px_rgb(255_239_215/0.25)]"
+                initial={false}
+                animate={{ left: ring.x - 6, top: ring.y - 5, width: ring.w + 12, height: ring.h + 10, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 420, damping: 34 }}
+              />
+            )}
+            {boxes && PARTS.map((part, i) => (
+              <button
+                key={part}
+                type="button"
+                aria-label={t.point(t.parts[part][0])}
+                aria-pressed={hot === part}
+                onPointerEnter={() => setHot(part)}
+                onPointerLeave={() => setHot(null)}
+                onFocus={() => setHot(part)}
+                onBlur={() => setHot(null)}
+                onClick={() => setHot((h) => (h === part ? null : part))}
+                style={markAt(part, boxes[part])}
+                className={`${MARK} ${markTone(hot === part)} absolute z-40 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:scale-95`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
         </Reveal>
 
         <div className="flex min-w-0 flex-1 flex-col gap-6">
           <ol className="flex flex-col gap-4">
             {PARTS.map((part, i) => (
-              <motion.li key={part} className="flex gap-3" initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.06) }}>
-                  <Marker n={i + 1} />
+              <motion.li key={part} className="flex gap-3" onPointerEnter={() => setHot(part)} onPointerLeave={() => setHot(null)} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.06) }}>
+                  <span aria-hidden="true" className={`${MARK} ${markTone(hot === part)}`}>{i + 1}</span>
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className="font-extrabold text-dl-text">{t.parts[part][0]}</span>
+                    <span className={`font-extrabold transition-colors ${hot === part ? "text-white" : "text-dl-text"}`}>{t.parts[part][0]}</span>
                     <span className="text-sm text-pretty text-zinc-300">{t.parts[part][1]}</span>
                     {part === "stats" && (
                       <dl className="mt-1 grid gap-x-6 gap-y-2 sm:grid-cols-2">
@@ -122,7 +187,7 @@ export function CardGuide({ sample }: { sample: Player }) {
             ))}
           </ol>
 
-          <Reveal className="flex flex-col gap-3 rounded-2xl bg-zinc-950/60 p-4">
+          <Reveal className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <span className="font-extrabold text-dl-text">{t.rarity}</span>
               <span className="text-sm text-zinc-300">{t.rarityLead}</span>
