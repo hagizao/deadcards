@@ -191,7 +191,7 @@ export function CardGuide({ sample }: { sample: Player }) {
               <motion.li key={part} className="flex gap-3" onPointerEnter={() => setHot(part)} onPointerLeave={() => setHot(null)} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.06) }}>
                   <span aria-hidden="true" className={`${MARK} ${markTone(hot === part)}`}>{i + 1}</span>
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className={`font-extrabold transition-colors ${hot === part ? "text-white" : "text-dl-text"}`}>{t.parts[part][0]}</span>
+                    <span className={`font-display text-base tracking-[0.11em] uppercase transition-colors title-depth ${hot === part ? "text-white" : "text-dl-text"}`}>{t.parts[part][0]}</span>
                     <span className="text-sm text-pretty text-zinc-300">{t.parts[part][1]}</span>
                     {part === "stats" && (
                       <dl className="mt-1 grid gap-x-6 gap-y-2 sm:grid-cols-2">
@@ -209,11 +209,15 @@ export function CardGuide({ sample }: { sample: Player }) {
           </ol>
 
           <Reveal className="flex flex-col gap-3">
-            <span className="font-extrabold text-dl-text">{t.heroes}</span>
+            <h3 className="font-display text-lg tracking-[0.11em] text-dl-text uppercase title-depth">{t.heroes}</h3>
             <dl className="flex flex-col gap-3">
-              {[{ term: t.sigTitle, text: t.sigText }, { term: t.playedTitle, text: t.playedText(ALT_HERO_DROP) }].map(({ term, text }) => (
-                <div key={term} className="flex flex-col gap-0.5">
-                  <dt className="font-semibold text-zinc-100">{term}</dt>
+              {/* assinatura em dourado (o herói principal); jogado em prata, o segundo lugar, 2 pontos abaixo */}
+              {[
+                { term: t.sigTitle, text: t.sigText, tone: "text-ach-gold", line: "border-ach-gold/60" },
+                { term: t.playedTitle, text: t.playedText(ALT_HERO_DROP), tone: "text-ach-silver", line: "border-ach-silver/50" },
+              ].map(({ term, text, tone, line }) => (
+                <div key={term} className={`flex flex-col gap-1 border-l-2 pl-3 ${line}`}>
+                  <dt className={`font-display text-base tracking-[0.11em] uppercase title-depth ${tone}`}>{term}</dt>
                   <dd className="text-sm text-pretty text-zinc-300">{text}</dd>
                 </div>
               ))}
@@ -222,7 +226,7 @@ export function CardGuide({ sample }: { sample: Player }) {
 
           <Reveal className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <span className="font-extrabold text-dl-text">{t.rarity}</span>
+              <h3 className="font-display text-lg tracking-[0.11em] text-dl-text uppercase title-depth">{t.rarity}</h3>
               <span className="text-sm text-zinc-300">{t.rarityLead}</span>
             </div>
             <ul className="flex flex-wrap gap-2">
