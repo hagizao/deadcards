@@ -107,7 +107,7 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={p.id} className="flex flex-col gap-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={enter}>
               <div className="flex flex-col gap-2">
-                <p className="font-display text-4xl/none font-black tracking-[0.08em] text-white uppercase sm:text-5xl/none">{p.name}</p>
+                <p className="font-display text-4xl/none font-black tracking-[0.08em] text-white uppercase title-depth sm:text-5xl/none">{p.name}</p>
                 <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-300">
                   <TeamLogo3D team={team} className="size-7" radius={6} />
                   {label(team.name)}
@@ -117,7 +117,7 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-lg bg-area px-3 py-1.5 text-xs font-extrabold tracking-widest text-dl-black uppercase">{label(p.position || "Flex")}</span>
+                <span className="rounded-lg bg-dl-text px-3 py-1.5 text-xs font-extrabold tracking-widest text-dl-black uppercase">{label(p.position || "Flex")}</span>
                 <span className="flex items-center gap-2 rounded-lg bg-zinc-900/80 py-1 pr-3 pl-1 text-xs font-bold text-zinc-200">
                   {hero ? <img src={hero} alt="" className="size-7 rounded-md object-cover" /> : <Icon name="star" className="size-4" />}
                   <span className="flex flex-col leading-tight">
@@ -158,7 +158,7 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
               {cards.map((c, i) => (
                 <button key={c.id} type="button" onClick={() => pick(i)} aria-label={t.show(c.name)} aria-current={i === at ? "true" : undefined}
                   className="group flex size-11 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
-                  <span className={`h-1.5 rounded-full transition-all duration-300 ${i === at ? "w-6 bg-area" : "w-1.5 bg-zinc-500 group-hover:bg-zinc-300"}`} />
+                  <span className={`h-1.5 rounded-full transition-all duration-300 ${i === at ? "w-6 bg-dl-text" : "w-1.5 bg-zinc-500 group-hover:bg-zinc-300"}`} />
                 </button>
               ))}
               <button type="button" onClick={() => pick(at + 1)} aria-label={t.next} className="flex size-11 cursor-pointer items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-100/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">

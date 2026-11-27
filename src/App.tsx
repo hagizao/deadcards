@@ -302,10 +302,9 @@ function Shell() {
                 data-nav={id}
                 onClick={() => go(id)}
                 aria-current={tab === id ? "page" : undefined}
-                style={areaStyle(id)}
                 className={`relative flex min-h-10 cursor-pointer items-center rounded-lg px-3 text-sm font-bold tracking-widest whitespace-nowrap uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 xl:px-4 ${tab === id ? "text-dl-black" : "text-zinc-300 hover:bg-zinc-100/10 hover:text-white"}`}
               >
-                {tab === id && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-area shadow-[0_0_18px_color-mix(in_srgb,var(--color-area)_40%,transparent)]" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+                {tab === id && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-dl-text shadow-[0_0_18px_rgba(255,239,215,0.35)]" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
                 <span className="relative">{t.tabs[id]}</span>
               </button>
             ))}
@@ -374,11 +373,10 @@ function Shell() {
             data-nav={id}
             onClick={() => go(id)}
             aria-current={tab === id ? "page" : undefined}
-            style={areaStyle(id)}
-            className={`flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 text-[10px] font-bold tracking-wider uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 ${tab === id ? "text-area" : "text-zinc-400 hover:text-zinc-100"}`}
+            className={`flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 text-[10px] font-bold tracking-wider uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 ${tab === id ? "text-dl-text" : "text-zinc-400 hover:text-zinc-100"}`}
           >
             <span className="relative flex h-7 w-12 items-center justify-center">
-              {tab === id && <motion.span layoutId="nav-pill-bottom" className="absolute inset-0 rounded-full bg-area/15" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+              {tab === id && <motion.span layoutId="nav-pill-bottom" className="absolute inset-0 rounded-full bg-dl-text/15" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
               <Icon name={NAV_ICON[id]} className="relative size-5" />
             </span>
             <span className="max-w-full truncate px-0.5">{t.tabs[id]}</span>

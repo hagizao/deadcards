@@ -1,13 +1,13 @@
 import { motion } from "motion/react";
 import type { Team } from "../lib/types";
 import { useData } from "../lib/data";
-import { getPlayerOvr, hexToRgba, isMainCard, regionClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
+import { getPlayerOvr, isMainCard, regionClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
 import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
 import { Icon, type IconName } from "../components/Icon";
-import { easeOut, pill } from "../lib/ui";
+import { easeOut, pill, sectionTitle } from "../lib/ui";
 import { cascade, enter } from "../lib/motion";
 import type { Tier } from "../lib/rarity";
 import { areaStyle, areaTier } from "../lib/areas";
@@ -133,7 +133,6 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
   );
 }
 
-const sectionTitle = "font-display text-xl font-extrabold tracking-[0.11em] text-area uppercase sm:text-2xl";
 
 /** Atalho do Explore: ícone e nome na cor da raridade, para que serve e um número. Só acende um fundo no hover. */
 function AreaTile({ icon, tier, title, text, meta, onClick }: { icon: IconName; tier: Tier; title: string; text: string; meta: string | null; onClick: () => void }) {
@@ -147,7 +146,7 @@ function AreaTile({ icon, tier, title, text, meta, onClick }: { icon: IconName; 
         <span aria-hidden="true" style={{ color: tier.c, filter: `drop-shadow(0 0 ${3 + tier.lvl * 2}px ${tier.c})` }}><Icon name={icon} className="size-6" /></span>
         <Icon name="chevron-right" className="size-5 text-zinc-500 transition-[translate,color] duration-200 group-hover:translate-x-1 group-hover:text-zinc-200" />
       </span>
-      <span className="font-display text-lg tracking-[0.11em] whitespace-nowrap uppercase" style={{ color: tier.c, textShadow: `0 0 ${4 + tier.lvl * 3}px ${hexToRgba(tier.c, 0.45)}` }}>{title}</span>
+      <span className="font-display text-lg tracking-[0.11em] whitespace-nowrap uppercase title-depth" style={{ color: tier.c }}>{title}</span>
       <span className="text-sm text-pretty text-zinc-300">{text}</span>
       {meta && <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{meta}</span>}
     </button>
@@ -180,7 +179,7 @@ function TeamRow({ r, idx, tier, meta, onOpen }: {
       <span className="relative z-10 w-9 shrink-0 text-center text-xl font-black text-zinc-300 tabular-nums sm:text-2xl">#{idx + 1}</span>
       <TeamLogo3D team={r.team} className="size-14 sm:size-16" radius={12} tilt={{ rotateX, rotateY }} />
       <div className="relative z-10 min-w-0 flex-1">
-        <div className="line-clamp-2 font-display text-base/tight font-extrabold tracking-wider text-balance text-area uppercase sm:text-xl/tight">{r.team.name}</div>
+        <div className="line-clamp-2 font-display text-base/tight font-extrabold tracking-wider text-balance text-dl-text uppercase sm:text-xl/tight">{r.team.name}</div>
         <div className="mt-1 text-[14px] font-bold tracking-wider text-zinc-300 uppercase">{meta}</div>
       </div>
       <div className="relative z-10 flex shrink-0 flex-col items-center gap-1">

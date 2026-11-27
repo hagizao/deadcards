@@ -102,7 +102,7 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
             <TeamHeader team={team} open={isOpen} onClick={() => setOpen((s) => ({ ...s, [team.id]: !s[team.id] }))}>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="team-title-text font-display text-xl/tight font-extrabold tracking-wider text-area uppercase transition-[color,text-shadow] duration-200 sm:text-2xl/tight">{team.name}</h2>
+                  <h2 className="team-title-text font-display text-xl/tight font-extrabold tracking-wider text-dl-text uppercase transition-[color,text-shadow] duration-200 sm:text-2xl/tight">{team.name}</h2>
                   <span className="team-ovr-chip">
                     <span className="team-ovr-num">{o.count ? o.rounded : "--"}</span>
                     <span className="team-ovr-lbl">OVR</span>

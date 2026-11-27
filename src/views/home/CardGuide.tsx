@@ -4,6 +4,7 @@ import { useData } from "../../lib/data";
 import { STAT_KEYS } from "../../lib/cards";
 import { ALT_HERO_DROP } from "../../lib/cardKinds";
 import { strings, useT } from "../../lib/i18n";
+import { sectionTitle } from "../../lib/ui";
 import { RARITY_TIERS, getRarity } from "../../lib/rarity";
 import { STAT_NAMES } from "../../lib/statNames";
 import { motion } from "motion/react";
@@ -78,7 +79,7 @@ function rarityRanges(cfg: TierBand[]) {
 }
 
 const MARK = "flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-black shadow-[0_0_0_3px_rgb(16_19_13/0.8)] transition-[scale,background-color] duration-150";
-const markTone = (on: boolean) => (on ? "scale-115 bg-white text-dl-black" : "bg-area text-dl-black");
+const markTone = (on: boolean) => (on ? "scale-115 bg-white text-dl-black" : "bg-dl-text text-dl-black");
 
 type Box = { x: number; y: number; w: number; h: number };
 
@@ -155,7 +156,7 @@ export function CardGuide({ sample }: { sample: Player }) {
   return (
     <section aria-labelledby="home-guide" className="flex flex-col gap-6">
       <Reveal className="flex flex-col gap-2">
-        <h2 id="home-guide" className="font-display text-xl font-extrabold tracking-[0.11em] text-area uppercase sm:text-2xl">{t.title}</h2>
+        <h2 id="home-guide" className={sectionTitle}>{t.title}</h2>
         <p className="max-w-2xl text-sm text-pretty text-zinc-300">{t.lead}</p>
       </Reveal>
 
@@ -190,7 +191,7 @@ export function CardGuide({ sample }: { sample: Player }) {
               <motion.li key={part} className="flex gap-3" onPointerEnter={() => setHot(part)} onPointerLeave={() => setHot(null)} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.06) }}>
                   <span aria-hidden="true" className={`${MARK} ${markTone(hot === part)}`}>{i + 1}</span>
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className={`font-extrabold transition-colors ${hot === part ? "text-white" : "text-area"}`}>{t.parts[part][0]}</span>
+                    <span className={`font-extrabold transition-colors ${hot === part ? "text-white" : "text-dl-text"}`}>{t.parts[part][0]}</span>
                     <span className="text-sm text-pretty text-zinc-300">{t.parts[part][1]}</span>
                     {part === "stats" && (
                       <dl className="mt-1 grid gap-x-6 gap-y-2 sm:grid-cols-2">
@@ -208,7 +209,7 @@ export function CardGuide({ sample }: { sample: Player }) {
           </ol>
 
           <Reveal className="flex flex-col gap-3">
-            <span className="font-extrabold text-area">{t.heroes}</span>
+            <span className="font-extrabold text-dl-text">{t.heroes}</span>
             <dl className="flex flex-col gap-3">
               {[{ term: t.sigTitle, text: t.sigText }, { term: t.playedTitle, text: t.playedText(ALT_HERO_DROP) }].map(({ term, text }) => (
                 <div key={term} className="flex flex-col gap-0.5">
@@ -221,7 +222,7 @@ export function CardGuide({ sample }: { sample: Player }) {
 
           <Reveal className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <span className="font-extrabold text-area">{t.rarity}</span>
+              <span className="font-extrabold text-dl-text">{t.rarity}</span>
               <span className="text-sm text-zinc-300">{t.rarityLead}</span>
             </div>
             <ul className="flex flex-wrap gap-2">

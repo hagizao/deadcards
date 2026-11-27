@@ -147,17 +147,17 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
                 : (me || !mine) && t.count(list.length)}
             </p>
           </div>
-          {/* ver todas as cartas: à direita, aceso quando ligado; desligado volta para a sua coleção */}
+          {/* ver todas as cartas: à direita, marcado quando ligado; desligado volta para a sua coleção */}
           <button type="button" aria-pressed={!mine} onClick={() => { setMode(mine ? "all" : "mine"); setLimit(PAGE); }}
-            className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-4 text-xs font-extrabold tracking-widest uppercase transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:scale-95 motion-reduce:transition-none ${
-              mine ? "bg-zinc-800/80 text-zinc-200 hover:bg-zinc-700 hover:text-white" : "bg-amber-300 text-zinc-950 shadow-[0_0_22px_rgb(252_211_77/0.45)] hover:bg-amber-200"}`}>
+            className={pill(!mine)}>
             <Icon name="cards" className="size-4" />
             {t.all}
           </button>
         </div>
         {alts.length > 0 && (
           <div role="group" aria-label={t.heroMode} className="flex flex-wrap gap-2">
-            {(["signature", "every"] as const).map((m) => (
+            {/* "todos os heróis" primeiro, à esquerda */}
+            {(["every", "signature"] as const).map((m) => (
               <button key={m} type="button" aria-pressed={heroMode === m} onClick={() => { setHeroMode(m); setLimit(PAGE); }} className={pill(heroMode === m)}>
                 {t[m]}
               </button>

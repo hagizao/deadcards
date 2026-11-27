@@ -107,7 +107,7 @@ export function Redeem({ onOpenCard }: { onOpenCard: (id: string) => void }) {
 
       {me && packs && (
         <div className="flex flex-col gap-4 border-t border-zinc-200/15 pt-6">
-          <h2 className="text-sm font-extrabold tracking-[0.2em] text-area uppercase">{t.packs} {packs.length > 0 && <span className="text-zinc-400">({packs.length})</span>}</h2>
+          <h2 className="text-sm font-extrabold tracking-[0.2em] text-area uppercase title-depth">{t.packs} {packs.length > 0 && <span className="text-zinc-400">({packs.length})</span>}</h2>
           {packs.length === 0 ? <p className="text-xs text-zinc-400">{t.noPacks}</p> : (
             <ul className="flex flex-wrap justify-center gap-6 sm:justify-start">
               {packs.map((p, i) => (
@@ -115,7 +115,7 @@ export function Redeem({ onOpenCard }: { onOpenCard: (id: string) => void }) {
                   <button type="button" onClick={() => setOpening(p)} aria-label={`${t.open}: ${p.type.name}${p.test ? ` (${t.testPack})` : ""}`}
                     className="group flex cursor-pointer flex-col items-center gap-2 rounded-2xl p-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-dl-text">
                     <span className="transition group-hover:-translate-y-1 group-active:scale-95 motion-reduce:transition-none"><PackArt name={p.type.name} art={p.type.art} alive delay={i * 1.3} /></span>
-                    <span className="text-xs font-extrabold tracking-widest text-area uppercase">{t.open}</span>
+                    <span className="text-xs font-extrabold tracking-widest text-dl-text uppercase">{t.open}</span>
                     {p.test && <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-bold tracking-wider text-zinc-300 uppercase">{t.testPack}</span>}
                   </button>
                 </li>

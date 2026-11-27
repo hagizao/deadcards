@@ -163,14 +163,14 @@ export function Achievements({ ids, profileCard, favorites, collapsible = false,
     <section aria-labelledby="achievements-title" className="flex min-w-0 flex-1 flex-col gap-5 border-t border-zinc-200/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
       <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
         <div className="flex items-baseline gap-3">
-          <h2 id="achievements-title" className="font-display text-[1.6875rem] font-black text-area">{t.heading}</h2>
+          <h2 id="achievements-title" className="font-display text-[1.6875rem] font-black text-area title-depth">{t.heading}</h2>
           <span className="text-[1.3125rem] whitespace-nowrap text-zinc-300 tabular-nums">{t.done(done, all.length)}</span>
         </div>
         <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="text-[1.3125rem] font-extrabold whitespace-nowrap text-area tabular-nums">{t.collection(pct)}</span>
+          <span className="text-[1.3125rem] font-extrabold whitespace-nowrap text-dl-text tabular-nums">{t.collection(pct)}</span>
           <span className="text-[1.3125rem] whitespace-nowrap text-zinc-400 tabular-nums">{t.cards(mine, players.length)}</span>
           <div role="progressbar" aria-label={t.collection(pct)} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="h-2 max-w-60 min-w-24 flex-1 rounded-full bg-zinc-800">
-            <FillBar pct={pct} delay={0.2} className="h-full rounded-full" barClassName="bg-area" />
+            <FillBar pct={pct} delay={0.2} className="h-full rounded-full" barClassName="bg-dl-text" />
           </div>
         </div>
       </div>
@@ -226,7 +226,7 @@ function AchievementTile({ a, t, hide, fresh, delay }: { a: Achievement; t: Text
         )}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={`text-sm/tight font-extrabold text-balance wrap-break-word ${a.done ? "text-area" : "text-zinc-300"}`}>{text.title}</span>
+        <span className={`text-sm/tight font-extrabold text-balance wrap-break-word ${a.done ? "text-dl-text" : "text-zinc-300"}`}>{text.title}</span>
         <span className="text-xs text-pretty wrap-break-word text-zinc-400">{text.desc(a.goal)}</span>
         {/* cada rótulo fica inteiro: sem espaço, o segundo desce para a linha de baixo em vez de quebrar no meio */}
         <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-bold tracking-wider uppercase">
@@ -237,7 +237,7 @@ function AchievementTile({ a, t, hide, fresh, delay }: { a: Achievement; t: Text
               {t.unlocked}
             </span>
           )}
-          {fresh && <span className="rounded-sm bg-area px-1.5 py-0.5 whitespace-nowrap text-dl-black">{t.fresh}</span>}
+          {fresh && <span className="rounded-sm bg-dl-text px-1.5 py-0.5 whitespace-nowrap text-dl-black">{t.fresh}</span>}
         </span>
         {!a.done && (
           <div className="flex min-w-0 items-center gap-2">
