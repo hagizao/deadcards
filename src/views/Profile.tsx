@@ -138,7 +138,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
             {card && <div ref={cardRef} className="w-fit max-w-full"><Card player={profilePlayer(card)} /></div>}
             {card && tier ? (
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <span className="font-display text-4xl leading-none font-black text-dl-text tabular-nums">{calculateOVR(card.stats)}</span>
+                <span className="font-display text-4xl/none font-black text-dl-text tabular-nums">{calculateOVR(card.stats)}</span>
                 <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">OVR</span>
                 <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.name}</span>
               </div>
