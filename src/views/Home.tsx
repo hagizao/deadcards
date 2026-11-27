@@ -9,8 +9,8 @@ import { usePointerTilt } from "../lib/tilt";
 import { Icon, type IconName } from "../components/Icon";
 import { easeOut, pill } from "../lib/ui";
 import { cascade, enter } from "../lib/motion";
-import { RARITY_TIERS, type Tier } from "../lib/rarity";
-import type { RarityKey } from "../lib/rarityBands";
+import type { Tier } from "../lib/rarity";
+import { areaStyle, areaTier } from "../lib/areas";
 import { Reveal } from "../components/Motion";
 import { Stage } from "./home/Stage";
 import { Welcome } from "./home/Welcome";
@@ -61,9 +61,6 @@ const S = strings({
 
 const AREAS: Area[] = ["teams", "tierlist", "collection", "compare", "redeem"];
 const AREA_ICON: Record<Area, IconName> = { teams: "shield", tierlist: "bars", collection: "cards", compare: "versus", redeem: "ticket" };
-// cada área ganha a cor de uma raridade, da mais rara para a mais comum
-const AREA_RARITY: Record<Area, RarityKey> = { teams: "eternus", tierlist: "ascendant", collection: "oracle", compare: "archon", redeem: "arcanist" };
-const rarityOf = (key: RarityKey) => RARITY_TIERS.find((r) => r.key === key)!;
 const FEATURED = 5;
 const RANKING = 4;
 
@@ -93,14 +90,15 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
 
   return (
     <div className="home-type flex flex-col gap-14">
-      <Stage cards={featured} onOpenCard={onOpenCard} onOpenTeam={onOpenTeam} />
-      <Welcome onNavigate={onNavigate} />
-      {guide && <CardGuide sample={guide} />}
-      <Roles onOpenCard={onOpenCard} />
-      <NewCards onOpenCard={onOpenCard} />
+      {/* cada seção usa a cor da área com que conversa (lib/areas.ts); "contents" não muda o layout, só passa a cor */}
+      <div className="contents" style={areaStyle("teams")}><Stage cards={featured} onOpenCard={onOpenCard} onOpenTeam={onOpenTeam} /></div>
+      <div className="contents" style={areaStyle("redeem")}><Welcome onNavigate={onNavigate} /></div>
+      {guide && <div className="contents" style={areaStyle("collection")}><CardGuide sample={guide} /></div>}
+      <div className="contents" style={areaStyle("tierlist")}><Roles onOpenCard={onOpenCard} /></div>
+      <div className="contents" style={areaStyle("compare")}><NewCards onOpenCard={onOpenCard} /></div>
 
 
-      <section className="flex flex-col gap-4" aria-labelledby="home-ranking">
+      <section className="flex flex-col gap-4" aria-labelledby="home-ranking" style={areaStyle("teams")}>
         <Reveal className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="home-ranking" className={sectionTitle}>{t.ranking}</h2>
           {ranked.length > RANKING && <button type="button" className={pill(false)} onClick={() => onNavigate("teams")}>{t.allTeams(ranked.length)}</button>}
@@ -126,7 +124,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
         <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-5">
           {AREAS.map((a, i) => (
             <motion.li key={a} className="flex border-l border-zinc-200/15 pl-2" initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.06) }}>
-              <AreaTile icon={AREA_ICON[a]} tier={rarityOf(AREA_RARITY[a])} title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />
+              <AreaTile icon={AREA_ICON[a]} tier={areaTier(a)} title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />
             </motion.li>
           ))}
         </ul>
@@ -135,7 +133,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
   );
 }
 
-const sectionTitle = "font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase sm:text-2xl";
+const sectionTitle = "font-display text-xl font-extrabold tracking-[0.11em] text-area uppercase sm:text-2xl";
 
 /** Atalho do Explore: ícone e nome na cor da raridade, para que serve e um número. Só acende um fundo no hover. */
 function AreaTile({ icon, tier, title, text, meta, onClick }: { icon: IconName; tier: Tier; title: string; text: string; meta: string | null; onClick: () => void }) {
@@ -182,7 +180,7 @@ function TeamRow({ r, idx, tier, meta, onOpen }: {
       <span className="relative z-10 w-9 shrink-0 text-center text-xl font-black text-zinc-300 tabular-nums sm:text-2xl">#{idx + 1}</span>
       <TeamLogo3D team={r.team} className="size-14 sm:size-16" radius={12} tilt={{ rotateX, rotateY }} />
       <div className="relative z-10 min-w-0 flex-1">
-        <div className="line-clamp-2 font-display text-base/tight font-extrabold tracking-wider text-balance text-dl-text uppercase sm:text-xl/tight">{r.team.name}</div>
+        <div className="line-clamp-2 font-display text-base/tight font-extrabold tracking-wider text-balance text-area uppercase sm:text-xl/tight">{r.team.name}</div>
         <div className="mt-1 text-[14px] font-bold tracking-wider text-zinc-300 uppercase">{meta}</div>
       </div>
       <div className="relative z-10 flex shrink-0 flex-col items-center gap-1">

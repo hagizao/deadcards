@@ -20,6 +20,8 @@
 @theme {
   --font-display: 'VALVE Pulp', 'VALVE Oracle', ui-sans-serif, system-ui, sans-serif;
   --color-dl-text: #ffefd7;
+  /* cor da área atual (lib/areas.ts troca por aba); fora de uma área, o bege do site */
+  --color-area: #ffefd7;
   --color-dl-black: #10130d;
   --color-dl-bevel-from: #373d45;
   --color-dl-bevel-to: #4d5860;

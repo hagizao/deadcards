@@ -56,11 +56,11 @@ export function Welcome({ onNavigate }: { onNavigate: (area: Area) => void }) {
         <div className="flex min-w-60 flex-1 flex-col gap-2">
           <h2 id="home-welcome" className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.mine}</h2>
           <div className="flex flex-wrap items-baseline gap-x-3">
-            <span className="font-display text-3xl font-black text-dl-text tabular-nums"><CountUp value={pct} />%</span>
+            <span className="font-display text-3xl font-black text-area tabular-nums"><CountUp value={pct} />%</span>
             <span className="text-sm text-zinc-400">{t.progress(mine, total)}</span>
           </div>
           <div role="progressbar" aria-label={t.mine} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="h-1.5 max-w-md rounded-full bg-zinc-800">
-            <FillBar pct={pct} className="h-full rounded-full" barClassName="bg-dl-text" />
+            <FillBar pct={pct} className="h-full rounded-full" barClassName="bg-area" />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -73,11 +73,11 @@ export function Welcome({ onNavigate }: { onNavigate: (area: Area) => void }) {
 
   return (
     <section aria-labelledby="home-welcome" className="flex flex-col gap-5">
-      <h2 id="home-welcome" className="font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase sm:text-2xl">{t.title}</h2>
+      <h2 id="home-welcome" className="font-display text-xl font-extrabold tracking-[0.11em] text-area uppercase sm:text-2xl">{t.title}</h2>
       <ol className="grid gap-4 md:grid-cols-3">
         {t.steps.map(([title, text], i) => (
           <motion.li key={title} className="flex gap-3" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.08) }}>
-            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 font-display text-lg text-dl-text">{i + 1}</span>
+            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 font-display text-lg text-area">{i + 1}</span>
             <span className="flex flex-col gap-1">
               <span className="font-extrabold text-white">{title}</span>
               <span className="text-sm text-pretty text-zinc-300">{text}</span>

@@ -16,6 +16,7 @@ import { Legal } from "./views/Legal";
 import { Compare } from "./views/Compare";
 import { LANGS, LANG_LABEL, LangProvider, type Lang, strings, useLang, useT } from "./lib/i18n";
 import { Feedback } from "./views/Feedback";
+import { areaStyle, type AreaKey } from "./lib/areas";
 import { Icon } from "./components/Icon";
 import { Profile } from "./views/Profile";
 import { easeOut } from "./lib/ui";
@@ -36,6 +37,9 @@ type Tab = "home" | "teams" | "tierlist" | "collection" | "redeem" | "compare" |
 // ordem da navegação: a tela nova entra pelo lado de quem está à frente ou atrás no menu
 const TAB_ORDER: Tab[] = ["home", "teams", "tierlist", "collection", "redeem", "compare", "profile", "settings", "editor", "feedback", "privacy", "terms"];
 const TABS = ["teams", "tierlist", "collection", "redeem", "compare"] as const;
+// aba -> área de cor (o perfil mostra a coleção da pessoa)
+const TAB_AREA: Partial<Record<Tab, AreaKey>> = { teams: "teams", tierlist: "tierlist", collection: "collection", redeem: "redeem", compare: "compare", profile: "collection" };
+
 const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", redeem: "ticket", compare: "versus" } as const;
 
 const S = strings({
@@ -298,9 +302,10 @@ function Shell() {
                 data-nav={id}
                 onClick={() => go(id)}
                 aria-current={tab === id ? "page" : undefined}
+                style={areaStyle(id)}
                 className={`relative flex min-h-10 cursor-pointer items-center rounded-lg px-3 text-sm font-bold tracking-widest whitespace-nowrap uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 xl:px-4 ${tab === id ? "text-dl-black" : "text-zinc-300 hover:bg-zinc-100/10 hover:text-white"}`}
               >
-                {tab === id && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-dl-text shadow-[0_0_18px_rgba(255,239,215,0.35)]" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+                {tab === id && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-area shadow-[0_0_18px_color-mix(in_srgb,var(--color-area)_40%,transparent)]" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
                 <span className="relative">{t.tabs[id]}</span>
               </button>
             ))}
@@ -314,7 +319,7 @@ function Shell() {
 
       <ReducedMotionNotice />
       {/* clip no eixo x: a tela que entra deslizando de lado não pode criar rolagem horizontal no celular */}
-      <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
+      <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 sm:px-6 sm:py-10 lg:px-8" style={areaStyle(TAB_AREA[tab])}>
         <motion.div
             key={tab}
             initial={{ opacity: 0, x: shown.dir * 24 }}
@@ -369,10 +374,11 @@ function Shell() {
             data-nav={id}
             onClick={() => go(id)}
             aria-current={tab === id ? "page" : undefined}
-            className={`flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 text-[10px] font-bold tracking-wider uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 ${tab === id ? "text-dl-text" : "text-zinc-400 hover:text-zinc-100"}`}
+            style={areaStyle(id)}
+            className={`flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 text-[10px] font-bold tracking-wider uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 ${tab === id ? "text-area" : "text-zinc-400 hover:text-zinc-100"}`}
           >
             <span className="relative flex h-7 w-12 items-center justify-center">
-              {tab === id && <motion.span layoutId="nav-pill-bottom" className="absolute inset-0 rounded-full bg-dl-text/15" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+              {tab === id && <motion.span layoutId="nav-pill-bottom" className="absolute inset-0 rounded-full bg-area/15" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
               <Icon name={NAV_ICON[id]} className="relative size-5" />
             </span>
             <span className="max-w-full truncate px-0.5">{t.tabs[id]}</span>
