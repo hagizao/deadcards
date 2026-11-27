@@ -371,6 +371,16 @@ export default {
       const rows = await env.DB.prepare("SELECT player_id FROM user_cards WHERE user_id = ?").bind(user.id).all<{ player_id: string }>();
       return Response.json(rows.results.map((r) => r.player_id));
     }
+    // quantas contas têm uma carta: público, aparece no destaque das cartas especiais
+    const ownersOf = url.pathname.match(/^\/api\/cards\/([^/]+)\/owners$/);
+    if (ownersOf) {
+      if (request.method !== "GET") return bad("método não suportado", 405);
+      let id = "";
+      try { id = decodeURIComponent(ownersOf[1]); } catch { /* escape inválido: nenhuma carta tem esse id */ }
+      if (!ID_RE.test(id)) return bad("id inválido");
+      const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM user_cards WHERE player_id = ?").bind(id).first<number>("n");
+      return Response.json({ count: count ?? 0 }, { headers: { "cache-control": "public, max-age=60" } });
+    }
     // coleção universal (Editor): quantas contas têm cada carta e quantas contas existem
     if (url.pathname === "/api/owners") {
       if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
