@@ -79,8 +79,8 @@ const SERIES = [
   { shape: "fill-sapphire/15 stroke-sapphire", text: "text-sapphire", mark: "┄" },
 ] as const;
 const SIDES = [
-  { label: "text-amber-hand", glow: "side-glow [--side:var(--color-amber-hand)]" },
-  { label: "text-sapphire", glow: "side-glow [--side:var(--color-sapphire)]" },
+  { label: "deco-fan text-amber-hand", glow: "side-glow [--side:var(--color-amber-hand)]" },
+  { label: "deco-flame text-sapphire", glow: "side-glow [--side:var(--color-sapphire)]" },
 ] as const;
 
 export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {

@@ -36,7 +36,7 @@ export function Roles({ onOpenCard }: { onOpenCard: (id: string) => void }) {
     <section aria-labelledby="home-roles" className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <Reveal className="flex flex-col gap-2">
-        <h2 id="home-roles" className={sectionTitle}>{t.title}</h2>
+        <h2 id="home-roles" className={`${sectionTitle} deco-tower`}>{t.title}</h2>
         <p className="max-w-2xl text-sm text-pretty text-zinc-300">{t.lead}</p>
         </Reveal>
         <RailArrows rail={rail} prev={t.prev} next={t.next} />

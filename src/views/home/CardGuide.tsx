@@ -156,7 +156,7 @@ export function CardGuide({ sample }: { sample: Player }) {
   return (
     <section aria-labelledby="home-guide" className="flex flex-col gap-6">
       <Reveal className="flex flex-col gap-2">
-        <h2 id="home-guide" className={sectionTitle}>{t.title}</h2>
+        <h2 id="home-guide" className={`${sectionTitle} deco-eye`}>{t.title}</h2>
         <p className="max-w-2xl text-sm text-pretty text-zinc-300">{t.lead}</p>
       </Reveal>
 

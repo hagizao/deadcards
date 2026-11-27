@@ -87,7 +87,7 @@ export function Calendar() {
   return (
     <section className="flex flex-col gap-6" aria-labelledby="home-calendar">
       <Reveal className="flex flex-col gap-2">
-        <h2 id="home-calendar" className={sectionTitle}>{t.title}</h2>
+        <h2 id="home-calendar" className={`${sectionTitle} deco-clock`}>{t.title}</h2>
         <p className="text-sm text-zinc-200">{t.lead}</p>
       </Reveal>
 
