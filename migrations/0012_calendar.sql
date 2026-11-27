@@ -21,7 +21,7 @@ CREATE INDEX tournament_dates_starts_at ON tournament_dates(starts_at);
 -- dá para corrigir, apagar ou subir a logo pelo Editor. OR IGNORE: rodar de novo não duplica nem desfaz edições.
 -- A logo é um arquivo do site (public/tournaments/), para chegar junto com o deploy; dá para trocar pelo Editor.
 INSERT OR IGNORE INTO tournaments (id, name, description, logo_key, url) VALUES
-  ('night-shift', 'Deadlock Night Shift', 'Torneio semanal do EDL, com uma edição por região.', '/tournaments/night-shift.webp', 'https://edl.gg/events');
+  ('night-shift', 'Deadlock Night Shift', 'Uma edição por região: Europa na quarta, América do Norte na quinta e Ásia-Pacífico na sexta.', '/tournaments/night-shift.webp', 'https://edl.gg/events');
 
 INSERT OR IGNORE INTO tournament_dates (id, tournament_id, starts_at, label) VALUES
   ('ns-67-eu', 'night-shift', 1796245200, 'EU #67'),
