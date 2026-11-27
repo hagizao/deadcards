@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
+import { STAT_NAMES } from "../lib/statNames";
 import { STAT_KEYS, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
@@ -23,19 +24,20 @@ const S = strings({
   pt: { notOwned: "Você não possui esta carta", favorite: "Favoritar", favorited: "Favorita", limit: `Até ${MAX_FAVORITES} favoritas. Abra uma favorita e desmarque para marcar outra.`, failed: "Não foi possível salvar a favorita.",
     owners: (n: number) => (n === 0 ? "Ninguém tem esta carta ainda" : n === 1 ? "1 conta tem esta carta" : `${n.toLocaleString("pt-BR")} contas têm esta carta`),
     cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por",
-    stats: "Atributos", statNames: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" } },
+    stats: "Atributos" },
   en: { notOwned: "You don't own this card", favorite: "Favorite", favorited: "Favorite", limit: `Up to ${MAX_FAVORITES} favorites. Open one and unmark it to pick another.`, failed: "Could not save the favorite.",
     owners: (n: number) => (n === 0 ? "Nobody owns this card yet" : n === 1 ? "1 account owns this card" : `${n.toLocaleString("en-US")} accounts own this card`),
     cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", versions: "Versions", main: "Main", version: "Version", artBy: "Art by",
-    stats: "Attributes", statNames: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" } },
+    stats: "Attributes" },
   es: { notOwned: "No tienes esta carta", favorite: "Marcar favorita", favorited: "Favorita", limit: `Hasta ${MAX_FAVORITES} favoritas. Abre una y desmárcala para marcar otra.`, failed: "No se pudo guardar la favorita.",
     owners: (n: number) => (n === 0 ? "Nadie tiene esta carta todavía" : n === 1 ? "1 cuenta tiene esta carta" : `${n.toLocaleString("es")} cuentas tienen esta carta`),
     cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de",
-    stats: "Atributos", statNames: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" } },
+    stats: "Atributos" },
 });
 
 export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: string; onClose: () => void; onSwitch: (id: string) => void; onEdit?: (id: string) => void }) {
   const t = useT(S);
+  const statNames = useT(STAT_NAMES);
   const label = useLabel();
   const { teams, players, settings, heroIcon, me } = useData();
   const player = players.find((p) => p.id === playerId);
@@ -220,7 +222,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
                 <div key={k} className="flex flex-col gap-1">
                   <div className="flex items-baseline gap-2">
                     <dt className="font-mono font-bold text-zinc-100">{k}</dt>
-                    <dd className="min-w-0 flex-1 truncate text-zinc-400">{t.statNames[k]}</dd>
+                    <dd className="min-w-0 flex-1 truncate text-zinc-400">{statNames[k]}</dd>
                     <dd className="font-bold text-zinc-100 tabular-nums"><CountUp value={player.stats[k]} delay={0.15 + cascade(i, 0.05)} /></dd>
                   </div>
                   <FillBar pct={((player.stats[k] - 40) / 59) * 100} delay={0.15 + cascade(i, 0.05)} className="h-1.5 rounded-full bg-zinc-800" style={{ background: `linear-gradient(90deg, ${tier.lo}, ${tier.c})` }} />
