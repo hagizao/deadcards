@@ -2,7 +2,7 @@
   "source": "src/index.css (@theme), src/styles/cards.css (:root, .team-region-*), src/lib/rarity.ts (RARITY_TIERS)",
   "tool": "html: public/design/, servido em /design/ (tokens.css, foundations.html, card.html, buttons.html, surfaces.html)",
   "naming": "Nomes de propriedade CSS como no código; valores só em TS viram --rarity-<key>-<c|hi|lo>; acentos de região viram --team-accent-<regiao>",
-  "synced": "2026-11-17",
+  "synced": "2026-11-27",
   "tokens": {
     "--font-display": "'VALVE Pulp', 'VALVE Oracle', ui-sans-serif, system-ui, sans-serif",
     "--color-dl-text": "#ffefd7",
@@ -51,6 +51,8 @@
     "Range": "in code only",
     "Account": "in code only",
     "Icon": "in code only",
-    "brand-badge": "in code only"
+    "brand-badge": "in code only",
+    "Motion (CountUp, FillBar, Reveal)": "in code only",
+    "Skeleton (CardSkeleton, ProfileSkeleton)": "in code only"
   }
 }

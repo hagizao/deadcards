@@ -104,7 +104,14 @@
     <div class="row">
       <div class="cell"><span class="tag">Curva</span><code>--ease-out: cubic-bezier(0.23, 1, 0.32, 1)</code></div>
       <div class="cell"><span class="tag">Clique</span><code>button:active → scale(0.97), 160ms</code></div>
-      <div class="cell"><span class="tag">Carta</span><code>tilt por mola (stiffness 220, damping 18), ±9° / ±11°</code></div>
+      <div class="cell"><span class="tag">Carta</span><code>tilt por mola (stiffness 220, damping 18), ±9° / ±11°, só com mouse</code></div>
+      <div class="cell"><span class="tag">Brilho</span><code>.card-glare segue o mouse (--gx/--gy); .card-foil holográfico em raridade ≥ ascendant e especiais</code></div>
+      <div class="cell"><span class="tag">Voo</span><code>springFlight (stiffness 210, damping 25): carta da grade até o destaque; volta em 300ms</code></div>
+      <div class="cell"><span class="tag">Entrada</span><code>enter: 250ms --ease-out · springSoft (260 / 26)</code></div>
+      <div class="cell"><span class="tag">Cascata</span><code>cascade(i): 35ms por item, teto de 12; só na primeira vez (useSettled)</code></div>
+      <div class="cell"><span class="tag">Aba</span><code>desliza 24px na direção do menu, 250ms</code></div>
+      <div class="cell"><span class="tag">Carregando</span><code>.skeleton: brilho passando em 1,4s · CardSkeleton no recorte da carta</code></div>
+      <div class="cell"><span class="tag">Reduced motion</span><code>MotionConfig reducedMotion="user" + @media em todo keyframe</code></div>
     </div>
   </section>
 
