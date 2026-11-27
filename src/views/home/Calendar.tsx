@@ -14,19 +14,19 @@ const S = strings({
   pt: {
     title: "Calendário", lead: "Quando o competitivo joga. Escolha um dia para ver o que tem; os horários estão no seu fuso.",
     prev: "Mês anterior", next: "Próximo mês", today: "Hoje", nothing: "Nada marcado neste dia.",
-    upNext: "Próximo", more: "Ver no site do campeonato", events: (n: number) => `${n} ${n === 1 ? "campeonato" : "campeonatos"}`,
+    upNext: "Próximo", stream: "Transmissão oficial", watch: "Watchparty Hagizao", events: (n: number) => `${n} ${n === 1 ? "campeonato" : "campeonatos"}`,
     startsIn: "Começa em", started: "Já começou", brazil: "Brasil em jogo", legend: "Dia com time brasileiro em jogo",
   },
   en: {
     title: "Calendar", lead: "When the competitive scene plays. Pick a day to see what's on; times are in your time zone.",
     prev: "Previous month", next: "Next month", today: "Today", nothing: "Nothing scheduled on this day.",
-    upNext: "Up next", more: "See on the tournament site", events: (n: number) => `${n} ${n === 1 ? "tournament" : "tournaments"}`,
+    upNext: "Up next", stream: "Official stream", watch: "Hagizao watchparty", events: (n: number) => `${n} ${n === 1 ? "tournament" : "tournaments"}`,
     startsIn: "Starts in", started: "Already started", brazil: "Brazil playing", legend: "Day with a Brazilian team playing",
   },
   es: {
     title: "Calendario", lead: "Cuándo juega el competitivo. Elige un día para ver qué hay; los horarios están en tu zona horaria.",
     prev: "Mes anterior", next: "Mes siguiente", today: "Hoy", nothing: "Nada programado este día.",
-    upNext: "Próximo", more: "Ver en el sitio del torneo", events: (n: number) => `${n} ${n === 1 ? "torneo" : "torneos"}`,
+    upNext: "Próximo", stream: "Transmisión oficial", watch: "Watchparty de Hagizao", events: (n: number) => `${n} ${n === 1 ? "torneo" : "torneos"}`,
     startsIn: "Empieza en", started: "Ya empezó", brazil: "Brasil en juego", legend: "Día con equipo brasileño en juego",
   },
 });
@@ -109,10 +109,11 @@ export function Calendar() {
                       <p className="text-xs font-bold text-zinc-200 tabular-nums">{time.format(new Date(ev.startsAt * 1000))}</p>
                       {ev.brazil && <BrazilTag text={t.brazil} />}
                       {ev.t.description && <p className="text-xs text-zinc-400">{ev.t.description}</p>}
-                      {ev.t.url && (
-                        <a href={ev.t.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-fit items-center gap-1 rounded-md text-xs font-bold text-dl-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:min-h-0">
-                          {t.more}<Icon name="chevron-right" className="size-4" />
-                        </a>
+                      {(ev.t.stream || ev.t.watch) && (
+                        <span className="flex flex-wrap gap-1.5">
+                          {ev.t.stream && <WatchLink href={ev.t.stream} icon="play" text={t.stream} />}
+                          {ev.t.watch && <WatchLink href={ev.t.watch} icon="users" text={t.watch} />}
+                        </span>
                       )}
                     </div>
                   </li>
@@ -250,5 +251,15 @@ function BrazilTag({ text }: { text: string }) {
       <span aria-hidden="true" className="br-frame size-4 shrink-0 rounded-sm" />
       {text}
     </span>
+  );
+}
+
+/** Link pequeno para assistir: cabe dois lado a lado no painel do dia. */
+function WatchLink({ href, icon, text }: { href: string; icon: "play" | "users"; text: string }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer"
+      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-zinc-100/8 px-2.5 py-1 text-xs font-bold text-dl-text transition-colors hover:bg-zinc-100/15 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/20 sm:min-h-8">
+      <Icon name={icon} className="size-3.5" />{text}
+    </a>
   );
 }
