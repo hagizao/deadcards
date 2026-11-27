@@ -1307,11 +1307,12 @@ function CalendarForm() {
   const [tour, setTour] = useState("");
   const [when, setWhen] = useState("");
   const [label, setLabel] = useState("");
+  const [brazil, setBrazil] = useState(false);
   const tournamentId = tour || tournaments[0]?.id || "";
   const at = fromLocalInput(when);
   const add = () => {
     if (at === null || !tournamentId) return;
-    run(async () => { await api.save("schedule", newId("day"), { tournamentId, startsAt: at, label: label.trim() }); setWhen(""); setLabel(""); }, "Dia marcado.");
+    run(async () => { await api.save("schedule", newId("day"), { tournamentId, startsAt: at, label: label.trim(), brazil }); setWhen(""); setLabel(""); setBrazil(false); }, "Dia marcado.");
   };
   const monthName = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
   const months = new Map<string, ScheduleEntry[]>();
@@ -1333,14 +1334,15 @@ function CalendarForm() {
           </Field>
           <Field label="Dia e hora (no seu fuso)"><input className={input} type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></Field>
           <Field label="Edição (opcional, ex.: EU #67)"><input className={input} value={label} maxLength={SCHEDULE_LABEL_MAX} onChange={(e) => setLabel(e.target.value)} /></Field>
+          <label className="flex min-h-11 items-center gap-2 text-sm font-bold text-zinc-200"><input type="checkbox" checked={brazil} onChange={(e) => setBrazil(e.target.checked)} className="size-4 accent-br-green" />Brasil joga</label>
           <button type="button" className={primary} disabled={busy || at === null} onClick={add}>+ Marcar</button>
         </div>
-        <p className="text-xs text-zinc-400">Cada visitante vê no fuso dele. Dias de mais de um mês atrás saem da lista e do site.</p>
+        <p className="text-xs text-zinc-400">"Brasil joga" pinta o dia de verde e amarelo no calendário da Home. Cada visitante vê no fuso dele. Dias de mais de um mês atrás saem da lista e do site.</p>
       </div>
       {[...months].map(([m, days]) => (
         <div key={m} className="space-y-2 border-t border-zinc-200/15 pt-4">
           <h3 className="text-sm font-black tracking-[0.12em] text-white uppercase">{m}</h3>
-          {days.map((s) => <ScheduleRow key={`${s.id}:${s.startsAt}:${s.label}:${s.tournamentId}`} entry={s} tournaments={tournaments} />)}
+          {days.map((s) => <ScheduleRow key={`${s.id}:${s.startsAt}:${s.label}:${s.tournamentId}:${s.brazil}`} entry={s} tournaments={tournaments} />)}
         </div>
       ))}
       <Toast msg={msg} />
@@ -1354,8 +1356,9 @@ function ScheduleRow({ entry, tournaments }: { entry: ScheduleEntry; tournaments
   const [tour, setTour] = useState(entry.tournamentId);
   const [when, setWhen] = useState(() => toLocalInput(entry.startsAt));
   const [label, setLabel] = useState(entry.label);
+  const [brazil, setBrazil] = useState(entry.brazil);
   const at = fromLocalInput(when);
-  const changed = tour !== entry.tournamentId || at !== entry.startsAt || label.trim() !== entry.label;
+  const changed = tour !== entry.tournamentId || at !== entry.startsAt || label.trim() !== entry.label || brazil !== entry.brazil;
   const t = tournaments.find((x) => x.id === tour);
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -1365,7 +1368,8 @@ function ScheduleRow({ entry, tournaments }: { entry: ScheduleEntry; tournaments
       </select>
       <input aria-label="Dia e hora" className={`${input} w-auto`} type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
       <input aria-label="Edição" className={`${input} w-28`} value={label} maxLength={SCHEDULE_LABEL_MAX} onChange={(e) => setLabel(e.target.value)} />
-      <button type="button" className={ghost} disabled={busy || !changed || at === null} onClick={() => run(() => api.save("schedule", entry.id, { tournamentId: tour, startsAt: at, label: label.trim() }), "Dia atualizado.")}>Salvar</button>
+      <label className="flex min-h-11 items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={brazil} onChange={(e) => setBrazil(e.target.checked)} className="size-4 accent-br-green" />Brasil joga</label>
+      <button type="button" className={ghost} disabled={busy || !changed || at === null} onClick={() => run(() => api.save("schedule", entry.id, { tournamentId: tour, startsAt: at, label: label.trim(), brazil }), "Dia atualizado.")}>Salvar</button>
       <HoldButton className={danger} disabled={busy} onConfirm={() => run(() => api.remove("schedule", entry.id), "Dia excluído.")} label="Excluir este dia">✕</HoldButton>
     </div>
   );
