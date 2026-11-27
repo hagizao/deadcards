@@ -3,8 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
-import { strings, useLocale, useT } from "../lib/i18n";
-import { STAT_KEYS, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
+import { strings, useT } from "../lib/i18n";
+import { STAT_KEYS, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
@@ -22,15 +22,15 @@ const revealed = new Set<string>();
 const S = strings({
   pt: { notOwned: "Você não possui esta carta", favorite: "Favoritar", favorited: "Favorita", limit: `Até ${MAX_FAVORITES} favoritas. Abra uma favorita e desmarque para marcar outra.`, failed: "Não foi possível salvar a favorita.",
     owners: (n: number) => (n === 0 ? "Ninguém tem esta carta ainda" : n === 1 ? "1 conta tem esta carta" : `${n.toLocaleString("pt-BR")} contas têm esta carta`),
-    cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por",
+    cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por",
     stats: "Atributos", statNames: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" } },
   en: { notOwned: "You don't own this card", favorite: "Favorite", favorited: "Favorite", limit: `Up to ${MAX_FAVORITES} favorites. Open one and unmark it to pick another.`, failed: "Could not save the favorite.",
     owners: (n: number) => (n === 0 ? "Nobody owns this card yet" : n === 1 ? "1 account owns this card" : `${n.toLocaleString("en-US")} accounts own this card`),
-    cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version", artBy: "Art by",
+    cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", versions: "Versions", main: "Main", version: "Version", artBy: "Art by",
     stats: "Attributes", statNames: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" } },
   es: { notOwned: "No tienes esta carta", favorite: "Marcar favorita", favorited: "Favorita", limit: `Hasta ${MAX_FAVORITES} favoritas. Abre una y desmárcala para marcar otra.`, failed: "No se pudo guardar la favorita.",
     owners: (n: number) => (n === 0 ? "Nadie tiene esta carta todavía" : n === 1 ? "1 cuenta tiene esta carta" : `${n.toLocaleString("es")} cuentas tienen esta carta`),
-    cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de",
+    cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de",
     stats: "Atributos", statNames: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" } },
 });
 
@@ -82,6 +82,10 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
 
   // a carta sai de onde estava na grade, cresce até aqui e, ao fechar, volta para o mesmo lugar
   const flyRef = useRef<HTMLDivElement>(null);
+  // o painel rola por dentro (overflow) e cortaria a carta enquanto ela voa de fora dele: durante o voo ele deixa vazar
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const unclip = () => { if (scrollRef.current) scrollRef.current.style.overflow = "visible"; };
+  const reclip = () => { if (scrollRef.current) scrollRef.current.style.overflow = ""; };
   const [isPresent, safeToRemove] = usePresence();
   const [firstId] = useState(playerId);
   const flightGap = (from: HTMLElement, el: HTMLElement) => {
@@ -91,10 +95,12 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   useLayoutEffect(() => {
     const from = flightOrigin(firstId), el = flyRef.current;
     if (!fly || !from || !el) return;
+    unclip();
     const g = flightGap(from, el);
     from.style.visibility = "hidden";
     const a = animate(el, { x: [g.x, 0], y: [g.y, 0], scale: [g.scale, 1] }, springFlight);
-    return () => { a.stop(); from.style.visibility = ""; };
+    a.then(reclip);
+    return () => { a.stop(); reclip(); from.style.visibility = ""; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- só na abertura; trocar de versão não voa de novo
   useEffect(() => {
     if (isPresent) return;
@@ -102,7 +108,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
     const done = () => { if (from) from.style.visibility = ""; safeToRemove(); };
     if (!el || still) { done(); return; }
     // volta para a grade só se ainda é a mesma carta que abriu; senão some no lugar
-    const back = fly && from && playerId === firstId ? flightGap(from, el) : null;
+    const flyBack = fly && from && playerId === firstId;
+    if (flyBack) unclip();
+    const back = flyBack ? flightGap(from, el) : null;
     const a = back
       ? animate(el, { x: back.x, y: back.y, scale: back.scale }, { duration: 0.3, ease: easeOut })
       : animate(el, { opacity: 0, scale: 0.95 }, { duration: 0.18 });
@@ -119,7 +127,6 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   if (!player) return null;
   const team = teamOf(teams, player);
   if (!tier) return null;
-  const history = getPlayerHistory(player);
   const groupKey = player.variantOf || player.id;
   // herói jogado aposentado só aparece para quem tem a carta (ou quando é a carta aberta)
   const versions = players.filter((p) => (p.id === groupKey || p.variantOf === groupKey) && (!isRetired(p) || p.id === player.id || !!owned?.has(p.id)));
@@ -154,6 +161,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
         />
       {/* sem rolagem lateral: o clarão da revelação passa da largura do painel no celular */}
       <div
+        ref={scrollRef}
         className="relative flex max-h-[92dvh] w-full flex-col items-center gap-8 overflow-x-hidden overflow-y-auto rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
       >
         <div ref={flyRef} className="relative z-10 max-w-full">
@@ -221,10 +229,6 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             </dl>
           </div>
 
-          <div>
-            <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.history}</h3>
-            <HistoryChart points={history} color={tier.c} />
-          </div>
 
           {versions.length > 1 && (
             <div>
@@ -284,32 +288,5 @@ function ArtCreditLine({ credit, label }: { credit: ArtCredit; label: string }) 
         <span className="font-bold text-zinc-100">{credit.name}</span>
       )}
     </p>
-  );
-}
-
-function HistoryChart({ points, color }: { points: { date: string; ovr: number }[]; color: string }) {
-  const locale = useLocale();
-  // Datas são ISO (YYYY-MM-DD); formata dia/mês na ordem do idioma, caindo no texto original se não for data válida.
-  const short = (iso: string) => {
-    const d = new Date(iso);
-    return isNaN(+d) ? iso : d.toLocaleDateString(locale, { day: "2-digit", month: "2-digit", timeZone: "UTC" });
-  };
-  const W = 420, H = 160, P = 32;
-  const vals = points.map((p) => p.ovr);
-  const min = Math.min(...vals) - 2, max = Math.max(...vals) + 2;
-  const x = (i: number) => (points.length === 1 ? W / 2 : P + (i * (W - 2 * P)) / (points.length - 1));
-  const y = (v: number) => H - P - ((v - min) / Math.max(1, max - min)) * (H - 2 * P);
-  const d = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.ovr).toFixed(1)}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full rounded-xl border border-zinc-200/10 bg-black/40">
-      <motion.path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.9, ease: "easeOut" }} style={{ filter: `drop-shadow(0 0 6px ${color})` }} />
-      {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={x(i)} cy={y(p.ovr)} r="4" fill="#09090b" stroke={color} strokeWidth="2" />
-          <text x={x(i)} y={y(p.ovr) - 12} textAnchor="middle" fontSize="16" fontWeight="800" fill="#f4f4f5">{p.ovr}</text>
-          <text x={x(i)} y={H - 8} textAnchor="middle" fontSize="15" fill="#a1a1aa">{short(p.date)}</text>
-        </g>
-      ))}
-    </svg>
   );
 }
