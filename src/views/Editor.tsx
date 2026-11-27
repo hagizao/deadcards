@@ -1332,7 +1332,7 @@ function CalendarForm() {
             </select>
           </Field>
           <Field label="Dia e hora (no seu fuso)"><input className={input} type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></Field>
-          <Field label="Edição (opcional, ex.: 67 EU)"><input className={input} value={label} maxLength={SCHEDULE_LABEL_MAX} onChange={(e) => setLabel(e.target.value)} /></Field>
+          <Field label="Edição (opcional, ex.: EU #67)"><input className={input} value={label} maxLength={SCHEDULE_LABEL_MAX} onChange={(e) => setLabel(e.target.value)} /></Field>
           <button type="button" className={primary} disabled={busy || at === null} onClick={add}>+ Marcar</button>
         </div>
         <p className="text-xs text-zinc-400">Cada visitante vê no fuso dele. Dias de mais de um mês atrás saem da lista e do site.</p>
