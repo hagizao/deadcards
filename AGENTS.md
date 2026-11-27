@@ -26,6 +26,7 @@ O dev roda tudo local (Vite + `@cloudflare/vite-plugin`) em `http://localhost:51
 | `npm run build` | Checagem de tipos + build de produção |
 | `npm test` | Testes (Vitest) em `test/` |
 | `npm run db:migrate` | Aplica migrations no D1 local |
+| `npm run db:pull` | Substitui o D1 local por uma cópia de produção (guarda o antigo em `.wrangler/backup/`) |
 | `npm run db:import -- <save.json> [--remote]` | Importa um save JSON para D1 e R2 |
 | `npm run design:guide` | Depois do `build`, regenera `public/design/app.css` e `card.html` a partir do código |
 | `npm run deploy` | Build + deploy no Cloudflare |
@@ -98,6 +99,15 @@ O visual é o produto. Mudança de UI segue estas regras; código antigo que nã
 - Funciona a 375 px sem scroll horizontal e em desktop largo. Use os breakpoints do Tailwind (`sm`, `md`, `lg`) antes de criar outro.
 
 ## Backend e dados
+
+**Produção é a fonte da verdade dos dados.**
+
+- Toda mudança de dado (tiers, times, cartas, packs, configurações) é feita em produção: pelo Editor do site em produção ou, por agente, com `wrangler d1 execute deadcards --remote`.
+- Nunca altere dados só no D1 local, nem gere arquivos `.sql` para outra pessoa importar. Mudança de dado feita só no local se perde e não chega a ninguém.
+- Antes de escrever em produção, leia o valor atual com `--remote` e mude só o necessário. Nada de `DELETE` ou sobrescrita em massa sem confirmação.
+- O D1 local serve só para testar código. Para ter os dados reais nele, rode `npm run db:pull`.
+- `npm run dev` continua 100% local: código de branch pode depender de migrations que ainda não estão em produção.
+- Migrations novas só vão para produção (`npm run db:migrate:remote`) junto com o deploy do código que as usa.
 
 - Toda rota que altera dados exige admin via `currentUser(...).admin`. Admins são definidos em `ADMINS` no `wrangler.jsonc`.
 - Valide entrada em toda API de escrita e upload.
