@@ -102,8 +102,22 @@
       100% { transform: translate(0, -470px); opacity: 0; }
     }
     .fr-soul { opacity: 0; animation: frSoul var(--d, 9s) ease-in-out var(--dl, 0s) infinite; }
+    /* Letreiro: o neon falha ao ligar e fica aceso */
+    @keyframes frNeon { 0%, 3% { opacity: .15; } 4% { opacity: 1; } 6% { opacity: .2; } 8%, 9% { opacity: 1; } 10% { opacity: .35; } 13%, 100% { opacity: 1; } }
+    .fr-neon { animation: frNeon 7s linear infinite; }
+    /* Chifres: o olho do meio pisca */
+    @keyframes frBlink { 0%, 90%, 100% { transform: scaleY(1); } 93% { transform: scaleY(.08); } 96% { transform: scaleY(1); } }
+    .fr-blink { animation: frBlink 5s ease-in-out infinite; }
+    /* Fechadura: no mesmo ritmo da silhueta (6 s), os trincos recolhem e a luz escapa pelo buraco */
+    @keyframes frBoltL { 0%, 55%, 97%, 100% { transform: translateX(0); } 62%, 90% { transform: translateX(-14px); } }
+    @keyframes frBoltR { 0%, 55%, 97%, 100% { transform: translateX(0); } 62%, 90% { transform: translateX(14px); } }
+    @keyframes frUnlock { 0%, 55%, 97%, 100% { opacity: .15; } 62% { opacity: 1; } 90% { opacity: .55; } }
+    .fr-bolt-l { animation: frBoltL 6s ease-in-out infinite; }
+    .fr-bolt-r { animation: frBoltR 6s ease-in-out infinite; }
+    .fr-unlock { animation: frUnlock 6s ease-in-out infinite; }
     @media (prefers-reduced-motion: reduce) {
       .fr-aim, .fr-lock { animation: none !important; }
+      .fr-neon, .fr-blink, .fr-bolt-l, .fr-bolt-r, .fr-unlock { animation: none !important; }
       .fr-bulb, .fr-spin, .fr-tick, .fr-rune { animation: none !important; }
       .fr-soul { animation: none !important; opacity: 0; }
       .fr-run, .fr-twinkle, .fr-breathe, .fr-flame, .fr-bolt, .fr-flash, .fr-scan { animation: none !important; }
