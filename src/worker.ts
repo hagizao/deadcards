@@ -127,8 +127,13 @@ async function appData(env: Env): Promise<Response> {
       return { id: t.id, name: t.name, tag: t.tag, region: t.region, logo: imgUrl(t.logo_key), ...(tbg ? { bg: tbg } : {}) };
     }),
     players: (players.results as Record<string, string | number | null>[]).map(playerFromRow),
-    tournaments: (tournaments.results as { id: string; name: string; description: string; logo_key: string | null; url: string | null }[])
-      .map((t) => ({ id: t.id, name: t.name, description: t.description, ...(t.logo_key ? { logo: t.logo_key.startsWith("/") ? t.logo_key : imgUrl(t.logo_key) } : {}), ...(t.url ? { url: t.url } : {}) })),
+    tournaments: (tournaments.results as { id: string; name: string; description: string; logo_key: string | null; stream_url: string | null; watch_url: string | null }[])
+      .map((t) => ({
+        id: t.id, name: t.name, description: t.description,
+        ...(t.logo_key ? { logo: t.logo_key.startsWith("/") ? t.logo_key : imgUrl(t.logo_key) } : {}),
+        ...(t.stream_url ? { stream: t.stream_url } : {}),
+        ...(t.watch_url ? { watch: t.watch_url } : {}),
+      })),
     schedule: (schedule.results as { id: string; tournament_id: string; starts_at: number; label: string; brazil: number }[])
       .map((d) => ({ id: d.id, tournamentId: d.tournament_id, startsAt: d.starts_at, label: d.label, brazil: d.brazil === 1 })),
     heroes: Object.fromEntries((heroes.results as { name: string; image_key: string; zoom: number; x: number; y: number }[])
@@ -251,14 +256,15 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
     else {
       const name = typeof b.name === "string" ? b.name.trim() : "";
       const description = typeof b.description === "string" ? b.description.trim() : "";
-      const link = b.url === undefined || b.url === null || b.url === "" ? null : httpUrl(b.url);
+      const optUrl = (v: unknown) => (v === undefined || v === null || v === "" ? null : httpUrl(v));
+      const stream = optUrl(b.stream), watch = optUrl(b.watch);
       if (!name || name.length > TOURNAMENT_NAME_MAX) return bad(`nome do campeonato obrigatório, até ${TOURNAMENT_NAME_MAX} caracteres`);
       if (description.length > TOURNAMENT_DESC_MAX) return bad(`descrição até ${TOURNAMENT_DESC_MAX} caracteres`);
-      if (link === null && b.url) return bad("link inválido: use http(s), até 200 caracteres");
+      if ((stream === null && b.stream) || (watch === null && b.watch)) return bad("link inválido: use http(s), até 200 caracteres");
       await db.prepare(
-        "INSERT INTO tournaments (id, name, description, logo_key, url) VALUES (?,?,?,?,?) " +
-        "ON CONFLICT(id) DO UPDATE SET name=excluded.name, description=excluded.description, logo_key=excluded.logo_key, url=excluded.url",
-      ).bind(id, name, description, tournamentLogo(b.logo), link).run();
+        "INSERT INTO tournaments (id, name, description, logo_key, stream_url, watch_url) VALUES (?,?,?,?,?,?) " +
+        "ON CONFLICT(id) DO UPDATE SET name=excluded.name, description=excluded.description, logo_key=excluded.logo_key, stream_url=excluded.stream_url, watch_url=excluded.watch_url",
+      ).bind(id, name, description, tournamentLogo(b.logo), stream, watch).run();
     }
   } else if (kind === "schedule") {
     if (del) await db.prepare("DELETE FROM tournament_dates WHERE id = ?").bind(id).run();

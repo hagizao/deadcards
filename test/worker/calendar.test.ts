@@ -11,18 +11,18 @@ const put = (cookie: string, path: string, body: unknown) => SELF.fetch(`http://
 });
 const del = (cookie: string, path: string) => SELF.fetch(`http://test/api/${path}`, { method: "DELETE", headers: { cookie, origin: "http://test" } });
 
-type Data = { tournaments: { id: string; name: string; description: string; logo?: string; url?: string }[]; schedule: { id: string; tournamentId: string; startsAt: number; label: string; brazil: boolean }[] };
+type Data = { tournaments: { id: string; name: string; description: string; logo?: string; stream?: string; watch?: string }[]; schedule: { id: string; tournamentId: string; startsAt: number; label: string; brazil: boolean }[] };
 const data = async () => (await (await SELF.fetch("http://test/api/data")).json()) as Data;
 const soon = () => Math.floor(Date.now() / 1000) + 7 * 86400;
 
 describe("Calendário de campeonatos", () => {
   it("cria campeonato com logo e link, marca um dia e mostra no /api/data", async () => {
     const { cookie } = await admin();
-    expect((await put(cookie, "tournaments/cup", { name: "  Copa Teste ", description: "Uma copa.", logo: "/img/events/cup.png", url: "https://example.com/copa" })).status).toBe(200);
+    expect((await put(cookie, "tournaments/cup", { name: "  Copa Teste ", description: "Uma copa.", logo: "/img/events/cup.png", stream: "https://youtube.com/@copa/live", watch: "https://youtube.com/@hagizao/live" })).status).toBe(200);
     const at = soon();
     expect((await put(cookie, "schedule/cup-1", { tournamentId: "cup", startsAt: at, label: "Final" })).status).toBe(200);
     const d = await data();
-    expect(d.tournaments.find((t) => t.id === "cup")).toEqual({ id: "cup", name: "Copa Teste", description: "Uma copa.", logo: "/img/events/cup.png", url: "https://example.com/copa" });
+    expect(d.tournaments.find((t) => t.id === "cup")).toEqual({ id: "cup", name: "Copa Teste", description: "Uma copa.", logo: "/img/events/cup.png", stream: "https://youtube.com/@copa/live", watch: "https://youtube.com/@hagizao/live" });
     expect(d.schedule.find((s) => s.id === "cup-1")).toEqual({ id: "cup-1", tournamentId: "cup", startsAt: at, label: "Final", brazil: false });
   });
 
@@ -33,7 +33,10 @@ describe("Calendário de campeonatos", () => {
     const d = await data();
     expect(d.tournaments.find((t) => t.id === "st")?.logo).toBe("/tournaments/st.webp");
     expect(d.tournaments.find((t) => t.id === "bad")?.logo).toBeUndefined();
-    expect(d.tournaments.find((t) => t.id === "night-shift")?.logo).toBe("/tournaments/night-shift.webp");
+    const ns = d.tournaments.find((t) => t.id === "night-shift");
+    expect(ns?.logo).toBe("/tournaments/night-shift.webp");
+    expect(ns?.stream).toBe("https://www.youtube.com/@DeadlockNightShift/live");
+    expect(ns?.watch).toBe("https://www.youtube.com/@hagizao/live");
   });
 
   it("marca e desmarca o dia em que o Brasil joga", async () => {
@@ -69,7 +72,8 @@ describe("Calendário de campeonatos", () => {
     expect((await put(cookie, "tournaments/x", { name: "", description: "" })).status).toBe(400);
     expect((await put(cookie, "tournaments/x", { name: "a".repeat(61), description: "" })).status).toBe(400);
     expect((await put(cookie, "tournaments/x", { name: "X", description: "a".repeat(281) })).status).toBe(400);
-    expect((await put(cookie, "tournaments/x", { name: "X", description: "", url: "javascript:alert(1)" })).status).toBe(400);
+    expect((await put(cookie, "tournaments/x", { name: "X", description: "", stream: "javascript:alert(1)" })).status).toBe(400);
+    expect((await put(cookie, "tournaments/x", { name: "X", description: "", watch: "ftp://x" })).status).toBe(400);
     await put(cookie, "tournaments/ok", { name: "Ok", description: "" });
     expect((await put(cookie, "schedule/s", { tournamentId: "nope", startsAt: soon(), label: "" })).status).toBe(404);
     expect((await put(cookie, "schedule/s", { tournamentId: "ok", startsAt: 1.5, label: "" })).status).toBe(400);
