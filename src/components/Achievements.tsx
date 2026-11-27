@@ -8,13 +8,13 @@ import { Icon } from "./Icon";
 
 type Text = { title: string; desc: (goal: number) => string };
 type Texts = {
-  heading: string; done: (n: number, total: number) => string; all: string; unlocked: string; locked: string; showAll: (n: number) => string; showLess: string;
+  heading: string; done: (n: number, total: number) => string; collection: (pct: number) => string; cards: (n: number, total: number) => string; all: string; unlocked: string; locked: string; showAll: (n: number) => string; showLess: string;
   rarities: Record<AchievementRarity, string>; items: Record<AchievementId, Text>;
 };
 
 const S = strings<Texts>({
   pt: {
-    heading: "Conquistas", done: (n, total) => `${n} de ${total}`, all: "Todas", unlocked: "Desbloqueada", locked: "Bloqueada", showAll: (n) => `Ver todas (${n})`, showLess: "Mostrar menos",
+    heading: "Conquistas", done: (n, total) => `${n} de ${total}`, collection: (p) => `${p}% da coleção`, cards: (n, total) => `${n} de ${total} cartas`, all: "Todas", unlocked: "Desbloqueada", locked: "Bloqueada", showAll: (n) => `Ver todas (${n})`, showLess: "Mostrar menos",
     rarities: { bronze: "Bronze", silver: "Prata", gold: "Ouro", diamond: "Diamante" },
     items: {
       "first-card": { title: "Primeira carta", desc: () => "Tenha sua primeira carta." },
@@ -46,7 +46,7 @@ const S = strings<Texts>({
     },
   },
   en: {
-    heading: "Achievements", done: (n, total) => `${n} of ${total}`, all: "All", unlocked: "Unlocked", locked: "Locked", showAll: (n) => `Show all (${n})`, showLess: "Show less",
+    heading: "Achievements", done: (n, total) => `${n} of ${total}`, collection: (p) => `${p}% of the collection`, cards: (n, total) => `${n} of ${total} cards`, all: "All", unlocked: "Unlocked", locked: "Locked", showAll: (n) => `Show all (${n})`, showLess: "Show less",
     rarities: { bronze: "Bronze", silver: "Silver", gold: "Gold", diamond: "Diamond" },
     items: {
       "first-card": { title: "First card", desc: () => "Get your first card." },
@@ -78,7 +78,7 @@ const S = strings<Texts>({
     },
   },
   es: {
-    heading: "Logros", done: (n, total) => `${n} de ${total}`, all: "Todos", unlocked: "Desbloqueado", locked: "Bloqueado", showAll: (n) => `Ver todos (${n})`, showLess: "Mostrar menos",
+    heading: "Logros", done: (n, total) => `${n} de ${total}`, collection: (p) => `${p}% de la colección`, cards: (n, total) => `${n} de ${total} cartas`, all: "Todos", unlocked: "Desbloqueado", locked: "Bloqueado", showAll: (n) => `Ver todos (${n})`, showLess: "Mostrar menos",
     rarities: { bronze: "Bronce", silver: "Plata", gold: "Oro", diamond: "Diamante" },
     items: {
       "first-card": { title: "Primera carta", desc: () => "Consigue tu primera carta." },
@@ -128,6 +128,10 @@ export function Achievements({ ids, profileCard, favorites, collapsible = false 
   const [open, setOpen] = useState(!collapsible);
   const all = achievementsFor(players, teams, ids, { profileCard, favorites: Math.min(favorites, MAX_FAVORITES) });
   const done = all.filter((a) => a.done).length;
+  // progresso na coleção toda, na mesma linha do título
+  const owned = new Set(ids);
+  const mine = players.filter((p) => owned.has(p.id)).length;
+  const pct = players.length ? Math.round((mine / players.length) * 100) : 0;
   // desbloqueadas primeiro (as mais raras na frente); depois as mais perto de sair
   const shown = all.filter((a) => !rarity || a.rarity === rarity)
     .map((a, i) => ({ a, i }))
@@ -138,9 +142,18 @@ export function Achievements({ ids, profileCard, favorites, collapsible = false 
 
   return (
     <section aria-labelledby="achievements-title" className="noir-glass flex min-w-0 flex-1 flex-col gap-5 rounded-2xl p-4 sm:p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="achievements-title" className="font-display text-lg font-black text-dl-text">{t.heading}</h2>
-        <span className="text-sm text-zinc-400 tabular-nums">{t.done(done, all.length)}</span>
+      <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
+        <div className="flex items-baseline gap-3">
+          <h2 id="achievements-title" className="font-display text-[1.6875rem] font-black text-dl-text">{t.heading}</h2>
+          <span className="text-[1.3125rem] whitespace-nowrap text-zinc-300 tabular-nums">{t.done(done, all.length)}</span>
+        </div>
+        <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span className="text-[1.3125rem] font-extrabold whitespace-nowrap text-dl-text tabular-nums">{t.collection(pct)}</span>
+          <span className="text-[1.3125rem] whitespace-nowrap text-zinc-400 tabular-nums">{t.cards(mine, players.length)}</span>
+          <div role="progressbar" aria-label={t.collection(pct)} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="h-2 max-w-60 min-w-24 flex-1 rounded-full bg-zinc-800">
+            <div className="h-full rounded-full bg-dl-text" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
       </div>
       <div role="group" aria-label={t.heading} className="flex flex-wrap gap-2">
         <button type="button" aria-pressed={!rarity} onClick={() => setRarity(undefined)} className={pill(!rarity)}>{t.all}</button>

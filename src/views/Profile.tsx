@@ -190,7 +190,7 @@ function ProfileFavorites({ ids, profileFavorites, owner, onOpenCard }: { ids: s
         <span className="text-sm text-zinc-400 tabular-nums">{pinned.length}/{MAX_FAVORITES}</span>
       </h2>
       {pinned.length ? (
-        <ul className="flex flex-wrap justify-center gap-6 sm:justify-start">
+        <ul className="flex flex-wrap justify-center gap-6">
           {pinned.map((player) => (
             <li key={player.id} className="relative drop-shadow-[0_0_28px_rgb(252_211_77/0.35)]">
               <Card player={player} onOpen={() => onOpenCard(player.id)} />
