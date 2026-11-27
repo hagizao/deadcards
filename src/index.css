@@ -63,14 +63,24 @@
 /* faixa com setas (useRail): esmaece a ponta que tem mais itens escondidos, em vez de cortar seco */
 @property --fade-l { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @property --fade-r { syntax: "<length>"; inherits: false; initial-value: 0px; }
+/* borda mínima de névoa em volta da faixa (rail-glow): o brilho das cartas some aos poucos no padding, sem linha reta */
+@property --fade-edge { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @utility rail-fade {
-  mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  mask-image:
+    linear-gradient(to right, transparent, #000 max(var(--fade-l), var(--fade-edge)), #000 calc(100% - max(var(--fade-r), var(--fade-edge))), transparent),
+    linear-gradient(to bottom, transparent, #000 var(--fade-edge), #000 calc(100% - var(--fade-edge)), transparent);
+  mask-composite: intersect;
   /* a máscara corta o que sai da caixa: quem usa deixa espaço (padding) em cima e embaixo para o brilho e o salto do hover.
      mask-clip: no-clip quebra a pintura das cartas com 3D no Chrome, por isso não é usado */
   transition: --fade-l 200ms ease-out, --fade-r 200ms ease-out;
   @media (prefers-reduced-motion: reduce) {
     transition: none;
   }
+}
+
+/* faixa de cartas: o brilho delas some numa névoa nas quatro bordas (a faixa precisa de padding, ex. px-6 pt-6 pb-10) */
+@utility rail-glow {
+  --fade-edge: 1rem;
 }
 
 @utility title-depth {
