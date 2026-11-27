@@ -13,7 +13,7 @@ import { MAX_FAVORITES, PROFILE_CARD_PATH, PROFILE_NAME_MAX, profilePlayer, prof
 import { getCardTier } from "../lib/rarity";
 import { useMyCards } from "../lib/myCards";
 import type { Player } from "../lib/types";
-import { easeOut, field, pageTitle, pill, primaryBtn } from "../lib/ui";
+import { easeOut, field, pill, primaryBtn } from "../lib/ui";
 import { cascade, useSettled } from "../lib/motion";
 import { CountUp, FillBar } from "../components/Motion";
 
@@ -113,7 +113,8 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
         ? <img src={profile.image} alt="" className="size-12 shrink-0 rounded-xl object-cover sm:size-14" />
         : <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-xl font-black text-dl-text sm:size-14">{profile.name.charAt(0).toUpperCase()}</span>}
       <div className="flex min-w-0 flex-col gap-0.5">
-        <h1 id="profile-title" className={`${pageTitle} truncate`}>{profile.name}</h1>
+        {/* nome do perfil um terço menor que o título das abas (pageTitle) */}
+        <h1 id="profile-title" className="truncate font-display text-2xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-[2rem]">{profile.name}</h1>
         {profile.handle && <p className="truncate text-sm font-semibold text-zinc-300">@{profile.handle}</p>}
         {card && <p className="truncate text-sm text-zinc-400">{card.name} · {card.hero}</p>}
       </div>
