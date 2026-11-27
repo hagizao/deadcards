@@ -452,13 +452,14 @@
        MOLDURA DE LOGO / SIGLA DO TIME + CHIP DE OVR (vidro escuro + cor da região)
        --team-accent vem da região do time (definida abaixo).
        ========================================================================== */
-    .team-region-europa { --team-accent: rgba(250, 204, 21, 0.60); }
+    /* accent-region-* (regionAccentClass): só a cor, para quem não quer o fundo de caixa da team-region-* */
+    .team-region-europa, .accent-region-europa { --team-accent: rgba(250, 204, 21, 0.60); }
     .team-region-americadonorte,
-    .team-region-na { --team-accent: rgba(147, 197, 253, 0.60); }
-    .team-region-brasil { --team-accent: rgba(52, 211, 153, 0.55); }
-    .team-region-americasul { --team-accent: rgba(56, 189, 248, 0.60); }
-    .team-region-asia { --team-accent: rgba(251, 191, 36, 0.55); }
-    .team-region-semtime { --team-accent: rgba(161, 161, 170, 0.50); }
+    .team-region-na, .accent-region-na { --team-accent: rgba(147, 197, 253, 0.60); }
+    .team-region-brasil, .accent-region-brasil { --team-accent: rgba(52, 211, 153, 0.55); }
+    .team-region-americasul, .accent-region-americasul { --team-accent: rgba(56, 189, 248, 0.60); }
+    .team-region-asia, .accent-region-asia { --team-accent: rgba(251, 191, 36, 0.55); }
+    .team-region-semtime, .accent-region-semtime { --team-accent: rgba(161, 161, 170, 0.50); }
 
     .team-logo-frame {
       position: relative;
