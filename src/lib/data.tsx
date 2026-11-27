@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { CardSkeleton } from "../components/Skeleton";
+import { BootScreen } from "../components/BootScreen";
 import type { AppData, HeroArt } from "./types";
 import type { InventoryPack, PackKind, PackType } from "./packs";
 import { DEFAULT_TIER_CONFIG } from "./cards";
@@ -108,12 +108,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [data, apiHeroes, me]);
 
   if (error) return <div className="flex min-h-dvh items-center justify-center text-sm text-red-300">{t.loadFail}: {error}</div>;
-  if (!value) return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-5 text-xs tracking-[0.3em] text-zinc-400 uppercase">
-      <CardSkeleton />
-      <p role="status">{t.loading}</p>
-    </div>
-  );
+  if (!value) return <BootScreen label={t.loading} />;
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
 
