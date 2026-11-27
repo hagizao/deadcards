@@ -618,6 +618,7 @@ function LookForm() {
   const [bg, setBg] = useState(settings.bg);
   const [homeHero, setHomeHero] = useState(settings.homeHero);
   const [featured, setFeatured] = useState(() => Array.from({ length: HOME_FEATURED_MAX }, (_, i) => settings.homeFeatured?.[i] ?? ""));
+  const [guide, setGuide] = useState(settings.homeGuide ?? "");
   const options = [...players].sort((a, b) => a.name.localeCompare(b.name));
   const tagOf = (p: Player) => teams.find((t) => t.id === p.teamId)?.tag ?? "FA";
   const [tiers, setTiers] = useState<TierBand[]>(() => structuredClone(settings.tierConfig ?? DEFAULT_TIER_CONFIG));
@@ -641,8 +642,8 @@ function LookForm() {
           </div>
         </div>
         <fieldset className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
-          <legend className="px-1 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Cartas em destaque (Home)</legend>
-          <p className="text-xs text-zinc-400">A primeira fica no centro. Sem nenhuma escolhida, a Home mostra as maiores OVR.</p>
+          <legend className="px-1 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Conheça os jogadores (Home)</legend>
+          <p className="text-xs text-zinc-400">As cartas do palco no topo da Home, na ordem em que giram. Sem nenhuma escolhida, a Home mostra as maiores OVR.</p>
           {featured.map((id, i) => (
             <select key={i} className={input} value={id} aria-label={`Destaque ${i + 1}`} onChange={(e) => setFeatured((f) => f.map((x, j) => (j === i ? e.target.value : x)))}>
               <option value="">{i + 1}. —</option>
@@ -654,6 +655,16 @@ function LookForm() {
             </select>
           ))}
         </fieldset>
+        <label className="block space-y-2 rounded-2xl border border-zinc-200/10 p-4">
+          <span className="block text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Como ler uma carta (Home)</span>
+          <span className="block text-xs text-zinc-400">A carta usada para explicar cada parte. Sem escolha, usa a primeira do palco.</span>
+          <select className={input} value={guide} onChange={(e) => setGuide(e.target.value)}>
+            <option value="">— A primeira do palco</option>
+            {options.map((p) => (
+              <option key={p.id} value={p.id}>{p.name} · {tagOf(p)} · {getPlayerOvr(p)}{p.special ? " · especial" : ""}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="noir-glass space-y-3 rounded-3xl p-5">
         <div className="flex items-center justify-between">
@@ -671,7 +682,7 @@ function LookForm() {
         ))}
       </div>
       <div className="flex items-center gap-3 lg:col-span-2">
-        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { bg: bg ?? null, homeHero: homeHero ?? null, homeFeatured: featured.filter(Boolean), tierConfig: tiers }), "Aparência salva!")}>
+        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { bg: bg ?? null, homeHero: homeHero ?? null, homeFeatured: featured.filter(Boolean), homeGuide: guide || null, tierConfig: tiers }), "Aparência salva!")}>
           {busy ? "Salvando…" : "Salvar aparência"}
         </button>
         <Toast msg={msg} />

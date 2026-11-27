@@ -71,6 +71,8 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
     ? picked
     : players.filter(isMainCard).sort((a, b) => getPlayerOvr(b) - getPlayerOvr(a)).slice(0, FEATURED);
 
+  const guide = players.find((p) => p.id === settings.homeGuide) ?? featured[0];
+
   const ranked = teams
     .map((team) => ({ team, ...teamOvr(players, team.id) }))
     .sort((a, b) => b.exact - a.exact || a.team.name.localeCompare(b.team.name));
@@ -87,7 +89,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
     <div className="flex flex-col gap-14">
       <Stage cards={featured} onOpenCard={onOpenCard} onOpenTeam={onOpenTeam} />
       <Welcome onNavigate={onNavigate} />
-      {featured[0] && <CardGuide sample={featured[0]} />}
+      {guide && <CardGuide sample={guide} />}
       <Roles onOpenCard={onOpenCard} />
       <NewCards onOpenCard={onOpenCard} />
 
