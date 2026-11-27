@@ -4,11 +4,10 @@ import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { STAT_KEYS, getPlayerHistory, getPlayerOvr, getPlayerTrend, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
+import { STAT_KEYS, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
-import { TrendBadge } from "./TrendBadge";
 import { Icon } from "./Icon";
 import { easeOut, pill } from "../lib/ui";
 import { MAX_FAVORITES } from "../lib/profile";
@@ -20,12 +19,15 @@ const revealed = new Set<string>();
 
 const S = strings({
   pt: { notOwned: "Você não possui esta carta", favorite: "Favoritar", favorited: "Favorita", limit: `Até ${MAX_FAVORITES} favoritas. Abra uma favorita e desmarque para marcar outra.`, failed: "Não foi possível salvar a favorita.",
+    owners: (n: number) => (n === 0 ? "Ninguém tem esta carta ainda" : n === 1 ? "1 conta tem esta carta" : `${n.toLocaleString("pt-BR")} contas têm esta carta`),
     cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por",
     stats: "Atributos", statNames: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" } },
   en: { notOwned: "You don't own this card", favorite: "Favorite", favorited: "Favorite", limit: `Up to ${MAX_FAVORITES} favorites. Open one and unmark it to pick another.`, failed: "Could not save the favorite.",
+    owners: (n: number) => (n === 0 ? "Nobody owns this card yet" : n === 1 ? "1 account owns this card" : `${n.toLocaleString("en-US")} accounts own this card`),
     cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version", artBy: "Art by",
     stats: "Attributes", statNames: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" } },
   es: { notOwned: "No tienes esta carta", favorite: "Marcar favorita", favorited: "Favorita", limit: `Hasta ${MAX_FAVORITES} favoritas. Abre una y desmárcala para marcar otra.`, failed: "No se pudo guardar la favorita.",
+    owners: (n: number) => (n === 0 ? "Nadie tiene esta carta todavía" : n === 1 ? "1 cuenta tiene esta carta" : `${n.toLocaleString("es")} cuentas tienen esta carta`),
     cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de",
     stats: "Atributos", statNames: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" } },
 });
@@ -42,6 +44,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   const { owned, favorites } = useMyCards();
   const [favIssue, setFavIssue] = useState<{ id: string; r: Exclude<FavoriteResult, "ok"> }>();
   const [favBusy, setFavBusy] = useState(false);
+  const owners = useOwnerCount(player?.special ? playerId : undefined);
   const tier = player ? getCardTier(player, settings.tierConfig!) : null;
   const ovr = player ? getPlayerOvr(player) : 0;
   const reveal = useMemo(
@@ -128,6 +131,12 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             <div>
               <h2 className="font-display text-3xl font-black tracking-[0.12em] text-dl-text uppercase"><span ref={nameRef} key={player.id + player.name}>{player.name}</span></h2>
               <p className="mt-1 text-sm text-zinc-300">{label(team.name)} ({team.tag}) · {label(player.position || "Flex")} · {player.hero}</p>
+              {player.special && owners !== undefined && (
+                <p className="mt-2 flex items-center gap-2 text-sm font-bold text-amber-200">
+                  <Icon name="cards" className="size-4" />
+                  {t.owners(owners)}
+                </p>
+              )}
               {me && owned && !owned.has(player.id) && (
                 <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-zinc-800/80 px-3 py-1 text-xs font-bold text-zinc-300">
                   <span aria-hidden="true" className="size-2 rounded-full bg-zinc-500" />
@@ -141,7 +150,6 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.custom ? t.special : tier.name}</span>
-            <TrendBadge delta={getPlayerTrend(player)} size="editor" />
             {canFavorite && (
               <button type="button" aria-pressed={fav} disabled={favBusy} onClick={flipFavorite}
                 className={`${pill(fav)} disabled:cursor-wait disabled:opacity-60`}>
@@ -201,6 +209,21 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
       </motion.div>
     </motion.div>
   );
+}
+
+/** Quantas contas têm a carta; `undefined` enquanto carrega, se falhar ou sem carta. */
+function useOwnerCount(id: string | undefined) {
+  const [result, setResult] = useState<{ id: string; count: number }>();
+  useEffect(() => {
+    if (!id) return;
+    const controller = new AbortController();
+    fetch(`/api/cards/${encodeURIComponent(id)}/owners`, { signal: controller.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<{ count: number }>) : Promise.reject(new Error(String(r.status)))))
+      .then(({ count }) => setResult({ id, count }))
+      .catch(() => { /* sem contagem: a linha simplesmente não aparece */ });
+    return () => controller.abort();
+  }, [id]);
+  return id && result?.id === id ? result.count : undefined;
 }
 
 function ArtCreditLine({ credit, label }: { credit: ArtCredit; label: string }) {

@@ -103,7 +103,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   const label = useLabel();
   const { teams, players, me } = useData();
   const [mode, setMode] = useState<Mode>("mine");
-  const [heroMode, setHeroMode] = useState<HeroMode>("signature");
+  const [heroMode, setHeroMode] = useState<HeroMode>("every");
   // ids das cartas que a pessoa tem; null enquanto carrega
   const { owned } = useMyCards();
   const [q, setQ] = useState("");

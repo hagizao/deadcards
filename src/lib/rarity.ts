@@ -11,6 +11,16 @@ const archTop = (): Pt[] => {
   return top.concat([[100, 88], [50, 100], [0, 88]]);
 };
 
+// retângulo de cantos arredondados (raio em px numa carta de 295 x 430), usado pelo Letreiro e pela Fechadura
+const rounded = (r: number): Pt[] => {
+  const rx = (r / 295) * 100, ry = (r / 430) * 100;
+  const corner = (cx: number, cy: number, a0: number) => Array.from({ length: 6 }, (_, i): Pt => {
+    const a = ((a0 + i * 18) * Math.PI) / 180;
+    return [+(cx + rx * Math.cos(a)).toFixed(2), +(cy + ry * Math.sin(a)).toFixed(2)];
+  });
+  return [...corner(rx, ry, 180), ...corner(100 - rx, ry, 270), ...corner(100 - rx, 100 - ry, 0), ...corner(rx, 100 - ry, 90)];
+};
+
 const SHAPES: Pt[][] = [
   [[0, 0], [100, 0], [100, 95.9], [94, 100], [6, 100], [0, 95.9]],
   [[0, 0], [100, 0], [100, 88], [50, 100], [0, 88]],
@@ -22,6 +32,10 @@ const SHAPES: Pt[][] = [
   [[0, 3.5], [10, 0], [22, 3.5], [34, 0], [46, 3.5], [58, 0], [70, 3.5], [82, 0], [94, 3.5], [100, 0], [100, 86], [50, 100], [0, 86]],
   [[0, 3.5], [5, 3.5], [5, 0], [95, 0], [95, 3.5], [100, 3.5], [100, 96.5], [95, 96.5], [95, 100], [5, 100], [5, 96.5], [0, 96.5]],
   [[0, 6], [50, 0], [100, 6], [100, 94], [50, 100], [0, 94]],
+  rounded(16),
+  // ogiva gótica no topo e ponta embaixo (Ritual)
+  [[0, 9], [4, 5.5], [12, 2.8], [24, 1.2], [38, 0.4], [50, 0], [62, 0.4], [76, 1.2], [88, 2.8], [96, 5.5], [100, 9], [100, 90], [56, 98.5], [50, 100], [44, 98.5], [0, 90]],
+  rounded(22),
 ];
 const PAD = [2, 3, 3, 4, 5];
 const GLOW_R = [0, 4, 8, 12, 18];
@@ -177,6 +191,133 @@ function frameOrbit(t: Tier) {
   return `<path d="${o}" fill="none" stroke="${t.c}" stroke-opacity=".35" stroke-width="1"/>` + comet(0) + comet(1);
 }
 
+// Letreiro: lâmpadas no alto acendendo do centro para fora, tubos de neon que falham ao ligar e um leque de raios
+function frameMarquee(t: Tier, uid: string) {
+  const o = frPath(frPts(t.lvl, 0.962, 0.974));
+  const n = 19, x0 = 26, x1 = FR_W - 26;
+  const bulbs = Array.from({ length: n }, (_, i) => {
+    const x = x0 + ((x1 - x0) * i) / (n - 1), d = Math.abs(x - FR_W / 2) / (FR_W / 2);
+    return `<circle class="fr-bulb" cx="${x.toFixed(1)}" cy="12" r="3.3" style="animation-delay:${(d * 1.2 - 1.2).toFixed(2)}s"/>`;
+  }).join("");
+  const rays = Array.from({ length: 9 }, (_, i) => {
+    const a = ((200 + i * 17.5) * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+    return `<line x1="${(147.5 + 12 * c).toFixed(1)}" y1="${(58 + 12 * s).toFixed(1)}" x2="${(147.5 + 38 * c).toFixed(1)}" y2="${(58 + 38 * s).toFixed(1)}"/>`;
+  }).join("");
+  const tube = "M11 92 V372 Q11 392 31 392 H70";
+  const tubes = `<path d="${tube}"/><path d="${tube}" transform="translate(295 0) scale(-1 1)"/>`;
+  return `<defs><radialGradient id="${uid}b"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="${t.hi}"/><stop offset="1" stop-color="${t.c}"/></radialGradient></defs>`
+    + `<path d="${o}" fill="none" stroke="${t.c}" stroke-opacity=".85" stroke-width="1.3"/>`
+    + `<g class="fr-breathe" stroke="${t.hi}" stroke-width="1.4" stroke-linecap="round" stroke-opacity=".55">${rays}</g>`
+    + `<g class="fr-neon" fill="none" stroke-linecap="round">`
+    + `<g stroke="${t.c}" stroke-width="7" stroke-opacity=".55" style="filter:blur(4px)">${tubes}</g>`
+    + `<g stroke="${t.hi}" stroke-width="2">${tubes}</g></g>`
+    + `<g fill="url(#${uid}b)" style="filter:drop-shadow(0 0 3px ${t.hi})">${bulbs}</g>`;
+}
+
+// Fechadura: carta de vidro com reflexo, trincos de aço nas laterais que recolhem a cada 6 s
+// e um buraco de fechadura gravado embaixo, que acende quando a carta destranca
+function frameLock(t: Tier, uid: string) {
+  const o1 = frPath(frPts(t.lvl, 0.965, 0.976));
+  const o2 = frPath(frPts(t.lvl, 0.935, 0.956));
+  const bolts = [[28, 36], [62, 70]].map(([y0, y1]) => {
+    const y = (y0 * FR_H) / 100, h = ((y1 - y0) * FR_H) / 100;
+    const plate = (x: number) => `<rect x="${x}" y="${y.toFixed(1)}" width="26" height="${h.toFixed(1)}" rx="3" fill="url(#${uid}m)" stroke="${t.lo}" stroke-width="1"/>`
+      + `<line x1="${x + 6}" y1="${(y + h / 2).toFixed(1)}" x2="${x + 20}" y2="${(y + h / 2).toFixed(1)}" stroke="${t.lo}" stroke-width="2" stroke-linecap="round"/>`;
+    return `<g class="fr-bolt-l">${plate(-10)}</g><g class="fr-bolt-r">${plate(FR_W - 16)}</g>`;
+  }).join("");
+  const hole = "M144.5 406 a4.5 4.5 0 1 1 6 0 l2.2 10 h-10.4z";
+  return `<defs><linearGradient id="${uid}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="${t.c}"/><stop offset="1" stop-color="${t.lo}"/></linearGradient>`
+    + `<linearGradient id="${uid}s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".32"/><stop offset=".4" stop-color="#ffffff" stop-opacity=".06"/><stop offset=".41" stop-color="#ffffff" stop-opacity="0"/></linearGradient>`
+    + `<radialGradient id="${uid}g"><stop offset="0" stop-color="${t.hi}" stop-opacity=".95"/><stop offset="1" stop-color="${t.hi}" stop-opacity="0"/></radialGradient></defs>`
+    + `<rect x="0" y="0" width="295" height="430" fill="url(#${uid}s)"/>`
+    + `<path d="${o1}" fill="none" stroke="#ffffff" stroke-opacity=".7" stroke-width="1.2"/>`
+    + `<path d="${o2}" fill="none" stroke="${t.hi}" stroke-opacity=".3" stroke-width=".8"/>`
+    + `<g style="filter:drop-shadow(0 2px 3px rgb(0 0 0 / .5))">${bolts}</g>`
+    + `<ellipse class="fr-unlock" cx="147.5" cy="410" rx="40" ry="22" fill="url(#${uid}g)"/>`
+    + `<path d="${hole}" fill="${t.lo}" fill-opacity=".85" stroke="#ffffff" stroke-opacity=".8" stroke-width="1"/>`;
+}
+
+const gearPath = (cx: number, cy: number, r: number, teeth: number, h: number) => {
+  const pt = (a: number, rad: number) => `${(cx + rad * Math.cos(a)).toFixed(1)} ${(cy + rad * Math.sin(a)).toFixed(1)}`;
+  let d = "";
+  for (let i = 0; i < teeth; i++) {
+    const a = (i / teeth) * Math.PI * 2, w = Math.PI / teeth;
+    d += `${i ? "L" : "M"}${pt(a - w * 0.55, r)} L${pt(a - w * 0.35, r + h)} L${pt(a + w * 0.35, r + h)} L${pt(a + w * 0.55, r)} `;
+  }
+  const hole = r * 0.32;
+  return d + `Z M${(cx + hole).toFixed(1)} ${cy} A${hole.toFixed(1)} ${hole.toFixed(1)} 0 1 0 ${(cx - hole).toFixed(1)} ${cy} A${hole.toFixed(1)} ${hole.toFixed(1)} 0 1 0 ${(cx + hole).toFixed(1)} ${cy}Z`;
+};
+
+// Engrenagens: relojoaria de latão girando nos cantos
+function frameGears(t: Tier, uid: string) {
+  const o = frPath(frPts(t.lvl, 0.962, 0.974));
+  // [cx, cy, raio, dentes, sentido]: as que se tocam giram ao contrário, na proporção dos dentes
+  const gears: [number, number, number, number, number][] = [
+    [6, 424, 44, 14, 1], [20, 357, 20, 7, -1],
+    [289, 424, 44, 14, -1], [275, 357, 20, 7, 1],
+    [291, 4, 30, 10, -1],
+  ];
+  const g = gears.map(([cx, cy, r, n, dir]) => {
+    const spokes = [0, 1, 2].map((k) => {
+      const a = (k / 3) * Math.PI * 2;
+      return `M${(cx + r * 0.32 * Math.cos(a)).toFixed(1)} ${(cy + r * 0.32 * Math.sin(a)).toFixed(1)} L${(cx + r * 0.8 * Math.cos(a)).toFixed(1)} ${(cy + r * 0.8 * Math.sin(a)).toFixed(1)}`;
+    }).join(" ");
+    return `<g class="fr-spin" style="--d:${(n * 1.6).toFixed(1)}s;animation-direction:${dir > 0 ? "normal" : "reverse"};transform-origin:${cx}px ${cy}px">`
+      + `<path d="${gearPath(cx, cy, r, n, r * 0.18)}" fill="url(#${uid}m)" fill-rule="evenodd" stroke="${t.lo}" stroke-width="1"/>`
+      + `<circle cx="${cx}" cy="${cy}" r="${(r * 0.8).toFixed(1)}" fill="none" stroke="${t.lo}" stroke-opacity=".7" stroke-width="1"/>`
+      + `<path d="${spokes}" stroke="${t.lo}" stroke-width="${(r * 0.12).toFixed(1)}" stroke-linecap="round"/></g>`;
+  }).join("");
+  const rivets = [[14, 14], [14, 120], [14, 240], [281, 120], [281, 240]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.2"/>`).join("");
+  return `<defs><linearGradient id="${uid}m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${t.hi}"/><stop offset=".45" stop-color="${t.c}"/><stop offset="1" stop-color="${t.lo}"/></linearGradient></defs>`
+    + `<path d="${o}" fill="none" stroke="${t.c}" stroke-opacity=".8" stroke-width="1.3"/>`
+    + `<g fill="${t.hi}" fill-opacity=".85">${rivets}</g>`
+    + `<g opacity=".92" style="filter:drop-shadow(0 2px 3px rgb(0 0 0 / .6))">${g}</g>`;
+}
+
+// Ritual: runas que acendem em onda pelas laterais e runas grandes que aparecem e somem pela carta
+const RUNES = ["M0 0 L0 10 M0 3 L5 0 M0 6 L5 3", "M0 0 L5 5 L0 10 M5 0 L5 10", "M2.5 0 L2.5 10 M0 3 L5 7 M5 3 L0 7", "M0 10 L2.5 0 L5 10 M1 6 L4 6", "M0 0 L5 0 L0 10 L5 10", "M0 5 L2.5 0 L5 5 L2.5 10Z"];
+function frameRitual(t: Tier, uid: string) {
+  const o1 = frPath(frPts(t.lvl, 0.958, 0.972));
+  const o2 = frPath(frPts(t.lvl, 0.925, 0.95));
+  let runes = "";
+  for (let i = 0; i < 13; i++) {
+    const y = 66 + i * 24, dl = (-(13 - i) * 0.22).toFixed(2);
+    runes += `<path class="fr-rune" d="${RUNES[i % RUNES.length]}" transform="translate(8 ${y}) scale(1.5)" style="animation-delay:${dl}s"/>`
+      + `<path class="fr-rune" d="${RUNES[(i + 3) % RUNES.length]}" transform="translate(279.5 ${y}) scale(1.5)" style="animation-delay:${dl}s"/>`;
+  }
+  // runas grandes que aparecem e somem em pontos diferentes da carta, uma depois da outra
+  const ghosts = [[62, 150], [214, 118], [146, 214], [58, 268], [222, 252], [132, 312]].map(([x, y], i) =>
+    `<path class="fr-ghost" d="${RUNES[(i + 2) % RUNES.length]}" transform="translate(${x} ${y}) scale(4.2)" style="animation-delay:${(-i * 1.1).toFixed(1)}s"/>`).join("");
+  return `<defs><radialGradient id="${uid}v" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="${t.c}" stop-opacity="0"/><stop offset="1" stop-color="${t.c}" stop-opacity=".55"/></radialGradient></defs>`
+    + `<rect class="fr-veil" x="0" y="0" width="295" height="430" fill="url(#${uid}v)"/>`
+    + `<path d="${o1}" fill="none" stroke="${t.c}" stroke-opacity=".9" stroke-width="1.4"/>`
+    + `<path d="${o2}" fill="none" stroke="${t.hi}" stroke-opacity=".35" stroke-width=".7" stroke-dasharray="1 4"/>`
+    + `<g fill="none" stroke="${t.hi}" stroke-width=".5" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 4px ${t.c})">${ghosts}</g>`
+    + `<g fill="none" stroke="${t.hi}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 2px ${t.hi}) drop-shadow(0 0 5px ${t.c})">${runes}</g>`;
+}
+
+// Almas: fumaça espectral subindo pelas laterais e almas que flutuam até sumir no alto
+function frameSouls(t: Tier, uid: string) {
+  const o = frPath(frPts(t.lvl, 0.962, 0.974));
+  const wisp = (x: number, amp: number, ph: number) => {
+    let d = `M${x} 440`;
+    for (let y = 440; y > -10; y -= 30) d += ` Q${(x + amp * Math.sin(ph + y / 30)).toFixed(1)} ${y - 15} ${x} ${y - 30}`;
+    return d;
+  };
+  const wisps = [[10, 7, 0], [22, 5, 2], [285, 7, 1], [273, 5, 3]].map(([x, a, ph], i) => {
+    const thin = i % 2 === 1;
+    return `<path class="fr-run" pathLength="100" d="${wisp(x, a, ph)}" fill="none" stroke="${thin ? t.hi : t.c}" stroke-width="${thin ? 2.4 : 7}" stroke-opacity="${thin ? 0.8 : 0.6}" stroke-linecap="round" stroke-dasharray="${thin ? "18 22" : "30 20"}" style="animation-duration:${(9 + i * 1.7).toFixed(1)}s;animation-delay:${(-i * 2.3).toFixed(1)}s;filter:blur(${thin ? 1 : 3}px)"/>`;
+  }).join("");
+  const souls = [[18, 0], [277, 1.6], [30, 3.4], [265, 5.1], [14, 6.6], [281, 8.2]].map(([x, dl], i) =>
+    `<g class="fr-soul" style="--d:${(8 + (i % 3) * 1.4).toFixed(1)}s;--dl:${(-dl).toFixed(1)}s;--sx:${i % 2 ? -10 : 10}px">`
+    + `<ellipse cx="${x}" cy="450" rx="4.5" ry="14" fill="url(#${uid}t)"/>`
+    + `<circle cx="${x}" cy="440" r="5" fill="${t.hi}" style="filter:drop-shadow(0 0 4px ${t.hi}) drop-shadow(0 0 8px ${t.c})"/></g>`).join("");
+  return `<defs><linearGradient id="${uid}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${t.hi}" stop-opacity=".9"/><stop offset="1" stop-color="${t.c}" stop-opacity="0"/></linearGradient><linearGradient id="${uid}f" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${t.c}" stop-opacity=".5"/><stop offset="1" stop-color="${t.c}" stop-opacity="0"/></linearGradient></defs>`
+    + `<rect class="fr-breathe" x="0" y="320" width="295" height="110" fill="url(#${uid}f)"/>`
+    + `<path d="${o}" fill="none" stroke="${t.c}" stroke-opacity=".6" stroke-width="1.1"/>`
+    + `<g>${wisps}</g>${souls}`;
+}
+
 type FramePreset = {
   name: string; lvl: number; c1: string; c2: string; pad: number; glow: number; anim: number; topPad: number; glint: boolean;
   fx: FxSpec; noSweep?: boolean; bg: (t: Tier) => string; bgH: (t: Tier) => string; orn: (t: Tier, uid: string) => string;
@@ -194,6 +335,16 @@ export const FRAME_PRESETS: Record<string, FramePreset> = {
     bg: (t) => `linear-gradient(135deg, ${t.lo}, ${t.c}, ${t.lo}, ${t.hi}, ${t.lo})`, bgH: (t) => `linear-gradient(135deg, ${t.c}, #ffffff, ${t.c})`, orn: frameStorm },
   orbita: { name: "Órbita", lvl: 2, c1: "#3df0ff", c2: "#ffffff", pad: 3, glow: 20, anim: 0, topPad: 0, glint: false, fx: { twinkle: 4 },
     bg: (t) => `linear-gradient(145deg, ${hexToRgba(t.c, 0.6)}, #17171c 40%, ${hexToRgba(t.hi, 0.5)})`, bgH: (t) => `linear-gradient(145deg, ${t.c}, #26262c 40%, ${t.hi})`, orn: frameOrbit },
+  letreiro: { name: "Letreiro", lvl: 10, c1: "#ff3d7f", c2: "#ffe9b0", pad: 4, glow: 18, anim: 0, topPad: 30, glint: false, fx: { twinkle: 3 },
+    bg: (t) => `linear-gradient(145deg, ${t.lo}, ${t.c} 30%, ${t.lo} 62%, ${t.c})`, bgH: (t) => `linear-gradient(145deg, ${t.c}, ${t.hi} 50%, ${t.c})`, orn: frameMarquee },
+  engrenagens: { name: "Engrenagens", lvl: 0, c1: "#c27c3a", c2: "#ffe1a8", pad: 4, glow: 12, anim: 8, topPad: 22, glint: true, fx: { twinkle: 2 }, bg: metal, bgH: metalH, orn: frameGears },
+  ritual: { name: "Ritual", lvl: 11, c1: "#d0173a", c2: "#ffa3b4", pad: 4, glow: 20, anim: 5, topPad: 30, glint: false, fx: { rise: 8, twinkle: 3, speed: [5, 9], size: [2, 5] },
+    bg: (t) => `linear-gradient(180deg, #14030a, ${t.c} 45%, #14030a)`, bgH: (t) => `linear-gradient(180deg, ${t.lo}, ${t.hi} 50%, ${t.lo})`, orn: frameRitual },
+  almas: { name: "Almas", lvl: 1, c1: "#6ee7c8", c2: "#f0fffb", pad: 3, glow: 22, anim: 7, topPad: 0, glint: false, fx: { rise: 10, twinkle: 4, speed: [6, 11], size: [2, 5] },
+    bg: (t) => `linear-gradient(160deg, ${hexToRgba(t.hi, 0.75)}, ${t.c} 40%, ${hexToRgba(t.lo, 0.85)})`, bgH: (t) => `linear-gradient(160deg, #ffffff, ${t.hi} 40%, ${t.c})`, orn: frameSouls },
+  fechadura: { name: "Fechadura", lvl: 12, c1: "#9fd8ff", c2: "#ffffff", pad: 5, glow: 16, anim: 6, topPad: 0, glint: true, fx: { twinkle: 4 },
+    bg: (t) => `linear-gradient(135deg, rgb(255 255 255 / .85), ${hexToRgba(t.c, 0.35)} 30%, rgb(255 255 255 / .12) 55%, ${hexToRgba(t.hi, 0.55)} 80%, rgb(255 255 255 / .8))`,
+    bgH: (t) => `linear-gradient(135deg, #ffffff, ${hexToRgba(t.c, 0.55)} 35%, rgb(255 255 255 / .3) 60%, #ffffff)`, orn: frameLock },
 };
 
 export function getRarity(ovr: number, cfg: TierBand[]): Tier {

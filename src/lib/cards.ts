@@ -48,13 +48,6 @@ export function getPlayerHistory(p: Player): HistoryPoint[] {
   return raw;
 }
 
-export function getPlayerTrend(p: Player): number {
-  const h = getPlayerHistory(p);
-  if (h.length < 2) return 0;
-  const last = h[h.length - 1];
-  return last.base ? 0 : last.ovr - h[h.length - 2].ovr;
-}
-
 export function isRosterCard(players: Player[], p: Player): boolean {
   // herói jogado é a mesma pessoa com outro herói: nunca entra no elenco nem na média do time
   if (p.inactive || isAltHero(p)) return false;
@@ -76,26 +69,6 @@ export function teamOvr(players: Player[], teamId: string) {
   if (!roster.length) return { exact: 0, rounded: 0, count: 0 };
   const exact = roster.reduce((a, p) => a + getPlayerOvr(p), 0) / roster.length;
   return { exact, rounded: Math.round(exact), count: roster.length };
-}
-
-export function teamHistory(players: Player[], teamId: string) {
-  const roster = activeRoster(players, teamId);
-  if (!roster.length) return [];
-  const hists = roster.map(getPlayerHistory);
-  const dates = [...new Set(hists.flat().map((h) => h.date))].sort();
-  return dates.map((date) => {
-    const sum = hists.reduce((acc, h) => {
-      let v = h[0].ovr;
-      for (const pt of h) if (pt.date <= date) v = pt.ovr;
-      return acc + v;
-    }, 0);
-    return { date, ovr: Math.round(sum / roster.length) };
-  });
-}
-
-export function teamTrend(players: Player[], teamId: string): number {
-  const h = teamHistory(players, teamId);
-  return h.length < 2 ? 0 : h[h.length - 1].ovr - h[h.length - 2].ovr;
 }
 
 export function tierKeyForOvr(ovr: number, cfg: TierBand[]): string {

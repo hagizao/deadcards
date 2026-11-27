@@ -20,11 +20,13 @@ npm run db:migrate               # cria as tabelas no D1 local
 npm run dev                      # site + Worker + D1 + R2 em http://localhost:5173
 ```
 
-Para ter dados locais, importe um save:
+Para ter os dados reais no local, copie produção (precisa de `npx wrangler login`):
 
 ```bash
-npm run db:import -- caminho/do/save.json
+npm run db:pull
 ```
+
+Os dados são alterados sempre em produção (pelo Editor do site); o D1 local é só uma cópia para testar código.
 
 ## Stack
 

@@ -1,12 +1,11 @@
 import { motion } from "motion/react";
 import { useState, type CSSProperties } from "react";
 import { useData } from "../lib/data";
-import { getPlayerOvr, getPlayerTrend, isMainCard, isRosterCard, REGIONS, regionClass, teamOf, teamOvr, teamTrend, tierKeyForOvr, useLabel } from "../lib/cards";
+import { getPlayerOvr, isMainCard, isRosterCard, REGIONS, regionClass, teamOf, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
 import { getCardTier, rarityStyleVars } from "../lib/rarity";
 import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
-import { Icon } from "../components/Icon";
 import { field, pageTitle, pill } from "../lib/ui";
 
 const S = strings({
@@ -48,7 +47,7 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
     .sort((a, b) => b.ovr - a.ovr || b.p.stats.MIR - a.p.stats.MIR);
 
   const rankedTeams = teams
-    .map((t) => ({ t, ...teamOvr(players, t.id), delta: teamTrend(players, t.id) }))
+    .map((t) => ({ t, ...teamOvr(players, t.id) }))
     .filter(({ t }) => (region === "ALL" || t.region === region) && (!query || `${t.name} ${t.tag} ${t.region} ${label(t.region)}`.toLowerCase().includes(query)))
     .sort((a, b) => b.exact - a.exact || a.t.name.localeCompare(b.t.name));
 
@@ -85,7 +84,6 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
                 {empty && <span className="px-2 text-xs text-zinc-500">{tr.nobody(tier.min, tier.max)}</span>}
                 {pItems.map(({ p, team, ovr }, i) => {
                   const art = heroArt(p.hero);
-                  const delta = getPlayerTrend(p);
                   return (
                     <motion.button
                       key={p.id}
@@ -102,12 +100,11 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
                       {art && <img src={art.url} alt="" className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${art.x}% ${art.y}%` }} />}
                       <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent" />
                       <span className="card-txt-shadow absolute top-1 left-1.5 text-lg font-black text-white tabular-nums">{ovr}</span>
-                      {delta !== 0 && <span className={`absolute top-1.5 right-1.5 flex items-center text-[11px] font-extrabold tabular-nums ${delta > 0 ? "text-emerald-300" : "text-red-300"}`}><Icon name={delta > 0 ? "arrow-up" : "arrow-down"} className="size-3" />{Math.abs(delta)}</span>}
                       <span className="card-txt-shadow absolute inset-x-1.5 bottom-1.5 line-clamp-2 text-[11px]/tight font-extrabold tracking-wider text-white uppercase">{p.name}</span>
                     </motion.button>
                   );
                 })}
-                {tItems.map(({ t, rounded, count, delta }) => (
+                {tItems.map(({ t, rounded, count }) => (
                   <button
                     key={t.id}
                     type="button"
@@ -123,8 +120,6 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
                       <div className="flex items-center gap-1.5">
                         <TeamLogo3D team={t} className="size-5" radius={4} />
                         <span className="truncate text-sm font-extrabold tracking-wider text-white uppercase">{t.name}</span>
-                        {delta > 0 && <span className="flex items-center text-[11px] font-extrabold text-emerald-300 tabular-nums"><Icon name="arrow-up" className="size-3" />{delta}</span>}
-                        {delta < 0 && <span className="flex items-center text-[11px] font-extrabold text-red-300 tabular-nums"><Icon name="arrow-down" className="size-3" />{-delta}</span>}
                       </div>
                       <div className="mt-1 text-xs text-zinc-400">{label(t.region)} · {tr.count(count)}</div>
                     </div>

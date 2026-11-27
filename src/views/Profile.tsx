@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
+import { Achievements } from "../components/Achievements";
 import { Card } from "../components/Card";
 import { CardExportButton } from "../components/CardExportButton";
 import { Icon } from "../components/Icon";
@@ -116,7 +117,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
   );
 
   return (
-    <section className="mx-auto flex max-w-6xl flex-col gap-6" aria-labelledby="profile-title">
+    <section className="flex flex-col gap-6" aria-labelledby="profile-title">
       {editing ? (
         <>
           {identity}
@@ -126,42 +127,31 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
           />
         </>
       ) : (
-        <div className="noir-glass flex flex-col items-center gap-6 rounded-2xl p-4 sm:p-6 md:flex-row md:items-stretch md:gap-8">
-          {card && <div ref={cardRef} className="w-fit max-w-full shrink-0"><Card player={profilePlayer(card)} /></div>}
-          <div className="flex w-full min-w-0 flex-1 flex-col gap-6">
-            {identity}
+        // carta do perfil à esquerda (só a carta, sem os atributos detalhados) e conquistas ocupando o resto da largura
+        <div className="flex flex-col gap-6 lg:flex-row">
+          <div className="noir-glass flex flex-col items-center gap-5 rounded-2xl p-4 sm:p-6 lg:w-fit lg:shrink-0">
+            <div className="w-full lg:max-w-80">{identity}</div>
+            {card && <div ref={cardRef} className="w-fit max-w-full"><Card player={profilePlayer(card)} /></div>}
             {card && tier ? (
-              <div className="flex flex-col gap-5">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="font-display text-5xl leading-none font-black text-dl-text tabular-nums">{calculateOVR(card.stats)}</span>
-                  <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">OVR</span>
-                  <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.name}</span>
-                </div>
-                <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                  {STAT_KEYS.map((k) => (
-                    <div key={k} className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between text-xs font-bold tracking-[0.18em] uppercase">
-                        <dt className="text-zinc-400">{k}</dt>
-                        <dd className="text-zinc-100 tabular-nums">{card.stats[k]}</dd>
-                      </div>
-                      <div aria-hidden="true" className="h-1.5 rounded-full bg-zinc-800">
-                        <div className="h-full rounded-full" style={{ width: `${card.stats[k]}%`, background: tier.c }} />
-                      </div>
-                    </div>
-                  ))}
-                </dl>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <span className="font-display text-4xl leading-none font-black text-dl-text tabular-nums">{calculateOVR(card.stats)}</span>
+                <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">OVR</span>
+                <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.name}</span>
               </div>
             ) : <p className="text-sm text-zinc-400">{t.noCard}</p>}
-            <div className="flex flex-wrap items-center gap-2 md:mt-auto">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               {owner && <button type="button" onClick={() => setEditing(true)} className={primaryBtn}>{card ? t.edit : t.create}</button>}
               <button type="button" onClick={share} className={pill(false)}>{t.share}</button>
               {card && <CardExportButton cardRef={cardRef} name={card.name} />}
-              {copy && <p role="status" className={`text-sm ${copy === "copied" ? "text-emerald-300" : "text-red-300"}`}>{t[copy]}</p>}
             </div>
+            {copy && <p role="status" className={`text-sm ${copy === "copied" ? "text-emerald-300" : "text-red-300"}`}>{t[copy]}</p>}
           </div>
+          <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible />
         </div>
       )}
 
+      {editing && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible />}
+      <ProfileFavorites ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} />
       <ProfileCards ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} onRedeem={onRedeem} />
     </section>
   );
@@ -169,36 +159,67 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
 
 const PAGE = 18;
 
+/** Favoritas do perfil (até MAX_FAVORITES), em destaque antes da coleção. No seu perfil acompanham o que você marca no destaque da carta. */
+function useFavorites(profileFavorites: string[], owner: boolean) {
+  const mine = useMyCards();
+  return owner && mine.owned ? mine.favorites : profileFavorites;
+}
+
+// a estrela só indica; marcar e desmarcar é no destaque da carta
+function FavoriteStar({ label }: { label: string }) {
+  return (
+    <span role="img" aria-label={label} className="pointer-events-none absolute top-2 right-2 z-20 flex size-9 items-center justify-center rounded-full bg-dl-black/80 text-amber-300">
+      <Icon name="star" className="size-5 fill-current" />
+    </span>
+  );
+}
+
+function ProfileFavorites({ ids, profileFavorites, owner, onOpenCard }: { ids: string[]; profileFavorites: string[]; owner: boolean; onOpenCard: (id: string) => void }) {
+  const t = useT(S);
+  const { players } = useData();
+  const favorites = useFavorites(profileFavorites, owner);
+  const owned = new Set(ids);
+  const pinned = players.filter((p) => owned.has(p.id) && favorites.includes(p.id))
+    .sort((a, b) => getPlayerOvr(b) - getPlayerOvr(a) || a.name.localeCompare(b.name)).slice(0, MAX_FAVORITES);
+  if (!pinned.length && !owner) return null;
+  return (
+    <section aria-labelledby="profile-favorites-title" className="noir-glass flex flex-col gap-4 rounded-2xl p-4 sm:p-6">
+      <h2 id="profile-favorites-title" className="flex items-center gap-2 font-display text-lg font-black text-amber-200">
+        <Icon name="star" className="size-4 fill-current" />
+        {t.favorites}
+        <span className="text-sm text-zinc-400 tabular-nums">{pinned.length}/{MAX_FAVORITES}</span>
+      </h2>
+      {pinned.length ? (
+        <ul className="flex flex-wrap justify-center gap-6">
+          {pinned.map((player) => (
+            <li key={player.id} className="relative drop-shadow-[0_0_28px_rgb(252_211_77/0.35)]">
+              <Card player={player} onOpen={() => onOpenCard(player.id)} />
+              <FavoriteStar label={t.favorites} />
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-sm text-zinc-400">{t.favoritesHint}</p>}
+    </section>
+  );
+}
+
 function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { ids: string[]; profileFavorites: string[]; owner: boolean; onOpenCard: (id: string) => void; onRedeem: () => void }) {
   const t = useT(S);
   const { players, teams, settings } = useData();
   const [q, setQ] = useState("");
   const [rarity, setRarity] = useState<string>();
   const [limit, setLimit] = useState(PAGE);
-  // no seu perfil as favoritas acompanham o que você marca no destaque da carta
-  const mine = useMyCards();
-  const favorites = owner && mine.owned ? mine.favorites : profileFavorites;
+  const favorites = useFavorites(profileFavorites, owner);
   const query = useDeferredValue(q.trim().toLowerCase());
 
   const summary = summarizeCollection(players, ids, settings.tierConfig!);
   const byOvr = (a: Player, b: Player) => getPlayerOvr(b) - getPlayerOvr(a) || a.name.localeCompare(b.name);
-  // favoritas (até MAX_FAVORITES) sobem para o topo, em destaque, por OVR como o resto
-  const pinned = summary.cards.filter((p) => favorites.includes(p.id)).sort(byOvr).slice(0, MAX_FAVORITES);
-  const favoriteIds = new Set(pinned.map((p) => p.id));
-  // o resto da coleção por OVR, do maior para o menor
+  // a coleção toda por OVR, do maior para o menor; as favoritas também aparecem aqui, com a estrela
   const list = summary.cards
-    .filter((p) => !favoriteIds.has(p.id))
     .filter((p) => !rarity || getCardTier(p, settings.tierConfig!).tierKey === rarity)
     .filter((p) => !query || `${p.name} ${p.hero} ${teamOf(teams, p).name} ${teamOf(teams, p).tag}`.toLowerCase().includes(query))
     .sort(byOvr);
   const pick = (key?: string) => { setRarity(key); setLimit(PAGE); };
-
-  // a estrela só indica; marcar e desmarcar é no destaque da carta
-  const star = (fav: boolean) => fav && (
-    <span role="img" aria-label={t.favorites} className="pointer-events-none absolute top-2 right-2 z-20 flex size-9 items-center justify-center rounded-full bg-dl-black/80 text-amber-300">
-      <Icon name="star" className="size-5 fill-current" />
-    </span>
-  );
 
   return (
     <section aria-labelledby="profile-cards-title" className="noir-glass flex flex-col gap-5 rounded-2xl p-4 sm:p-6">
@@ -230,26 +251,6 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
             )}
           </div>
 
-          {(pinned.length > 0 || owner) && (
-            <div className="flex flex-col gap-3">
-              <h3 className="flex items-center gap-2 text-xs font-bold tracking-widest text-amber-200 uppercase">
-                <Icon name="star" className="size-3.5 fill-current" />
-                {t.favorites}
-                <span className="text-zinc-400 tabular-nums">{pinned.length}/{MAX_FAVORITES}</span>
-              </h3>
-              {pinned.length ? (
-                <ul className="flex flex-wrap justify-center gap-6 sm:justify-start">
-                  {pinned.map((player) => (
-                    <li key={player.id} className="relative drop-shadow-[0_0_28px_rgb(252_211_77/0.35)]">
-                      <Card player={player} onOpen={() => onOpenCard(player.id)} />
-                      {star(true)}
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="text-sm text-zinc-400">{t.favoritesHint}</p>}
-            </div>
-          )}
-
           {(list.length > 0 || rarity || query) && (
             <>
               <div role="group" aria-label={t.rarity} className="flex flex-wrap gap-2">
@@ -270,7 +271,7 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
                   {list.slice(0, limit).map((player) => (
                     <li key={player.id} className="relative">
                       <Card player={player} variant="medium" onOpen={() => onOpenCard(player.id)} />
-                      
+                      {favorites.includes(player.id) && <FavoriteStar label={t.favorites} />}
                     </li>
                   ))}
                 </ul>

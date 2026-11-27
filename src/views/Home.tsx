@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import type { CSSProperties } from "react";
 import type { Player, Team } from "../lib/types";
 import { useData } from "../lib/data";
-import { getPlayerOvr, isMainCard, regionClass, teamOvr, teamTrend, tierKeyForOvr, useLabel } from "../lib/cards";
+import { getPlayerOvr, isMainCard, regionClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
 import { Card } from "../components/Card";
 import { RegionBackdrop } from "../components/RegionBackdrop";
@@ -73,7 +73,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
     : players.filter(isMainCard).sort((a, b) => getPlayerOvr(b) - getPlayerOvr(a)).slice(0, FEATURED);
 
   const ranked = teams
-    .map((team) => ({ team, ...teamOvr(players, team.id), delta: teamTrend(players, team.id) }))
+    .map((team) => ({ team, ...teamOvr(players, team.id) }))
     .sort((a, b) => b.exact - a.exact || a.team.name.localeCompare(b.team.name));
 
   const meta: Record<Area, string | null> = {
@@ -162,7 +162,7 @@ function AreaTile({ title, text, meta, onClick }: { title: string; text: string;
 }
 
 function TeamRow({ r, idx, tier, meta, onOpen }: {
-  r: { team: Team; rounded: number; count: number; delta: number };
+  r: { team: Team; rounded: number; count: number };
   idx: number;
   tier?: { key: string; bg: string; text: string };
   meta: string;
@@ -194,11 +194,7 @@ function TeamRow({ r, idx, tier, meta, onOpen }: {
           <span className="team-ovr-num">{r.count ? r.rounded : "--"}</span>
           <span className="team-ovr-lbl">OVR</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          {tier && <span className="rounded-md border border-black/25 px-2 py-0.5 text-xs font-black" style={{ background: tier.bg, color: tier.text }}>{tier.key}</span>}
-          {r.delta > 0 && <span className="flex items-center gap-0.5 text-xs font-extrabold text-emerald-300 tabular-nums"><Icon name="arrow-up" className="size-3" />+{r.delta}</span>}
-          {r.delta < 0 && <span className="flex items-center gap-0.5 text-xs font-extrabold text-red-300 tabular-nums"><Icon name="arrow-down" className="size-3" />{r.delta}</span>}
-        </div>
+        {tier && <span className="rounded-md border border-black/25 px-2 py-0.5 text-xs font-black" style={{ background: tier.bg, color: tier.text }}>{tier.key}</span>}
       </div>
     </motion.button>
   );

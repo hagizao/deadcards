@@ -6,5 +6,6 @@ export function TeamLogo({ team }: { team: Team }) {
   }
   const tag = team.tag || "—";
   const cls = tag.length >= 5 ? "team-logo-text team-logo-text--5" : tag.length === 4 ? "team-logo-text team-logo-text--4" : "team-logo-text";
-  return <span className={cls}>{tag}</span>;
+  // a sigla mede a fonte pela largura do próprio quadro (cqw): sem ele, contaria a janela inteira e estouraria fora da moldura
+  return <span className="@container flex size-full items-center justify-center"><span className={cls}>{tag}</span></span>;
 }
