@@ -46,7 +46,7 @@ export function Roles({ onOpenCard }: { onOpenCard: (id: string) => void }) {
         {ROLES.map((role, i) => (
           <motion.li
             key={role}
-            className="flex shrink-0 flex-col gap-4 border-l border-zinc-200/15 pl-4"
+            className="flex shrink-0 flex-col gap-4 border-l border-zinc-200/15 pl-2"
             style={{ width: rail.size }}
             inert={rail.hidden(i) || undefined}
             initial={{ opacity: 0, y: 16 }}
@@ -54,12 +54,13 @@ export function Roles({ onOpenCard }: { onOpenCard: (id: string) => void }) {
             viewport={{ once: true }}
             transition={{ ...enter, delay: cascade(i, 0.06) }}
           >
-            <div className="flex flex-col gap-1.5">
+            {/* texto com px-2, igual ao padding dos jogadores: a tinta de tudo cai na mesma linha e o fundo do hover encaixa na borda */}
+            <div className="flex flex-col gap-1.5 px-2">
               <span className="font-display text-lg tracking-[0.11em] text-dl-text uppercase">{label(role)}</span>
               <p className="text-sm text-pretty text-zinc-300">{roles[role]}</p>
             </div>
             <div className="mt-auto flex flex-col gap-1">
-              <span className="text-[14px] font-bold tracking-widest text-zinc-400 uppercase">{t.examples}</span>
+              <span className="px-2 text-[14px] font-bold tracking-widest text-zinc-400 uppercase">{t.examples}</span>
               {top(role).map((p) => {
                 const icon = heroIcon(p.hero);
                 return (
