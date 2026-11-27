@@ -152,8 +152,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
           exit={{ opacity: 0, scale: 0.97 }}
           transition={{ type: "spring", duration: 0.35, bounce: 0.12 }}
         />
+      {/* sem rolagem lateral: o clarão da revelação passa da largura do painel no celular */}
       <div
-        className="relative flex max-h-[92dvh] w-full flex-col items-center gap-8 overflow-y-auto rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
+        className="relative flex max-h-[92dvh] w-full flex-col items-center gap-8 overflow-x-hidden overflow-y-auto rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
       >
         <div ref={flyRef} className="relative z-10 max-w-full">
         <motion.div key={player.id} className="relative max-w-full" initial={reveal || fly ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2, ease: easeOut }}>
