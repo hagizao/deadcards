@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { useState, type CSSProperties } from "react";
 import { useData } from "../lib/data";
-import { getPlayerOvr, getPlayerTrend, isMainCard, REGIONS, regionClass, teamOf, teamOvr, teamTrend, tierKeyForOvr, useLabel } from "../lib/cards";
+import { getPlayerOvr, getPlayerTrend, isMainCard, isRosterCard, REGIONS, regionClass, teamOf, teamOvr, teamTrend, tierKeyForOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
 import { getCardTier, rarityStyleVars } from "../lib/rarity";
 import { RegionBackdrop } from "../components/RegionBackdrop";
@@ -40,7 +40,7 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
   const rankedPlayers = players
     .map((p) => ({ p, team: teamOf(teams, p), ovr: getPlayerOvr(p) }))
     .filter(({ p, team }) => {
-      if (p.inactive) return false;
+      if (!isRosterCard(players, p)) return false;
       if (!isMainCard(p) && region === "ALL") return false;
       if (region !== "ALL" && team.region !== region) return false;
       return !query || `${p.name} ${team.name} ${team.tag} ${p.hero} ${p.position}`.toLowerCase().includes(query);

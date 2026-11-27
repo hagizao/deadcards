@@ -1,0 +1,36 @@
+/* Moldura das páginas do guia; não faz parte do design system. */
+* { box-sizing: border-box; }
+html { background: var(--noir-charcoal); }
+body {
+  margin: 0;
+  padding: 32px 16px 64px;
+  color: var(--platinum-bright);
+  font-family: 'VALVE Oracle', ui-sans-serif, system-ui, sans-serif;
+  background: radial-gradient(circle at 50% 0%, #27272a 0%, var(--noir-charcoal) 60%);
+  min-height: 100vh;
+}
+main { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px; }
+nav { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; }
+nav a { color: var(--platinum-muted); text-decoration: none; }
+nav a:hover, nav a[aria-current] { color: var(--color-dl-text); }
+h1 { font-family: var(--font-display); color: var(--color-dl-text); letter-spacing: .11em; text-transform: uppercase; font-size: 32px; margin: 0; }
+h2 { font-family: var(--font-display); color: var(--color-dl-text); letter-spacing: .1em; text-transform: uppercase; font-size: 20px; margin: 0; }
+h3 { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--platinum-muted); margin: 0; }
+p, li { color: var(--platinum-mid); line-height: 1.55; font-size: 15px; margin: 0; }
+code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--platinum-muted); }
+section { display: flex; flex-direction: column; gap: 20px; }
+.lede { max-width: 70ch; }
+.row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.cell { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+.sw { display: flex; flex-direction: column; gap: 6px; }
+.sw i { display: block; height: 64px; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.sw b { font-size: 13px; color: var(--platinum-bright); font-weight: 600; }
+.tag { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--platinum-muted); }
+.proposed { color: #fbbf24; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 10px 12px; }
+th { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--platinum-muted); font-weight: 600; }
+tr:nth-child(even) td { background: rgba(255,255,255,.03); }
+td a { color: var(--color-dl-text); }
+.legend { display: flex; flex-direction: column; gap: 8px; padding-left: 18px; max-width: 80ch; }

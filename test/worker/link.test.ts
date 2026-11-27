@@ -65,6 +65,18 @@ describe("juntar contas", () => {
     expect(firstLogin).toBe("twitch");
   });
 
+  it("leva os packs fechados da outra conta, sem duplicar o do mesmo código", async () => {
+    const a = await login("a");
+    const b = await login("b", ["google"]);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO user_packs (id, user_id, pack_type_id, code) VALUES ('pa', ?, 'pack-semanal', 'SAME-CODE')").bind(a.userId),
+      env.DB.prepare("INSERT INTO user_packs (id, user_id, pack_type_id, code) VALUES ('pb1', ?, 'pack-semanal', 'SAME-CODE'), ('pb2', ?, 'pack-semanal', 'OTHER-CODE')").bind(b.userId, b.userId),
+    ]);
+    const link = await start(a.cookie);
+    expect(await (await post("finish", `${b.cookie}; ${link}`, { confirm: true })).json()).toMatchObject({ merged: true });
+    expect(await ids("SELECT id AS v FROM user_packs WHERE user_id = ?", a.userId)).toEqual(["pa", "pb2"]);
+  });
+
   it("pede confirmação para juntar uma conta que já existia e recusa uma que já junta dois logins", async () => {
     const a = await login("a");
     const b = await login("Irmão", ["google"]);

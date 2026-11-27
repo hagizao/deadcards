@@ -1,6 +1,6 @@
 {
   "name": "deadcards",
-  "version": "1.8.0",
+  "version": "1.15.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply deadcards --remote",
     "typegen": "wrangler types",
     "db:import": "node scripts/import-save.mjs",
+    "design:guide": "node scripts/design-guide.mjs",
     "test": "tsc -p test && vitest run",
     "lint": "eslint ."
   },
@@ -21,7 +22,8 @@
     "html-to-image": "1.11.13",
     "motion": "^12.0.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.69.1",
@@ -31,6 +33,7 @@
     "@tailwindcss/vite": "^4.1.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@types/three": "^0.187.0",
     "@vitejs/plugin-react": "^4.4.0",
     "eslint": "^10.15.0",
     "eslint-plugin-better-tailwindcss": "^4.11.0",

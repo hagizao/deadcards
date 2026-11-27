@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Superfícies · Deadlock Cards</title>
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="guide.css">
+<style>
+  .stage { position: relative; display: flex; flex-wrap: wrap; gap: 24px; padding: 32px; border-radius: 24px; overflow: hidden;
+    background: radial-gradient(circle at 20% 30%, rgba(245,184,46,.45), transparent 40%), radial-gradient(circle at 80% 70%, rgba(56,232,255,.35), transparent 45%), var(--noir-charcoal); }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="index.html">Índice</a><a href="foundations.html">Fundações</a><a href="card.html">Carta</a><a href="buttons.html">Botões</a><a href="surfaces.html" aria-current="page">Superfícies</a></nav>
+  <section>
+    <h1>Superfícies</h1>
+    <p class="lede">Vidro escuro sobre o fundo do herói. Use estas duas antes de criar outra (<code>src/styles/cards.css</code>). O fundo colorido abaixo só existe para mostrar o desfoque.</p>
+  </section>
+  <section>
+    <div class="stage">
+      <div class="cell" style="flex:1 1 280px">
+        <span class="tag">noir-glass · cabeçalho e painéis</span>
+        <div class="noir-glass flex flex-col gap-3 rounded-2xl p-5" style="width:100%">
+          <span class="font-display text-xl tracking-[0.11em] text-dl-text uppercase">Times</span>
+          <p>Fundo <code>noir-surface</code>, blur 18 px, borda <code>platinum-border</code>.</p>
+        </div>
+      </div>
+      <div class="cell" style="flex:1 1 280px">
+        <span class="tag">noir-glass-strong · menus e Spotlight</span>
+        <div class="noir-glass-strong flex flex-col gap-3 rounded-2xl p-5" style="width:100%">
+          <span class="font-display text-xl tracking-[0.11em] text-dl-text uppercase">Idioma</span>
+          <p>Fundo <code>noir-surface-strong</code>, blur 24 px, sombra mais funda: fica por cima de outra superfície.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section>
+    <h2>Estados</h2>
+    <p class="lede">As superfícies não são interativas e não têm estados. O que fica sobre elas (botões, cartas) traz os próprios estados.</p>
+  </section>
+</main>
+</body>
+</html>

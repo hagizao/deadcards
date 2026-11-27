@@ -27,6 +27,7 @@ O dev roda tudo local (Vite + `@cloudflare/vite-plugin`) em `http://localhost:51
 | `npm test` | Testes (Vitest) em `test/` |
 | `npm run db:migrate` | Aplica migrations no D1 local |
 | `npm run db:import -- <save.json> [--remote]` | Importa um save JSON para D1 e R2 |
+| `npm run design:guide` | Depois do `build`, regenera `public/design/app.css` e `card.html` a partir do código |
 | `npm run deploy` | Build + deploy no Cloudflare |
 
 ## Arquitetura
@@ -40,6 +41,7 @@ src/views/           Telas (Home, Teams, TierList, Collection, Editor, Login...)
 src/styles/cards.css CSS das cartas
 migrations/          Schema do D1, uma migration por mudança
 scripts/             Scripts de manutenção
+public/design/       Guia do design system, servido em /design/
 ```
 
 Antes de criar helper ou componente, procure um existente em `src/lib` e `src/components`.
@@ -53,6 +55,12 @@ Antes de criar helper ou componente, procure um existente em `src/lib` e `src/co
 ## Visual
 
 O visual é o produto. Mudança de UI segue estas regras; código antigo que não segue não precisa ser corrigido junto, só não piore.
+
+**Brief e guia**
+
+- Leia o [DESIGN.md](DESIGN.md) antes de qualquer tarefa de design: produto, público, clima, referências e o que o site nunca pode parecer.
+- O guia do design system fica em `public/design/` e abre em `/design/` (local e produção). Ele não tem link no site e está com `noindex`: só abre digitando a URL. Não adicione link para ele na navegação.
+- O código é a fonte da verdade e o guia o espelha com os mesmos nomes; `design-sync.json` guarda os valores combinados. Mudou token, carta ou classe de `src/lib/ui.ts`? Atualize `public/design/tokens.css` e as páginas, rode `npm run build && npm run design:guide` e atualize o `design-sync.json`.
 
 **Onde vai o estilo**
 
@@ -91,7 +99,7 @@ O visual é o produto. Mudança de UI segue estas regras; código antigo que nã
 
 ## Backend e dados
 
-- Toda rota que altera dados exige admin via `currentUser(...).admin`. Admins são definidos em `ADMINS` no `wrangler.jsonc`.
+- Toda rota que altera dados exige admin via `currentUser(...).admin`. Admins são definidos em `ADMINS` no `wrangler.jsonc`, pelo id numérico do Twitch (nunca pelo nome).
 - Valide entrada em toda API de escrita e upload.
 - SQL sempre com bind (`prepare(...).bind(...)`), nunca concatenando valores.
 - Schema muda só por migration nova em `migrations/` (`000N_descricao.sql`). Nunca edite migration já aplicada.

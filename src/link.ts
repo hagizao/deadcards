@@ -9,10 +9,19 @@ const COOKIE = "dc_link";
 const TTL_MS = 10 * 60 * 1000;
 const SESSION_COOKIES = ["better-auth.session_token", "better-auth.session_data", "__Secure-better-auth.session_token", "__Secure-better-auth.session_data"];
 
+const macKey = (env: Env) =>
+  crypto.subtle.importKey("raw", new TextEncoder().encode(env.BETTER_AUTH_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+
 async function sign(env: Env, value: string) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.BETTER_AUTH_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`link:${value}`));
+  const mac = await crypto.subtle.sign("HMAC", await macKey(env), new TextEncoder().encode(`link:${value}`));
   return btoa(String.fromCharCode(...new Uint8Array(mac))).replace(/[+/=]/g, (c) => ({ "+": "-", "/": "_", "=": "" })[c]!);
+}
+
+// verify compara em tempo constante, ao contrário de !== entre strings
+async function verify(env: Env, value: string, mac: string) {
+  let bytes: Uint8Array<ArrayBuffer>;
+  try { bytes = Uint8Array.from(atob(mac.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)); } catch { return false; }
+  return crypto.subtle.verify("HMAC", await macKey(env), bytes, new TextEncoder().encode(`link:${value}`));
 }
 
 function cookie(request: Request, name: string, value: string, maxAge: number) {
@@ -27,7 +36,7 @@ function readCookie(request: Request, name: string) {
 async function readLink(env: Env, request: Request) {
   const [userId, provider, exp, mac] = readCookie(request, COOKIE)?.split(".") ?? [];
   if (!userId || !provider || !exp || !mac || Number(exp) < Date.now()) return null;
-  if (mac !== await sign(env, `${userId}.${provider}.${exp}`)) return null;
+  if (!await verify(env, `${userId}.${provider}.${exp}`, mac)) return null;
   return { userId, provider, startedAt: Number(exp) - TTL_MS };
 }
 
@@ -41,8 +50,6 @@ const json = (body: unknown, status = 200, cookies: string[] = []) => {
 // finish call runs after the same browser signed in with the other provider as user B.
 export async function accountLink(env: Env, request: Request, step: string): Promise<Response> {
   if (request.method !== "POST") return json({ code: "method" }, 405);
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return json({ code: "origin" }, 403);
   const user = await currentUser(env, request);
   if (!user) return json({ code: "login" }, 401);
 
@@ -88,6 +95,9 @@ export async function accountLink(env: Env, request: Request, step: string): Pro
     env.DB.prepare(`UPDATE profile_card_history SET user_id = ?1 WHERE user_id = ?2 AND ${noCard}`).bind(target, source),
     env.DB.prepare(`UPDATE profile_cards SET user_id = ?1 WHERE user_id = ?2 AND ${noCard}`).bind(target, source),
     env.DB.prepare("UPDATE profile_handles SET user_id = ?1 WHERE user_id = ?2 AND NOT EXISTS (SELECT 1 FROM profile_handles WHERE user_id = ?1)").bind(target, source),
+    // um pack por código por pessoa: o repetido fica na conta apagada e some com ela
+    env.DB.prepare("UPDATE OR IGNORE user_packs SET user_id = ?1 WHERE user_id = ?2").bind(target, source),
+    env.DB.prepare("UPDATE pack_openings SET user_id = ?1 WHERE user_id = ?2").bind(target, source),
     env.DB.prepare(`DELETE FROM "user" WHERE id = ?`).bind(source),
   ]);
   return json(

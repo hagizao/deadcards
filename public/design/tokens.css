@@ -1,0 +1,53 @@
+/* Espelho dos tokens do código. Mesmos nomes do código; valores que só existem em TS
+   ganham --rarity-<key>-<c|hi|lo> e --team-accent-<regiao>. Ver design-sync.json. */
+
+@font-face {
+  font-family: 'VALVE Oracle';
+  src: url('fonts/valveoracle-semibold.ttf') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VALVE Pulp';
+  src: url('fonts/valvepulp-bold.ttf') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  /* src/index.css @theme */
+  --font-display: 'VALVE Pulp', 'VALVE Oracle', ui-sans-serif, system-ui, sans-serif;
+  --color-dl-text: #ffefd7;
+  --color-dl-black: #10130d;
+  --color-dl-bevel-from: #373d45;
+  --color-dl-bevel-to: #4d5860;
+  --color-dl-bevel-hover-from: #4c5561;
+  --color-dl-bevel-hover-to: #6c7d88;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* src/styles/cards.css :root */
+  --noir-charcoal: #09090b;
+  --noir-surface: rgba(18, 18, 22, 0.72);
+  --noir-surface-strong: rgba(14, 14, 17, 0.88);
+  --platinum-bright: #f4f4f5;
+  --platinum-mid: #d4d4d8;
+  --platinum-muted: #a1a1aa;
+  --platinum-border: rgba(228, 228, 231, 0.16);
+  --platinum-border-hover: rgba(244, 244, 245, 0.55);
+
+  /* src/lib/rarity.ts RARITY_TIERS */
+  --rarity-eternus-c: #38e8ff;   --rarity-eternus-hi: #e8fdff;   --rarity-eternus-lo: #0b6f9e;
+  --rarity-ascendant-c: #f5b82e; --rarity-ascendant-hi: #fff3c4; --rarity-ascendant-lo: #8f5e08;
+  --rarity-oracle-c: #ff6a26;    --rarity-oracle-hi: #ffd6bf;    --rarity-oracle-lo: #992b05;
+  --rarity-archon-c: #b26bff;    --rarity-archon-hi: #f0dcff;    --rarity-archon-lo: #4a1a8f;
+  --rarity-arcanist-c: #2dd47a;  --rarity-arcanist-hi: #d1fae5;  --rarity-arcanist-lo: #0b6636;
+  --rarity-initiate-c: #b5533a;  --rarity-initiate-hi: #f0a58f;  --rarity-initiate-lo: #5c2214;
+
+  /* src/styles/cards.css .team-region-* { --team-accent } */
+  --team-accent-europa: rgba(250, 204, 21, 0.60);
+  --team-accent-na: rgba(147, 197, 253, 0.60);
+  --team-accent-brasil: rgba(52, 211, 153, 0.55);
+  --team-accent-americasul: rgba(56, 189, 248, 0.60);
+  --team-accent-asia: rgba(251, 191, 36, 0.55);
+  --team-accent-semtime: rgba(161, 161, 170, 0.50);
+}

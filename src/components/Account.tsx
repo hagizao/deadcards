@@ -14,12 +14,12 @@ export function TwitchIcon({ className = "w-4 h-4" }: { className?: string }) {
 }
 
 const S = strings({
-  pt: { signIn: "Entrar", signOut: "Sair", profile: "Meu perfil", settings: "Configurações", account: "Menu da conta" },
-  en: { signIn: "Sign in", signOut: "Sign out", profile: "My profile", settings: "Settings", account: "Account menu" },
-  es: { signIn: "Ingresar", signOut: "Salir", profile: "Mi perfil", settings: "Configuración", account: "Menú de la cuenta" },
+  pt: { signIn: "Entrar", signOut: "Sair", profile: "Meu perfil", settings: "Configurações", editor: "Editor", account: "Menu da conta" },
+  en: { signIn: "Sign in", signOut: "Sign out", profile: "My profile", settings: "Settings", editor: "Editor", account: "Account menu" },
+  es: { signIn: "Ingresar", signOut: "Salir", profile: "Mi perfil", settings: "Configuración", editor: "Editor", account: "Menú de la cuenta" },
 });
 
-export function Account({ onProfile, onSettings }: { onProfile: () => void; onSettings: () => void }) {
+export function Account({ onProfile, onSettings, onEditor }: { onProfile: () => void; onSettings: () => void; onEditor: () => void }) {
   const t = useT(S);
   const { me } = useData();
   const [open, setOpen] = useState(false);
@@ -92,6 +92,16 @@ export function Account({ onProfile, onSettings }: { onProfile: () => void; onSe
             >
               {t.settings}
             </button>
+            {me.admin && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { setOpen(false); onEditor(); }}
+                className="min-h-11 w-full cursor-pointer rounded-lg px-2 text-left text-sm text-zinc-300 hover:bg-zinc-800/70 hover:text-white focus-visible:outline-2 focus-visible:outline-zinc-100 active:bg-zinc-700"
+              >
+                {t.editor}
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"

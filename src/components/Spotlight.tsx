@@ -4,7 +4,7 @@ import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { getPlayerHistory, getPlayerOvr, getPlayerTrend, isMainCard, teamOf, useLabel } from "../lib/cards";
+import { getPlayerHistory, getPlayerOvr, getPlayerTrend, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
@@ -12,26 +12,35 @@ import { TrendBadge } from "./TrendBadge";
 import { Icon } from "./Icon";
 import { SpotlightHints } from "./SpotlightHints";
 import { easeOut, pill } from "../lib/ui";
+import { MAX_FAVORITES } from "../lib/profile";
+import { toggleFavorite, useMyCards, type FavoriteResult } from "../lib/myCards";
+import type { ArtCredit } from "../lib/types";
 
 gsap.registerPlugin(SplitText);
 const revealed = new Set<string>();
 
 const S = strings({
-  pt: { cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão" },
-  en: { cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version" },
-  es: { cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión" },
+  pt: { notOwned: "Você não possui esta carta", favorite: "Favoritar", favorited: "Favorita", limit: `Até ${MAX_FAVORITES} favoritas. Abra uma favorita e desmarque para marcar outra.`, failed: "Não foi possível salvar a favorita.",
+    cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por" },
+  en: { notOwned: "You don't own this card", favorite: "Favorite", favorited: "Favorite", limit: `Up to ${MAX_FAVORITES} favorites. Open one and unmark it to pick another.`, failed: "Could not save the favorite.",
+    cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version", artBy: "Art by" },
+  es: { notOwned: "No tienes esta carta", favorite: "Marcar favorita", favorited: "Favorita", limit: `Hasta ${MAX_FAVORITES} favoritas. Abre una y desmárcala para marcar otra.`, failed: "No se pudo guardar la favorita.",
+    cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de" },
 });
 
 export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: string; onClose: () => void; onSwitch: (id: string) => void; onEdit?: (id: string) => void }) {
   const t = useT(S);
   const label = useLabel();
-  const { teams, players, settings } = useData();
+  const { teams, players, settings, heroIcon, me } = useData();
   const player = players.find((p) => p.id === playerId);
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLSpanElement>(null);
   const [exportReadyId, setExportReadyId] = useState<string>();
+  const { owned, favorites } = useMyCards();
+  const [favIssue, setFavIssue] = useState<{ id: string; r: Exclude<FavoriteResult, "ok"> }>();
+  const [favBusy, setFavBusy] = useState(false);
   const tier = player ? getCardTier(player, settings.tierConfig!) : null;
   const ovr = player ? getPlayerOvr(player) : 0;
   const reveal = useMemo(
@@ -72,13 +81,14 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
       if (e.key === "Escape") onClose();
       if (e.key !== "Tab" || !dialogRef.current) return;
       const dialog = dialogRef.current;
-      const buttons = dialog.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
-      const first = buttons[0];
-      const last = buttons[buttons.length - 1];
+      const controls = [...dialog.querySelectorAll<HTMLElement>("a[href], button:not(:disabled)")]
+        .filter((element) => element.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
       const focused = document.activeElement;
-      if (e.shiftKey ? focused === first || focused === dialog : focused === last) {
+      if (!dialog.contains(focused) || (e.shiftKey ? focused === first || focused === dialog : focused === last)) {
         e.preventDefault();
-        (e.shiftKey ? last : first)?.focus();
+        (e.shiftKey ? last : first)?.focus({ preventScroll: false });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -90,7 +100,18 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   if (!tier) return null;
   const history = getPlayerHistory(player);
   const groupKey = player.variantOf || player.id;
-  const versions = players.filter((p) => p.id === groupKey || p.variantOf === groupKey);
+  // herói jogado aposentado só aparece para quem tem a carta (ou quando é a carta aberta)
+  const versions = players.filter((p) => (p.id === groupKey || p.variantOf === groupKey) && (!isRetired(p) || p.id === player.id || !!owned?.has(p.id)));
+  // só dá para favoritar carta que está na sua coleção
+  const canFavorite = !!owned?.has(player.id);
+  const fav = favorites.includes(player.id);
+  const flipFavorite = async () => {
+    setFavBusy(true);
+    setFavIssue(undefined);
+    const r = await toggleFavorite(player.id);
+    setFavBusy(false);
+    if (r !== "ok") setFavIssue({ id: player.id, r });
+  };
 
   return (
     <motion.div
@@ -120,7 +141,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             </div>
           )}
           <div ref={cardRef} className="relative">
-            <Card player={player} variant="editor" />
+            <Card player={player} variant="editor" signature={isMainCard(player) && versions.some(isAltHero)} />
           </div>
         </motion.div>
 
@@ -129,6 +150,13 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             <div>
               <h2 className="font-display text-3xl font-black tracking-[0.12em] text-dl-text uppercase"><span ref={nameRef} key={player.id + player.name}>{player.name}</span></h2>
               <p className="mt-1 text-sm text-zinc-300">{label(team.name)} ({team.tag}) · {label(player.position || "Flex")} · {player.hero}</p>
+              {me && owned && !owned.has(player.id) && (
+                <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-zinc-800/80 px-3 py-1 text-xs font-bold text-zinc-300">
+                  <span aria-hidden="true" className="size-2 rounded-full bg-zinc-500" />
+                  {t.notOwned}
+                </p>
+              )}
+              {player.art?.credit && <ArtCreditLine credit={player.art.credit} label={t.artBy} />}
             </div>
             <button type="button" onClick={onClose} aria-label={t.close} className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-zinc-800/60 text-zinc-300 transition hover:bg-zinc-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:size-9"><Icon name="x" /></button>
           </div>
@@ -136,10 +164,18 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
           <div className="flex flex-wrap items-center gap-2">
             <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.custom ? t.special : tier.name}</span>
             <TrendBadge delta={getPlayerTrend(player)} size="editor" />
+            {canFavorite && (
+              <button type="button" aria-pressed={fav} disabled={favBusy} onClick={flipFavorite}
+                className={`${pill(fav)} disabled:cursor-wait disabled:opacity-60`}>
+                <Icon name="star" className={`size-4 ${fav ? "fill-current" : ""}`} />
+                {fav ? t.favorited : t.favorite}
+              </button>
+            )}
             <CardExportButton key={player.id} cardRef={cardRef} name={player.name} disabled={reveal && exportReadyId !== playerId} />
             {onEdit && <button type="button" onClick={() => onEdit(player.id)} className={`${pill(true)} ml-auto hover:bg-white`}>{t.edit}</button>}
             {player.special && player.specialText && <span className="text-xs font-bold text-amber-200">✦ {player.specialText}</span>}
           </div>
+          {favIssue?.id === player.id && <p role="alert" className="text-sm text-red-300">{t[favIssue.r]}</p>}
 
           <SpotlightHints key={player.id} stats={player.stats} position={player.position || "Flex"} />
 
@@ -151,23 +187,45 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
           {versions.length > 1 && (
             <div>
               <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.versions} ({versions.length})</h3>
-              <div className="flex flex-wrap gap-2">
-                {versions.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => onSwitch(v.id)}
-                    className={pill(v.id === player.id)}
-                  >
-                    {isMainCard(v) ? t.main : v.special ? t.special : t.version} · {teamOf(teams, v).tag}
-                  </button>
-                ))}
+              <div className="flex flex-wrap gap-3">
+                {versions.map((v) => {
+                  const icon = heroIcon(v.hero);
+                  const on = v.id === player.id;
+                  // herói jogado é só o rosto do herói; principal, especial e versão de outro time ganham legenda
+                  const caption = isAltHero(v) ? null : isMainCard(v) ? t.main : `${v.special ? t.special : t.version} · ${teamOf(teams, v).tag}`;
+                  // versão que você não tem fica em preto e branco
+                  const missing = !!me && !!owned && !owned.has(v.id);
+                  return (
+                    <button key={v.id} type="button" onClick={() => onSwitch(v.id)} aria-pressed={on} aria-label={caption ? `${caption} · ${v.hero}` : v.hero} title={v.hero}
+                      className="group flex w-16 cursor-pointer flex-col items-center gap-1 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
+                      <span className={`flex size-14 items-center justify-center overflow-hidden rounded-full bg-zinc-900 transition group-hover:scale-105 group-active:scale-95 motion-reduce:transition-none ${on ? "ring-2 ring-dl-text ring-offset-2 ring-offset-zinc-950" : "ring-1 ring-zinc-200/15"} ${missing ? "opacity-60 grayscale" : ""}`}>
+                        {icon ? <img src={icon} alt="" className="size-full scale-110 object-cover" /> : <span className="text-[10px] font-bold text-zinc-300">{v.hero.slice(0, 3)}</span>}
+                      </span>
+                      {caption && <span className={`max-w-full truncate text-[10px] font-bold tracking-wider uppercase ${on ? "text-dl-text" : "text-zinc-400"}`}>{caption}</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+function ArtCreditLine({ credit, label }: { credit: ArtCredit; label: string }) {
+  return (
+    <p className="mt-1 text-xs text-zinc-400">
+      {label}{" "}
+      {credit.url && /^https?:\/\//i.test(credit.url) ? (
+        <a href={credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm font-bold text-zinc-100 underline decoration-zinc-500 underline-offset-2 transition hover:decoration-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">
+          {credit.name}
+        </a>
+      ) : (
+        <span className="font-bold text-zinc-100">{credit.name}</span>
+      )}
+    </p>
   );
 }
 

@@ -1,6 +1,6 @@
 import { currentUser } from "./auth";
 import type { Env } from "./worker";
-import { parseProfileCard, type ProfileCard, type ProfileCardState, type PublicProfile } from "./lib/profile";
+import { MAX_FAVORITES, parseProfileCard, type ProfileCard, type ProfileCardState, type PublicProfile } from "./lib/profile";
 
 const HISTORY_LIMIT = 20;
 
@@ -17,15 +17,17 @@ export async function profileCard(env: Env, request: Request): Promise<Response>
   if (!user) return json({ code: "login" }, 401);
   if (request.method === "GET") return json(await readProfile(env, user.id));
   if (request.method !== "PUT") return json({ code: "method" }, 405);
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return json({ code: "origin" }, 403);
 
   const card = parseProfileCard(await request.json().catch(() => null));
   if (!card) return json({ code: "invalid_card" }, 400);
-  await env.DB.prepare(`INSERT INTO profile_cards (user_id, snapshot, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT(user_id) DO UPDATE SET snapshot = excluded.snapshot, updated_at = excluded.updated_at
-    WHERE profile_cards.snapshot <> excluded.snapshot`)
-    .bind(user.id, JSON.stringify(card), Date.now()).run();
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO profile_cards (user_id, snapshot, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET snapshot = excluded.snapshot, updated_at = excluded.updated_at
+      WHERE profile_cards.snapshot <> excluded.snapshot`).bind(user.id, JSON.stringify(card), Date.now()),
+    // o histórico só mostra as últimas HISTORY_LIMIT; o resto não fica crescendo no D1
+    env.DB.prepare(`DELETE FROM profile_card_history WHERE user_id = ?1
+      AND id NOT IN (SELECT id FROM profile_card_history WHERE user_id = ?1 ORDER BY id DESC LIMIT ?2)`).bind(user.id, HISTORY_LIMIT),
+  ]);
   return json(await readProfile(env, user.id));
 }
 
@@ -54,22 +56,25 @@ export async function publicProfile(env: Env, key: string): Promise<Response> {
 }
 
 const favoritesQuery = (env: Env, userId: string) =>
-  env.DB.prepare("SELECT player_id FROM user_favorites WHERE user_id = ? ORDER BY created_at DESC").bind(userId);
+  // quem já tinha mais que o limite mostra só as mais recentes; tirar uma libera a próxima
+  env.DB.prepare("SELECT player_id FROM user_favorites WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?").bind(userId, MAX_FAVORITES);
 
 export async function favorite(env: Env, request: Request, playerId: string): Promise<Response> {
   const user = await currentUser(env, request);
   if (!user) return json({ code: "login" }, 401);
   if (request.method !== "PUT" && request.method !== "DELETE") return json({ code: "method" }, 405);
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return json({ code: "origin" }, 403);
 
   if (request.method === "DELETE") {
     await env.DB.prepare("DELETE FROM user_favorites WHERE user_id = ? AND player_id = ?").bind(user.id, playerId).run();
   } else {
-    const { meta } = await env.DB.prepare("INSERT OR IGNORE INTO user_favorites (user_id, player_id) SELECT user_id, player_id FROM user_cards WHERE user_id = ? AND player_id = ?")
-      .bind(user.id, playerId).run();
+    // o limite vai na mesma instrução do insert: dois cliques ao mesmo tempo não passam de MAX_FAVORITES
+    const { meta } = await env.DB.prepare(`INSERT OR IGNORE INTO user_favorites (user_id, player_id)
+      SELECT user_id, player_id FROM user_cards WHERE user_id = ? AND player_id = ?
+      AND (SELECT COUNT(*) FROM user_favorites WHERE user_id = ?) < ?`)
+      .bind(user.id, playerId, user.id, MAX_FAVORITES).run();
     if (!meta.changes && !(await env.DB.prepare("SELECT 1 FROM user_favorites WHERE user_id = ? AND player_id = ?").bind(user.id, playerId).first())) {
-      return json({ code: "not_owned" }, 404);
+      const owned = await env.DB.prepare("SELECT 1 FROM user_cards WHERE user_id = ? AND player_id = ?").bind(user.id, playerId).first();
+      return owned ? json({ code: "limit" }, 409) : json({ code: "not_owned" }, 404);
     }
   }
   const { results } = await favoritesQuery(env, user.id).all<{ player_id: string }>();

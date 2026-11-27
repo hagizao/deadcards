@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Carta · Deadlock Cards</title>
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="guide.css">
+</head>
+<body>
+<main>
+  <nav><a href="index.html">Índice</a><a href="foundations.html">Fundações</a><a href="card.html" aria-current="page">Carta</a><a href="buttons.html">Botões</a><a href="surfaces.html">Superfícies</a></nav>
+  <section>
+    <h1>Carta</h1>
+    <p class="lede"><code>src/components/Card.tsx</code>, variante <code>team</code>, sem arte (o fundo radial é o fallback do código). Moldura, anel, brilho e partículas vêm de <code>rarityStyleVars</code>, <code>ringSVG</code> e <code>particleSpecs</code>. A arte de verdade é feita por pessoas e não entra no guia.</p>
+  </section>
+  <section>
+    <h2>Raridades</h2>
+    <div class="row"><div class="cell"><span class="tag">Eternus · SS · OVR 95+</span><div class="rk-wrap " data-rarity="eternus" style="--rk-clip:polygon(0% 7%, 5% 2.5%, 14% 4.5%, 31% 0%, 41% 3.8%, 50% 0%, 59% 3.8%, 69% 0%, 86% 4.5%, 95% 2.5%, 100% 7%, 100% 84%, 50% 100%, 0% 84%);--rk-pad:5px;--rk-bg:linear-gradient(145deg, #e8fdff, #38e8ff 28%, #0b6f9e 52%, #38e8ff 76%, #e8fdff);--rk-bg-h:linear-gradient(145deg, #ffffff, #e8fdff 25%, #38e8ff 50%, #e8fdff 80%, #ffffff);--rk-glow:rgba(56, 232, 255, 0.55);--rk-gr:18px;--rk-fx:block;--rk-sz:260%;--rk-dx:-61.54%;--rk-anim:rk-shift 5s ease-in-out infinite alternate;transform:perspective(900px)">
+  <div class="deadlock-card-shell card-size-team group select-none ">
+    <div class="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5" style="padding-top:26px">
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)"></div>
+      <div class="pointer-events-none absolute inset-0" style="background:linear-gradient(180deg, rgba(63,63,70,0) 52%, rgba(63,63,70,.5) 80%, rgba(9,9,11,.78) 100%)"></div>
+      <svg class="rk-ring rk-ring-pulse" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="2.35,8.42 7.12,4.07 15.69,6.00 31.89,1.65 41.42,5.32 50.00,1.65 58.58,5.32 68.11,1.65 84.31,6.00 92.88,4.07 97.65,8.42 97.65,82.88 50.00,98.35 2.35,82.88" fill="none" stroke="#38e8ff" stroke-opacity="0.85" stroke-width="1.4" vector-effect="non-scaling-stroke"/><polygon points="5.00,10.01 9.50,5.82 17.60,7.68 32.90,3.50 41.90,7.03 50.00,3.50 58.10,7.03 67.10,3.50 82.40,7.68 90.50,5.82 95.00,10.01 95.00,81.62 50.00,96.50 5.00,81.62" fill="none" stroke="#e8fdff" stroke-opacity="0.4" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>
+      <div class="rk-glint"></div>
+      <div class="rk-particles" aria-hidden="true"><span class="rk-p" style="--x:66.45%;--y:0.00%;--s:7.18px;--d:6.98s;--dl:-5.91s;--dx:-12.47px;--po:0.95;--pc:#e8fdff"></span><span class="rk-p" style="--x:61.95%;--y:0.00%;--s:4.74px;--d:6.86s;--dl:-4.25s;--dx:-15.94px;--po:0.87;--pc:#38e8ff"></span><span class="rk-p" style="--x:68.37%;--y:0.00%;--s:8.67px;--d:3.63s;--dl:-0.26s;--dx:-13.57px;--po:0.91;--pc:#7ff3ff"></span><span class="rk-p" style="--x:68.83%;--y:0.00%;--s:7.27px;--d:5.37s;--dl:-2.89s;--dx:-3.82px;--po:0.82;--pc:#e8fdff"></span><span class="rk-p" style="--x:93.02%;--y:0.00%;--s:7.96px;--d:6.44s;--dl:-4.36s;--dx:-19.40px;--po:0.90;--pc:#38e8ff"></span><span class="rk-p" style="--x:48.20%;--y:0.00%;--s:4.09px;--d:3.78s;--dl:-0.02s;--dx:21.59px;--po:0.63;--pc:#7ff3ff"></span><span class="rk-p" style="--x:72.01%;--y:0.00%;--s:8.76px;--d:4.51s;--dl:-0.09s;--dx:-4.20px;--po:0.86;--pc:#e8fdff"></span><span class="rk-p" style="--x:45.86%;--y:0.00%;--s:6.35px;--d:3.54s;--dl:-2.31s;--dx:-21.68px;--po:0.84;--pc:#38e8ff"></span><span class="rk-p" style="--x:47.85%;--y:0.00%;--s:8.47px;--d:4.77s;--dl:-2.57s;--dx:17.45px;--po:0.87;--pc:#7ff3ff"></span><span class="rk-p" style="--x:13.26%;--y:0.00%;--s:5.67px;--d:6.17s;--dl:-3.95s;--dx:-21.67px;--po:0.82;--pc:#e8fdff"></span><span class="rk-p" style="--x:80.37%;--y:0.00%;--s:6.83px;--d:4.54s;--dl:-3.50s;--dx:-10.16px;--po:0.80;--pc:#38e8ff"></span><span class="rk-p" style="--x:13.52%;--y:0.00%;--s:4.64px;--d:6.82s;--dl:-0.39s;--dx:-5.70px;--po:0.88;--pc:#7ff3ff"></span><span class="rk-p" style="--x:15.10%;--y:0.00%;--s:5.12px;--d:4.55s;--dl:-2.10s;--dx:-19.99px;--po:0.87;--pc:#e8fdff"></span><span class="rk-p" style="--x:90.84%;--y:0.00%;--s:7.09px;--d:4.77s;--dl:-3.39s;--dx:10.79px;--po:0.62;--pc:#38e8ff"></span><span class="rk-p" style="--x:33.10%;--y:0.00%;--s:4.05px;--d:6.77s;--dl:-1.02s;--dx:8.85px;--po:0.75;--pc:#7ff3ff"></span><span class="rk-p" style="--x:28.44%;--y:0.00%;--s:8.04px;--d:6.54s;--dl:-1.67s;--dx:8.73px;--po:0.82;--pc:#e8fdff"></span><span class="rk-p" style="--x:43.27%;--y:0.00%;--s:7.91px;--d:6.08s;--dl:-4.82s;--dx:11.51px;--po:0.76;--pc:#38e8ff"></span><span class="rk-p" style="--x:26.66%;--y:0.00%;--s:8.47px;--d:5.66s;--dl:-3.36s;--dx:3.26px;--po:0.87;--pc:#7ff3ff"></span><span class="rk-tw" style="--x:29.06%;--y:9.70%;--s:13.11px;--d:2.59s;--dl:-1.90s;--dx:0.00px;--po:1.00;--pc:#e8fdff"></span><span class="rk-tw" style="--x:45.34%;--y:17.55%;--s:14.31px;--d:3.78s;--dl:-3.13s;--dx:0.00px;--po:1.00;--pc:#e8fdff"></span><span class="rk-tw" style="--x:30.86%;--y:17.76%;--s:12.01px;--d:2.67s;--dl:-1.24s;--dx:0.00px;--po:1.00;--pc:#e8fdff"></span><span class="rk-tw" style="--x:47.14%;--y:61.99%;--s:9.50px;--d:3.18s;--dl:-1.79s;--dx:0.00px;--po:1.00;--pc:#e8fdff"></span><span class="rk-tw" style="--x:16.38%;--y:52.51%;--s:10.09px;--d:2.44s;--dl:-0.21s;--dx:0.00px;--po:1.00;--pc:#e8fdff"></span><span class="rk-tw" style="--x:28.62%;--y:69.73%;--s:11.88px;--d:2.97s;--dl:-0.99s;--dx:0.00px;--po:1.00;--pc:#e8fdff"></span><span class="rk-tw" style="--x:34.09%;--y:9.76%;--s:14.80px;--d:3.38s;--dl:-0.61s;--dx:0.00px;--po:1.00;--pc:#e8fdff"></span><span class="rk-streak" style="--x:21.56%;--y:21.84%;--s:0.00px;--d:5.47s;--dl:-4.01s;--dx:0.00px;--po:1.00;--pc:#38e8ff"></span><span class="rk-streak" style="--x:41.88%;--y:21.70%;--s:0.00px;--d:4.39s;--dl:-1.65s;--dx:0.00px;--po:1.00;--pc:#38e8ff"></span><span class="rk-streak" style="--x:25.54%;--y:24.59%;--s:0.00px;--d:3.84s;--dl:-3.57s;--dx:0.00px;--po:1.00;--pc:#38e8ff"></span></div>
+      <div class="relative z-10 flex items-start justify-between gap-2">
+        <div class="flex flex-col items-start">
+          <span class="text-5xl leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">95</span>
+          <span class="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">Flex</span>
+          <span class="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">FA</span>
+        </div>
+      </div>
+      <div class="relative z-10 mt-auto pb-8">
+        <div class="mx-2 mb-2 border-b border-zinc-200/45 pb-1.5 text-center">
+          <h3 class="truncate text-xl font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">Eternus</h3>
+        </div>
+        <div class="card-txt-shadow grid grid-cols-2 gap-x-5 gap-y-1.5 px-4 py-1">
+          <div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MIR</span><span class="text-lg font-black text-white">92</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MOV</span><span class="text-lg font-black text-white">88</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MAC</span><span class="text-lg font-black text-white">81</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">POL</span><span class="text-lg font-black text-white">77</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">SUP</span><span class="text-lg font-black text-white">70</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">CON</span><span class="text-lg font-black text-white">85</span></div>
+        </div>
+        <div class="mt-3 text-center leading-tight font-black uppercase" style="font-size:12px;letter-spacing:.2em;color:#f4f4f5;text-shadow:0 1px 6px rgba(0,0,0,.95)">Cardslock</div>
+      </div>
+      <button type="button" class="card-hover-overlay border-0 " aria-label="Visualizar carta de Eternus">
+        <span class="card-hover-cta w-full max-w-[215px] rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]">Visualizar Carta</span>
+      </button>
+    </div>
+  </div>
+</div></div><div class="cell"><span class="tag">Ascendant · S · OVR 90+</span><div class="rk-wrap " data-rarity="ascendant" style="--rk-clip:polygon(0% 5.5%, 8% 0%, 36% 0%, 50% 3.5%, 64% 0%, 92% 0%, 100% 5.5%, 100% 86%, 50% 100%, 0% 86%);--rk-pad:4px;--rk-bg:linear-gradient(145deg, #fff3c4, #f5b82e 28%, #8f5e08 52%, #f5b82e 76%, #fff3c4);--rk-bg-h:linear-gradient(145deg, #ffffff, #fff3c4 25%, #f5b82e 50%, #fff3c4 80%, #ffffff);--rk-glow:rgba(245, 184, 46, 0.55);--rk-gr:12px;--rk-fx:block;--rk-sz:260%;--rk-dx:-61.54%;--rk-anim:rk-shift 5s ease-in-out infinite alternate;transform:perspective(900px)">
+  <div class="deadlock-card-shell card-size-team group select-none ">
+    <div class="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5" style="padding-top:26px">
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)"></div>
+      <div class="pointer-events-none absolute inset-0" style="background:linear-gradient(180deg, rgba(63,63,70,0) 52%, rgba(63,63,70,.5) 80%, rgba(9,9,11,.78) 100%)"></div>
+      <svg class="rk-ring rk-ring-pulse" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="2.35,6.97 9.97,1.65 36.66,1.65 50.00,5.03 63.34,1.65 90.03,1.65 97.65,6.97 97.65,84.81 50.00,98.35 2.35,84.81" fill="none" stroke="#f5b82e" stroke-opacity="0.85" stroke-width="1.4" vector-effect="non-scaling-stroke"/><polygon points="5.00,8.61 12.20,3.50 37.40,3.50 50.00,6.75 62.60,3.50 87.80,3.50 95.00,8.61 95.00,83.48 50.00,96.50 5.00,83.48" fill="none" stroke="#fff3c4" stroke-opacity="0.4" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>
+      <div class="rk-glint"></div>
+      <div class="rk-particles" aria-hidden="true"><span class="rk-p" style="--x:32.87%;--y:0.00%;--s:5.85px;--d:5.65s;--dl:-2.76s;--dx:1.63px;--po:0.63;--pc:#f5b82e"></span><span class="rk-p" style="--x:25.15%;--y:0.00%;--s:5.75px;--d:7.54s;--dl:-2.08s;--dx:-6.83px;--po:0.77;--pc:#ff9d2e"></span><span class="rk-p" style="--x:41.97%;--y:0.00%;--s:7.51px;--d:6.76s;--dl:-1.65s;--dx:13.45px;--po:0.89;--pc:#fff3c4"></span><span class="rk-p" style="--x:74.31%;--y:0.00%;--s:8.85px;--d:7.00s;--dl:-5.01s;--dx:3.29px;--po:0.68;--pc:#f5b82e"></span><span class="rk-p" style="--x:12.28%;--y:0.00%;--s:7.96px;--d:6.91s;--dl:-5.52s;--dx:1.42px;--po:0.94;--pc:#ff9d2e"></span><span class="rk-p" style="--x:12.74%;--y:0.00%;--s:4.64px;--d:7.42s;--dl:-7.11s;--dx:-6.06px;--po:0.79;--pc:#fff3c4"></span><span class="rk-p" style="--x:48.79%;--y:0.00%;--s:4.04px;--d:7.51s;--dl:-4.84s;--dx:11.94px;--po:0.73;--pc:#f5b82e"></span><span class="rk-p" style="--x:6.97%;--y:0.00%;--s:7.82px;--d:5.60s;--dl:-3.21s;--dx:-17.01px;--po:0.97;--pc:#ff9d2e"></span><span class="rk-p" style="--x:20.50%;--y:0.00%;--s:6.05px;--d:4.82s;--dl:-3.43s;--dx:-5.33px;--po:0.68;--pc:#fff3c4"></span><span class="rk-p" style="--x:47.54%;--y:0.00%;--s:6.82px;--d:7.61s;--dl:-6.36s;--dx:8.01px;--po:0.85;--pc:#f5b82e"></span><span class="rk-p" style="--x:28.30%;--y:0.00%;--s:6.62px;--d:6.33s;--dl:-0.44s;--dx:-2.77px;--po:0.86;--pc:#ff9d2e"></span><span class="rk-p" style="--x:76.91%;--y:0.00%;--s:8.65px;--d:4.96s;--dl:-3.26s;--dx:1.10px;--po:0.61;--pc:#fff3c4"></span><span class="rk-p" style="--x:47.88%;--y:0.00%;--s:8.13px;--d:5.92s;--dl:-0.10s;--dx:-17.57px;--po:0.88;--pc:#f5b82e"></span><span class="rk-p" style="--x:91.63%;--y:0.00%;--s:8.03px;--d:4.22s;--dl:-0.52s;--dx:14.19px;--po:0.62;--pc:#ff9d2e"></span><span class="rk-p" style="--x:87.40%;--y:0.00%;--s:6.16px;--d:5.87s;--dl:-0.65s;--dx:4.95px;--po:0.77;--pc:#fff3c4"></span><span class="rk-p" style="--x:51.96%;--y:0.00%;--s:4.90px;--d:5.49s;--dl:-4.13s;--dx:14.39px;--po:0.66;--pc:#f5b82e"></span><span class="rk-tw" style="--x:24.89%;--y:46.45%;--s:11.67px;--d:2.61s;--dl:-1.13s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:51.48%;--y:44.45%;--s:15.24px;--d:3.90s;--dl:-2.19s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:58.48%;--y:8.65%;--s:15.85px;--d:2.87s;--dl:-1.02s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:57.47%;--y:78.45%;--s:12.42px;--d:2.20s;--dl:-1.87s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span></div>
+      <div class="relative z-10 flex items-start justify-between gap-2">
+        <div class="flex flex-col items-start">
+          <span class="text-5xl leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">90</span>
+          <span class="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">Flex</span>
+          <span class="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">FA</span>
+        </div>
+      </div>
+      <div class="relative z-10 mt-auto pb-8">
+        <div class="mx-2 mb-2 border-b border-zinc-200/45 pb-1.5 text-center">
+          <h3 class="truncate text-xl font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">Ascendant</h3>
+        </div>
+        <div class="card-txt-shadow grid grid-cols-2 gap-x-5 gap-y-1.5 px-4 py-1">
+          <div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MIR</span><span class="text-lg font-black text-white">92</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MOV</span><span class="text-lg font-black text-white">88</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MAC</span><span class="text-lg font-black text-white">81</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">POL</span><span class="text-lg font-black text-white">77</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">SUP</span><span class="text-lg font-black text-white">70</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">CON</span><span class="text-lg font-black text-white">85</span></div>
+        </div>
+        <div class="mt-3 text-center leading-tight font-black uppercase" style="font-size:12px;letter-spacing:.2em;color:#f4f4f5;text-shadow:0 1px 6px rgba(0,0,0,.95)">Cardslock</div>
+      </div>
+      <button type="button" class="card-hover-overlay border-0 " aria-label="Visualizar carta de Ascendant">
+        <span class="card-hover-cta w-full max-w-[215px] rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]">Visualizar Carta</span>
+      </button>
+    </div>
+  </div>
+</div></div><div class="cell"><span class="tag">Oracle · A · OVR 85+</span><div class="rk-wrap " data-rarity="oracle" style="--rk-clip:polygon(0% 4.1%, 6% 0%, 94% 0%, 100% 4.1%, 100% 87%, 50% 100%, 0% 87%);--rk-pad:3px;--rk-bg:linear-gradient(145deg, #ffd6bf, #ff6a26 28%, #992b05 52%, #ff6a26 76%, #ffd6bf);--rk-bg-h:linear-gradient(145deg, #ffffff, #ffd6bf 25%, #ff6a26 50%, #ffd6bf 80%, #ffffff);--rk-glow:rgba(255, 106, 38, 0.55);--rk-gr:8px;--rk-fx:block;--rk-sz:260%;--rk-dx:-61.54%;--rk-anim:rk-shift 9s ease-in-out infinite alternate;transform:perspective(900px)">
+  <div class="deadlock-card-shell card-size-team group select-none ">
+    <div class="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5">
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)"></div>
+      <div class="pointer-events-none absolute inset-0" style="background:linear-gradient(180deg, rgba(63,63,70,0) 52%, rgba(63,63,70,.5) 80%, rgba(9,9,11,.78) 100%)"></div>
+      <svg class="rk-ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="2.35,5.61 8.07,1.65 91.93,1.65 97.65,5.61 97.65,85.78 50.00,98.35 2.35,85.78" fill="none" stroke="#ff6a26" stroke-opacity="0.85" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg>
+      
+      <div class="rk-particles" aria-hidden="true"><span class="rk-tw" style="--x:35.84%;--y:81.74%;--s:15.67px;--d:3.33s;--dl:-1.31s;--dx:0.00px;--po:1.00;--pc:#ffd6bf"></span><span class="rk-tw" style="--x:36.19%;--y:12.05%;--s:15.96px;--d:3.52s;--dl:-2.97s;--dx:0.00px;--po:1.00;--pc:#ffd6bf"></span><span class="rk-tw" style="--x:50.68%;--y:70.56%;--s:11.58px;--d:2.60s;--dl:-1.26s;--dx:0.00px;--po:1.00;--pc:#ffd6bf"></span><span class="rk-tw" style="--x:11.17%;--y:29.00%;--s:14.55px;--d:2.86s;--dl:-1.49s;--dx:0.00px;--po:1.00;--pc:#ffd6bf"></span><span class="rk-tw" style="--x:25.74%;--y:21.32%;--s:9.19px;--d:2.84s;--dl:-1.05s;--dx:0.00px;--po:1.00;--pc:#ffd6bf"></span><span class="rk-tw" style="--x:82.80%;--y:54.08%;--s:15.76px;--d:2.27s;--dl:-1.16s;--dx:0.00px;--po:1.00;--pc:#ffd6bf"></span><span class="rk-tw" style="--x:54.23%;--y:79.48%;--s:10.48px;--d:3.52s;--dl:-0.44s;--dx:0.00px;--po:1.00;--pc:#ffd6bf"></span></div>
+      <div class="relative z-10 flex items-start justify-between gap-2">
+        <div class="flex flex-col items-start">
+          <span class="text-5xl leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">85</span>
+          <span class="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">Flex</span>
+          <span class="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">FA</span>
+        </div>
+      </div>
+      <div class="relative z-10 mt-auto pb-8">
+        <div class="mx-2 mb-2 border-b border-zinc-200/45 pb-1.5 text-center">
+          <h3 class="truncate text-xl font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">Oracle</h3>
+        </div>
+        <div class="card-txt-shadow grid grid-cols-2 gap-x-5 gap-y-1.5 px-4 py-1">
+          <div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MIR</span><span class="text-lg font-black text-white">92</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MOV</span><span class="text-lg font-black text-white">88</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MAC</span><span class="text-lg font-black text-white">81</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">POL</span><span class="text-lg font-black text-white">77</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">SUP</span><span class="text-lg font-black text-white">70</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">CON</span><span class="text-lg font-black text-white">85</span></div>
+        </div>
+        <div class="mt-3 text-center leading-tight font-black uppercase" style="font-size:12px;letter-spacing:.2em;color:#f4f4f5;text-shadow:0 1px 6px rgba(0,0,0,.95)">Cardslock</div>
+      </div>
+      <button type="button" class="card-hover-overlay border-0 " aria-label="Visualizar carta de Oracle">
+        <span class="card-hover-cta w-full max-w-[215px] rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]">Visualizar Carta</span>
+      </button>
+    </div>
+  </div>
+</div></div><div class="cell"><span class="tag">Archon · B · OVR 80+</span><div class="rk-wrap " data-rarity="archon" style="--rk-clip:polygon(0% 0%, 100% 0%, 100% 88%, 50% 100%, 0% 88%);--rk-pad:3px;--rk-bg:linear-gradient(145deg, #f0dcff, #b26bff 28%, #4a1a8f 52%, #b26bff 76%, #f0dcff);--rk-bg-h:linear-gradient(145deg, #ffffff, #f0dcff 25%, #b26bff 50%, #f0dcff 80%, #ffffff);--rk-glow:rgba(178, 107, 255, 0.55);--rk-gr:4px;transform:perspective(900px)">
+  <div class="deadlock-card-shell card-size-team group select-none ">
+    <div class="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5">
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)"></div>
+      <div class="pointer-events-none absolute inset-0" style="background:linear-gradient(180deg, rgba(63,63,70,0) 52%, rgba(63,63,70,.5) 80%, rgba(9,9,11,.78) 100%)"></div>
+      <svg class="rk-ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="2.35,1.65 97.65,1.65 97.65,86.75 50.00,98.35 2.35,86.75" fill="none" stroke="#b26bff" stroke-opacity="0.85" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg>
+      
+      <div class="rk-particles" aria-hidden="true"><span class="rk-tw" style="--x:78.41%;--y:62.16%;--s:12.41px;--d:3.29s;--dl:-2.64s;--dx:0.00px;--po:1.00;--pc:#f0dcff"></span><span class="rk-tw" style="--x:26.50%;--y:14.38%;--s:12.34px;--d:2.65s;--dl:-0.88s;--dx:0.00px;--po:1.00;--pc:#f0dcff"></span><span class="rk-tw" style="--x:78.22%;--y:12.43%;--s:13.79px;--d:3.84s;--dl:-2.18s;--dx:0.00px;--po:1.00;--pc:#f0dcff"></span><span class="rk-tw" style="--x:16.66%;--y:50.49%;--s:9.63px;--d:3.24s;--dl:-0.49s;--dx:0.00px;--po:1.00;--pc:#f0dcff"></span></div>
+      <div class="relative z-10 flex items-start justify-between gap-2">
+        <div class="flex flex-col items-start">
+          <span class="text-5xl leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">80</span>
+          <span class="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">Flex</span>
+          <span class="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">FA</span>
+        </div>
+      </div>
+      <div class="relative z-10 mt-auto pb-8">
+        <div class="mx-2 mb-2 border-b border-zinc-200/45 pb-1.5 text-center">
+          <h3 class="truncate text-xl font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">Archon</h3>
+        </div>
+        <div class="card-txt-shadow grid grid-cols-2 gap-x-5 gap-y-1.5 px-4 py-1">
+          <div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MIR</span><span class="text-lg font-black text-white">92</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MOV</span><span class="text-lg font-black text-white">88</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MAC</span><span class="text-lg font-black text-white">81</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">POL</span><span class="text-lg font-black text-white">77</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">SUP</span><span class="text-lg font-black text-white">70</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">CON</span><span class="text-lg font-black text-white">85</span></div>
+        </div>
+        <div class="mt-3 text-center leading-tight font-black uppercase" style="font-size:12px;letter-spacing:.2em;color:#f4f4f5;text-shadow:0 1px 6px rgba(0,0,0,.95)">Cardslock</div>
+      </div>
+      <button type="button" class="card-hover-overlay border-0 " aria-label="Visualizar carta de Archon">
+        <span class="card-hover-cta w-full max-w-[215px] rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]">Visualizar Carta</span>
+      </button>
+    </div>
+  </div>
+</div></div><div class="cell"><span class="tag">Arcanist · C · OVR 74+</span><div class="rk-wrap " data-rarity="arcanist" style="--rk-clip:polygon(0% 0%, 100% 0%, 100% 88%, 50% 100%, 0% 88%);--rk-pad:3px;--rk-bg:linear-gradient(145deg, #d1fae5, #2dd47a 28%, #0b6636 52%, #2dd47a 76%, #d1fae5);--rk-bg-h:linear-gradient(145deg, #ffffff, #d1fae5 25%, #2dd47a 50%, #d1fae5 80%, #ffffff);--rk-glow:rgba(45, 212, 122, 0.55);--rk-gr:4px;transform:perspective(900px)">
+  <div class="deadlock-card-shell card-size-team group select-none ">
+    <div class="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5">
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)"></div>
+      <div class="pointer-events-none absolute inset-0" style="background:linear-gradient(180deg, rgba(63,63,70,0) 52%, rgba(63,63,70,.5) 80%, rgba(9,9,11,.78) 100%)"></div>
+      <svg class="rk-ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="2.35,1.65 97.65,1.65 97.65,86.75 50.00,98.35 2.35,86.75" fill="none" stroke="#2dd47a" stroke-opacity="0.85" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg>
+      
+      
+      <div class="relative z-10 flex items-start justify-between gap-2">
+        <div class="flex flex-col items-start">
+          <span class="text-5xl leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">74</span>
+          <span class="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">Flex</span>
+          <span class="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">FA</span>
+        </div>
+      </div>
+      <div class="relative z-10 mt-auto pb-8">
+        <div class="mx-2 mb-2 border-b border-zinc-200/45 pb-1.5 text-center">
+          <h3 class="truncate text-xl font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">Arcanist</h3>
+        </div>
+        <div class="card-txt-shadow grid grid-cols-2 gap-x-5 gap-y-1.5 px-4 py-1">
+          <div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MIR</span><span class="text-lg font-black text-white">92</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MOV</span><span class="text-lg font-black text-white">88</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MAC</span><span class="text-lg font-black text-white">81</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">POL</span><span class="text-lg font-black text-white">77</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">SUP</span><span class="text-lg font-black text-white">70</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">CON</span><span class="text-lg font-black text-white">85</span></div>
+        </div>
+        <div class="mt-3 text-center leading-tight font-black uppercase" style="font-size:12px;letter-spacing:.2em;color:#f4f4f5;text-shadow:0 1px 6px rgba(0,0,0,.95)">Cardslock</div>
+      </div>
+      <button type="button" class="card-hover-overlay border-0 " aria-label="Visualizar carta de Arcanist">
+        <span class="card-hover-cta w-full max-w-[215px] rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]">Visualizar Carta</span>
+      </button>
+    </div>
+  </div>
+</div></div><div class="cell"><span class="tag">Initiate · D · OVR 64+</span><div class="rk-wrap " data-rarity="initiate" style="--rk-clip:polygon(0% 0%, 100% 0%, 100% 95.9%, 94% 100%, 6% 100%, 0% 95.9%);--rk-pad:2px;--rk-bg:linear-gradient(145deg, #f0a58f, #b5533a 28%, #5c2214 52%, #b5533a 76%, #f0a58f);--rk-bg-h:linear-gradient(145deg, #ffffff, #f0a58f 25%, #b5533a 50%, #f0a58f 80%, #ffffff);--rk-glow:rgba(181, 83, 58, 0.55);--rk-gr:0px;transform:perspective(900px)">
+  <div class="deadlock-card-shell card-size-team group select-none ">
+    <div class="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5">
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)"></div>
+      <div class="pointer-events-none absolute inset-0" style="background:linear-gradient(180deg, rgba(63,63,70,0) 52%, rgba(63,63,70,.5) 80%, rgba(9,9,11,.78) 100%)"></div>
+      <svg class="rk-ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="2.35,1.65 97.65,1.65 97.65,94.39 91.93,98.35 8.07,98.35 2.35,94.39" fill="none" stroke="#b5533a" stroke-opacity="0.85" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg>
+      
+      
+      <div class="relative z-10 flex items-start justify-between gap-2">
+        <div class="flex flex-col items-start">
+          <span class="text-5xl leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">64</span>
+          <span class="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">Flex</span>
+          <span class="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">FA</span>
+        </div>
+      </div>
+      <div class="relative z-10 mt-auto pb-8">
+        <div class="mx-2 mb-2 border-b border-zinc-200/45 pb-1.5 text-center">
+          <h3 class="truncate text-xl font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">Initiate</h3>
+        </div>
+        <div class="card-txt-shadow grid grid-cols-2 gap-x-5 gap-y-1.5 px-4 py-1">
+          <div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MIR</span><span class="text-lg font-black text-white">92</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MOV</span><span class="text-lg font-black text-white">88</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MAC</span><span class="text-lg font-black text-white">81</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">POL</span><span class="text-lg font-black text-white">77</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">SUP</span><span class="text-lg font-black text-white">70</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">CON</span><span class="text-lg font-black text-white">85</span></div>
+        </div>
+        <div class="mt-3 text-center leading-tight font-black uppercase" style="font-size:12px;letter-spacing:.2em;color:#f4f4f5;text-shadow:0 1px 6px rgba(0,0,0,.95)">Cardslock</div>
+      </div>
+      <button type="button" class="card-hover-overlay border-0 " aria-label="Visualizar carta de Initiate">
+        <span class="card-hover-cta w-full max-w-[215px] rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]">Visualizar Carta</span>
+      </button>
+    </div>
+  </div>
+</div></div></div>
+  </section>
+  <section>
+    <h2>Estados</h2>
+    <p class="lede">A carta inclina seguindo o ponteiro (mola, até ±11°), o que não aparece numa imagem parada. Não há estado desabilitado: a carta é sempre clicável quando abre o Spotlight.</p>
+    <div class="row">
+      <div class="cell"><span class="tag">Normal</span><div class="rk-wrap " data-rarity="ascendant" style="--rk-clip:polygon(0% 5.5%, 8% 0%, 36% 0%, 50% 3.5%, 64% 0%, 92% 0%, 100% 5.5%, 100% 86%, 50% 100%, 0% 86%);--rk-pad:4px;--rk-bg:linear-gradient(145deg, #fff3c4, #f5b82e 28%, #8f5e08 52%, #f5b82e 76%, #fff3c4);--rk-bg-h:linear-gradient(145deg, #ffffff, #fff3c4 25%, #f5b82e 50%, #fff3c4 80%, #ffffff);--rk-glow:rgba(245, 184, 46, 0.55);--rk-gr:12px;--rk-fx:block;--rk-sz:260%;--rk-dx:-61.54%;--rk-anim:rk-shift 5s ease-in-out infinite alternate;transform:perspective(900px)">
+  <div class="deadlock-card-shell card-size-team group select-none ">
+    <div class="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5" style="padding-top:26px">
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)"></div>
+      <div class="pointer-events-none absolute inset-0" style="background:linear-gradient(180deg, rgba(63,63,70,0) 52%, rgba(63,63,70,.5) 80%, rgba(9,9,11,.78) 100%)"></div>
+      <svg class="rk-ring rk-ring-pulse" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="2.35,6.97 9.97,1.65 36.66,1.65 50.00,5.03 63.34,1.65 90.03,1.65 97.65,6.97 97.65,84.81 50.00,98.35 2.35,84.81" fill="none" stroke="#f5b82e" stroke-opacity="0.85" stroke-width="1.4" vector-effect="non-scaling-stroke"/><polygon points="5.00,8.61 12.20,3.50 37.40,3.50 50.00,6.75 62.60,3.50 87.80,3.50 95.00,8.61 95.00,83.48 50.00,96.50 5.00,83.48" fill="none" stroke="#fff3c4" stroke-opacity="0.4" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>
+      <div class="rk-glint"></div>
+      <div class="rk-particles" aria-hidden="true"><span class="rk-p" style="--x:32.87%;--y:0.00%;--s:5.85px;--d:5.65s;--dl:-2.76s;--dx:1.63px;--po:0.63;--pc:#f5b82e"></span><span class="rk-p" style="--x:25.15%;--y:0.00%;--s:5.75px;--d:7.54s;--dl:-2.08s;--dx:-6.83px;--po:0.77;--pc:#ff9d2e"></span><span class="rk-p" style="--x:41.97%;--y:0.00%;--s:7.51px;--d:6.76s;--dl:-1.65s;--dx:13.45px;--po:0.89;--pc:#fff3c4"></span><span class="rk-p" style="--x:74.31%;--y:0.00%;--s:8.85px;--d:7.00s;--dl:-5.01s;--dx:3.29px;--po:0.68;--pc:#f5b82e"></span><span class="rk-p" style="--x:12.28%;--y:0.00%;--s:7.96px;--d:6.91s;--dl:-5.52s;--dx:1.42px;--po:0.94;--pc:#ff9d2e"></span><span class="rk-p" style="--x:12.74%;--y:0.00%;--s:4.64px;--d:7.42s;--dl:-7.11s;--dx:-6.06px;--po:0.79;--pc:#fff3c4"></span><span class="rk-p" style="--x:48.79%;--y:0.00%;--s:4.04px;--d:7.51s;--dl:-4.84s;--dx:11.94px;--po:0.73;--pc:#f5b82e"></span><span class="rk-p" style="--x:6.97%;--y:0.00%;--s:7.82px;--d:5.60s;--dl:-3.21s;--dx:-17.01px;--po:0.97;--pc:#ff9d2e"></span><span class="rk-p" style="--x:20.50%;--y:0.00%;--s:6.05px;--d:4.82s;--dl:-3.43s;--dx:-5.33px;--po:0.68;--pc:#fff3c4"></span><span class="rk-p" style="--x:47.54%;--y:0.00%;--s:6.82px;--d:7.61s;--dl:-6.36s;--dx:8.01px;--po:0.85;--pc:#f5b82e"></span><span class="rk-p" style="--x:28.30%;--y:0.00%;--s:6.62px;--d:6.33s;--dl:-0.44s;--dx:-2.77px;--po:0.86;--pc:#ff9d2e"></span><span class="rk-p" style="--x:76.91%;--y:0.00%;--s:8.65px;--d:4.96s;--dl:-3.26s;--dx:1.10px;--po:0.61;--pc:#fff3c4"></span><span class="rk-p" style="--x:47.88%;--y:0.00%;--s:8.13px;--d:5.92s;--dl:-0.10s;--dx:-17.57px;--po:0.88;--pc:#f5b82e"></span><span class="rk-p" style="--x:91.63%;--y:0.00%;--s:8.03px;--d:4.22s;--dl:-0.52s;--dx:14.19px;--po:0.62;--pc:#ff9d2e"></span><span class="rk-p" style="--x:87.40%;--y:0.00%;--s:6.16px;--d:5.87s;--dl:-0.65s;--dx:4.95px;--po:0.77;--pc:#fff3c4"></span><span class="rk-p" style="--x:51.96%;--y:0.00%;--s:4.90px;--d:5.49s;--dl:-4.13s;--dx:14.39px;--po:0.66;--pc:#f5b82e"></span><span class="rk-tw" style="--x:24.89%;--y:46.45%;--s:11.67px;--d:2.61s;--dl:-1.13s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:51.48%;--y:44.45%;--s:15.24px;--d:3.90s;--dl:-2.19s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:58.48%;--y:8.65%;--s:15.85px;--d:2.87s;--dl:-1.02s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:57.47%;--y:78.45%;--s:12.42px;--d:2.20s;--dl:-1.87s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span></div>
+      <div class="relative z-10 flex items-start justify-between gap-2">
+        <div class="flex flex-col items-start">
+          <span class="text-5xl leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">90</span>
+          <span class="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">Flex</span>
+          <span class="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">FA</span>
+        </div>
+      </div>
+      <div class="relative z-10 mt-auto pb-8">
+        <div class="mx-2 mb-2 border-b border-zinc-200/45 pb-1.5 text-center">
+          <h3 class="truncate text-xl font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">Ascendant</h3>
+        </div>
+        <div class="card-txt-shadow grid grid-cols-2 gap-x-5 gap-y-1.5 px-4 py-1">
+          <div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MIR</span><span class="text-lg font-black text-white">92</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MOV</span><span class="text-lg font-black text-white">88</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MAC</span><span class="text-lg font-black text-white">81</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">POL</span><span class="text-lg font-black text-white">77</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">SUP</span><span class="text-lg font-black text-white">70</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">CON</span><span class="text-lg font-black text-white">85</span></div>
+        </div>
+        <div class="mt-3 text-center leading-tight font-black uppercase" style="font-size:12px;letter-spacing:.2em;color:#f4f4f5;text-shadow:0 1px 6px rgba(0,0,0,.95)">Cardslock</div>
+      </div>
+      <button type="button" class="card-hover-overlay border-0 " aria-label="Visualizar carta de Ascendant">
+        <span class="card-hover-cta w-full max-w-[215px] rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]">Visualizar Carta</span>
+      </button>
+    </div>
+  </div>
+</div></div>
+      <div class="cell"><span class="tag">Hover</span><div class="rk-wrap is-hover" data-rarity="ascendant" style="--rk-clip:polygon(0% 5.5%, 8% 0%, 36% 0%, 50% 3.5%, 64% 0%, 92% 0%, 100% 5.5%, 100% 86%, 50% 100%, 0% 86%);--rk-pad:4px;--rk-bg:linear-gradient(145deg, #fff3c4, #f5b82e 28%, #8f5e08 52%, #f5b82e 76%, #fff3c4);--rk-bg-h:linear-gradient(145deg, #ffffff, #fff3c4 25%, #f5b82e 50%, #fff3c4 80%, #ffffff);--rk-glow:rgba(245, 184, 46, 0.55);--rk-gr:12px;--rk-fx:block;--rk-sz:260%;--rk-dx:-61.54%;--rk-anim:rk-shift 5s ease-in-out infinite alternate;transform:perspective(900px)">
+  <div class="deadlock-card-shell card-size-team group select-none is-hover">
+    <div class="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5" style="padding-top:26px">
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)"></div>
+      <div class="pointer-events-none absolute inset-0" style="background:linear-gradient(180deg, rgba(63,63,70,0) 52%, rgba(63,63,70,.5) 80%, rgba(9,9,11,.78) 100%)"></div>
+      <svg class="rk-ring rk-ring-pulse" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="2.35,6.97 9.97,1.65 36.66,1.65 50.00,5.03 63.34,1.65 90.03,1.65 97.65,6.97 97.65,84.81 50.00,98.35 2.35,84.81" fill="none" stroke="#f5b82e" stroke-opacity="0.85" stroke-width="1.4" vector-effect="non-scaling-stroke"/><polygon points="5.00,8.61 12.20,3.50 37.40,3.50 50.00,6.75 62.60,3.50 87.80,3.50 95.00,8.61 95.00,83.48 50.00,96.50 5.00,83.48" fill="none" stroke="#fff3c4" stroke-opacity="0.4" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>
+      <div class="rk-glint"></div>
+      <div class="rk-particles" aria-hidden="true"><span class="rk-p" style="--x:32.87%;--y:0.00%;--s:5.85px;--d:5.65s;--dl:-2.76s;--dx:1.63px;--po:0.63;--pc:#f5b82e"></span><span class="rk-p" style="--x:25.15%;--y:0.00%;--s:5.75px;--d:7.54s;--dl:-2.08s;--dx:-6.83px;--po:0.77;--pc:#ff9d2e"></span><span class="rk-p" style="--x:41.97%;--y:0.00%;--s:7.51px;--d:6.76s;--dl:-1.65s;--dx:13.45px;--po:0.89;--pc:#fff3c4"></span><span class="rk-p" style="--x:74.31%;--y:0.00%;--s:8.85px;--d:7.00s;--dl:-5.01s;--dx:3.29px;--po:0.68;--pc:#f5b82e"></span><span class="rk-p" style="--x:12.28%;--y:0.00%;--s:7.96px;--d:6.91s;--dl:-5.52s;--dx:1.42px;--po:0.94;--pc:#ff9d2e"></span><span class="rk-p" style="--x:12.74%;--y:0.00%;--s:4.64px;--d:7.42s;--dl:-7.11s;--dx:-6.06px;--po:0.79;--pc:#fff3c4"></span><span class="rk-p" style="--x:48.79%;--y:0.00%;--s:4.04px;--d:7.51s;--dl:-4.84s;--dx:11.94px;--po:0.73;--pc:#f5b82e"></span><span class="rk-p" style="--x:6.97%;--y:0.00%;--s:7.82px;--d:5.60s;--dl:-3.21s;--dx:-17.01px;--po:0.97;--pc:#ff9d2e"></span><span class="rk-p" style="--x:20.50%;--y:0.00%;--s:6.05px;--d:4.82s;--dl:-3.43s;--dx:-5.33px;--po:0.68;--pc:#fff3c4"></span><span class="rk-p" style="--x:47.54%;--y:0.00%;--s:6.82px;--d:7.61s;--dl:-6.36s;--dx:8.01px;--po:0.85;--pc:#f5b82e"></span><span class="rk-p" style="--x:28.30%;--y:0.00%;--s:6.62px;--d:6.33s;--dl:-0.44s;--dx:-2.77px;--po:0.86;--pc:#ff9d2e"></span><span class="rk-p" style="--x:76.91%;--y:0.00%;--s:8.65px;--d:4.96s;--dl:-3.26s;--dx:1.10px;--po:0.61;--pc:#fff3c4"></span><span class="rk-p" style="--x:47.88%;--y:0.00%;--s:8.13px;--d:5.92s;--dl:-0.10s;--dx:-17.57px;--po:0.88;--pc:#f5b82e"></span><span class="rk-p" style="--x:91.63%;--y:0.00%;--s:8.03px;--d:4.22s;--dl:-0.52s;--dx:14.19px;--po:0.62;--pc:#ff9d2e"></span><span class="rk-p" style="--x:87.40%;--y:0.00%;--s:6.16px;--d:5.87s;--dl:-0.65s;--dx:4.95px;--po:0.77;--pc:#fff3c4"></span><span class="rk-p" style="--x:51.96%;--y:0.00%;--s:4.90px;--d:5.49s;--dl:-4.13s;--dx:14.39px;--po:0.66;--pc:#f5b82e"></span><span class="rk-tw" style="--x:24.89%;--y:46.45%;--s:11.67px;--d:2.61s;--dl:-1.13s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:51.48%;--y:44.45%;--s:15.24px;--d:3.90s;--dl:-2.19s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:58.48%;--y:8.65%;--s:15.85px;--d:2.87s;--dl:-1.02s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:57.47%;--y:78.45%;--s:12.42px;--d:2.20s;--dl:-1.87s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span></div>
+      <div class="relative z-10 flex items-start justify-between gap-2">
+        <div class="flex flex-col items-start">
+          <span class="text-5xl leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">90</span>
+          <span class="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">Flex</span>
+          <span class="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">FA</span>
+        </div>
+      </div>
+      <div class="relative z-10 mt-auto pb-8">
+        <div class="mx-2 mb-2 border-b border-zinc-200/45 pb-1.5 text-center">
+          <h3 class="truncate text-xl font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">Ascendant</h3>
+        </div>
+        <div class="card-txt-shadow grid grid-cols-2 gap-x-5 gap-y-1.5 px-4 py-1">
+          <div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MIR</span><span class="text-lg font-black text-white">92</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MOV</span><span class="text-lg font-black text-white">88</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MAC</span><span class="text-lg font-black text-white">81</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">POL</span><span class="text-lg font-black text-white">77</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">SUP</span><span class="text-lg font-black text-white">70</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">CON</span><span class="text-lg font-black text-white">85</span></div>
+        </div>
+        <div class="mt-3 text-center leading-tight font-black uppercase" style="font-size:12px;letter-spacing:.2em;color:#f4f4f5;text-shadow:0 1px 6px rgba(0,0,0,.95)">Cardslock</div>
+      </div>
+      <button type="button" class="card-hover-overlay border-0 " aria-label="Visualizar carta de Ascendant">
+        <span class="card-hover-cta w-full max-w-[215px] rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]">Visualizar Carta</span>
+      </button>
+    </div>
+  </div>
+</div></div>
+      <div class="cell"><span class="tag">Foco do teclado</span><div class="rk-wrap is-focus" data-rarity="ascendant" style="--rk-clip:polygon(0% 5.5%, 8% 0%, 36% 0%, 50% 3.5%, 64% 0%, 92% 0%, 100% 5.5%, 100% 86%, 50% 100%, 0% 86%);--rk-pad:4px;--rk-bg:linear-gradient(145deg, #fff3c4, #f5b82e 28%, #8f5e08 52%, #f5b82e 76%, #fff3c4);--rk-bg-h:linear-gradient(145deg, #ffffff, #fff3c4 25%, #f5b82e 50%, #fff3c4 80%, #ffffff);--rk-glow:rgba(245, 184, 46, 0.55);--rk-gr:12px;--rk-fx:block;--rk-sz:260%;--rk-dx:-61.54%;--rk-anim:rk-shift 5s ease-in-out infinite alternate;transform:perspective(900px)">
+  <div class="deadlock-card-shell card-size-team group select-none is-focus">
+    <div class="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5" style="padding-top:26px">
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 50% 30%, #3f3f46 0%, #09090b 100%)"></div>
+      <div class="pointer-events-none absolute inset-0" style="background:linear-gradient(180deg, rgba(63,63,70,0) 52%, rgba(63,63,70,.5) 80%, rgba(9,9,11,.78) 100%)"></div>
+      <svg class="rk-ring rk-ring-pulse" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="2.35,6.97 9.97,1.65 36.66,1.65 50.00,5.03 63.34,1.65 90.03,1.65 97.65,6.97 97.65,84.81 50.00,98.35 2.35,84.81" fill="none" stroke="#f5b82e" stroke-opacity="0.85" stroke-width="1.4" vector-effect="non-scaling-stroke"/><polygon points="5.00,8.61 12.20,3.50 37.40,3.50 50.00,6.75 62.60,3.50 87.80,3.50 95.00,8.61 95.00,83.48 50.00,96.50 5.00,83.48" fill="none" stroke="#fff3c4" stroke-opacity="0.4" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>
+      <div class="rk-glint"></div>
+      <div class="rk-particles" aria-hidden="true"><span class="rk-p" style="--x:32.87%;--y:0.00%;--s:5.85px;--d:5.65s;--dl:-2.76s;--dx:1.63px;--po:0.63;--pc:#f5b82e"></span><span class="rk-p" style="--x:25.15%;--y:0.00%;--s:5.75px;--d:7.54s;--dl:-2.08s;--dx:-6.83px;--po:0.77;--pc:#ff9d2e"></span><span class="rk-p" style="--x:41.97%;--y:0.00%;--s:7.51px;--d:6.76s;--dl:-1.65s;--dx:13.45px;--po:0.89;--pc:#fff3c4"></span><span class="rk-p" style="--x:74.31%;--y:0.00%;--s:8.85px;--d:7.00s;--dl:-5.01s;--dx:3.29px;--po:0.68;--pc:#f5b82e"></span><span class="rk-p" style="--x:12.28%;--y:0.00%;--s:7.96px;--d:6.91s;--dl:-5.52s;--dx:1.42px;--po:0.94;--pc:#ff9d2e"></span><span class="rk-p" style="--x:12.74%;--y:0.00%;--s:4.64px;--d:7.42s;--dl:-7.11s;--dx:-6.06px;--po:0.79;--pc:#fff3c4"></span><span class="rk-p" style="--x:48.79%;--y:0.00%;--s:4.04px;--d:7.51s;--dl:-4.84s;--dx:11.94px;--po:0.73;--pc:#f5b82e"></span><span class="rk-p" style="--x:6.97%;--y:0.00%;--s:7.82px;--d:5.60s;--dl:-3.21s;--dx:-17.01px;--po:0.97;--pc:#ff9d2e"></span><span class="rk-p" style="--x:20.50%;--y:0.00%;--s:6.05px;--d:4.82s;--dl:-3.43s;--dx:-5.33px;--po:0.68;--pc:#fff3c4"></span><span class="rk-p" style="--x:47.54%;--y:0.00%;--s:6.82px;--d:7.61s;--dl:-6.36s;--dx:8.01px;--po:0.85;--pc:#f5b82e"></span><span class="rk-p" style="--x:28.30%;--y:0.00%;--s:6.62px;--d:6.33s;--dl:-0.44s;--dx:-2.77px;--po:0.86;--pc:#ff9d2e"></span><span class="rk-p" style="--x:76.91%;--y:0.00%;--s:8.65px;--d:4.96s;--dl:-3.26s;--dx:1.10px;--po:0.61;--pc:#fff3c4"></span><span class="rk-p" style="--x:47.88%;--y:0.00%;--s:8.13px;--d:5.92s;--dl:-0.10s;--dx:-17.57px;--po:0.88;--pc:#f5b82e"></span><span class="rk-p" style="--x:91.63%;--y:0.00%;--s:8.03px;--d:4.22s;--dl:-0.52s;--dx:14.19px;--po:0.62;--pc:#ff9d2e"></span><span class="rk-p" style="--x:87.40%;--y:0.00%;--s:6.16px;--d:5.87s;--dl:-0.65s;--dx:4.95px;--po:0.77;--pc:#fff3c4"></span><span class="rk-p" style="--x:51.96%;--y:0.00%;--s:4.90px;--d:5.49s;--dl:-4.13s;--dx:14.39px;--po:0.66;--pc:#f5b82e"></span><span class="rk-tw" style="--x:24.89%;--y:46.45%;--s:11.67px;--d:2.61s;--dl:-1.13s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:51.48%;--y:44.45%;--s:15.24px;--d:3.90s;--dl:-2.19s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:58.48%;--y:8.65%;--s:15.85px;--d:2.87s;--dl:-1.02s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span><span class="rk-tw" style="--x:57.47%;--y:78.45%;--s:12.42px;--d:2.20s;--dl:-1.87s;--dx:0.00px;--po:1.00;--pc:#fff3c4"></span></div>
+      <div class="relative z-10 flex items-start justify-between gap-2">
+        <div class="flex flex-col items-start">
+          <span class="text-5xl leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">90</span>
+          <span class="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">Flex</span>
+          <span class="mt-1.5 rounded-sm border border-white/35 bg-white/20 px-2 py-0.5 text-[10px] font-black tracking-widest text-white uppercase">FA</span>
+        </div>
+      </div>
+      <div class="relative z-10 mt-auto pb-8">
+        <div class="mx-2 mb-2 border-b border-zinc-200/45 pb-1.5 text-center">
+          <h3 class="truncate text-xl font-black tracking-[0.12em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">Ascendant</h3>
+        </div>
+        <div class="card-txt-shadow grid grid-cols-2 gap-x-5 gap-y-1.5 px-4 py-1">
+          <div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MIR</span><span class="text-lg font-black text-white">92</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MOV</span><span class="text-lg font-black text-white">88</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">MAC</span><span class="text-lg font-black text-white">81</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">POL</span><span class="text-lg font-black text-white">77</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">SUP</span><span class="text-lg font-black text-white">70</span></div><div class="flex items-center justify-between leading-none"><span class="text-sm font-extrabold tracking-wider text-zinc-200">CON</span><span class="text-lg font-black text-white">85</span></div>
+        </div>
+        <div class="mt-3 text-center leading-tight font-black uppercase" style="font-size:12px;letter-spacing:.2em;color:#f4f4f5;text-shadow:0 1px 6px rgba(0,0,0,.95)">Cardslock</div>
+      </div>
+      <button type="button" class="card-hover-overlay border-0 is-focus" aria-label="Visualizar carta de Ascendant">
+        <span class="card-hover-cta w-full max-w-[215px] rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]">Visualizar Carta</span>
+      </button>
+    </div>
+  </div>
+</div></div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

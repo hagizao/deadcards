@@ -15,7 +15,7 @@ export async function seedCode(code: string, playerId: string, opts: { maxUses?:
 }
 
 // Cria usuário + sessão no D1 e devolve o cookie assinado como o Better Auth espera (token.hmac-base64).
-export async function login(name: string, providers: string[] = ["twitch"]) {
+export async function login(name: string, providers: string[] = ["twitch"], twitchId?: string) {
   const userId = crypto.randomUUID();
   const token = crypto.randomUUID().replace(/-/g, "");
   const t = now();
@@ -25,7 +25,7 @@ export async function login(name: string, providers: string[] = ["twitch"]) {
       .bind(crypto.randomUUID(), new Date(Date.now() + 86_400_000).toISOString(), token, t, t, userId),
     ...providers.map((p, i) =>
       env.DB.prepare(`INSERT INTO "account" (id, accountId, providerId, userId, createdAt, updatedAt) VALUES (?,?,?,?,?,?)`)
-        .bind(crypto.randomUUID(), crypto.randomUUID(), p, userId, new Date(Date.now() + i * 1000).toISOString(), t)),
+        .bind(crypto.randomUUID(), p === "twitch" && twitchId ? twitchId : crypto.randomUUID(), p, userId, new Date(Date.now() + i * 1000).toISOString(), t)),
   ]);
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.BETTER_AUTH_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(token)))));

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Guia · Deadlock Cards</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="guide.css">
+</head>
+<body>
+<main>
+  <nav><a href="index.html" aria-current="page">Índice</a><a href="foundations.html">Fundações</a><a href="card.html">Carta</a><a href="buttons.html">Botões</a><a href="surfaces.html">Superfícies</a></nav>
+  <section>
+    <h1>Guia do design system</h1>
+    <p class="lede">Espelho do código, importado em 17/11/2026. O código é a fonte: mudanças desenhadas aqui só chegam ao app por uma exportação aprovada. <code>design-sync.json</code> guarda os valores combinados. Para atualizar a carta e o CSS: <code>npm run build &amp;&amp; npm run design:guide</code>.</p>
+  </section>
+  <section>
+    <h2>Componentes</h2>
+    <table>
+      <thead><tr><th>Nome</th><th>Código</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><a href="card.html">Card</a></td><td><code>src/components/Card.tsx</code></td><td>desenhado · 6 raridades · normal, hover, foco</td></tr>
+        <tr><td><a href="buttons.html">Pill bevel / ativo</a></td><td><code>src/lib/ui.ts › pill</code></td><td>desenhado · desabilitado proposto</td></tr>
+        <tr><td><a href="buttons.html">Primário</a></td><td><code>src/lib/ui.ts › primaryBtn</code></td><td>desenhado</td></tr>
+        <tr><td><a href="buttons.html">Campo</a></td><td><code>src/lib/ui.ts › field</code></td><td>desenhado · desabilitado proposto</td></tr>
+        <tr><td><a href="surfaces.html">noir-glass / -strong</a></td><td><code>src/styles/cards.css</code></td><td>desenhado</td></tr>
+        <tr><td>Card (molduras especiais)</td><td><code>src/lib/rarity.ts › FRAME_PRESETS</code></td><td>só no código</td></tr>
+        <tr><td>Spotlight</td><td><code>src/components/Spotlight.tsx</code></td><td>só no código</td></tr>
+        <tr><td>CardExportButton</td><td><code>src/components/CardExportButton.tsx</code></td><td>só no código</td></tr>
+        <tr><td>TrendBadge</td><td><code>src/components/TrendBadge.tsx</code></td><td>só no código</td></tr>
+        <tr><td>TeamLogo / TeamLogo3D</td><td><code>src/components/TeamLogo*.tsx</code></td><td>só no código</td></tr>
+        <tr><td>team-ovr-chip</td><td><code>src/styles/cards.css</code></td><td>só no código</td></tr>
+        <tr><td>RegionBackdrop</td><td><code>src/components/RegionBackdrop.tsx</code></td><td>só no código</td></tr>
+        <tr><td>HoldButton</td><td><code>src/components/HoldButton.tsx</code></td><td>só no código</td></tr>
+        <tr><td>Range</td><td><code>src/components/Range.tsx</code></td><td>só no código</td></tr>
+        <tr><td>Account</td><td><code>src/components/Account.tsx</code></td><td>só no código</td></tr>
+        <tr><td>Icon</td><td><code>src/components/Icon.tsx</code></td><td>só no código</td></tr>
+        <tr><td>brand-badge</td><td><code>src/styles/cards.css</code></td><td>só no código</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

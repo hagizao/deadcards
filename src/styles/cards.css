@@ -393,8 +393,6 @@
     @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
       .team-header-trigger:hover .team-logo-frame { transform: scale(1.06); }
       .team-ovr-chip:not(.team-ovr-chip--stack):hover { transform: translateY(-1px) scale(1.05); }
-      .home-hero-arrow:hover { transform: translateY(-50%) scale(1.07); }
-      .home-hero-pick:hover { transform: translateY(-1px); }
       input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.18); }
     }
 
@@ -762,64 +760,12 @@
       cursor: pointer;
     }
 
-    /* ---- Tela inicial: colunas com a mesma altura + lista de times com fade ---- */
-    .home-hero-box { height: 460px; }
-    @media (min-width: 1024px) {
-      .home-col { height: clamp(520px, calc(100vh - 11rem), 820px); }
-    }
-    /* no celular a lista segue a rolagem da página; a rolagem própria só existe ao lado do herói */
-    @media (min-width: 1024px) { .home-teams-scroll {
-      --ft: 0px; --fb: 170px;
-      overflow-y: auto;
-      padding: 0 8px;            /* folga lateral para a sombra não ser cortada pela rolagem */
-      margin: 0 -8px;            /* mantém o alinhamento com o resto da página */
-      scrollbar-width: thin;
-      scrollbar-color: #3f3f46 transparent;
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--ft), #000 calc(100% - var(--fb)), transparent 100%);
-      mask-image: linear-gradient(to bottom, transparent 0, #000 var(--ft), #000 calc(100% - var(--fb)), transparent 100%);
-    } }
     .home-team-box {
       min-height: 136px; flex-shrink: 0;
       /* sombra leve: a sombra pesada do .noir-glass se acumulava entre as caixas e, cortada pela rolagem, formava uma "caixa preta" atrás da lista */
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
       border: 0;
     }
-
-    /* ---- Tela inicial: setas discretas para trocar o herói ---- */
-    .home-hero-arrow {
-      position: absolute; top: 50%; transform: translateY(-50%);
-      width: 44px; height: 44px; border-radius: 999px;
-      display: flex; align-items: center; justify-content: center;
-      color: #e4e4e7; background: rgba(9, 9, 11, 0.42);
-      border: 1px solid rgba(228, 228, 231, 0.22);
-      -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
-      opacity: 0; cursor: pointer; z-index: 2;
-      transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
-    }
-    .home-hero-arrow--l { left: 8px; }
-    .home-hero-arrow--r { right: 8px; }
-    .home-hero-box:hover .home-hero-arrow, .home-hero-arrow:focus-visible { opacity: 0.8; }
-    .home-hero-arrow:hover { opacity: 1 !important; background: rgba(9, 9, 11, 0.72); border-color: rgba(244, 244, 245, 0.6); }
-    .home-hero-arrow:active { transform: translateY(-50%) scale(0.96); }
-    .home-hero-arrow:focus-visible { outline: 2px solid #f4f4f5; outline-offset: 2px; }
-    @media (hover: none) { .home-hero-arrow { opacity: 0.55; } }
-    .home-hero-tag {
-      position: absolute; left: 14px; bottom: 12px; z-index: 2;
-      padding: 3px 10px; border-radius: 999px;
-      font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-      color: #e4e4e7; background: rgba(9, 9, 11, 0.5); border: 1px solid rgba(228, 228, 231, 0.18);
-      opacity: 0; transition: opacity 0.2s ease; pointer-events: none;
-    }
-    .home-hero-box:hover .home-hero-tag { opacity: 0.85; }
-    @media (hover: none) { .home-hero-tag { opacity: 0.7; } }
-    .home-hero-pick {
-      padding: 0; aspect-ratio: 1; overflow: hidden; border-radius: 8px; cursor: pointer;
-      background: #09090b; border: 2px solid transparent; opacity: 0.72;
-      transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-    }
-    .home-hero-pick:hover { opacity: 1; }
-    .home-hero-pick.is-sel { opacity: 1; border-color: #f4f4f5; }
-    .home-hero-pick img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
 
     /* Barra de rolagem discreta Noir */
     ::-webkit-scrollbar {
@@ -836,3 +782,38 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #71717a;
     }
+
+    /* herói de assinatura: faixa dourada na diagonal do canto superior direito.
+       O quadrado guarda a faixa; o clip-path da .deadlock-card-inner corta o resto no formato da carta. */
+    .sig-ribbon {
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 12;
+      width: 54%;
+      aspect-ratio: 1;
+      overflow: hidden;
+      pointer-events: none;
+      container-type: inline-size;
+    }
+
+    .sig-ribbon > span {
+      position: absolute;
+      top: 38%;
+      right: -38%;
+      width: 150%;
+      padding: 3cqw 0;
+      transform: translateY(-50%) rotate(45deg);
+      background: linear-gradient(90deg, #92400e, #f59e0b 22%, #fde68a 44%, #fffbeb 50%, #fde68a 56%, #f59e0b 78%, #92400e);
+      border-block: 1px solid rgb(255 251 235 / 0.7);
+      box-shadow: 0 3px 10px rgb(0 0 0 / 0.6), 0 0 16px rgb(252 211 77 / 0.45);
+      color: #1c1206;
+      font-size: 7.5cqw;
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      line-height: 1;
+      text-align: center;
+      text-transform: uppercase;
+      text-shadow: 0 1px 0 rgb(255 255 255 / 0.45);
+    }
+

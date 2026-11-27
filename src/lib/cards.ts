@@ -1,7 +1,12 @@
 import type { Player, Team, TierBand, HistoryPoint } from "./types";
 import { strings, useT } from "./i18n";
+import { getPlayerOvr, isAltHero, isMainCard } from "./cardKinds";
 
-export const REGIONS = ["Europa", "América do Norte", "Brasil", "América do Sul", "Ásia", "Sem Time"];
+// regras de tipo de carta e OVR ficam sem React para o worker também usar
+export { ALT_HERO_DROP, STAT_KEYS, calculateOVR, getPlayerOvr, isAltHero, isMainCard, isRetired } from "./cardKinds";
+
+// Brasil deixou de ser região (os times foram para América do Sul); o rótulo e a classe dele ficam para dado antigo.
+export const REGIONS = ["Europa", "América do Norte", "América do Sul", "Ásia", "Sem Time"];
 
 // Os valores de REGIONS e position são chaves salvas no banco; só o rótulo exibido muda por idioma.
 const LABELS = strings<Record<string, string>>({
@@ -27,18 +32,6 @@ export const DEFAULT_TIER_CONFIG: TierBand[] = [
 
 export const POSITIONS = ["Carry", "OffCarry", "Frontline", "Flex", "Suporte"];
 
-export const STAT_KEYS = ["MIR", "MAC", "SUP", "MOV", "POL", "CON"] as const;
-
-export function calculateOVR(stats: Player["stats"]): number {
-  const sum = STAT_KEYS.reduce((acc, k) => acc + (Number(stats[k]) || 0), 0);
-  return Math.round(sum / STAT_KEYS.length);
-}
-
-export function getPlayerOvr(p: Player): number {
-  const v = Number(p.ovr);
-  if (p.ovr !== undefined && p.ovr !== null && Number.isFinite(v)) return Math.min(99, Math.max(1, Math.round(v)));
-  return calculateOVR(p.stats);
-}
 
 function today(): string {
   const d = new Date();
@@ -62,8 +55,20 @@ export function getPlayerTrend(p: Player): number {
   return last.base ? 0 : last.ovr - h[h.length - 2].ovr;
 }
 
+export function isRosterCard(players: Player[], p: Player): boolean {
+  // herói jogado é a mesma pessoa com outro herói: nunca entra no elenco nem na média do time
+  if (p.inactive || isAltHero(p)) return false;
+  // Versão no mesmo time da carta principal é o mesmo jogador: fica fora do elenco e da média do time.
+  return isMainCard(p) || !players.some((m) => m.id === p.variantOf && m.teamId === p.teamId);
+}
+
+export function cardVersions(players: Player[], p: Player): Player[] {
+  const main = isMainCard(p) ? p.id : p.variantOf!;
+  return players.filter((c) => c.id === main || c.variantOf === main).sort((a, b) => Number(!isMainCard(a)) - Number(!isMainCard(b)));
+}
+
 export function activeRoster(players: Player[], teamId: string): Player[] {
-  return players.filter((p) => p.teamId === teamId && !p.inactive);
+  return players.filter((p) => p.teamId === teamId && isRosterCard(players, p));
 }
 
 export function teamOvr(players: Player[], teamId: string) {
@@ -115,10 +120,6 @@ export function hexToRgba(hex: string, alpha = 1): string {
   if (c.length === 3) c = c.split("").map((x) => x + x).join("");
   if (!/^[0-9a-f]{6}$/i.test(c)) return `rgba(24, 24, 27, ${alpha})`;
   return `rgba(${parseInt(c.slice(0, 2), 16)}, ${parseInt(c.slice(2, 4), 16)}, ${parseInt(c.slice(4, 6), 16)}, ${alpha})`;
-}
-
-export function isMainCard(p: Player): boolean {
-  return !p.variantOf || p.variantOf === p.id;
 }
 
 export function teamOf(teams: Team[], p: Player): Team {

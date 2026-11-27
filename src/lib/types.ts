@@ -41,18 +41,29 @@ export type Player = {
   specialText?: string;
   frame?: Frame;
   variantOf?: string;
+  /** Versão do mesmo jogador com outro herói que ele joga (a principal é o herói de assinatura). */
+  altHero?: boolean;
   inactive?: boolean;
-  art?: { url: string; zoom?: number; x?: number; y?: number };
+  /** Carta exclusiva: nunca sai em pack (só por código ou outro meio). */
+  exclusive?: boolean;
+  art?: ArtLayer & { credit?: ArtCredit; fg?: ArtLayer };
 };
+
+export type ArtLayer = { url: string; zoom?: number; x?: number; y?: number };
+
+export type ArtCredit = { name: string; url?: string };
 
 export type HeroArt = { name: string; url: string; zoom: number; x: number; y: number };
 
 export type TierBand = { key: string; min: number; max: number; bg: string; text: string };
 
+export const HOME_FEATURED_MAX = 5;
+
 export type Settings = {
   tierConfig?: TierBand[];
   bg?: BgSettings;
   homeHero?: string;
+  homeFeatured?: string[];
 };
 
 export type AppData = {

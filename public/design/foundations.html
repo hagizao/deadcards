@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Fundações · Deadlock Cards</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="guide.css">
+</head>
+<body>
+<main>
+  <nav><a href="index.html">Índice</a><a href="foundations.html" aria-current="page">Fundações</a><a href="card.html">Carta</a><a href="buttons.html">Botões</a><a href="surfaces.html">Superfícies</a></nav>
+
+  <section>
+    <h1>Fundações</h1>
+    <p class="lede">Valores lidos do código em 17/11/2026: <code>src/index.css</code>, <code>src/styles/cards.css</code> e <code>src/lib/rarity.ts</code>. O código continua sendo a fonte; este guia o espelha com os mesmos nomes.</p>
+  </section>
+
+  <section>
+    <h2>Deadlock (Panorama)</h2>
+    <p class="lede">Cores tiradas do <code>citadel_base_styles.css</code> do jogo: o offWhite dos títulos, o offBlack e o degradê do ButtonBevel.</p>
+    <div class="swatches">
+      <div class="sw"><i style="background:var(--color-dl-text)"></i><b>dl-text</b><code>#ffefd7</code></div>
+      <div class="sw"><i style="background:var(--color-dl-black)"></i><b>dl-black</b><code>#10130d</code></div>
+      <div class="sw"><i style="background:linear-gradient(var(--color-dl-bevel-from),var(--color-dl-bevel-to))"></i><b>dl-bevel</b><code>#373d45 → #4d5860</code></div>
+      <div class="sw"><i style="background:linear-gradient(var(--color-dl-bevel-hover-from),var(--color-dl-bevel-hover-to))"></i><b>dl-bevel-hover</b><code>#4c5561 → #6c7d88</code></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Noir e platina</h2>
+    <p class="lede">Fundo carvão e texto platina. Os três tons platina são os mesmos de <code>zinc-100/300/400</code>, que as telas usam direto.</p>
+    <div class="swatches">
+      <div class="sw"><i style="background:var(--noir-charcoal)"></i><b>noir-charcoal</b><code>#09090b</code></div>
+      <div class="sw"><i style="background:var(--noir-surface)"></i><b>noir-surface</b><code>rgba(18,18,22,.72)</code></div>
+      <div class="sw"><i style="background:var(--noir-surface-strong)"></i><b>noir-surface-strong</b><code>rgba(14,14,17,.88)</code></div>
+      <div class="sw"><i style="background:var(--platinum-bright)"></i><b>platinum-bright</b><code>#f4f4f5 · zinc-100</code></div>
+      <div class="sw"><i style="background:var(--platinum-mid)"></i><b>platinum-mid</b><code>#d4d4d8 · zinc-300</code></div>
+      <div class="sw"><i style="background:var(--platinum-muted)"></i><b>platinum-muted</b><code>#a1a1aa · zinc-400</code></div>
+      <div class="sw"><i style="background:var(--platinum-border)"></i><b>platinum-border</b><code>rgba(228,228,231,.16)</code></div>
+      <div class="sw"><i style="background:var(--platinum-border-hover)"></i><b>platinum-border-hover</b><code>rgba(244,244,245,.55)</code></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Raridades</h2>
+    <p class="lede">Cada raridade tem três tons: <b>c</b> (a cor), <b>hi</b> (o brilho) e <b>lo</b> (a sombra do metal). A raridade sai do OVR.</p>
+    <table>
+      <thead><tr><th>Raridade</th><th>Tier</th><th>OVR mín.</th><th>c · hi · lo</th><th>Metal</th></tr></thead>
+      <tbody>
+        <tr><td>Eternus</td><td>SS</td><td>93</td><td><code>#38e8ff · #e8fdff · #0b6f9e</code></td><td><i style="display:block;width:120px;height:24px;border-radius:6px;background:linear-gradient(145deg,var(--rarity-eternus-lo),var(--rarity-eternus-c),var(--rarity-eternus-hi),var(--rarity-eternus-c),var(--rarity-eternus-lo))"></i></td></tr>
+        <tr><td>Ascendant</td><td>S</td><td>88</td><td><code>#f5b82e · #fff3c4 · #8f5e08</code></td><td><i style="display:block;width:120px;height:24px;border-radius:6px;background:linear-gradient(145deg,var(--rarity-ascendant-lo),var(--rarity-ascendant-c),var(--rarity-ascendant-hi),var(--rarity-ascendant-c),var(--rarity-ascendant-lo))"></i></td></tr>
+        <tr><td>Oracle</td><td>A</td><td>83</td><td><code>#ff6a26 · #ffd6bf · #992b05</code></td><td><i style="display:block;width:120px;height:24px;border-radius:6px;background:linear-gradient(145deg,var(--rarity-oracle-lo),var(--rarity-oracle-c),var(--rarity-oracle-hi),var(--rarity-oracle-c),var(--rarity-oracle-lo))"></i></td></tr>
+        <tr><td>Archon</td><td>B</td><td>77</td><td><code>#b26bff · #f0dcff · #4a1a8f</code></td><td><i style="display:block;width:120px;height:24px;border-radius:6px;background:linear-gradient(145deg,var(--rarity-archon-lo),var(--rarity-archon-c),var(--rarity-archon-hi),var(--rarity-archon-c),var(--rarity-archon-lo))"></i></td></tr>
+        <tr><td>Arcanist</td><td>C</td><td>70</td><td><code>#2dd47a · #d1fae5 · #0b6636</code></td><td><i style="display:block;width:120px;height:24px;border-radius:6px;background:linear-gradient(145deg,var(--rarity-arcanist-lo),var(--rarity-arcanist-c),var(--rarity-arcanist-hi),var(--rarity-arcanist-c),var(--rarity-arcanist-lo))"></i></td></tr>
+        <tr><td>Initiate</td><td>D</td><td>1</td><td><code>#b5533a · #f0a58f · #5c2214</code></td><td><i style="display:block;width:120px;height:24px;border-radius:6px;background:linear-gradient(145deg,var(--rarity-initiate-lo),var(--rarity-initiate-c),var(--rarity-initiate-hi),var(--rarity-initiate-c),var(--rarity-initiate-lo))"></i></td></tr>
+      </tbody>
+    </table>
+    <p class="tag">Os limites de OVR são o padrão do código; o admin pode mudá-los em <code>settings.tierConfig</code>. As faixas de metal são uma aproximação; o metal real é a função <code>metal()</code>.</p>
+  </section>
+
+  <section>
+    <h2>Regiões</h2>
+    <div class="swatches">
+      <div class="sw"><i style="background:var(--team-accent-europa)"></i><b>europa</b><code>rgba(250,204,21,.60)</code></div>
+      <div class="sw"><i style="background:var(--team-accent-na)"></i><b>na</b><code>rgba(147,197,253,.60)</code></div>
+      <div class="sw"><i style="background:var(--team-accent-brasil)"></i><b>brasil</b><code>rgba(52,211,153,.55)</code></div>
+      <div class="sw"><i style="background:var(--team-accent-americasul)"></i><b>americasul</b><code>rgba(56,189,248,.60)</code></div>
+      <div class="sw"><i style="background:var(--team-accent-asia)"></i><b>asia</b><code>rgba(251,191,36,.55)</code></div>
+      <div class="sw"><i style="background:var(--team-accent-semtime)"></i><b>semtime</b><code>rgba(161,161,170,.50)</code></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Estados</h2>
+    <p class="lede">Ainda não são tokens: as telas usam a paleta do Tailwind direto.</p>
+    <div class="swatches">
+      <div class="sw"><i style="background:#fca5a5"></i><b>erro · red-300</b><code>19 usos</code></div>
+      <div class="sw"><i style="background:#6ee7b7"></i><b>sucesso · emerald-300</b><code>10 usos</code></div>
+      <div class="sw"><i style="background:#fcd34d"></i><b>destaque · amber-300</b><code>3 usos</code></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Tipografia</h2>
+    <div class="row">
+      <div class="cell" style="flex:1 1 320px">
+        <span class="tag">VALVE Pulp · font-display · títulos</span>
+        <span style="font-family:var(--font-display);font-size:30px;letter-spacing:.11em;text-transform:uppercase;color:var(--color-dl-text)">Tier List dos Times</span>
+        <code>pageTitle: font-display text-2xl sm:text-3xl font-extrabold tracking-[0.11em] text-dl-text uppercase</code>
+      </div>
+      <div class="cell" style="flex:1 1 320px">
+        <span class="tag">VALVE Oracle · base · todo o resto</span>
+        <span style="font-size:48px;font-weight:900;line-height:1">94</span>
+        <span style="font-size:20px;font-weight:900;letter-spacing:.12em;text-transform:uppercase">Nome do jogador</span>
+        <span style="font-size:15px;color:var(--platinum-mid)">Texto corrido, rótulos e números da carta.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Movimento</h2>
+    <div class="row">
+      <div class="cell"><span class="tag">Curva</span><code>--ease-out: cubic-bezier(0.23, 1, 0.32, 1)</code></div>
+      <div class="cell"><span class="tag">Clique</span><code>button:active → scale(0.97), 160ms</code></div>
+      <div class="cell"><span class="tag">Carta</span><code>tilt por mola (stiffness 220, damping 18), ±9° / ±11°</code></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Diretrizes</h2>
+    <p class="lede">Resumo da seção Visual do <code>AGENTS.md</code>, que é a fonte.</p>
+    <ul class="legend">
+      <li>Tailwind v4 no <code>className</code>; CSS próprio só para os efeitos das cartas, máscaras e keyframes.</li>
+      <li><code>flex</code> + <code>gap</code> para linhas e colunas; <code>grid</code> só para 2D de verdade. Espaço entre irmãos é gap, nunca margin.</li>
+      <li>Superfícies <code>zinc</code>, <code>noir-glass</code> e <code>noir-glass-strong</code> antes de criar outra. Cor reutilizada vira token em <code>@theme</code>.</li>
+      <li>Poucas bordas: separe com contraste, espaço e sombra.</li>
+      <li>Todo controle tem hover, focus-visible, active e disabled. Alvo de toque de 44 px no celular.</li>
+      <li>Movimento com propósito, menos de 300 ms, só transform/opacity, respeitando <code>prefers-reduced-motion</code>.</li>
+      <li>Funciona a 375 px sem scroll horizontal.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
