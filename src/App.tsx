@@ -269,7 +269,8 @@ function Shell() {
 
   return (
     <>
-      <RitualBackground color={TAB_AREA[tab] && areaTier(TAB_AREA[tab]).c} />
+      {/* luz do fundo: a Home pega o azul de Times e Times fica no bege do site; as outras abas, a cor da área */}
+      <RitualBackground color={tab === "home" ? areaTier("teams").c : tab === "teams" ? undefined : TAB_AREA[tab] && areaTier(TAB_AREA[tab]).c} />
       {/* cabeçalho sem caixa: no topo é transparente; rolando, uma sombra escura desce atrás dele para o menu seguir legível */}
       <header className="sticky top-0 z-40">
         <ScrollShade />
