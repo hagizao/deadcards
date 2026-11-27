@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "motion/react";
 import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
 import { ProfileSkeleton } from "../components/Skeleton";
 import { Achievements } from "../components/Achievements";
@@ -12,7 +13,9 @@ import { MAX_FAVORITES, PROFILE_CARD_PATH, PROFILE_NAME_MAX, profilePlayer, prof
 import { getCardTier } from "../lib/rarity";
 import { useMyCards } from "../lib/myCards";
 import type { Player } from "../lib/types";
-import { field, pageTitle, pill, primaryBtn } from "../lib/ui";
+import { easeOut, field, pageTitle, pill, primaryBtn } from "../lib/ui";
+import { cascade, useSettled } from "../lib/motion";
+import { CountUp, FillBar } from "../components/Motion";
 
 const S = strings({
   pt: {
@@ -147,11 +150,11 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
             </div>
             {copy && <p role="status" className={`text-sm ${copy === "copied" ? "text-emerald-300" : "text-red-300"}`}>{t[copy]}</p>}
           </div>
-          <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible />
+          <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />
         </div>
       )}
 
-      {editing && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible />}
+      {editing && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />}
       <ProfileFavorites ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} />
       <ProfileCards ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} onRedeem={onRedeem} />
     </section>
@@ -192,12 +195,17 @@ function ProfileFavorites({ ids, profileFavorites, owner, onOpenCard }: { ids: s
       </h2>
       {pinned.length ? (
         <ul className="flex flex-wrap justify-center gap-6">
-          {pinned.map((player) => (
-            <li key={player.id} className="relative drop-shadow-[0_0_28px_rgb(252_211_77/0.35)]">
-              <Card player={player} onOpen={() => onOpenCard(player.id)} />
-              <FavoriteStar label={t.favorites} />
-            </li>
-          ))}
+          {/* marcar ou desmarcar uma favorita no destaque faz a carta pular para cá (ou sair) e as outras abrirem espaço */}
+          <AnimatePresence mode="popLayout">
+            {pinned.map((player) => (
+              <motion.li key={player.id} layout className="relative drop-shadow-[0_0_28px_rgb(252_211_77/0.35)]"
+                initial={{ opacity: 0, y: 24, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 260, damping: 22 }}>
+                <Card player={player} onOpen={() => onOpenCard(player.id)} />
+                <FavoriteStar label={t.favorites} />
+              </motion.li>
+            ))}
+          </AnimatePresence>
         </ul>
       ) : <p className="text-sm text-zinc-400">{t.favoritesHint}</p>}
     </section>
@@ -210,6 +218,7 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
   const [q, setQ] = useState("");
   const [rarity, setRarity] = useState<string>();
   const [limit, setLimit] = useState(PAGE);
+  const settled = useSettled();
   const favorites = useFavorites(profileFavorites, owner);
   const query = useDeferredValue(q.trim().toLowerCase());
 
@@ -234,11 +243,11 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
             <div className="flex min-w-48 flex-1 flex-col gap-2">
               <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.progress}</span>
               <div className="flex flex-wrap items-baseline gap-x-3">
-                <span className="font-display text-3xl font-black text-dl-text tabular-nums">{summary.percent}%</span>
+                <span className="font-display text-3xl font-black text-dl-text tabular-nums"><CountUp value={summary.percent} delay={0.15} />%</span>
                 <span className="text-sm text-zinc-400">{t.catalog(summary.cards.length, summary.total)}</span>
               </div>
               <div role="progressbar" aria-label={t.progress} aria-valuenow={summary.percent} aria-valuemin={0} aria-valuemax={100} className="h-1.5 rounded-full bg-zinc-800">
-                <div className="h-full rounded-full bg-dl-text" style={{ width: `${summary.percent}%` }} />
+                <FillBar pct={summary.percent} delay={0.15} className="h-full rounded-full" barClassName="bg-dl-text" />
               </div>
             </div>
             {summary.best && (
@@ -269,11 +278,12 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
               <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder={t.searchPlaceholder} aria-label={t.search} className={`${field} w-full sm:max-w-sm`} />
               {list.length ? (
                 <ul className="flex flex-wrap justify-center gap-6 sm:justify-start">
-                  {list.slice(0, limit).map((player) => (
-                    <li key={player.id} className="relative">
+                  {list.slice(0, limit).map((player, i) => (
+                    <motion.li key={player.id} className="relative" initial={{ opacity: 0, y: settled ? 0 : 16 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: settled ? 0.2 : 0.35, ease: easeOut, delay: settled ? 0 : cascade(i) }}>
                       <Card player={player} variant="medium" onOpen={() => onOpenCard(player.id)} />
                       {favorites.includes(player.id) && <FavoriteStar label={t.favorites} />}
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               ) : <p role="status" className="text-sm text-zinc-400">{t.noResults}</p>}
