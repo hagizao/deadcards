@@ -102,9 +102,10 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
 
       <div className="flex flex-col gap-2 py-2 lg:flex-row lg:items-center lg:gap-8">
         <div className="relative z-20 order-2 flex flex-col gap-5 lg:order-1 lg:w-[40%] lg:shrink-0">
-          {/* título da Home: maior que o das abas, em branco, com o nome do jogo na cor da área */}
-          <h1 id="home-stage" className="font-display text-3xl/tight font-extrabold tracking-widest text-balance text-dl-text uppercase title-depth sm:text-4xl/tight">
-            {t.title[0]}<span className="text-area">{t.title[1]}</span>{t.title[2]}
+          {/* título da Home como abertura: uma linha discreta com traço, e o nome do jogador embaixo é a manchete */}
+          <h1 id="home-stage" className="flex items-center gap-3 font-display text-sm/snug font-extrabold tracking-[0.22em] text-zinc-300 uppercase sm:text-base/snug">
+            <span aria-hidden="true" className="h-0.5 w-8 shrink-0 rounded-full bg-area shadow-[0_0_10px_var(--color-area)] sm:w-10" />
+            <span className="text-balance">{t.title[0]}<span className="text-area title-depth">{t.title[1]}</span>{t.title[2]}</span>
           </h1>
 
           <AnimatePresence mode="wait" initial={false}>
@@ -176,19 +177,21 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
         <motion.div
           aria-label={t.carousel}
           role="group"
-          className="relative order-1 h-[470px] w-full perspective-[1400px] lg:order-2 lg:h-[520px] lg:flex-1 lg:mask-[linear-gradient(to_right,transparent,#000_24%,#000_86%,transparent)]"
+          className="relative order-1 h-[470px] w-full lg:order-2 lg:h-[520px] lg:flex-1"
           drag={n > 1 ? "x" : false}
           dragSnapToOrigin
           dragElastic={0.15}
           onDragEnd={(_, info) => { if (info.offset.x < -50) pick(at + 1); else if (info.offset.x > 50) pick(at - 1); }}
         >
+          {/* a máscara das laterais fica numa camada mais alta que o palco: o brilho das cartas cabe nela e não é cortado em linha reta */}
+          <div className="pointer-events-none absolute inset-x-0 -inset-y-16 perspective-[1400px] lg:mask-[linear-gradient(to_right,transparent,#000_24%,#000_86%,transparent)]">
           {cards.map((c, i) => {
             const d = offset(i, at, n);
             const far = Math.abs(d);
             return (
               <motion.div
                 key={c.id}
-                className="absolute top-1/2 left-1/2"
+                className="pointer-events-auto absolute top-1/2 left-1/2"
                 style={{ zIndex: 10 - far, translate: "-50% -50%" }}
                 initial={false}
                 animate={{ x: `${d * 56}%`, rotateY: -d * 24, z: -far * 140, scale: 1 - far * 0.1, opacity: far > 2 ? 0 : 1 - far * 0.2 }}
@@ -207,6 +210,7 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
               </motion.div>
             );
           })}
+          </div>
         </motion.div>
       </div>
     </section>
