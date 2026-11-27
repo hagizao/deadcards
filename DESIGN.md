@@ -57,6 +57,9 @@ Fonte do design system: `src/index.css` (tokens `@theme`, `noir-glass`, `noir-gl
 - 2026-11-27 — Home nova, pensada para quem não conhece o competitivo (pedido do dono: acolhedora, sem cara de loja e sem "ao vivo"): palco 3D com as cartas em destaque em arco (a ativa no centro; ao lado quem é o jogador: time, região, função explicada, herói de assinatura e dois pontos fortes) → boas-vindas (3 passos para quem chega; progresso da coleção para quem entrou) → "Como ler uma carta" (carta real numerada + atributos e raridades explicados) → "Quem faz o quê" (as 5 funções com os 3 maiores OVR de cada) → "Chegaram agora" → ranking dos times → Explore. Substitui a vitrine em leque. Código em `src/views/home/`.
 - 2026-11-27 — O palco gira sozinho a cada 7 s, pausa com mouse ou foco e para de vez quando a pessoa escolhe uma carta; sem autoplay com reduced motion.
 
+- 2026-11-27 — Fundo do site = "ritual de longe" (`src/lib/ritualBackdrop.ts`): redemoinho achatado sobre uma cidade art déco, olho com sigilo, feixe até a torre, almas subindo e relâmpagos raros, na cor da aba; véu escuro por cima para o texto ler bem — escolhido entre 4 protótipos (`explorations/fundos/`). Substitui a imagem de fundo do Editor, que saiu.
+- 2026-11-27 — Linguagem art déco: título de seção com leque, losango e linha (`deco-title`); perfil como dossiê (foto 3×4 carimbada, número da ficha em `font-typewriter`, arte do herói da carta atrás na cor da raridade, "almas recolhidas", conquistas em insígnias escalonadas, favoritas numa vitrine iluminada); Comparar com os lados Âmbar e Safira, as cores dos dois times do jogo.
+
 ## Perguntas abertas
 - Celular fraco aguenta a maleta 3D? Hoje ela cai para 1x pixel e sem bloom quando os primeiros quadros passam de 25 ms; falta testar num aparelho real.
 - A tarefa principal é achar e mostrar a sua carta ou a do streamer? (assumido) A Home mostra o progresso da coleção para quem entrou, mas ainda não a "sua carta".

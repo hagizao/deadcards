@@ -18,6 +18,8 @@
 
 /* Tokens do Deadlock (Panorama citadel_base_styles.css): offWhite, offBlack e o degradê do .ButtonBevel */
 @theme {
+  /* rótulo de dossiê, com cara de máquina de escrever */
+  --font-typewriter: 'Courier Prime', 'Courier New', Courier, monospace;
   --font-display: 'VALVE Pulp', 'VALVE Oracle', ui-sans-serif, system-ui, sans-serif;
   --color-dl-text: #ffefd7;
   /* cor da área atual (lib/areas.ts troca por aba); fora de uma área, o bege do site */
@@ -33,6 +35,9 @@
   --color-ach-silver: #d6dee8;
   --color-ach-gold: #f5c84b;
   --color-ach-diamond: #8ff3ff;
+  /* os dois times do jogo, nos lados do Comparar */
+  --color-amber-hand: #ff9a3c;
+  --color-sapphire: #5b9bff;
   /* dia em que o Brasil joga no calendário da Home */
   --color-br-green: #00b84a;
   --color-br-yellow: #ffd400;
@@ -78,6 +83,33 @@
 }
 
 /* volume da logo: sombras encadeadas seguem o contorno da imagem e formam a "espessura"; a última é a sombra no chão */
+/* título de seção art déco: um leque de raios antes do texto e, depois, o losango da marca puxando uma linha que some */
+@utility deco-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  &::before {
+    content: "";
+    flex: none;
+    width: 1.4em;
+    height: 0.8em;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M12 14L24 14M12 14L19.9 10.7M12 14L20.5 5.5M12 14L15.3 6.1M12 14L12 2M12 14L8.7 6.1M12 14L3.5 5.5M12 14L4.1 10.7M12 14L0 14' stroke='%23000' stroke-width='1.3'/%3E%3Cpath d='M8 14a4 4 0 0 1 8 0z' fill='%23000'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  &::after {
+    content: "";
+    flex: 1 1 0;
+    min-width: 2rem;
+    max-width: 10rem;
+    height: 0.5em;
+    background: linear-gradient(to right, currentColor, transparent);
+    opacity: 0.6;
+    mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0L10 5L5 10L0 5z'/%3E%3C/svg%3E") left center / 0.5em 0.5em no-repeat,
+      linear-gradient(#000, #000) 0.8em 50% / 100% 1px no-repeat;
+  }
+}
+
 @utility logo-3d {
   filter: drop-shadow(0 1px 0 #b8a98f) drop-shadow(0 1px 0 #8f8370) drop-shadow(0 2px 0 #6b6254) drop-shadow(0 10px 12px rgb(0 0 0 / 0.55));
 }
@@ -302,8 +334,21 @@
   box-shadow: none;
   animation: none;
 }
-.ach-medal { color: var(--ach-c); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ach-c) 55%, transparent), 0 0 14px color-mix(in srgb, var(--ach-c) 30%, transparent); }
-.ach-tile[data-locked] .ach-medal { color: color-mix(in srgb, var(--ach-c) 35%, #52525b); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ach-c) 18%, transparent); }
+.ach-medal { color: var(--ach-c); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--ach-c) 35%, transparent)); }
+.ach-tile[data-locked] .ach-medal { color: color-mix(in srgb, var(--ach-c) 35%, #52525b); filter: none; }
+/* insígnia escalonada (art déco): a moldura é o metal da raridade, o miolo é escuro */
+.ach-badge {
+  --deco-step: polygon(30% 0, 70% 0, 70% 8%, 92% 8%, 92% 30%, 100% 30%, 100% 70%, 92% 70%, 92% 92%, 70% 92%, 70% 100%, 30% 100%, 30% 92%, 8% 92%, 8% 70%, 0 70%, 0 30%, 8% 30%, 8% 8%, 30% 8%);
+  background: var(--ach-border);
+  clip-path: var(--deco-step);
+}
+.ach-badge::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: radial-gradient(circle at 50% 30%, #1d1d22, #09090b 70%);
+  clip-path: var(--deco-step);
+}
 @keyframes achShine { to { background-position: 0 0, 300% 0; } }
 /* conquista nova desde a última visita: a medalha pula e solta um anel na cor da raridade, duas vezes */
 .ach-fresh { animation: achPop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 400ms both; }
@@ -311,7 +356,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: inherit;
+  border-radius: 30%;
   border: 2px solid var(--ach-c);
   pointer-events: none;
   animation: achRing 900ms var(--ease-out) 600ms 2 both;
@@ -435,4 +480,47 @@ select { color-scheme: dark; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ritual-grain { animation: none; }
+}
+
+/* dossiê do perfil: carimbo sobre a foto, arte do herói atrás da ficha e a vitrine das favoritas */
+.dossier-stamp {
+  padding: 0.1rem 0.35rem;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  color: color-mix(in srgb, var(--color-area) 85%, #fff);
+  font: 700 0.625rem/1.2 var(--font-typewriter);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: rgb(9 9 11 / 0.6);
+}
+.dossier-hero {
+  opacity: 0.5;
+  mask-image: radial-gradient(closest-side at 50% 40%, #000 35%, transparent 100%);
+}
+.dossier-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--hero-c);
+  mix-blend-mode: color;
+}
+.dossier-showcase::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60% 55% at 50% 0%, rgb(252 211 77 / 0.16), transparent 70%),
+    radial-gradient(50% 12% at 50% 100%, rgb(252 211 77 / 0.2), transparent 80%);
+}
+
+/* Comparar: cada lado acende de leve na cor do seu time (Âmbar ou Safira), atrás da carta */
+.side-glow::before {
+  content: "";
+  position: absolute;
+  inset: 3rem -1rem 0;
+  z-index: -1;
+  background: radial-gradient(55% 45% at 50% 45%, color-mix(in srgb, var(--side) 38%, transparent), transparent 75%);
+  pointer-events: none;
 }
