@@ -56,7 +56,7 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
 
   return (
     <section className="space-y-5">
-      <div className="noir-glass flex flex-col justify-between gap-4 rounded-2xl p-5 sm:p-7 lg:flex-row lg:items-center">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div>
           <h1 className={pageTitle}>Tier List</h1>
           <p className="mt-1.5 text-xs text-zinc-400">{mode === "players" ? tr.rankedPlayers(rankedPlayers.length) : tr.rankedTeams(rankedTeams.length)}</p>
@@ -72,7 +72,7 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
         </div>
       </div>
 
-      <div className="tierlist-board overflow-hidden rounded-xl">
+      <div className="tierlist-board">
         {cfg.map((tier, row) => {
           const rowDelay = settled ? 0 : row * 0.07;
           const pItems = mode === "players" ? rankedPlayers.filter((x) => tierKeyForOvr(x.ovr, cfg) === tier.key) : [];

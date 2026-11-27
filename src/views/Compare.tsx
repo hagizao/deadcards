@@ -76,7 +76,7 @@ export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
 
   return (
     <section className="space-y-6">
-      <div className="noir-glass rounded-2xl p-5 sm:p-7">
+      <div>
         <h1 className={pageTitle}>{t.title}</h1>
         <p className="mt-1.5 text-xs text-zinc-400">{t.subtitle}</p>
       </div>
@@ -95,7 +95,7 @@ export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
                 </div>
               </>
             ) : (
-              <div className="flex aspect-295/430 items-center justify-center rounded-2xl bg-zinc-900/60 p-4 text-center text-xs text-zinc-400">{t.empty}</div>
+              <div className="flex aspect-295/430 items-center justify-center rounded-2xl border-2 border-dashed border-zinc-200/15 p-4 text-center text-xs text-zinc-400">{t.empty}</div>
             )}
           </div>
         ))}
@@ -106,7 +106,7 @@ export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
       </div>
 
       {left && right && (
-        <div className="noir-glass grid gap-6 rounded-2xl p-5 sm:p-7 md:grid-cols-2">
+        <div className="grid gap-6 border-t border-zinc-200/15 pt-6 md:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-4">
             <h2 className="text-sm font-extrabold tracking-widest text-zinc-100 uppercase">{t.attributes}</h2>
             <table className="w-full table-fixed text-center">

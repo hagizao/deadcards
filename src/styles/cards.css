@@ -732,16 +732,18 @@
     /* ==========================================================================
        4C. TEMÁTICA DA TIER LIST (ESTILO TIERMAKER CLÁSSICO + DARK ROSTER)
        ========================================================================== */
+    /* sem caixa: as faixas são separadas pela mesma linha fina da Home (zinc-200/15) */
     .tierlist-board {
-      background-color: #141417;
-      border: 2px solid #09090b;
-      box-shadow: 0 22px 50px rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
     }
 
     .tierlist-row {
       display: flex;
       flex-direction: column;
-      border-bottom: 2px solid #09090b;
+      gap: 0.75rem;
+      padding-block: 0.75rem;
+      border-bottom: 1px solid rgb(228 228 231 / 0.15);
     }
 
     @media (min-width: 640px) {
@@ -761,7 +763,7 @@
       align-items: center;
       justify-content: center;
       color: #18181b;
-      border-bottom: 2px solid #09090b;
+      border-radius: 0.75rem;
       user-select: none;
     }
 
@@ -769,15 +771,12 @@
       .tierlist-label-cell {
         width: 118px;
         min-width: 118px;
-        border-bottom: none;
-        border-right: 2px solid #09090b;
       }
     }
 
     .tierlist-content-cell {
       flex: 1;
-      background-color: #141417;
-      padding: 12px;
+      padding: 0;
       display: flex;
       flex-wrap: wrap;
       align-items: center;

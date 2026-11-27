@@ -137,7 +137,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
 
   return (
     <section className="space-y-5">
-      <div className="noir-glass space-y-4 rounded-2xl p-5 sm:p-7">
+      <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className={pageTitle}>{mine ? t.mine : t.all}</h1>

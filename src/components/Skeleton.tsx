@@ -8,7 +8,7 @@ export function ProfileSkeleton({ label }: { label: string }) {
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       <p role="status" className="sr-only">{label}</p>
-      <div className="noir-glass flex flex-col items-center gap-5 rounded-2xl p-4 sm:p-6 lg:w-fit lg:shrink-0">
+      <div className="flex flex-col items-center gap-5 lg:w-fit lg:shrink-0">
         <div className="flex w-full items-center gap-3">
           <div aria-hidden="true" className="skeleton size-12 shrink-0 rounded-xl sm:size-14" />
           <div className="flex flex-1 flex-col gap-2">
@@ -18,7 +18,7 @@ export function ProfileSkeleton({ label }: { label: string }) {
         </div>
         <CardSkeleton />
       </div>
-      <div className="noir-glass flex flex-1 flex-col gap-4 rounded-2xl p-4 sm:p-6">
+      <div className="flex flex-1 flex-col gap-4 border-t border-zinc-200/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
         <div aria-hidden="true" className="skeleton h-7 w-48 rounded-md" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }, (_, i) => <div key={i} aria-hidden="true" className="skeleton h-20 rounded-xl" />)}

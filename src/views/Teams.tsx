@@ -56,7 +56,7 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
 
   return (
     <section className="space-y-6">
-      <div className="noir-glass space-y-4 rounded-2xl p-5 sm:p-7">
+      <div className="space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className={pageTitle}>{t.title}</h1>
@@ -82,7 +82,7 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
         </div>
       </div>
 
-      {visible.length === 0 && <div className="noir-glass rounded-2xl p-10 text-center text-sm text-zinc-300">{t.noTeams}</div>}
+      {visible.length === 0 && <div className="py-10 text-center text-sm text-zinc-300">{t.noTeams}</div>}
 
       {visible.map(({ team, o }, i) => {
         const roster = activeRoster(players, team.id);
@@ -102,7 +102,7 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
             <TeamHeader team={team} open={isOpen} onClick={() => setOpen((s) => ({ ...s, [team.id]: !s[team.id] }))}>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="team-title-text font-display text-xl/tight font-extrabold tracking-wider text-dl-text uppercase transition-[color,text-shadow] duration-200 sm:text-2xl/tight">{team.name}</h2>
+                  <h2 className="team-title-text font-display text-xl/tight font-extrabold tracking-wider text-area uppercase transition-[color,text-shadow] duration-200 sm:text-2xl/tight">{team.name}</h2>
                   <span className="team-ovr-chip">
                     <span className="team-ovr-num">{o.count ? o.rounded : "--"}</span>
                     <span className="team-ovr-lbl">OVR</span>

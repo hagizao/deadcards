@@ -63,7 +63,7 @@ export function UniversalCollection({ onEdit }: { onEdit: (id: string) => void }
   const pct = (n: number) => (accounts ? `${((n / accounts) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "–");
 
   return (
-    <div className="noir-glass flex flex-col gap-5 rounded-3xl p-5 sm:p-7">
+    <div className="flex flex-col gap-5 border-t border-zinc-200/15 pt-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-extrabold tracking-[0.12em] text-zinc-100 uppercase">Coleção universal</h2>

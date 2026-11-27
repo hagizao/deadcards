@@ -103,7 +103,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
           <h2 id="home-ranking" className={sectionTitle}>{t.ranking}</h2>
           {ranked.length > RANKING && <button type="button" className={pill(false)} onClick={() => onNavigate("teams")}>{t.allTeams(ranked.length)}</button>}
         </Reveal>
-        {ranked.length === 0 && <div className="noir-glass rounded-2xl p-6 text-sm text-zinc-300">{t.none}</div>}
+        {ranked.length === 0 && <div className="py-6 text-sm text-zinc-300">{t.none}</div>}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {ranked.slice(0, RANKING).map((r, idx) => (
             <TeamRow
