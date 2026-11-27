@@ -1,23 +1,25 @@
 import { motion } from "motion/react";
-import type { CSSProperties } from "react";
-import type { Player, Team } from "../lib/types";
+import type { Team } from "../lib/types";
 import { useData } from "../lib/data";
 import { getPlayerOvr, isMainCard, regionClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
-import { Card } from "../components/Card";
 import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
 import { Icon } from "../components/Icon";
-import { easeOut, pageTitle, pill } from "../lib/ui";
+import { easeOut, pill } from "../lib/ui";
 import { cascade } from "../lib/motion";
 import { Reveal } from "../components/Motion";
+import { Stage } from "./home/Stage";
+import { Welcome } from "./home/Welcome";
+import { CardGuide } from "./home/CardGuide";
+import { Roles } from "./home/Roles";
+import { NewCards } from "./home/NewCards";
 
 export type Area = "teams" | "tierlist" | "collection" | "compare" | "redeem";
 
 const S = strings({
   pt: {
-    featured: "Cartas em destaque", picked: "Escolhidas pela equipe", top: "As maiores OVR",
     explore: "Explore", ranking: "Ranking dos times", allTeams: (n: number) => `Ver os ${n} times`,
     none: "Nenhum time cadastrado ainda.", players: (n: number) => `${n} ${n === 1 ? "jogador" : "jogadores"}`,
     areas: {
@@ -30,7 +32,6 @@ const S = strings({
     meta: { teams: (n: number) => `${n} times`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cartas`, compare: () => "1 contra 1", redeem: () => "Precisa entrar" },
   },
   en: {
-    featured: "Featured cards", picked: "Picked by the team", top: "Highest OVR",
     explore: "Explore", ranking: "Team ranking", allTeams: (n: number) => `See all ${n} teams`,
     none: "No teams registered yet.", players: (n: number) => `${n} ${n === 1 ? "player" : "players"}`,
     areas: {
@@ -43,7 +44,6 @@ const S = strings({
     meta: { teams: (n: number) => `${n} teams`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cards`, compare: () => "1 vs 1", redeem: () => "Sign-in needed" },
   },
   es: {
-    featured: "Cartas destacadas", picked: "Elegidas por el equipo", top: "Los OVR más altos",
     explore: "Explora", ranking: "Ranking de equipos", allTeams: (n: number) => `Ver los ${n} equipos`,
     none: "Aún no hay equipos registrados.", players: (n: number) => `${n} ${n === 1 ? "jugador" : "jugadores"}`,
     areas: {
@@ -60,9 +60,6 @@ const S = strings({
 const AREAS: Area[] = ["teams", "tierlist", "collection", "compare", "redeem"];
 const FEATURED = 5;
 const RANKING = 4;
-
-// no leque (xl) a primeira escolhida fica no centro e as seguintes alternam esquerda/direita: 0 → 0, 1 → -1, 2 → 1, 3 → -2, 4 → 2
-const fanOffset = (i: number) => (i % 2 ? -(i + 1) / 2 : i / 2);
 
 export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (teamId: string) => void; onOpenCard: (id: string) => void; onNavigate: (area: Area) => void }) {
   const { teams, players, settings, me } = useData();
@@ -87,29 +84,13 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
   };
 
   return (
-    <div className="flex flex-col gap-10">
-      {featured.length > 0 && (
-        <section className="noir-glass relative flex flex-col gap-6 overflow-hidden rounded-3xl py-5 sm:py-8" aria-labelledby="home-featured">
-          {/* a capa assenta devagar enquanto as cartas são distribuídas */}
-          {settings.homeHero && <motion.img src={settings.homeHero} alt="" className="pointer-events-none absolute inset-0 size-full object-cover opacity-20" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 1.4, ease: easeOut }} />}
-          <div className="relative flex flex-col gap-1 px-5 sm:px-8">
-            <span className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">{picked.length ? t.picked : t.top}</span>
-            <h1 id="home-featured" className={pageTitle}>{t.featured}</h1>
-          </div>
-          <Fan cards={featured} onOpenCard={onOpenCard} />
-        </section>
-      )}
+    <div className="flex flex-col gap-14">
+      <Stage cards={featured} onOpenCard={onOpenCard} onOpenTeam={onOpenTeam} />
+      <Welcome onNavigate={onNavigate} />
+      {featured[0] && <CardGuide sample={featured[0]} />}
+      <Roles onOpenCard={onOpenCard} />
+      <NewCards onOpenCard={onOpenCard} />
 
-      <section className="flex flex-col gap-4" aria-labelledby="home-explore">
-        <Reveal><h2 id="home-explore" className={sectionTitle}>{t.explore}</h2></Reveal>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {AREAS.map((a, i) => (
-            <Reveal key={a} delay={cascade(i, 0.06)} className="flex flex-col">
-              <AreaTile title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />
-            </Reveal>
-          ))}
-        </div>
-      </section>
 
       <section className="flex flex-col gap-4" aria-labelledby="home-ranking">
         <Reveal className="flex flex-wrap items-center justify-between gap-3">
@@ -130,29 +111,22 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
           ))}
         </div>
       </section>
+
+      <section className="flex flex-col gap-4" aria-labelledby="home-explore">
+        <Reveal><h2 id="home-explore" className={sectionTitle}>{t.explore}</h2></Reveal>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {AREAS.map((a, i) => (
+            <Reveal key={a} delay={cascade(i, 0.06)} className="flex flex-col">
+              <AreaTile title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />
+            </Reveal>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
 
 const sectionTitle = "font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase sm:text-2xl";
-
-function Fan({ cards, onOpenCard }: { cards: Player[]; onOpenCard: (id: string) => void }) {
-  return (
-    <div className="relative flex snap-x snap-mandatory items-center justify-center-safe gap-2 overflow-x-auto overflow-y-hidden px-5 py-8 sm:px-8 xl:items-end xl:gap-0 xl:overflow-visible xl:px-4">
-      {cards.map((p, i) => {
-        const k = fanOffset(i);
-        return (
-          <div key={p.id} className="shrink-0 snap-center xl:order-(--fo) xl:translate-y-(--fy) xl:rotate-(--fr)" style={{ "--fo": k, "--fr": `${k * 3}deg`, "--fy": `${Math.abs(k) * 12}px` } as CSSProperties}>
-            {/* as cartas são distribuídas do centro para as pontas */}
-            <motion.div initial={{ opacity: 0, y: 48, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 200, damping: 22, delay: 0.1 + Math.abs(k) * 0.09 }}>
-              <Card player={p} variant={k === 0 ? "team" : "medium"} onOpen={() => onOpenCard(p.id)} />
-            </motion.div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function AreaTile({ title, text, meta, onClick }: { title: string; text: string; meta: string | null; onClick: () => void }) {
   return (

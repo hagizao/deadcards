@@ -3,6 +3,7 @@ const PATHS = {
   "chevron-down": "m6 9 6 6 6-6",
   "chevron-up": "m6 15 6-6 6 6",
   "chevron-right": "m9 5 7 7-7 7",
+  "chevron-left": "m15 5-7 7 7 7",
   "arrow-down": "M12 5v14m-6-6 6 6 6-6",
   check: "m5 12 5 5 9-10",
   "arrow-up": "M12 19V5m-6 6 6-6 6 6",
