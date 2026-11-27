@@ -260,10 +260,10 @@ function BrazilTag({ text }: { text: string }) {
 }
 
 /** Link pequeno para assistir: cabe dois lado a lado no painel do dia. */
-// transmissão oficial em vermelho (YouTube), watchparty em roxo: dá para diferenciar de relance
+// transmissão oficial no tom neutro do site; a watchparty do Hagizao em vermelho, para se destacar
 const WATCH_TONE = {
-  play: "bg-red-600/30 text-red-50 hover:bg-red-600/50 active:bg-red-600/60",
-  users: "bg-violet-500/30 text-violet-50 hover:bg-violet-500/50 active:bg-violet-500/60",
+  play: "bg-zinc-100/8 text-dl-text hover:bg-zinc-100/15 hover:text-white active:bg-zinc-100/20",
+  users: "bg-red-600/30 text-red-50 hover:bg-red-600/50 active:bg-red-600/60",
 } as const;
 
 function WatchLink({ href, icon, text }: { href: string; icon: keyof typeof WATCH_TONE; text: string }) {
