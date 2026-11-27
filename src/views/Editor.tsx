@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, useData } from "../lib/data";
 import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, isRetired, ALT_HERO_DROP } from "../lib/cards";
+import { asPlayedHero, playedStats } from "../lib/cardKinds";
 import { FRAME_PRESETS, RARITY_TIERS, getCardTier, type Tier } from "../lib/rarity";
 import { RARITY_KEYS, rarityKeyOf, type RarityKey } from "../lib/rarityBands";
 import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
@@ -155,7 +156,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
   const base = !existing && versionOf ? players.find((p) => p.id === versionOf) : undefined;
   const [d, setD] = useState<Player>(() => {
     if (existing) return structuredClone({ ...existing, ovr: getPlayerOvr(existing) });
-    if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, altHero: undefined, history: [], inactive: undefined, exclusive: undefined, special: true };
+    if (base) return { ...structuredClone(base), ovr: getPlayerOvr(base), id: "", variantOf: base.id, altHero: undefined, history: [], inactive: undefined, exclusive: undefined };
     return blankPlayer(teams[0]?.id ?? "");
   });
   const [date, setDate] = useState(today);
@@ -168,14 +169,16 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
   // heróis com carta aposentada: marcar de novo reativa a mesma carta
   const retired = new Set(existing && isMainCard(existing) ? altsOf(existing.id).filter(isRetired).map((c) => c.hero) : []);
   const { busy, msg, run } = useSaver(reload);
-  const set = (patch: Partial<Player>) => setD((p) => ({ ...p, ...patch }));
+  // toda mudança passa pela regra do herói jogado: versão comum com outro herói no mesmo time fica 2 abaixo da principal
+  const set = (patch: Partial<Player>) => setD((p) => asPlayedHero({ ...p, ...patch }, players));
+  const isPlayed = !!asPlayedHero(d, players).altHero;
   const setStat = (k: keyof Stats, v: number) => setD((p) => { const stats = { ...p.stats, [k]: v }; return { ...p, stats, ovr: calculateOVR(stats) }; });
   const preview = withHistory({ ...d, name: d.name || "NOVO JOGADOR" }, date, rebase);
   const frame = d.frame ?? { style: "deco" };
 
   const save = () => {
     const id = d.id || newId("p");
-    const body = { ...preview, id, name: d.name.trim() || "NOVO JOGADOR", footer: d.footer?.trim().slice(0, 30), specialText: d.special ? d.specialText?.trim().slice(0, 400) : undefined, frame: d.special ? frame : undefined };
+    const body = { ...asPlayedHero(preview, players), id, name: d.name.trim() || "NOVO JOGADOR", footer: d.footer?.trim().slice(0, 30), specialText: d.special ? d.specialText?.trim().slice(0, 400) : undefined, frame: d.special ? frame : undefined };
     run(async () => {
       await api.save("players", id, body);
       if (isMainCard(body)) await syncPlayed(body);
@@ -185,8 +188,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
   };
   // cria, apaga e atualiza as cartas de heróis jogados para ficarem iguais à seleção, tudo ALT_HERO_DROP abaixo da principal
   const syncPlayed = async (main: Player) => {
-    const ovr = Math.max(1, getPlayerOvr(main) - ALT_HERO_DROP);
-    const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Math.max(1, main.stats[k] - ALT_HERO_DROP)])) as Stats;
+    const { stats, ovr } = playedStats(main) as { stats: Stats; ovr: number };
     const have = altsOf(main.id);
     // primeiro cria, reativa e atualiza; só depois tira as desmarcadas, para uma falha não deixar a seleção pela metade
     for (const hero of played) {
@@ -332,13 +334,16 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
           )}
         </div>
 
+        {isPlayed && (
+          <p className="text-xs text-amber-200">Carta de herói jogado: atributos e OVR ficam {ALT_HERO_DROP} abaixo da principal e acompanham quando ela muda. Para valores próprios, marque Carta especial.</p>
+        )}
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-          {STAT_KEYS.map((k) => <Range key={k} label={k} value={d.stats[k]} min={1} max={99} onChange={(v) => setStat(k, v)} />)}
+          {STAT_KEYS.map((k) => <Range key={k} label={k} value={d.stats[k]} min={1} max={99} disabled={isPlayed} onChange={(v) => setStat(k, v)} />)}
         </div>
 
         <div className="grid items-end gap-4 sm:grid-cols-3">
           <Field label={`OVR (média ${calculateOVR(d.stats)})`}>
-            <input type="number" min={1} max={99} className={input} value={d.ovr ?? ""} onChange={(e) => set({ ovr: Number(e.target.value) })} />
+            <input type="number" min={1} max={99} className={`${input} disabled:cursor-not-allowed disabled:opacity-40`} disabled={isPlayed} value={d.ovr ?? ""} onChange={(e) => set({ ovr: Number(e.target.value) })} />
           </Field>
           <label className="flex items-center gap-2 pb-2.5 text-sm text-zinc-300 sm:col-span-2">
             <input type="checkbox" checked={rebase} onChange={(e) => setRebase(e.target.checked)} className="accent-zinc-100" />

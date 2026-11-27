@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { activeRoster, cardVersions, isAltHero, isRosterCard } from "../src/lib/cards";
+import { asPlayedHero } from "../src/lib/cardKinds";
 import type { Player } from "../src/lib/types";
 
 const card = (id: string, teamId: string, extra: Partial<Player> = {}) =>
@@ -61,5 +62,31 @@ describe("cardVersions", () => {
 
   it("chamada por uma versão devolve o mesmo grupo", () => {
     expect(ids("sp")).toEqual(["main", "sp"]);
+  });
+});
+
+describe("Versão com outro herói vira herói jogado", () => {
+  const stats = { MIR: 89, MAC: 88, SUP: 84, MOV: 96, POL: 89, CON: 88 };
+  const main = card("goober", "yfp", { hero: "Viscous", stats, ovr: 89 });
+  const players = [main];
+
+  it("versão comum no mesmo time com outro herói fica 2 abaixo e com a marca", () => {
+    const v = asPlayedHero(card("v", "yfp", { variantOf: "goober", hero: "Paradox", stats, ovr: 89 }), players);
+    expect(v.altHero).toBe(true);
+    expect(v.ovr).toBe(87);
+    expect(v.stats).toEqual({ MIR: 87, MAC: 86, SUP: 82, MOV: 94, POL: 87, CON: 86 });
+    expect(isAltHero(v)).toBe(true);
+  });
+
+  it("especial, outro time ou mesmo herói continuam versão comum", () => {
+    const special = asPlayedHero(card("s", "yfp", { variantOf: "goober", hero: "Paradox", special: true, stats, ovr: 89 }), players);
+    const national = asPlayedHero(card("n", "eua", { variantOf: "goober", hero: "Paradox", stats, ovr: 86 }), players);
+    const same = asPlayedHero(card("m", "yfp", { variantOf: "goober", hero: "Viscous", altHero: true, stats, ovr: 89 }), players);
+    expect([special.altHero, national.altHero, same.altHero]).toEqual([undefined, undefined, undefined]);
+    expect(national.ovr).toBe(86);
+  });
+
+  it("carta principal nunca vira herói jogado", () => {
+    expect(asPlayedHero(main, players).altHero).toBeUndefined();
   });
 });
