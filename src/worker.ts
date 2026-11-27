@@ -57,6 +57,8 @@ const STATIC_LOGO = /^\/tournaments\/[\w-]{1,64}\.(png|webp|svg|jpg)$/;
 const tournamentLogo = (v: unknown) => keyOf(v) ?? (typeof v === "string" && STATIC_LOGO.test(v) ? v : null);
 
 /** Link http(s) de até 200 caracteres, normalizado; null se não servir. */
+/** Link opcional: vazio vira null; inválido também (quem chama recusa se veio algo). */
+const optUrl = (v: unknown) => (v === undefined || v === null || v === "" ? null : httpUrl(v));
 function httpUrl(v: unknown): string | null {
   if (typeof v !== "string" || v.length > 200) return null;
   try {
@@ -134,8 +136,12 @@ async function appData(env: Env): Promise<Response> {
         ...(t.stream_url ? { stream: t.stream_url } : {}),
         ...(t.watch_url ? { watch: t.watch_url } : {}),
       })),
-    schedule: (schedule.results as { id: string; tournament_id: string; starts_at: number; label: string; brazil: number }[])
-      .map((d) => ({ id: d.id, tournamentId: d.tournament_id, startsAt: d.starts_at, label: d.label, brazil: d.brazil === 1 })),
+    schedule: (schedule.results as { id: string; tournament_id: string; starts_at: number; label: string; brazil: number; stream_url: string | null; watch_url: string | null }[])
+      .map((d) => ({
+        id: d.id, tournamentId: d.tournament_id, startsAt: d.starts_at, label: d.label, brazil: d.brazil === 1,
+        ...(d.stream_url ? { stream: d.stream_url } : {}),
+        ...(d.watch_url ? { watch: d.watch_url } : {}),
+      })),
     heroes: Object.fromEntries((heroes.results as { name: string; image_key: string; zoom: number; x: number; y: number }[])
       .map((h) => [h.name, { name: h.name, url: imgUrl(h.image_key), zoom: h.zoom, x: h.x, y: h.y }])),
     settings: {
@@ -256,7 +262,6 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
     else {
       const name = typeof b.name === "string" ? b.name.trim() : "";
       const description = typeof b.description === "string" ? b.description.trim() : "";
-      const optUrl = (v: unknown) => (v === undefined || v === null || v === "" ? null : httpUrl(v));
       const stream = optUrl(b.stream), watch = optUrl(b.watch);
       if (!name || name.length > TOURNAMENT_NAME_MAX) return bad(`nome do campeonato obrigatório, até ${TOURNAMENT_NAME_MAX} caracteres`);
       if (description.length > TOURNAMENT_DESC_MAX) return bad(`descrição até ${TOURNAMENT_DESC_MAX} caracteres`);
@@ -274,11 +279,14 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
       if (typeof b.startsAt !== "number" || !Number.isInteger(b.startsAt) || b.startsAt < SCHEDULE_MIN || b.startsAt > SCHEDULE_MAX) return bad("data inválida");
       if (label.length > SCHEDULE_LABEL_MAX) return bad(`rótulo até ${SCHEDULE_LABEL_MAX} caracteres`);
       if (b.brazil !== undefined && typeof b.brazil !== "boolean") return bad("brazil deve ser verdadeiro ou falso");
+      const stream = optUrl(b.stream), watch = optUrl(b.watch);
+      if ((stream === null && b.stream) || (watch === null && b.watch)) return bad("link inválido: use http(s), até 200 caracteres");
       if (!(await db.prepare("SELECT 1 FROM tournaments WHERE id = ?").bind(b.tournamentId).first())) return bad("campeonato não existe", 404);
       await db.prepare(
-        "INSERT INTO tournament_dates (id, tournament_id, starts_at, label, brazil) VALUES (?,?,?,?,?) " +
-        "ON CONFLICT(id) DO UPDATE SET tournament_id=excluded.tournament_id, starts_at=excluded.starts_at, label=excluded.label, brazil=excluded.brazil",
-      ).bind(id, b.tournamentId, b.startsAt, label, b.brazil === true ? 1 : 0).run();
+        "INSERT INTO tournament_dates (id, tournament_id, starts_at, label, brazil, stream_url, watch_url) VALUES (?,?,?,?,?,?,?) " +
+        "ON CONFLICT(id) DO UPDATE SET tournament_id=excluded.tournament_id, starts_at=excluded.starts_at, label=excluded.label, brazil=excluded.brazil, " +
+        "stream_url=excluded.stream_url, watch_url=excluded.watch_url",
+      ).bind(id, b.tournamentId, b.startsAt, label, b.brazil === true ? 1 : 0, stream, watch).run();
     }
   } else if (kind === "settings" && !del) {
     const rows: Record<string, unknown> = {};

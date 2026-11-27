@@ -60,11 +60,11 @@ export type TierBand = { key: string; min: number; max: number; bg: string; text
 export const HOME_FEATURED_MAX = 5;
 
 /** Campeonato do calendário da Home: nome, descrição curta (o balão do hover) e logo. */
-/** stream: transmissão oficial; watch: watchparty do Hagizao. */
+/** stream e watch: links padrão (transmissão oficial e watchparty do Hagizao) para cada dia novo do campeonato. */
 export type Tournament = { id: string; name: string; description: string; logo?: string; stream?: string; watch?: string };
 /** Um dia de campeonato: startsAt em segundos UTC; label diferencia edições ("67 EU"). */
-/** brazil: um time brasileiro joga nesse dia (borda verde e amarela no calendário). */
-export type ScheduleEntry = { id: string; tournamentId: string; startsAt: number; label: string; brazil: boolean };
+/** brazil: um time brasileiro joga nesse dia (borda verde e amarela no calendário). stream e watch: links de assistir desse dia. */
+export type ScheduleEntry = { id: string; tournamentId: string; startsAt: number; label: string; brazil: boolean; stream?: string; watch?: string };
 export const TOURNAMENT_NAME_MAX = 60;
 export const TOURNAMENT_DESC_MAX = 280;
 export const SCHEDULE_LABEL_MAX = 24;

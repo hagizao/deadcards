@@ -1,4 +1,4 @@
-import { SELF } from "cloudflare:test";
+import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { login } from "../helpers/fixtures";
 
@@ -11,7 +11,7 @@ const put = (cookie: string, path: string, body: unknown) => SELF.fetch(`http://
 });
 const del = (cookie: string, path: string) => SELF.fetch(`http://test/api/${path}`, { method: "DELETE", headers: { cookie, origin: "http://test" } });
 
-type Data = { tournaments: { id: string; name: string; description: string; logo?: string; stream?: string; watch?: string }[]; schedule: { id: string; tournamentId: string; startsAt: number; label: string; brazil: boolean }[] };
+type Data = { tournaments: { id: string; name: string; description: string; logo?: string; stream?: string; watch?: string }[]; schedule: { id: string; tournamentId: string; startsAt: number; label: string; brazil: boolean; stream?: string; watch?: string }[] };
 const data = async () => (await (await SELF.fetch("http://test/api/data")).json()) as Data;
 const soon = () => Math.floor(Date.now() / 1000) + 7 * 86400;
 
@@ -48,6 +48,26 @@ describe("Calendário de campeonatos", () => {
     expect((await put(cookie, "schedule/br-1", { tournamentId: "br", startsAt: at, label: "", brazil: false })).status).toBe(200);
     expect((await data()).schedule.find((s) => s.id === "br-1")?.brazil).toBe(false);
     expect((await put(cookie, "schedule/br-1", { tournamentId: "br", startsAt: at, label: "", brazil: "sim" })).status).toBe(400);
+  });
+
+  it("cada dia tem a própria transmissão e watchparty, que dá para tirar", async () => {
+    const { cookie } = await admin();
+    await put(cookie, "tournaments/wp", { name: "Com watch", description: "" });
+    const at = soon();
+    const day = { tournamentId: "wp", startsAt: at, label: "" };
+    expect((await put(cookie, "schedule/wp-1", { ...day, stream: "https://youtube.com/@x/live", watch: "https://youtube.com/@hagizao/live" })).status).toBe(200);
+    let s = (await data()).schedule.find((e) => e.id === "wp-1");
+    expect([s?.stream, s?.watch]).toEqual(["https://youtube.com/@x/live", "https://youtube.com/@hagizao/live"]);
+    expect((await put(cookie, "schedule/wp-1", { ...day, stream: "https://youtube.com/@x/live" })).status).toBe(200);
+    s = (await data()).schedule.find((e) => e.id === "wp-1");
+    expect(s?.watch).toBeUndefined();
+    expect((await put(cookie, "schedule/wp-1", { ...day, watch: "javascript:alert(1)" })).status).toBe(400);
+  });
+
+  it("os dias do Night Shift já vêm com transmissão e watchparty", async () => {
+    // direto no banco: pelo /api/data o dia some depois que passa
+    const s = await env.DB.prepare("SELECT stream_url, watch_url FROM tournament_dates WHERE id = 'ns-71-eu'").first<{ stream_url: string; watch_url: string }>();
+    expect(s).toEqual({ stream_url: "https://www.youtube.com/@DeadlockNightShift/live", watch_url: "https://www.youtube.com/@hagizao/live" });
   });
 
   it("apagar o campeonato apaga os dias dele", async () => {
