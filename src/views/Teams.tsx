@@ -7,7 +7,8 @@ import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
 import type { Team } from "../lib/types";
 import { Card } from "../components/Card";
-import { easeOut, pageTitle, pill, sectionTitle } from "../lib/ui";
+import { easeOut, pill, sectionTitle } from "../lib/ui";
+import { Icon } from "../components/Icon";
 import { cascade, useSettled } from "../lib/motion";
 import { useRail } from "../lib/rail";
 import { RailArrows } from "../components/Rail";
@@ -18,21 +19,21 @@ const S = strings({
     medium: "Cartas médias", large: "Cartas grandes", regions: "Times por região", noTeams: "Nenhum time ainda",
     teams: (n: number) => `${n} ${n === 1 ? "time" : "times"}`, show: (name: string) => `Ver o elenco de ${name}`,
     count: (n: number) => `${n} ${n === 1 ? "jogador" : "jogadores"} no elenco oficial`, emptyRoster: "Nenhum jogador cadastrado neste elenco ainda.",
-    prevRegions: "Regiões anteriores", nextRegions: "Mais regiões", prevCards: "Cartas anteriores", nextCards: "Mais cartas",
+    collapse: "Recolher os times", expand: "Mostrar os times", prevRegions: "Regiões anteriores", nextRegions: "Mais regiões", prevCards: "Cartas anteriores", nextCards: "Mais cartas",
   },
   en: {
     title: "Rosters & cards", hint: "Pick a team to see its roster. Click a card to see its details.",
     medium: "Medium cards", large: "Large cards", regions: "Teams by region", noTeams: "No teams yet",
     teams: (n: number) => `${n} ${n === 1 ? "team" : "teams"}`, show: (name: string) => `Show ${name}'s roster`,
     count: (n: number) => `${n} ${n === 1 ? "player" : "players"} on the official roster`, emptyRoster: "No players registered on this roster yet.",
-    prevRegions: "Previous regions", nextRegions: "More regions", prevCards: "Previous cards", nextCards: "More cards",
+    collapse: "Hide the teams", expand: "Show the teams", prevRegions: "Previous regions", nextRegions: "More regions", prevCards: "Previous cards", nextCards: "More cards",
   },
   es: {
     title: "Rosters y cartas", hint: "Elige un equipo para ver su roster. Haz clic en una carta para ver los detalles.",
     medium: "Cartas medianas", large: "Cartas grandes", regions: "Equipos por región", noTeams: "Aún no hay equipos",
     teams: (n: number) => `${n} ${n === 1 ? "equipo" : "equipos"}`, show: (name: string) => `Ver el roster de ${name}`,
     count: (n: number) => `${n} ${n === 1 ? "jugador" : "jugadores"} en el roster oficial`, emptyRoster: "Aún no hay jugadores registrados en este roster.",
-    prevRegions: "Regiones anteriores", nextRegions: "Más regiones", prevCards: "Cartas anteriores", nextCards: "Más cartas",
+    collapse: "Ocultar los equipos", expand: "Mostrar los equipos", prevRegions: "Regiones anteriores", nextRegions: "Más regiones", prevCards: "Cartas anteriores", nextCards: "Más cartas",
   },
 });
 
@@ -50,6 +51,8 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
   const settled = useSettled();
   const [size, setSize] = useState<"team" | "medium">("team");
   const [picked, setPicked] = useState<string | null>(focusTeamId ?? null);
+  // clicar no nome de uma região recolhe os logos de todas, e as cartas sobem para a vista
+  const [open, setOpen] = useState(true);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const ranked = teams
@@ -80,7 +83,8 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
     <section className="flex flex-col gap-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-col gap-1.5">
-          <h1 className={pageTitle}>{t.title}</h1>
+          {/* pageTitle 50% maior nesta tela */}
+          <h1 className="font-display text-4xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-5xl">{t.title}</h1>
           <p className="text-xs text-zinc-400 sm:text-sm">{t.hint}</p>
         </div>
         <button type="button" className={pill(size === "medium")} aria-pressed={size === "medium"} onClick={() => setSize((s) => (s === "team" ? "medium" : "team"))}>
@@ -93,7 +97,7 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
         <div className="flex min-h-11 justify-end">
           <RailArrows rail={regionRail} prev={t.prevRegions} next={t.nextRegions} />
         </div>
-        <div ref={setRegionsEl} className="overflow-x-clip">
+        <div ref={setRegionsEl} className={`${regionRail.fade} overflow-x-clip`}>
           <motion.ul className="flex gap-6" {...regionRail.track}>
             {regionList.map((r, i) => {
               const list = inRegion(r);
@@ -101,15 +105,26 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
                 <li key={r} style={{ width: regionRail.size }} inert={regionRail.hidden(i) || undefined}
                   className={`${regionAccentClass(r)} flex shrink-0 flex-col gap-3 border-l border-zinc-200/15 pl-4`}>
                   <div className="flex flex-col gap-1">
-                    <h2 className="flex items-center gap-2.5 text-2xl font-extrabold tracking-widest text-zinc-100 uppercase">
-                      <span aria-hidden="true" className="size-3 shrink-0 rounded-full bg-(--team-accent) shadow-[0_0_10px_var(--team-accent)]" />
-                      {label(r)}
+                    <h2>
+                      <button type="button" aria-expanded={open} aria-controls={`region-${i}`} title={open ? t.collapse : t.expand} onClick={() => setOpen((o) => !o)}
+                        className="group flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-md text-left text-2xl font-extrabold tracking-widest text-zinc-100 uppercase transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:opacity-80">
+                        <span aria-hidden="true" className="size-3 shrink-0 rounded-full bg-(--team-accent) shadow-[0_0_10px_var(--team-accent)]" />
+                        {label(r)}
+                        <Icon name="chevron-down" className={`size-5 shrink-0 text-zinc-500 transition-transform duration-200 group-hover:text-zinc-200 motion-reduce:transition-none ${open ? "" : "-rotate-90"}`} />
+                      </button>
                     </h2>
                     <span className="text-xs text-zinc-500">{t.teams(list.length)}</span>
                   </div>
-                  {list.length
-                    ? <ul className="flex flex-wrap gap-1">{list.map(logo)}</ul>
-                    : <p className="py-2 text-sm text-zinc-500">{t.noTeams}</p>}
+                  <AnimatePresence initial={false}>
+                    {open && (
+                      <motion.div id={`region-${i}`} className="overflow-y-clip [overflow-clip-margin:6px]" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                        transition={still ? { duration: 0 } : { duration: 0.22, ease: easeOut }}>
+                        {list.length
+                          ? <ul className="flex flex-wrap gap-1">{list.map(logo)}</ul>
+                          : <p className="py-2 text-sm text-zinc-500">{t.noTeams}</p>}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </li>
               );
             })}
@@ -182,7 +197,7 @@ function TeamPanel({ team, ovr, size, onOpenCard }: { team: Team; ovr: { rounded
       </div>
       {roster.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{t.emptyRoster}</p>}
       {/* corta só na horizontal: a carta sobe e brilha no hover sem ser cortada em cima e embaixo */}
-      <div ref={setRowEl} className="overflow-x-clip pt-2 pb-6">
+      <div ref={setRowEl} className={`${rail.fade} overflow-x-clip pt-2 pb-6`}>
         <motion.ul className="flex gap-6" {...rail.track}>
           {roster.map((p, i) => (
             <motion.li key={p.id} className="shrink-0" inert={rail.hidden(i) || undefined} initial={{ opacity: 0, y: 12, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: Math.min(i, 5) * 0.04, duration: 0.25, ease: easeOut }}>
