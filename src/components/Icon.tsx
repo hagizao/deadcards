@@ -11,6 +11,8 @@ const PATHS = {
   versus: "M8 4v16M16 4v16M3 9l5-5 5 5M11 15l5 5 5-5",
   ticket: "M4 8a2 2 0 0 0 0 4v4h16v-4a2 2 0 0 1 0-4V4H4zM10 4v12",
   star: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z",
+  trophy: "M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M10 17h4",
+  lock: "M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3",
 };
 
 export function Icon({ name, className = "size-4" }: { name: keyof typeof PATHS; className?: string }) {

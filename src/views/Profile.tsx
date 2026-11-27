@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
+import { Achievements } from "../components/Achievements";
 import { Card } from "../components/Card";
 import { CardExportButton } from "../components/CardExportButton";
 import { Icon } from "../components/Icon";
@@ -162,6 +163,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
         </div>
       )}
 
+      <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} />
       <ProfileCards ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} onRedeem={onRedeem} />
     </section>
   );
