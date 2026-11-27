@@ -1297,12 +1297,12 @@ function TournamentsForm() {
               <Field label={`Descrição: aparece no painel do dia na Home (${d.description.length}/${TOURNAMENT_DESC_MAX})`}>
                 <textarea className={input} rows={3} maxLength={TOURNAMENT_DESC_MAX} value={d.description} onChange={(e) => set({ description: e.target.value })} />
               </Field>
-              <Field label="Transmissão oficial (opcional)"><input className={input} type="url" placeholder="https://www.youtube.com/@canal/live" value={d.stream ?? ""} maxLength={200} onChange={(e) => set({ stream: e.target.value || undefined })} /></Field>
+              <Field label="Transmissão oficial (padrão dos dias novos)"><input className={input} type="url" placeholder="https://www.youtube.com/@canal/live" value={d.stream ?? ""} maxLength={200} onChange={(e) => set({ stream: e.target.value || undefined })} /></Field>
               <div className="flex flex-col gap-2">
-                <Field label="Watchparty Hagizao (opcional)"><input className={input} type="url" placeholder={HAGIZAO_LIVE} value={d.watch ?? ""} maxLength={200} onChange={(e) => set({ watch: e.target.value || undefined })} /></Field>
+                <Field label="Watchparty Hagizao (padrão dos dias novos)"><input className={input} type="url" placeholder={HAGIZAO_LIVE} value={d.watch ?? ""} maxLength={200} onChange={(e) => set({ watch: e.target.value || undefined })} /></Field>
                 {d.watch !== HAGIZAO_LIVE && <button type="button" className={`${ghost} w-fit`} onClick={() => set({ watch: HAGIZAO_LIVE })}>Usar o canal do Hagizao</button>}
               </div>
-              <span className="text-xs text-zinc-500">Com "/live" no fim, o link do YouTube abre direto a live que estiver no ar.</span>
+              <span className="text-xs text-zinc-500">Esses links já vêm preenchidos ao marcar um dia, e cada dia pode mudar ou tirar. Com "/live" no fim, o YouTube abre direto a live que estiver no ar.</span>
               <div className="flex flex-wrap items-center gap-3">
                 <button type="button" className={primary} disabled={busy || !d.name.trim()} onClick={save}>{busy ? "Salvando…" : d.id ? "Salvar" : "Criar campeonato"}</button>
                 <button type="button" className={ghost} onClick={() => setD(null)}>Cancelar</button>
@@ -1406,8 +1406,11 @@ function DayEntry({ entry, day, tournaments }: { entry: ScheduleEntry; day: Day;
   const [time, setTime] = useState(() => hhmm(entry.startsAt));
   const [label, setLabel] = useState(entry.label);
   const [brazil, setBrazil] = useState(entry.brazil);
+  const [stream, setStream] = useState(entry.stream ?? "");
+  const [watch, setWatch] = useState(!!entry.watch);
   const at = atTime(day, time);
-  const changed = tour !== entry.tournamentId || at !== entry.startsAt || label.trim() !== entry.label || brazil !== entry.brazil;
+  const changed = tour !== entry.tournamentId || at !== entry.startsAt || label.trim() !== entry.label || brazil !== entry.brazil
+    || stream.trim() !== (entry.stream ?? "") || watch !== !!entry.watch;
   const t = tournaments.find((x) => x.id === tour);
   return (
     <div className={`flex flex-col gap-3 rounded-xl bg-zinc-950/60 p-3 ${brazil ? "br-frame" : ""}`}>
@@ -1422,8 +1425,10 @@ function DayEntry({ entry, day, tournaments }: { entry: ScheduleEntry; day: Day;
         <Field label="Edição"><input className={`${input} w-32`} value={label} maxLength={SCHEDULE_LABEL_MAX} placeholder="EU #67" onChange={(e) => setLabel(e.target.value)} /></Field>
         <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-bold text-zinc-200"><input type="checkbox" checked={brazil} onChange={(e) => setBrazil(e.target.checked)} className={checkbox} />Brasil joga</label>
       </div>
+      <WatchFields stream={stream} onStream={setStream} watch={watch} onWatch={setWatch} />
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={primary} disabled={busy || !changed || at === null} onClick={() => run(() => api.save("schedule", entry.id, { tournamentId: tour, startsAt: at, label: label.trim(), brazil }), "Salvo.")}>Salvar</button>
+        <button type="button" className={primary} disabled={busy || !changed || at === null}
+          onClick={() => run(() => api.save("schedule", entry.id, { tournamentId: tour, startsAt: at, label: label.trim(), brazil, stream: stream.trim(), watch: watch ? (entry.watch ?? HAGIZAO_LIVE) : "" }), "Salvo.")}>Salvar</button>
         <HoldButton className={danger} disabled={busy} onConfirm={() => run(() => api.remove("schedule", entry.id), "Excluído do dia.")} label="Tirar do dia">Tirar do dia</HoldButton>
         <Toast msg={msg} />
       </div>
@@ -1439,10 +1444,15 @@ function AddToDay({ day, tournaments }: { day: Day; tournaments: Tournament[] })
   const [time, setTime] = useState("18:00");
   const [label, setLabel] = useState("");
   const [brazil, setBrazil] = useState(false);
+  // os links vêm do campeonato escolhido e dá para mudar só neste dia
+  const [stream, setStream] = useState(tournaments[0]?.stream ?? "");
+  const [watch, setWatch] = useState(!!tournaments[0]?.watch);
+  const choose = (t: Tournament) => { setTour(t.id); setStream(t.stream ?? ""); setWatch(!!t.watch); };
   const at = atTime(day, time);
   const add = () => {
     if (at === null || !tour) return;
-    run(async () => { await api.save("schedule", newId("day"), { tournamentId: tour, startsAt: at, label: label.trim(), brazil }); setLabel(""); setBrazil(false); }, "Marcado!");
+    const watchUrl = watch ? (tournaments.find((t) => t.id === tour)?.watch ?? HAGIZAO_LIVE) : "";
+    run(async () => { await api.save("schedule", newId("day"), { tournamentId: tour, startsAt: at, label: label.trim(), brazil, stream: stream.trim(), watch: watchUrl }); setLabel(""); setBrazil(false); }, "Marcado!");
   };
   return (
     <div className="flex flex-col gap-3 rounded-xl bg-zinc-100/5 p-4">
@@ -1453,7 +1463,7 @@ function AddToDay({ day, tournaments }: { day: Day; tournaments: Tournament[] })
             key={t.id}
             type="button"
             aria-pressed={tour === t.id}
-            onClick={() => setTour(t.id)}
+            onClick={() => choose(t)}
             className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl py-1.5 pr-3 pl-1.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:opacity-80 ${
               tour === t.id ? "bg-zinc-100 text-zinc-950" : "bg-zinc-950/60 text-zinc-300 hover:text-white"}`}
           >
@@ -1467,10 +1477,33 @@ function AddToDay({ day, tournaments }: { day: Day; tournaments: Tournament[] })
         <Field label="Edição (opcional)"><input className={`${input} w-32`} value={label} maxLength={SCHEDULE_LABEL_MAX} placeholder="EU #67" onChange={(e) => setLabel(e.target.value)} /></Field>
         <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-bold text-zinc-200"><input type="checkbox" checked={brazil} onChange={(e) => setBrazil(e.target.checked)} className={checkbox} />Brasil joga</label>
       </div>
+      <WatchFields stream={stream} onStream={setStream} watch={watch} onWatch={setWatch} />
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className={primary} disabled={busy || at === null || !tour} onClick={add}>{busy ? "Marcando…" : "+ Marcar"}</button>
         <Toast msg={msg} />
       </div>
+    </div>
+  );
+}
+
+/** Onde assistir naquele dia: a transmissão oficial e a watchparty do Hagizao, que liga e desliga. */
+function WatchFields({ stream, onStream, watch, onWatch }: { stream: string; onStream: (v: string) => void; watch: boolean; onWatch: (v: boolean) => void }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Field label="Transmissão oficial"><input className={input} type="url" placeholder="https://www.youtube.com/@canal/live" value={stream} maxLength={200} onChange={(e) => onStream(e.target.value)} /></Field>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={watch}
+        onClick={() => onWatch(!watch)}
+        className={`flex min-h-11 w-fit cursor-pointer items-center gap-3 rounded-xl py-2 pr-4 pl-2 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:opacity-80 ${
+          watch ? "bg-red-600/30 text-red-50 hover:bg-red-600/40" : "bg-zinc-950/60 text-zinc-400 hover:text-zinc-200"}`}
+      >
+        <span className={`flex h-6 w-10 items-center rounded-full p-0.5 transition-colors ${watch ? "bg-red-600" : "bg-zinc-700"}`}>
+          <span className={`size-5 rounded-full bg-white shadow-sm transition-transform duration-200 motion-reduce:transition-none ${watch ? "translate-x-4" : ""}`} />
+        </span>
+        Watchparty Hagizao
+      </button>
     </div>
   );
 }
