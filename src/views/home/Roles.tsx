@@ -41,7 +41,7 @@ export function Roles({ onOpenCard }: { onOpenCard: (id: string) => void }) {
         </Reveal>
         <RailArrows rail={rail} prev={t.prev} next={t.next} />
       </div>
-      <div ref={setRailEl} className="overflow-x-clip">
+      <div ref={setRailEl} className={`${rail.fade} overflow-x-clip`}>
       <motion.ul className="flex gap-8" {...rail.track}>
         {ROLES.map((role, i) => (
           <motion.li

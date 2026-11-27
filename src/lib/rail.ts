@@ -36,6 +36,8 @@ export function useRail(el: HTMLElement | null, count: number, { item, gap, max 
       dragElastic: 0.12,
       onDragEnd: (_: unknown, info: PanInfo) => go(info.offset.x < -60 ? 1 : info.offset.x > 60 ? -1 : 0),
     },
+    /** Classes do elemento que corta a faixa: esmaece as pontas que ainda têm itens escondidos. */
+    fade: `rail-fade ${at > 0 ? "[--fade-l:4rem]" : ""} ${at < last ? "[--fade-r:4rem]" : ""}`,
     /** Item fora da vista sai do Tab e do leitor de tela. */
     hidden: (i: number) => i < at || i >= at + visible,
   };

@@ -45,7 +45,7 @@ export function NewCards({ onOpenCard }: { onOpenCard: (id: string) => void }) {
         <RailArrows rail={rail} prev={t.prev} next={t.next} />
       </div>
       {/* corta só na horizontal: o brilho e a subida da carta no hover continuam visíveis em cima e embaixo */}
-      <div ref={setRailEl} className="overflow-x-clip pt-2 pb-6">
+      <div ref={setRailEl} className={`${rail.fade} overflow-x-clip pt-2 pb-6`}>
         <motion.ul className="flex gap-5" {...rail.track}>
           {latest.map((p, i) => (
             <li key={p.id} className="shrink-0" inert={rail.hidden(i) || undefined}>

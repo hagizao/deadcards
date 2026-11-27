@@ -36,6 +36,20 @@
 }
 
 /* volume dos títulos: degraus escuros logo abaixo (a "espessura"), sombra no chão e um brilho leve na cor do próprio texto */
+/* faixa com setas (useRail): esmaece a ponta que tem mais itens escondidos, em vez de cortar seco */
+@property --fade-l { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-r { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@utility rail-fade {
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  /* a máscara se repete na vertical e não corta fora da caixa: o brilho e o salto do hover passam por cima e por baixo */
+  mask-repeat: repeat-y;
+  mask-clip: no-clip;
+  transition: --fade-l 200ms ease-out, --fade-r 200ms ease-out;
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
 @utility title-depth {
   text-shadow:
     0 1px 0 color-mix(in srgb, currentColor 45%, #000),
