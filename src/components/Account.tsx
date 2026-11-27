@@ -44,7 +44,7 @@ export function Account({ onProfile, onSettings, onEditor }: { onProfile: () => 
         className={`${primaryBtn} shadow-[0_0_18px_rgba(255,239,215,0.35)] sm:min-h-10`}
         aria-label={t.signIn}
       >
-        <span>{t.signIn}</span>
+        <span className="text-base">{t.signIn}</span>
       </motion.a>
     );
   }
@@ -61,7 +61,7 @@ export function Account({ onProfile, onSettings, onEditor }: { onProfile: () => 
         className="flex cursor-pointer items-center gap-2 rounded-full border border-zinc-200/25 bg-zinc-900/70 p-1 shadow-[0_0_14px_rgba(244,244,245,0.15)] hover:border-zinc-200/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:pr-3"
       >
         {me.image ? <img src={me.image} alt="" className="size-8 rounded-full" /> : <span className="flex size-8 items-center justify-center rounded-full bg-zinc-700 text-sm font-bold text-white">{me.name.charAt(0).toUpperCase()}</span>}
-        <span className="hidden max-w-32 truncate text-sm font-bold text-zinc-100 sm:inline">{me.name}</span>
+        <span className="hidden max-w-32 truncate text-lg font-bold text-zinc-100 sm:inline">{me.name}</span>
       </motion.button>
       <AnimatePresence>
         {open && (
