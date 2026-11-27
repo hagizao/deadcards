@@ -11,7 +11,7 @@ const put = (cookie: string, path: string, body: unknown) => SELF.fetch(`http://
 });
 const del = (cookie: string, path: string) => SELF.fetch(`http://test/api/${path}`, { method: "DELETE", headers: { cookie, origin: "http://test" } });
 
-type Data = { tournaments: { id: string; name: string; description: string; logo?: string; url?: string }[]; schedule: { id: string; tournamentId: string; startsAt: number; label: string }[] };
+type Data = { tournaments: { id: string; name: string; description: string; logo?: string; url?: string }[]; schedule: { id: string; tournamentId: string; startsAt: number; label: string; brazil: boolean }[] };
 const data = async () => (await (await SELF.fetch("http://test/api/data")).json()) as Data;
 const soon = () => Math.floor(Date.now() / 1000) + 7 * 86400;
 
@@ -23,7 +23,7 @@ describe("Calendário de campeonatos", () => {
     expect((await put(cookie, "schedule/cup-1", { tournamentId: "cup", startsAt: at, label: "Final" })).status).toBe(200);
     const d = await data();
     expect(d.tournaments.find((t) => t.id === "cup")).toEqual({ id: "cup", name: "Copa Teste", description: "Uma copa.", logo: "/img/events/cup.png", url: "https://example.com/copa" });
-    expect(d.schedule.find((s) => s.id === "cup-1")).toEqual({ id: "cup-1", tournamentId: "cup", startsAt: at, label: "Final" });
+    expect(d.schedule.find((s) => s.id === "cup-1")).toEqual({ id: "cup-1", tournamentId: "cup", startsAt: at, label: "Final", brazil: false });
   });
 
   it("aceita logo estática de /tournaments/ e descarta caminho estranho", async () => {
@@ -34,6 +34,17 @@ describe("Calendário de campeonatos", () => {
     expect(d.tournaments.find((t) => t.id === "st")?.logo).toBe("/tournaments/st.webp");
     expect(d.tournaments.find((t) => t.id === "bad")?.logo).toBeUndefined();
     expect(d.tournaments.find((t) => t.id === "night-shift")?.logo).toBe("/tournaments/night-shift.webp");
+  });
+
+  it("marca e desmarca o dia em que o Brasil joga", async () => {
+    const { cookie } = await admin();
+    await put(cookie, "tournaments/br", { name: "Copa BR", description: "" });
+    const at = soon();
+    expect((await put(cookie, "schedule/br-1", { tournamentId: "br", startsAt: at, label: "", brazil: true })).status).toBe(200);
+    expect((await data()).schedule.find((s) => s.id === "br-1")?.brazil).toBe(true);
+    expect((await put(cookie, "schedule/br-1", { tournamentId: "br", startsAt: at, label: "", brazil: false })).status).toBe(200);
+    expect((await data()).schedule.find((s) => s.id === "br-1")?.brazil).toBe(false);
+    expect((await put(cookie, "schedule/br-1", { tournamentId: "br", startsAt: at, label: "", brazil: "sim" })).status).toBe(400);
   });
 
   it("apagar o campeonato apaga os dias dele", async () => {

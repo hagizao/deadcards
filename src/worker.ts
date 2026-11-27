@@ -129,8 +129,8 @@ async function appData(env: Env): Promise<Response> {
     players: (players.results as Record<string, string | number | null>[]).map(playerFromRow),
     tournaments: (tournaments.results as { id: string; name: string; description: string; logo_key: string | null; url: string | null }[])
       .map((t) => ({ id: t.id, name: t.name, description: t.description, ...(t.logo_key ? { logo: t.logo_key.startsWith("/") ? t.logo_key : imgUrl(t.logo_key) } : {}), ...(t.url ? { url: t.url } : {}) })),
-    schedule: (schedule.results as { id: string; tournament_id: string; starts_at: number; label: string }[])
-      .map((d) => ({ id: d.id, tournamentId: d.tournament_id, startsAt: d.starts_at, label: d.label })),
+    schedule: (schedule.results as { id: string; tournament_id: string; starts_at: number; label: string; brazil: number }[])
+      .map((d) => ({ id: d.id, tournamentId: d.tournament_id, startsAt: d.starts_at, label: d.label, brazil: d.brazil === 1 })),
     heroes: Object.fromEntries((heroes.results as { name: string; image_key: string; zoom: number; x: number; y: number }[])
       .map((h) => [h.name, { name: h.name, url: imgUrl(h.image_key), zoom: h.zoom, x: h.x, y: h.y }])),
     settings: {
@@ -267,11 +267,12 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
       if (typeof b.tournamentId !== "string" || !ID_RE.test(b.tournamentId)) return bad("campeonato inválido");
       if (typeof b.startsAt !== "number" || !Number.isInteger(b.startsAt) || b.startsAt < SCHEDULE_MIN || b.startsAt > SCHEDULE_MAX) return bad("data inválida");
       if (label.length > SCHEDULE_LABEL_MAX) return bad(`rótulo até ${SCHEDULE_LABEL_MAX} caracteres`);
+      if (b.brazil !== undefined && typeof b.brazil !== "boolean") return bad("brazil deve ser verdadeiro ou falso");
       if (!(await db.prepare("SELECT 1 FROM tournaments WHERE id = ?").bind(b.tournamentId).first())) return bad("campeonato não existe", 404);
       await db.prepare(
-        "INSERT INTO tournament_dates (id, tournament_id, starts_at, label) VALUES (?,?,?,?) " +
-        "ON CONFLICT(id) DO UPDATE SET tournament_id=excluded.tournament_id, starts_at=excluded.starts_at, label=excluded.label",
-      ).bind(id, b.tournamentId, b.startsAt, label).run();
+        "INSERT INTO tournament_dates (id, tournament_id, starts_at, label, brazil) VALUES (?,?,?,?,?) " +
+        "ON CONFLICT(id) DO UPDATE SET tournament_id=excluded.tournament_id, starts_at=excluded.starts_at, label=excluded.label, brazil=excluded.brazil",
+      ).bind(id, b.tournamentId, b.startsAt, label, b.brazil === true ? 1 : 0).run();
     }
   } else if (kind === "settings" && !del) {
     const rows: Record<string, unknown> = {};

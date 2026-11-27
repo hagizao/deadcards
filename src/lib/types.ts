@@ -62,7 +62,8 @@ export const HOME_FEATURED_MAX = 5;
 /** Campeonato do calendário da Home: nome, descrição curta (o balão do hover) e logo. */
 export type Tournament = { id: string; name: string; description: string; logo?: string; url?: string };
 /** Um dia de campeonato: startsAt em segundos UTC; label diferencia edições ("67 EU"). */
-export type ScheduleEntry = { id: string; tournamentId: string; startsAt: number; label: string };
+/** brazil: um time brasileiro joga nesse dia (borda verde e amarela no calendário). */
+export type ScheduleEntry = { id: string; tournamentId: string; startsAt: number; label: string; brazil: boolean };
 export const TOURNAMENT_NAME_MAX = 60;
 export const TOURNAMENT_DESC_MAX = 280;
 export const SCHEDULE_LABEL_MAX = 24;
