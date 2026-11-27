@@ -33,6 +33,25 @@
   --color-ach-silver: #d6dee8;
   --color-ach-gold: #f5c84b;
   --color-ach-diamond: #8ff3ff;
+  /* dia em que o Brasil joga no calendário da Home */
+  --color-br-green: #00b84a;
+  --color-br-yellow: #ffd400;
+}
+
+/* moldura listrada de verde e amarelo: dia em que o Brasil joga (calendário da Home e a legenda dele) */
+@utility br-frame {
+  position: relative;
+  box-shadow: 0 0 14px color-mix(in oklab, var(--color-br-green) 45%, transparent);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 3px;
+    border-radius: inherit;
+    background: repeating-linear-gradient(135deg, var(--color-br-green) 0 6px, var(--color-br-yellow) 6px 12px);
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    pointer-events: none;
+  }
 }
 
 /* volume dos títulos: degraus escuros logo abaixo (a "espessura"), sombra no chão e um brilho leve na cor do próprio texto */

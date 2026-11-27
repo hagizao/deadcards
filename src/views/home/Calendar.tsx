@@ -14,19 +14,19 @@ const S = strings({
     title: "Calendário", lead: "Quando o competitivo joga. Escolha um dia para ver o que tem; os horários estão no seu fuso.",
     prev: "Mês anterior", next: "Próximo mês", today: "Hoje", nothing: "Nada marcado neste dia.",
     upNext: "Próximo", more: "Ver no site do campeonato", events: (n: number) => `${n} ${n === 1 ? "campeonato" : "campeonatos"}`,
-    startsIn: "Começa em", started: "Já começou",
+    startsIn: "Começa em", started: "Já começou", brazil: "Brasil em jogo", legend: "Dia com time brasileiro em jogo",
   },
   en: {
     title: "Calendar", lead: "When the competitive scene plays. Pick a day to see what's on; times are in your time zone.",
     prev: "Previous month", next: "Next month", today: "Today", nothing: "Nothing scheduled on this day.",
     upNext: "Up next", more: "See on the tournament site", events: (n: number) => `${n} ${n === 1 ? "tournament" : "tournaments"}`,
-    startsIn: "Starts in", started: "Already started",
+    startsIn: "Starts in", started: "Already started", brazil: "Brazil playing", legend: "Day with a Brazilian team playing",
   },
   es: {
     title: "Calendario", lead: "Cuándo juega el competitivo. Elige un día para ver qué hay; los horarios están en tu zona horaria.",
     prev: "Mes anterior", next: "Mes siguiente", today: "Hoy", nothing: "Nada programado este día.",
     upNext: "Próximo", more: "Ver en el sitio del torneo", events: (n: number) => `${n} ${n === 1 ? "torneo" : "torneos"}`,
-    startsIn: "Empieza en", started: "Ya empezó",
+    startsIn: "Empieza en", started: "Ya empezó", brazil: "Brasil en juego", legend: "Día con equipo brasileño en juego",
   },
 });
 
@@ -118,6 +118,7 @@ export function Calendar() {
                       {ev.t.name}{ev.label && <span className="text-area"> {ev.label}</span>}
                     </p>
                     <p className="text-xs font-bold text-zinc-200 tabular-nums">{time.format(new Date(ev.startsAt * 1000))}</p>
+                    {ev.brazil && <BrazilTag text={t.brazil} />}
                     {ev.t.description && <p className="text-xs text-zinc-400">{ev.t.description}</p>}
                     {ev.t.url && (
                       <a href={ev.t.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-fit items-center gap-1 rounded-md text-xs font-bold text-dl-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:min-h-0">
@@ -175,6 +176,7 @@ export function Calendar() {
                 const isToday = sameDay(day, today);
                 const isSel = sameDay(day, selected);
                 const logos = [...new Map(evs.map((ev) => [ev.t.id, ev.t])).values()];
+                const br = evs.some((ev) => ev.brazil);
                 const tip = hot?.cell === k ? evs.filter((ev) => ev.t.id === hot.id) : [];
                 const col = i % 7;
                 return (
@@ -186,9 +188,9 @@ export function Calendar() {
                       onBlur={() => setHot(null)}
                       aria-pressed={isSel}
                       aria-current={isToday ? "date" : undefined}
-                      aria-label={[longDay.format(dateOf(day)), ...evs.map((ev) => `${fullName(ev)}, ${time.format(new Date(ev.startsAt * 1000))}`)].join(". ")}
+                      aria-label={[longDay.format(dateOf(day)), ...evs.map((ev) => `${fullName(ev)}, ${time.format(new Date(ev.startsAt * 1000))}${ev.brazil ? `, ${t.brazil}` : ""}`)].join(". ")}
                       aria-describedby={tip.length ? `cal-tip-${k}` : undefined}
-                      className={`flex min-h-14 w-full cursor-pointer flex-col items-center gap-1 rounded-lg px-0.5 py-1 ${logos.length ? "justify-center" : "pt-1.5"} transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-zinc-100 active:bg-zinc-100/10 sm:min-h-20 ${
+                      className={`flex min-h-14 w-full cursor-pointer flex-col items-center gap-1 rounded-lg px-0.5 py-1 ${logos.length ? "justify-center" : "pt-1.5"} ${br ? "br-frame" : ""} transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-zinc-100 active:bg-zinc-100/10 sm:min-h-20 ${
                         isSel ? "bg-zinc-100/10 shadow-[inset_0_-2px_0_var(--color-area)]" : "hover:bg-zinc-100/5"}`}
                     >
                       {/* dia com campeonato mostra só a logo; o número fica no rótulo para leitor de tela */}
@@ -238,8 +240,24 @@ export function Calendar() {
               })}
             </motion.div>
           </AnimatePresence>
+          {events.some((ev) => ev.brazil) && (
+            <p className="flex w-fit items-center gap-4 rounded-xl bg-br-green/20 py-3 pr-5 pl-3 font-display text-base/tight font-extrabold tracking-wide text-br-yellow uppercase sm:text-lg/tight">
+              <span aria-hidden="true" className="br-frame size-10 shrink-0 rounded-lg" />
+              {t.legend}
+            </p>
+          )}
         </div>
       </div>
     </section>
+  );
+}
+
+/** Selo do evento em que um time brasileiro joga, com a mesma listra verde e amarela da borda do dia. */
+function BrazilTag({ text }: { text: string }) {
+  return (
+    <span className="flex w-fit items-center gap-2 rounded-md bg-br-green/15 py-1 pr-2 pl-1 text-xs font-extrabold tracking-wide text-br-yellow uppercase">
+      <span aria-hidden="true" className="br-frame size-4 shrink-0 rounded-sm" />
+      {text}
+    </span>
   );
 }
