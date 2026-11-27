@@ -13,8 +13,8 @@ export const pill = (active: boolean) =>
       : "text-zinc-400 hover:bg-zinc-100/5 hover:text-white active:bg-zinc-100/10"
   }`;
 
-/** Campo e select sem caixa: só uma linha embaixo, que acende no foco. O menu do select é estilizado no index.css. */
-export const field = `min-h-11 sm:min-h-9 px-1 bg-transparent border-0 border-b border-zinc-200/20 rounded-none text-sm text-zinc-100 placeholder:text-zinc-500 transition-colors hover:border-zinc-200/45 focus:border-dl-text ${focus}`;
+/** Campo e select sem caixa: só uma linha embaixo, que acende no foco; o texto começa na mesma linha do rótulo (px-0). O menu do select é estilizado no index.css. */
+export const field = `min-h-11 sm:min-h-9 px-0 bg-transparent border-0 border-b border-zinc-200/20 rounded-none text-sm text-zinc-100 placeholder:text-zinc-500 transition-colors hover:border-zinc-200/45 focus:border-dl-text ${focus}`;
 
 export const primaryBtn = `min-h-11 sm:min-h-9 inline-flex items-center justify-center px-5 rounded-lg bg-dl-text text-xs font-extrabold uppercase tracking-widest text-dl-black cursor-pointer transition hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed ${focus}`;
 
