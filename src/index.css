@@ -588,6 +588,6 @@ select { color-scheme: dark; }
   position: absolute;
   inset: 1rem -3rem -3rem;
   z-index: -1;
-  background: radial-gradient(45% 40% at 50% 50%, color-mix(in srgb, var(--side) 38%, transparent), transparent 100%);
+  background: radial-gradient(40% 35% at 50% 50%, color-mix(in srgb, var(--side) 16%, transparent), transparent 100%);
   pointer-events: none;
 }
