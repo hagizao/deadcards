@@ -15,19 +15,19 @@ const S = strings({
     title: "Calendário", lead: "Quando o competitivo joga. Escolha um dia para ver o que tem; os horários estão no seu fuso.",
     prev: "Mês anterior", next: "Próximo mês", today: "Hoje", nothing: "Nada marcado neste dia.",
     upNext: "Próximo", stream: "Transmissão oficial", watch: "Watchparty Hagizao", events: (n: number) => `${n} ${n === 1 ? "campeonato" : "campeonatos"}`,
-    startsIn: "Começa em", started: "Já começou", brazil: "Brasil em jogo", legend: "Dia com time brasileiro em jogo",
+    startsIn: "Começa em", started: "Já começou", ended: "Encerrado", brazil: "Brasil em jogo", legend: "Dia com time brasileiro em jogo",
   },
   en: {
     title: "Calendar", lead: "When the competitive scene plays. Pick a day to see what's on; times are in your time zone.",
     prev: "Previous month", next: "Next month", today: "Today", nothing: "Nothing scheduled on this day.",
     upNext: "Up next", stream: "Official stream", watch: "Hagizao watchparty", events: (n: number) => `${n} ${n === 1 ? "tournament" : "tournaments"}`,
-    startsIn: "Starts in", started: "Already started", brazil: "Brazil playing", legend: "Day with a Brazilian team playing",
+    startsIn: "Starts in", started: "Already started", ended: "Over", brazil: "Brazil playing", legend: "Day with a Brazilian team playing",
   },
   es: {
     title: "Calendario", lead: "Cuándo juega el competitivo. Elige un día para ver qué hay; los horarios están en tu zona horaria.",
     prev: "Mes anterior", next: "Mes siguiente", today: "Hoy", nothing: "Nada programado este día.",
     upNext: "Próximo", stream: "Transmisión oficial", watch: "Watchparty de Hagizao", events: (n: number) => `${n} ${n === 1 ? "torneo" : "torneos"}`,
-    startsIn: "Empieza en", started: "Ya empezó", brazil: "Brasil en juego", legend: "Día con equipo brasileño en juego",
+    startsIn: "Empieza en", started: "Ya empezó", ended: "Terminado", brazil: "Brasil en juego", legend: "Día con equipo brasileño en juego",
   },
 });
 
@@ -38,10 +38,13 @@ const LOGOS = 3;
 const fullName = (ev: Ev) => (ev.label ? `${ev.t.name} ${ev.label}` : ev.t.name);
 
 /** Quanto falta para o jogo, em dias, horas e minutos; anda sozinho enquanto o balão está aberto. */
-function Countdown({ at, startsIn, started }: { at: number; startsIn: string; started: string }) {
+// depois de umas 3 horas do início, o jogo conta como encerrado
+const LIVE_MINUTES = 180;
+function Countdown({ at, startsIn, started, ended }: { at: number; startsIn: string; started: string; ended: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 15_000); return () => clearInterval(id); }, []);
   const left = Math.floor((at * 1000 - now) / 60_000);
+  if (left < -LIVE_MINUTES) return <span className="text-zinc-500">{ended}</span>;
   if (left < 0) return <span className="font-bold text-area">{started}</span>;
   const d = Math.floor(left / 1440), h = Math.floor((left % 1440) / 60), m = left % 60;
   return <>{startsIn} <span className="font-bold text-area tabular-nums">{d > 0 && `${d}d `}{(d > 0 || h > 0) && `${h}h `}{m}m</span></>;
@@ -106,7 +109,10 @@ export function Calendar() {
                       <p className="font-display text-base/tight font-extrabold tracking-wide text-white uppercase">
                         {ev.t.name}{ev.label && <span className="text-area"> {ev.label}</span>}
                       </p>
-                      <p className="text-xs font-bold text-zinc-200 tabular-nums">{time.format(new Date(ev.startsAt * 1000))}</p>
+                      <p className="flex flex-wrap items-center gap-x-2 text-xs">
+                        <span className="font-bold text-zinc-200 tabular-nums">{time.format(new Date(ev.startsAt * 1000))}</span>
+                        <span className="text-zinc-400"><Countdown at={ev.startsAt} startsIn={t.startsIn} started={t.started} ended={t.ended} /></span>
+                      </p>
                       {ev.brazil && <BrazilTag text={t.brazil} />}
                       {ev.t.description && <p className="text-xs text-zinc-400">{ev.t.description}</p>}
                       {(ev.t.stream || ev.t.watch) && (
@@ -227,7 +233,7 @@ export function Calendar() {
                           {tip.map((ev) => (
                             <span key={ev.id} className="flex flex-col gap-1">
                               <span className="font-display text-base/tight font-extrabold tracking-wide text-white uppercase">{fullName(ev)}</span>
-                              <span className="text-xs text-zinc-400"><Countdown at={ev.startsAt} startsIn={t.startsIn} started={t.started} /></span>
+                              <span className="text-xs text-zinc-400"><Countdown at={ev.startsAt} startsIn={t.startsIn} started={t.started} ended={t.ended} /></span>
                             </span>
                           ))}
                         </motion.div>
@@ -244,21 +250,26 @@ export function Calendar() {
   );
 }
 
-/** Selo do evento em que um time brasileiro joga, com o mesmo degradê verde e amarelo da borda do dia. */
+/** Selo do evento em que um time brasileiro joga. */
 function BrazilTag({ text }: { text: string }) {
   return (
-    <span className="flex w-fit items-center gap-2 rounded-md bg-br-green/15 py-1 pr-2 pl-1 text-xs font-extrabold tracking-wide text-br-yellow uppercase">
-      <span aria-hidden="true" className="br-frame size-4 shrink-0 rounded-sm" />
+    <span className="w-fit rounded-md bg-br-green/15 px-2 py-1 text-xs font-extrabold tracking-wide text-br-yellow uppercase">
       {text}
     </span>
   );
 }
 
 /** Link pequeno para assistir: cabe dois lado a lado no painel do dia. */
-function WatchLink({ href, icon, text }: { href: string; icon: "play" | "users"; text: string }) {
+// transmissão oficial em vermelho (YouTube), watchparty em roxo: dá para diferenciar de relance
+const WATCH_TONE = {
+  play: "bg-red-600/30 text-red-50 hover:bg-red-600/50 active:bg-red-600/60",
+  users: "bg-violet-500/30 text-violet-50 hover:bg-violet-500/50 active:bg-violet-500/60",
+} as const;
+
+function WatchLink({ href, icon, text }: { href: string; icon: keyof typeof WATCH_TONE; text: string }) {
   return (
     <a href={href} target="_blank" rel="noreferrer"
-      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-zinc-100/8 px-2.5 py-1 text-xs font-bold text-dl-text transition-colors hover:bg-zinc-100/15 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/20 sm:min-h-8">
+      className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:min-h-8 ${WATCH_TONE[icon]}`}>
       <Icon name={icon} className="size-3.5" />{text}
     </a>
   );
