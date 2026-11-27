@@ -43,7 +43,7 @@ export function RitualBackground({ color = BASE }: { color?: string }) {
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#0b0d11]" aria-hidden="true">
       <canvas ref={ref} className="absolute inset-0 size-full" />
       {/* véu escuro: o ritual fica de fundo, sem competir com o texto */}
-      <div className="absolute inset-0 bg-zinc-950/65" />
+      <div className="absolute inset-0 bg-zinc-950/55" />
       <div className="ritual-grain" style={{ backgroundImage: `url(${grain})` }} />
       <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_40%,transparent_45%,rgb(0_0_0/0.7)_100%)]" />
     </div>

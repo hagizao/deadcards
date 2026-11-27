@@ -121,7 +121,7 @@ export class RitualBackdrop {
       const x1 = cx + Math.cos(p.a) * p.r, y1 = cy + Math.sin(p.a) * p.r * flat + p.z * p.r * 0.03;
       const near = 1 - p.r / R, front = Math.sin(p.a) > 0;
       // a borda de trás fica mais apagada, a da frente mais nítida
-      tc.strokeStyle = rgba(mix([150, 160, 170], tint, 0.4 + near * 0.6), (0.12 + near * 0.55) * p.l * (front ? 1 : 0.6));
+      tc.strokeStyle = rgba(mix([150, 160, 170], tint, 0.65 + near * 0.35), (0.12 + near * 0.55) * p.l * (front ? 1 : 0.6));
       tc.lineWidth = 0.5 + near;
       tc.beginPath(); tc.moveTo(x0, y0); tc.lineTo(x1, y1); tc.stroke();
     }
@@ -193,7 +193,7 @@ export class RitualBackdrop {
 
     // céu: ardósia em cima, névoa quente perto do horizonte
     const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#0b0d11"); sky.addColorStop(0.55, "#151820"); sky.addColorStop(0.85, rgba(mix([44, 36, 42], tint, 0.08), 1)); sky.addColorStop(1, "#1a171c");
+    sky.addColorStop(0, "#0b0d11"); sky.addColorStop(0.55, rgba(mix([21, 24, 32], tint, 0.06), 1)); sky.addColorStop(0.85, rgba(mix([44, 36, 42], tint, 0.2), 1)); sky.addColorStop(1, rgba(mix([26, 23, 28], tint, 0.1), 1));
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
 
     // nuvens em espiral: o ruído é girado mais perto do centro, e gira devagar com o tempo
@@ -228,6 +228,12 @@ export class RitualBackdrop {
         ctx.globalCompositeOperation = "source-over";
       }
     }
+
+    // halo largo na cor da aba em volta do redemoinho: cor de ambiente, fraca e espalhada
+    const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.9);
+    halo.addColorStop(0, rgba(tint, 0.16)); halo.addColorStop(0.45, rgba(tint, 0.07)); halo.addColorStop(1, rgba(tint, 0));
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(1, 0.6); ctx.translate(-cx, -cy);
+    ctx.fillStyle = halo; ctx.fillRect(cx - R, cy - R, R * 2, R * 2); ctx.restore();
 
     // olho do ritual: luz pulsando devagar no centro
     const eye = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.22);
