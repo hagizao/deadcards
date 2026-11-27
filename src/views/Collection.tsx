@@ -8,6 +8,7 @@ import { easeOut, field, pageTitle, pill, primaryBtn } from "../lib/ui";
 import { useMyCards } from "../lib/myCards";
 import { SignInOptions } from "./Login";
 import { Icon } from "../components/Icon";
+import { cascade, useSettled } from "../lib/motion";
 
 type Mode = "mine" | "all";
 type HeroMode = "signature" | "every";
@@ -103,6 +104,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   const label = useLabel();
   const { teams, players, me } = useData();
   const [mode, setMode] = useState<Mode>("mine");
+  const settled = useSettled();
   const [heroMode, setHeroMode] = useState<HeroMode>("every");
   // ids das cartas que a pessoa tem; null enquanto carrega
   const { owned } = useMyCards();
@@ -205,8 +207,9 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
       {(me || !mine) && (
       <motion.div layout className="flex flex-wrap justify-center gap-6 sm:justify-start">
         <AnimatePresence mode="popLayout">
-          {list.slice(0, limit).map((p) => (
-            <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }} transition={{ duration: 0.2, ease: easeOut }}>
+          {list.slice(0, limit).map((p, i) => (
+            <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.92, y: settled ? 0 : 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92 }}
+              transition={{ duration: settled ? 0.2 : 0.35, ease: easeOut, delay: settled ? 0 : cascade(i) }}>
               {/* em "todas", a carta que você não tem fica em preto e branco; no destaque ela aparece normal */}
               <div className={me && !mine && !has(p.id) ? "opacity-80 grayscale transition hover:opacity-100" : undefined}>
                 <Card player={p} variant="medium" signature={every && isMainCard(p) && withAlts.has(p.id)} onOpen={() => onOpenCard(p.id)} />
