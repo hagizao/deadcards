@@ -10,6 +10,8 @@ import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
 import { Icon } from "../components/Icon";
 import { easeOut, pageTitle, pill } from "../lib/ui";
+import { cascade } from "../lib/motion";
+import { Reveal } from "../components/Motion";
 
 export type Area = "teams" | "tierlist" | "collection" | "compare" | "redeem";
 
@@ -88,7 +90,8 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
     <div className="flex flex-col gap-10">
       {featured.length > 0 && (
         <section className="noir-glass relative flex flex-col gap-6 overflow-hidden rounded-3xl py-5 sm:py-8" aria-labelledby="home-featured">
-          {settings.homeHero && <img src={settings.homeHero} alt="" className="pointer-events-none absolute inset-0 size-full object-cover opacity-20" />}
+          {/* a capa assenta devagar enquanto as cartas são distribuídas */}
+          {settings.homeHero && <motion.img src={settings.homeHero} alt="" className="pointer-events-none absolute inset-0 size-full object-cover opacity-20" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 1.4, ease: easeOut }} />}
           <div className="relative flex flex-col gap-1 px-5 sm:px-8">
             <span className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">{picked.length ? t.picked : t.top}</span>
             <h1 id="home-featured" className={pageTitle}>{t.featured}</h1>
@@ -98,17 +101,21 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
       )}
 
       <section className="flex flex-col gap-4" aria-labelledby="home-explore">
-        <h2 id="home-explore" className={sectionTitle}>{t.explore}</h2>
+        <Reveal><h2 id="home-explore" className={sectionTitle}>{t.explore}</h2></Reveal>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {AREAS.map((a) => <AreaTile key={a} title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />)}
+          {AREAS.map((a, i) => (
+            <Reveal key={a} delay={cascade(i, 0.06)} className="flex flex-col">
+              <AreaTile title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />
+            </Reveal>
+          ))}
         </div>
       </section>
 
       <section className="flex flex-col gap-4" aria-labelledby="home-ranking">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <Reveal className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="home-ranking" className={sectionTitle}>{t.ranking}</h2>
           {ranked.length > RANKING && <button type="button" className={pill(false)} onClick={() => onNavigate("teams")}>{t.allTeams(ranked.length)}</button>}
-        </div>
+        </Reveal>
         {ranked.length === 0 && <div className="noir-glass rounded-2xl p-6 text-sm text-zinc-300">{t.none}</div>}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {ranked.slice(0, RANKING).map((r, idx) => (
@@ -136,7 +143,10 @@ function Fan({ cards, onOpenCard }: { cards: Player[]; onOpenCard: (id: string) 
         const k = fanOffset(i);
         return (
           <div key={p.id} className="shrink-0 snap-center xl:order-(--fo) xl:translate-y-(--fy) xl:rotate-(--fr)" style={{ "--fo": k, "--fr": `${k * 3}deg`, "--fy": `${Math.abs(k) * 12}px` } as CSSProperties}>
-            <Card player={p} variant={k === 0 ? "team" : "medium"} onOpen={() => onOpenCard(p.id)} />
+            {/* as cartas são distribuídas do centro para as pontas */}
+            <motion.div initial={{ opacity: 0, y: 48, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 200, damping: 22, delay: 0.1 + Math.abs(k) * 0.09 }}>
+              <Card player={p} variant={k === 0 ? "team" : "medium"} onOpen={() => onOpenCard(p.id)} />
+            </motion.div>
           </div>
         );
       })}
@@ -149,7 +159,7 @@ function AreaTile({ title, text, meta, onClick }: { title: string; text: string;
     <button
       type="button"
       onClick={onClick}
-      className="noir-glass flex min-h-11 cursor-pointer items-center gap-4 rounded-2xl p-5 text-left transition-colors hover:border-zinc-200/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+      className="noir-glass flex min-h-11 flex-1 cursor-pointer items-center gap-4 rounded-2xl p-5 text-left transition-colors hover:border-zinc-200/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
     >
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="font-display text-lg tracking-[0.11em] text-dl-text uppercase">{title}</span>
@@ -176,7 +186,8 @@ function TeamRow({ r, idx, tier, meta, onOpen }: {
       onClick={onOpen}
       {...tiltHandlers}
       initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: true }}
       transition={{ delay: Math.min(idx, 8) * 0.05, duration: 0.25, ease: easeOut }}
       whileHover="hover"
       variants={{ hover: { y: -2 } }}
