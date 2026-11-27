@@ -147,9 +147,10 @@ export function Calendar() {
             </div>
           )}
           {events.some((ev) => ev.brazil) && (
-            <p className="flex w-fit items-center gap-4 rounded-xl bg-br-green/20 py-3 pr-5 pl-3 font-display text-base/tight font-extrabold tracking-wide text-br-yellow uppercase sm:text-lg/tight">
-              <span aria-hidden="true" className="br-frame size-10 shrink-0 rounded-lg" />
-              {t.legend}
+            <p className="flex w-fit items-center gap-3 rounded-xl bg-br-green/20 py-2.5 pr-4 pl-2.5 font-display text-sm/tight font-extrabold tracking-wide text-br-yellow uppercase">
+              <span aria-hidden="true" className="br-frame size-6 shrink-0 rounded-md" />
+              {/* a fonte de título tem espaço sobrando embaixo: o recorte põe as maiúsculas no centro da caixa */}
+              <span className="[text-box:trim-both_cap_alphabetic]">{t.legend}</span>
             </p>
           )}
         </div>
