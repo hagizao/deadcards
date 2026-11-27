@@ -12,6 +12,7 @@ const S = strings({
     title: "Comparar cartas",
     subtitle: "Escolha duas cartas e veja a diferença de OVR e de cada atributo.",
     player: (n: number) => `Jogador ${n}`,
+    sides: ["Âmbar", "Safira"],
     search: "Buscar jogador ou time…",
     selectPlayer: "Selecione um jogador",
     selectHero: "Selecione o herói",
@@ -32,6 +33,7 @@ const S = strings({
     title: "Compare cards",
     subtitle: "Pick two cards and see the difference in OVR and each attribute.",
     player: (n: number) => `Player ${n}`,
+    sides: ["Amber", "Sapphire"],
     search: "Search player or team…",
     selectPlayer: "Select a player",
     selectHero: "Select the hero",
@@ -52,6 +54,7 @@ const S = strings({
     title: "Comparar cartas",
     subtitle: "Elige dos cartas y mira la diferencia de OVR y de cada atributo.",
     player: (n: number) => `Jugador ${n}`,
+    sides: ["Ámbar", "Zafiro"],
     search: "Buscar jugador o equipo…",
     selectPlayer: "Selecciona un jugador",
     selectHero: "Selecciona el héroe",
@@ -70,9 +73,14 @@ const S = strings({
   },
 });
 
+// os dois lados do confronto têm as cores dos dois times do jogo: Âmbar à esquerda, Safira à direita
 const SERIES = [
-  { shape: "fill-cyan-300/15 stroke-cyan-300", text: "text-cyan-300", mark: "━" },
-  { shape: "fill-amber-400/15 stroke-amber-400", text: "text-amber-400", mark: "┄" },
+  { shape: "fill-amber-hand/15 stroke-amber-hand", text: "text-amber-hand", mark: "━" },
+  { shape: "fill-sapphire/15 stroke-sapphire", text: "text-sapphire", mark: "┄" },
+] as const;
+const SIDES = [
+  { label: "text-amber-hand", glow: "side-glow [--side:var(--color-amber-hand)]" },
+  { label: "text-sapphire", glow: "side-glow [--side:var(--color-sapphire)]" },
 ] as const;
 
 export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
@@ -92,7 +100,8 @@ export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
 
       <div className="grid grid-cols-2 gap-3 sm:gap-8">
         {selected.map((p, i) => (
-          <div key={i} className="flex min-w-0 flex-col gap-4">
+          <div key={i} className={`${SIDES[i].glow} relative isolate flex min-w-0 flex-col gap-4`}>
+            <span className={`deco-title font-display text-lg font-extrabold tracking-[0.14em] uppercase title-depth sm:text-2xl ${SIDES[i].label}`}>{t.sides[i]}</span>
             <Picker label={t.player(i + 1)} value={ids[i]} onChange={(id) => setIds(i ? [ids[0], id] : [id, ids[1]])} />
             {p ? (
               <>
