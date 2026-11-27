@@ -18,6 +18,7 @@
   /* src/index.css @theme */
   --font-display: 'VALVE Pulp', 'VALVE Oracle', ui-sans-serif, system-ui, sans-serif;
   --color-dl-text: #ffefd7;
+  --color-area: #ffefd7; /* trocado por aba em src/lib/areas.ts */
   --color-dl-black: #10130d;
   --color-dl-bevel-from: #373d45;
   --color-dl-bevel-to: #4d5860;

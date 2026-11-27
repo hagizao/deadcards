@@ -29,6 +29,19 @@
   </section>
 
   <section>
+    <h2>Cor da área</h2>
+    <p class="lede">Cada aba tem a cor de uma raridade, no token <code>--color-area</code> (<code>text-area</code>, <code>bg-area</code>, <code>border-area</code>). Fora de uma área ele fica no <code>dl-text</code>. Título de página, pílula ativa, botão principal e o menu usam essa cor. Mapa em <code>src/lib/areas.ts</code>.</p>
+    <div class="swatches">
+      <div class="sw"><i style="background:var(--rarity-eternus-c)"></i><b>Times · Eternus</b><code>#38e8ff</code></div>
+      <div class="sw"><i style="background:var(--rarity-ascendant-c)"></i><b>Tier List · Ascendant</b><code>#f5b82e</code></div>
+      <div class="sw"><i style="background:var(--rarity-oracle-c)"></i><b>Coleção · Oracle</b><code>#ff6a26</code></div>
+      <div class="sw"><i style="background:var(--rarity-archon-c)"></i><b>Comparar · Archon</b><code>#b26bff</code></div>
+      <div class="sw"><i style="background:var(--rarity-arcanist-c)"></i><b>Resgatar · Arcanist</b><code>#2dd47a</code></div>
+    </div>
+    <p class="lede">Sem caixas aparentes: áreas se separam por espaço e por uma linha fina (<code>border-zinc-200/15</code>), à esquerda em colunas e em cima em seções empilhadas.</p>
+  </section>
+
+  <section>
     <h2>Noir e platina</h2>
     <p class="lede">Fundo carvão e texto platina. Os três tons platina são os mesmos de <code>zinc-100/300/400</code>, que as telas usam direto.</p>
     <div class="swatches">
@@ -88,7 +101,7 @@
       <div class="cell" style="flex:1 1 320px">
         <span class="tag">VALVE Pulp · font-display · títulos</span>
         <span style="font-family:var(--font-display);font-size:30px;letter-spacing:.11em;text-transform:uppercase;color:var(--color-dl-text)">Tier List dos Times</span>
-        <code>pageTitle: font-display text-2xl sm:text-3xl font-extrabold tracking-[0.11em] text-dl-text uppercase</code>
+        <code>pageTitle: font-display text-2xl sm:text-3xl font-extrabold tracking-[0.11em] text-area uppercase</code>
       </div>
       <div class="cell" style="flex:1 1 320px">
         <span class="tag">VALVE Oracle · base · todo o resto</span>

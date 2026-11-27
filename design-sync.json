@@ -6,6 +6,7 @@
   "tokens": {
     "--font-display": "'VALVE Pulp', 'VALVE Oracle', ui-sans-serif, system-ui, sans-serif",
     "--color-dl-text": "#ffefd7",
+    "--color-area": "#ffefd7 (por aba: teams eternus, tierlist ascendant, collection oracle, compare archon, redeem arcanist; src/lib/areas.ts)",
     "--color-dl-black": "#10130d",
     "--color-dl-bevel-from": "#373d45",
     "--color-dl-bevel-to": "#4d5860",
@@ -53,6 +54,7 @@
     "Icon": "in code only",
     "brand-badge": "in code only",
     "Motion (CountUp, FillBar, Reveal)": "in code only",
-    "Skeleton (CardSkeleton, ProfileSkeleton)": "in code only"
+    "Skeleton (CardSkeleton, ProfileSkeleton)": "in code only",
+    "Rail (useRail, RailArrows)": "in code only"
   }
 }
