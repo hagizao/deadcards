@@ -182,18 +182,24 @@ function AchievementTile({ a, t, hide }: { a: Achievement; t: Texts; hide: boole
         )}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={`truncate text-sm font-extrabold ${a.done ? "text-dl-text" : "text-zinc-300"}`}>{text.title}</span>
-        <span className="text-xs text-zinc-400">{text.desc(a.goal)}</span>
-        <span className="flex items-center gap-2 text-[11px] font-bold tracking-widest uppercase">
-          <span className={a.done ? COLOR[a.rarity] : "text-zinc-500"}>{t.rarities[a.rarity]}</span>
-          {a.done && <span className="text-zinc-400">· {t.unlocked}</span>}
+        <span className={`text-sm/tight font-extrabold text-balance wrap-break-word ${a.done ? "text-dl-text" : "text-zinc-300"}`}>{text.title}</span>
+        <span className="text-xs text-pretty wrap-break-word text-zinc-400">{text.desc(a.goal)}</span>
+        {/* cada rótulo fica inteiro: sem espaço, o segundo desce para a linha de baixo em vez de quebrar no meio */}
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-bold tracking-wider uppercase">
+          <span className={`whitespace-nowrap ${a.done ? COLOR[a.rarity] : "text-zinc-500"}`}>{t.rarities[a.rarity]}</span>
+          {a.done && (
+            <span className="flex items-center gap-1 whitespace-nowrap text-zinc-400">
+              <Icon name="check" className="size-3" />
+              {t.unlocked}
+            </span>
+          )}
         </span>
         {!a.done && (
-          <div className="flex items-center gap-2">
-            <div role="progressbar" aria-label={text.title} aria-valuenow={a.value} aria-valuemin={0} aria-valuemax={a.goal} className="h-1.5 flex-1 rounded-full bg-zinc-800">
+          <div className="flex min-w-0 items-center gap-2">
+            <div role="progressbar" aria-label={text.title} aria-valuenow={a.value} aria-valuemin={0} aria-valuemax={a.goal} className="h-1.5 min-w-8 flex-1 rounded-full bg-zinc-800">
               <div className="h-full rounded-full bg-zinc-400" style={{ width: `${pct}%` }} />
             </div>
-            <span className="text-[11px] text-zinc-400 tabular-nums">{a.value}/{a.goal}</span>
+            <span className="shrink-0 text-[11px] whitespace-nowrap text-zinc-400 tabular-nums">{a.value}/{a.goal}</span>
           </div>
         )}
       </div>
