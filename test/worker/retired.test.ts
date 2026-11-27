@@ -21,7 +21,7 @@ const json = (cookie: string, path: string, method: string, body?: unknown) =>
 
 describe("Herói jogado aposentado", () => {
   it("apagar carta que alguém tem devolve 409 com code owned", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     const { userId } = await login("fan");
     await put(cookie, "rmain");
     await put(cookie, "ralt", { variantOf: "rmain", hero: "Mina", altHero: true });
@@ -32,7 +32,7 @@ describe("Herói jogado aposentado", () => {
   });
 
   it("não cria nem resgata código de carta aposentada", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     await put(cookie, "cmain");
     await put(cookie, "calt", { variantOf: "cmain", hero: "Mina", altHero: true });
     await seedCode("OLD-CODE-1", "calt");
@@ -50,7 +50,7 @@ describe("Herói jogado aposentado", () => {
   });
 
   it("carta principal inativa (fora do elenco) continua resgatável", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     await put(cookie, "imain", { inactive: true });
     await seedCode("MAIN-CODE-1", "imain");
     const { cookie: fan } = await login("fan");

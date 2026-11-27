@@ -14,7 +14,7 @@ const featured = async () => ((await (await SELF.fetch("http://test/api/data")).
 
 describe("Cartas em destaque da Home", () => {
   it("salva a lista na ordem escolhida e aceita lista vazia", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     expect((await saveFeatured(cookie, ["p2", "p1"])).status).toBe(200);
     expect(await featured()).toEqual(["p2", "p1"]);
     expect((await saveFeatured(cookie, [])).status).toBe(200);
@@ -22,7 +22,7 @@ describe("Cartas em destaque da Home", () => {
   });
 
   it("recusa mais de 5, repetidos e itens que não são id", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     expect((await saveFeatured(cookie, ["a", "b", "c", "d", "e", "f"])).status).toBe(400);
     expect((await saveFeatured(cookie, ["a", "a"])).status).toBe(400);
     expect((await saveFeatured(cookie, ["a", 3])).status).toBe(400);

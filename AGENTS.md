@@ -109,7 +109,7 @@ O visual é o produto. Mudança de UI segue estas regras; código antigo que nã
 - `npm run dev` continua 100% local: código de branch pode depender de migrations que ainda não estão em produção.
 - Migrations novas só vão para produção (`npm run db:migrate:remote`) junto com o deploy do código que as usa.
 
-- Toda rota que altera dados exige admin via `currentUser(...).admin`. Admins são definidos em `ADMINS` no `wrangler.jsonc`.
+- Toda rota que altera dados exige admin via `currentUser(...).admin`. Admins são definidos em `ADMINS` no `wrangler.jsonc`, pelo id numérico do Twitch (nunca pelo nome).
 - Valide entrada em toda API de escrita e upload.
 - SQL sempre com bind (`prepare(...).bind(...)`), nunca concatenando valores.
 - Schema muda só por migration nova em `migrations/` (`000N_descricao.sql`). Nunca edite migration já aplicada.

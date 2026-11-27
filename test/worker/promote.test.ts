@@ -31,12 +31,12 @@ describe("Tornar versão a principal", () => {
 
   it("recusa sem login e método errado", async () => {
     expect((await promote("v1")).status).toBe(403);
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     expect((await promote("v1", cookie, "GET")).status).toBe(405);
   });
 
   it("troca principal e versões numa só operação", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     expect((await promote("v1", cookie)).status).toBe(200);
     expect(await extra("v1")).toEqual({});
     expect(await extra("m")).toEqual({ variantOf: "v1" });
@@ -45,7 +45,7 @@ describe("Tornar versão a principal", () => {
   });
 
   it("recusa carta que já é principal e id inexistente", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     expect((await promote("m", cookie)).status).toBe(400);
     expect((await promote("nope", cookie)).status).toBe(404);
   });

@@ -93,7 +93,7 @@ describe("Packs", () => {
   });
 
   it("carta exclusiva não sai em pack", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     await env.DB.prepare("UPDATE players SET extra_json = '{\"exclusive\":true}' WHERE id = 'a'").run();
     for (let i = 0; i < 8; i++) {
       const res = (await (await req(cookie, "/api/packs/test:pack-semanal/open", "POST")).json()) as { cards: { id: string }[] };
@@ -102,7 +102,7 @@ describe("Packs", () => {
   });
 
   it("admin sempre tem pack de teste, que abre sem gravar", async () => {
-    const { cookie, userId } = await login("admvicli");
+    const { cookie, userId } = await login("admvicli", ["twitch"], "190835130");
     const inv = (await (await req(cookie, "/api/packs")).json()) as Inv;
     expect(inv.packs).toEqual([expect.objectContaining({ id: "test:pack-semanal", test: true })]);
     for (let i = 0; i < 3; i++) expect((await req(cookie, "/api/packs/test:pack-semanal/open", "POST")).status).toBe(200);
@@ -113,7 +113,7 @@ describe("Packs", () => {
   });
 
   it("tipos de pack: só admin, com chances validadas", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     const { cookie: fan } = await login("fan");
     const body = { name: "Final", odds: { alt: 70, signature: 25, special: 5 }, teams: ["t1"] };
     expect((await req(fan, "/api/pack-types/final", "PUT", body)).status).toBe(403);
@@ -125,8 +125,26 @@ describe("Packs", () => {
     expect((await req(cookie, "/api/pack-types/final", "DELETE")).status).toBe(409);
   });
 
+  it("cartas escolhidas: valida, guarda e só elas saem, até exclusiva", async () => {
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
+    await env.DB.prepare("UPDATE players SET extra_json = '{\"exclusive\":true}' WHERE id = 'a'").run();
+    const body = { name: "Só A", odds: { alt: 80, signature: 15, special: 5 }, teams: [], players: ["a"] };
+    for (const players of ["a", [1], ["../x"]]) expect((await req(cookie, "/api/pack-types/so-a", "PUT", { ...body, players })).status).toBe(400);
+    expect((await req(cookie, "/api/pack-types/so-a", "PUT", body)).status).toBe(200);
+    const list = (await (await req(cookie, "/api/pack-types")).json()) as { id: string; players?: string[] }[];
+    expect(list.find((t) => t.id === "so-a")?.players).toEqual(["a"]);
+    for (let i = 0; i < 8; i++) {
+      const res = (await (await req(cookie, "/api/packs/test:so-a/open", "POST")).json()) as { cards: { id: string }[] };
+      expect(res.cards[0].id).toBe("a");
+    }
+    // salvar sem cartas volta para o pool por time
+    expect((await req(cookie, "/api/pack-types/so-a", "PUT", { ...body, players: undefined })).status).toBe(200);
+    const again = (await (await req(cookie, "/api/pack-types")).json()) as { id: string; players?: string[] }[];
+    expect(again.find((t) => t.id === "so-a")?.players).toBeUndefined();
+  });
+
   it("tipos de pack com chances por raridade: valida, guarda e o sorteio respeita", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     const high = JSON.stringify({ MIR: 95, MAC: 95, SUP: 95, MOV: 95, POL: 95, CON: 95 });
     const low = JSON.stringify({ MIR: 50, MAC: 50, SUP: 50, MOV: 50, POL: 50, CON: 50 });
     await env.DB.batch([
@@ -150,7 +168,7 @@ describe("Packs", () => {
   });
 
   it("código: carta ou pack, nunca os dois", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     const base = { code: "BOTH-CODE-1", maxUses: 1, startsAt: null, expiresAt: null };
     expect((await req(cookie, "/api/codes", "POST", { ...base, playerId: "a", packTypeId: "pack-semanal" })).status).toBe(400);
     expect((await req(cookie, "/api/codes", "POST", base)).status).toBe(400);

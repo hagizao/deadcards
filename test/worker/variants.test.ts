@@ -21,7 +21,7 @@ async function stored(id: string) {
 
 describe("Versões de carta", () => {
   it("valida variantOf ao salvar", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     expect((await put(cookie, "vmain")).status).toBe(200);
     expect((await put(cookie, "vver", { variantOf: "vmain" })).status).toBe(200);
     expect((await stored("vver")).variantOf).toBe("vmain");
@@ -33,7 +33,7 @@ describe("Versões de carta", () => {
   });
 
   it("herói jogado só fica marcado em versão", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     await put(cookie, "hmain");
     expect((await put(cookie, "hmina", { variantOf: "hmain", hero: "Mina", altHero: true })).status).toBe(200);
     expect((await stored("hmina")).altHero).toBe(true);
@@ -44,7 +44,7 @@ describe("Versões de carta", () => {
   });
 
   it("bloqueia apagar principal com versões", async () => {
-    const { cookie } = await login("admvicli");
+    const { cookie } = await login("admvicli", ["twitch"], "190835130");
     await put(cookie, "dmain");
     await put(cookie, "dver", { variantOf: "dmain" });
     expect((await del(cookie, "dmain")).status).toBe(409);

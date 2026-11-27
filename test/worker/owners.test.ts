@@ -17,7 +17,7 @@ describe("GET /api/owners", () => {
     await give(a.userId, "p1");
     await give(b.userId, "p1");
     await give(b.userId, "p2");
-    const admin = await login("admvicli");
+    const admin = await login("admvicli", ["twitch"], "190835130");
     const res = await owners(admin.cookie);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ owners: { p1: 2, p2: 1 }, accounts: 3 });

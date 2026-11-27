@@ -10,6 +10,7 @@ import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team,
 import { Card } from "../components/Card";
 import { TeamLogo } from "../components/TeamLogo";
 import { HoldButton } from "../components/HoldButton";
+import { Icon } from "../components/Icon";
 import { Range } from "../components/Range";
 import { PackArt } from "../components/Pack";
 import { downloadBlob } from "../lib/cardImage";
@@ -372,6 +373,22 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
             </div>
           )}
           {d.art && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Camada da frente (PNG transparente, opcional)</span>
+              <div className="flex gap-2">
+                <ImagePick folder="players" label={d.art.fg ? "Trocar camada" : "Enviar camada"} onUrl={(url) => set({ art: { ...d.art!, fg: { url, zoom: 100, x: 50, y: 50 } } })} />
+                {d.art.fg && <button type="button" className={ghost} onClick={() => set({ art: { ...d.art!, fg: undefined } })}>Remover camada</button>}
+              </div>
+            </div>
+          )}
+          {d.art?.fg && (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Range label="Zoom da frente" value={d.art.fg.zoom ?? 100} min={50} max={300} onChange={(v) => set({ art: { ...d.art!, fg: { ...d.art!.fg!, zoom: v } } })} />
+              <Range label="X da frente" value={d.art.fg.x ?? 50} min={0} max={100} onChange={(v) => set({ art: { ...d.art!, fg: { ...d.art!.fg!, x: v } } })} />
+              <Range label="Y da frente" value={d.art.fg.y ?? 50} min={0} max={100} onChange={(v) => set({ art: { ...d.art!, fg: { ...d.art!.fg!, y: v } } })} />
+            </div>
+          )}
+          {d.art && (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Artista (crédito)">
                 <input className={input} maxLength={60} placeholder="@artista" value={d.art.credit?.name ?? ""}
@@ -666,6 +683,100 @@ function LookForm() {
 const KIND_LABEL: Record<PackKind, string> = { alt: "Herói jogado", signature: "Herói de assinatura", special: "Especial e outras versões" };
 const pct = (n: number) => `${(n * 100).toLocaleString("pt-BR", { maximumFractionDigits: n < 0.01 ? 2 : 1 })}%`;
 
+const KIND_SHORT: Record<PackKind, string> = { alt: "Herói jogado", signature: "Assinatura", special: "Especial" };
+const filterChip = (on: boolean) => `${chip} shrink-0 whitespace-nowrap ${on ? "bg-zinc-100 text-zinc-950" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`;
+
+/** Grade de cartas para escolher a dedo o que sai no pack: busca, filtros e um toque para marcar. */
+function CardPicker({ value, onChange, rarityOf }: { value: string[]; onChange: (ids: string[]) => void; rarityOf: RarityOf }) {
+  const { players, teams, heroArt } = useData();
+  const [q, setQ] = useState("");
+  const [kind, setKind] = useState<PackKind | null>(null);
+  const [rar, setRar] = useState<RarityKey | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
+  const on = new Set(value);
+  const tagOf = (p: Player) => teams.find((t) => t.id === p.teamId)?.tag ?? "";
+  const term = q.trim().toLowerCase();
+  // escolhida aparece mesmo inativa, para dar para desmarcar
+  const visible = players.filter((p) => (showInactive || !p.inactive || on.has(p.id)) && (!kind || packKind(p) === kind) && (!rar || rarityOf(p) === rar)
+    && (!term || `${p.name} ${p.hero} ${tagOf(p)}`.toLowerCase().includes(term)));
+  const pickable = visible.filter((p) => !isRetired(p) && !on.has(p.id));
+  const missing = value.filter((id) => !players.some((p) => p.id === id));
+  const inactive = players.filter((p) => p.inactive).length;
+  const clear = () => { setQ(""); setKind(null); setRar(null); };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="search" className={`${input} min-h-11 sm:max-w-xs`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nome, herói ou time" aria-label="Buscar carta" />
+        <span className="flex-1 text-sm text-zinc-300" aria-live="polite"><b className="text-zinc-100">{value.length - missing.length}</b> escolhidas</span>
+        <button type="button" className={`${ghost} min-h-11 sm:min-h-0`} disabled={!pickable.length} onClick={() => onChange([...value, ...pickable.map((p) => p.id)])}>
+          Marcar visíveis ({pickable.length})
+        </button>
+        <HoldButton className={`${ghost} min-h-11 sm:min-h-0`} disabled={!value.length} onConfirm={() => onChange([])} label="Segure para desmarcar todas">Desmarcar todas</HoldButton>
+      </div>
+
+      <div className="flex shrink-0 gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" role="group" aria-label="Filtros">
+        {PACK_KINDS.map((k) => <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(kind === k ? null : k)} className={filterChip(kind === k)}>{KIND_SHORT[k]}</button>)}
+        {RARITY_TIERS.map((tier) => {
+          const r = tier.key as RarityKey;
+          return (
+            <button key={r} type="button" aria-pressed={rar === r} onClick={() => setRar(rar === r ? null : r)} className={`${filterChip(rar === r)} flex items-center gap-1.5`}>
+              <span aria-hidden="true" className="size-2 rounded-full" style={{ background: tier.c }} />{tier.name}
+            </button>
+          );
+        })}
+        {inactive > 0 && <button type="button" aria-pressed={showInactive} onClick={() => setShowInactive(!showInactive)} className={filterChip(showInactive)}>Mostrar inativas ({inactive})</button>}
+      </div>
+
+      {missing.length > 0 && (
+        <p className="flex flex-wrap items-center gap-2 text-xs text-amber-300">
+          {missing.length === 1 ? "1 carta escolhida foi apagada." : `${missing.length} cartas escolhidas foram apagadas.`}
+          <button type="button" className="cursor-pointer font-bold underline hover:text-amber-200" onClick={() => onChange(value.filter((id) => !missing.includes(id)))}>Tirar da lista</button>
+        </p>
+      )}
+      {value.length === 0 && <p className="text-sm text-amber-300">Nenhuma carta escolhida: toque nas cartas abaixo para colocar no pack.</p>}
+
+      {/* quem rola é o contêiner: grade com altura limitada espreme as linhas e os blocos se sobrepõem */}
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl bg-zinc-950/40 p-2">
+      <div role="group" aria-label="Cartas" className="grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2">
+        {visible.map((p) => {
+          const sel = on.has(p.id);
+          const retired = isRetired(p);
+          const tier = RARITY_TIERS.find((x) => x.key === rarityOf(p))!;
+          const art = p.art?.url ? { url: p.art.url, x: p.art.x ?? 50, y: p.art.y ?? 50 } : heroArt(p.hero);
+          const tag = retired ? "aposentada" : p.exclusive ? "exclusiva" : p.inactive ? "inativa" : null;
+          return (
+            <button key={p.id} type="button" aria-pressed={sel} disabled={retired && !sel} onClick={() => onChange(sel ? value.filter((x) => x !== p.id) : [...value, p.id])}
+              title={`${p.name} · ${p.hero} · ${tagOf(p)}${retired ? " · herói aposentado, não sai em pack" : ""}`}
+              className={`relative flex aspect-4/5 cursor-pointer flex-col justify-end overflow-hidden rounded-xl bg-zinc-900 text-left transition duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-30 ${sel ? "ring-2 ring-zinc-100" : "opacity-60 hover:opacity-100"}`}>
+              {art && <img src={art.url} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${art.x}% ${art.y}%` }} />}
+              <span aria-hidden="true" className="absolute inset-0 bg-linear-to-t from-zinc-950 via-zinc-950/50 to-transparent" />
+              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1" style={{ background: tier.c }} />
+              {tag && <span className="absolute top-2 left-2 rounded-md bg-zinc-950/80 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-amber-200 uppercase">{tag}</span>}
+              {sel && <span className="absolute top-2 right-2 grid size-6 place-items-center rounded-full bg-zinc-100 text-zinc-950"><Icon name="check" className="size-4" /></span>}
+              <span className="relative flex min-w-0 flex-col gap-0.5 p-2.5 pb-3">
+                <span className="flex items-baseline gap-1.5">
+                  <span className="font-display text-2xl leading-none" style={{ color: tier.c }}>{getPlayerOvr(p)}</span>
+                  <span className="text-[10px] font-bold tracking-wider text-zinc-300 uppercase">{tier.name}</span>
+                </span>
+                <span className="truncate text-sm font-bold text-zinc-100">{p.name}</span>
+                <span className="truncate text-xs text-zinc-400">{p.hero} · {KIND_SHORT[packKind(p)]} · {tagOf(p)}</span>
+              </span>
+            </button>
+          );
+        })}
+        {!visible.length && (
+          <div className="col-span-full flex flex-col items-center gap-3 p-8 text-center text-sm text-zinc-400">
+            Nenhuma carta com esses filtros.
+            <button type="button" className={ghost} onClick={clear}>Limpar filtros</button>
+          </div>
+        )}
+      </div>
+      </div>
+    </div>
+  );
+}
+
 /** Tipos de pack: nome, arte, chances por tipo de carta e times do pool, com a prévia das chances reais. */
 // pack salvo sem chances por raridade abre com as padrão (salvar passa a gravá-las)
 const editable = (t: PackType | undefined): PackType | null => (t ? { ...structuredClone(t), rarity: t.rarity ? { ...t.rarity } : { ...DEFAULT_RARITY_ODDS } } : null);
@@ -674,6 +785,7 @@ function PacksForm() {
   const { players, teams, settings } = useData();
   const [types, setTypes] = useState<PackType[]>([]);
   const [d, setD] = useState<PackType | null>(null);
+  const picker = useRef<HTMLDialogElement>(null);
   const [sim, setSim] = useState<{ kind: Record<PackKind, number>; rarity: Record<RarityKey, number>; top: [string, number][] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -779,22 +891,51 @@ function PacksForm() {
               <p className="text-xs text-zinc-500">Vale dentro do tipo sorteado. Raridade sem carta naquele tipo sai da conta e divide a chance entre as outras; 0 = nunca sai.</p>
             </div>
 
-            <div className="space-y-2">
-              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Times do pool {d.teams.length === 0 && <span className="text-zinc-100">· todos</span>}</span>
-              <div className="flex flex-wrap gap-2">
-                {teams.map((t) => {
-                  const on = d.teams.includes(t.id);
-                  return (
-                    <button key={t.id} type="button" aria-pressed={on} onClick={() => set({ teams: on ? d.teams.filter((x) => x !== t.id) : [...d.teams, t.id] })}
-                      className={`${chip} ${on ? "bg-amber-300 text-zinc-950 hover:bg-amber-200" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>{t.tag}</button>
-                  );
-                })}
+            <div className="space-y-3">
+              <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Cartas que podem sair</span>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Como escolher as cartas">
+                <button type="button" aria-pressed={!d.players} onClick={() => set({ players: undefined })} className={filterChip(!d.players)}>Por time</button>
+                {/* começa com o pool que já saía por time, para nada mudar até você mexer */}
+                <button type="button" aria-pressed={!!d.players} onClick={() => d.players || set({ players: pool.map((p) => p.id) })} className={filterChip(!!d.players)}>Cartas escolhidas</button>
               </div>
+              {d.players ? (
+                <>
+                  <p className="text-xs text-zinc-500">Só as cartas marcadas saem neste pack, até exclusivas e inativas. Os times deixam de valer.</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button type="button" className={ghost} onClick={() => picker.current?.showModal()}>Escolher cartas</button>
+                    <span className="text-sm text-zinc-300"><b className="text-zinc-100">{pool.length}</b> {pool.length === 1 ? "carta pode sair" : "cartas podem sair"}</span>
+                  </div>
+                  <dialog ref={picker} aria-labelledby="pick-title" closedby="any"
+                    className="m-auto h-[min(52rem,calc(100dvh-2rem))] w-[min(80rem,calc(100%-2rem))] max-w-none rounded-3xl bg-zinc-900 p-0 text-zinc-100 backdrop:bg-zinc-950/80">
+                    <div className="flex h-full flex-col gap-4 p-4 sm:p-6">
+                      <div className="flex items-center gap-3">
+                        <h2 id="pick-title" className="flex-1 truncate text-lg font-extrabold tracking-[0.12em] uppercase">Cartas de {d.name || "pack"}</h2>
+                        <button type="button" className={primary} onClick={() => picker.current?.close()}>Pronto</button>
+                      </div>
+                      <CardPicker value={d.players} onChange={(players) => set({ players })} rarityOf={rarityOf} />
+                    </div>
+                  </dialog>
+                </>
+              ) : (
+                <>
+                  <span className="block text-xs text-zinc-500">Times do pool {d.teams.length === 0 && <span className="text-zinc-100">· todos</span>}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {teams.map((t) => {
+                      const on = d.teams.includes(t.id);
+                      return (
+                        <button key={t.id} type="button" aria-pressed={on} onClick={() => set({ teams: on ? d.teams.filter((x) => x !== t.id) : [...d.teams, t.id] })}
+                          className={`${chip} ${on ? "bg-amber-300 text-zinc-950 hover:bg-amber-200" : "border border-zinc-200/20 bg-zinc-900/60 text-zinc-300 hover:text-white"}`}>{t.tag}</button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
 
             {chances && (
               <div className="space-y-2 rounded-2xl bg-zinc-950/40 p-4">
                 <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Chances reais para quem não tem nenhuma carta · {pool.length} cartas no pool</span>
+                {pool.length === 1 && <p className="text-xs text-amber-300">Só uma carta: quem já tem ela não consegue abrir este pack.</p>}
                 <span className="block pt-1 text-[11px] font-bold tracking-[0.18em] text-zinc-500 uppercase">Por tipo</span>
                 <ul className="grid gap-1 text-sm text-zinc-200">
                   {PACK_KINDS.map((k) => {
@@ -834,8 +975,9 @@ function PacksForm() {
             )}
 
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" className={primary} disabled={busy || !valid || !d.name.trim()}
-                onClick={() => run(() => api.savePackType(d.id, { name: d.name.trim(), art: d.art, odds: d.odds, rarity: d.rarity, teams: d.teams }), `Pack "${d.name.trim()}" salvo!`, d.id)}>Salvar pack</button>
+              <button type="button" className={primary} disabled={busy || !valid || !d.name.trim() || !pool.length}
+                onClick={() => run(() => api.savePackType(d.id, { name: d.name.trim(), art: d.art, odds: d.odds, rarity: d.rarity, teams: d.teams, players: d.players }), `Pack "${d.name.trim()}" salvo!`, d.id)}>Salvar pack</button>
+              {!pool.length && <span className="text-xs text-amber-300">Nenhuma carta pode sair: escolha cartas ou times.</span>}
               {types.some((t) => t.id === d.id) && (
                 <button type="button" className={danger} disabled={busy}
                   onClick={() => { if (confirm(`Apagar o pack "${d.name}"?`)) run(() => api.removePackType(d.id), "Pack apagado.", ""); }}>Apagar</button>

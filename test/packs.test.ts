@@ -29,6 +29,16 @@ describe("packs", () => {
     expect(packPool(all, { teams: ["t2"] }, new Set()).map((p) => p.id)).toEqual(["other"]);
   });
 
+  it("cartas escolhidas: só elas, até exclusiva e inativa, sem aposentada nem repetida", () => {
+    const vip = card("vip", { exclusive: true, teamId: "t9" });
+    const benched = card("benched", { inactive: true });
+    const retired = card("retired", { variantOf: "main", altHero: true, inactive: true });
+    const all = [main, alt, vip, benched, retired];
+    const type = { teams: ["t1"], players: ["vip", "benched", "retired", "alt", "gone"] };
+    expect(packPool(all, type, new Set(["alt"])).map((p) => p.id)).toEqual(["vip", "benched"]);
+    expect(packPool(all, { teams: [], players: [] }, new Set())).toEqual([]);
+  });
+
   it("carta exclusiva nunca entra no pool", () => {
     const pool = packPool([main, card("vip", { exclusive: true })], { teams: [] }, new Set());
     expect(pool.map((p) => p.id)).toEqual(["main"]);

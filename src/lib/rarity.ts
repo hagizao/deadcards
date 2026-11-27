@@ -355,7 +355,8 @@ export function getRarity(ovr: number, cfg: TierBand[]): Tier {
 export function getCardTier(p: Player, cfg: TierBand[]): Tier {
   const base = getRarity(getPlayerOvr(p), cfg);
   const f = p.special ? p.frame : undefined;
-  const pr = f && FRAME_PRESETS[f.style];
+  // hasOwn: um style como "constructor" acharia um membro herdado e quebraria o render
+  const pr = f && Object.hasOwn(FRAME_PRESETS, f.style) ? FRAME_PRESETS[f.style] : undefined;
   if (!f || !pr) return base;
   const c = HEX.test(String(f.c1)) ? f.c1! : pr.c1;
   const hi = HEX.test(String(f.c2)) ? f.c2! : pr.c2;

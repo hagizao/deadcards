@@ -50,6 +50,10 @@ Fonte do design system: `src/index.css` (tokens `@theme`, `noir-glass`, `noir-gl
 - 2026-11-24 — Nada de dinheiro, ficha ou moeda na maleta, e um aviso "Packs são grátis e nunca serão vendidos" — "contrabando" não pode virar cassino.
 - 2026-11-24 — Na maleta, a luz da raridade sai da carta (halo, feixes e poeira); o interior e a espuma ficam pretos — o plano de luz chapado deixava tudo branco.
 - 2026-11-24 — Maleta em 3D (three.js) aprovada e no app (`src/lib/packCase.ts`, carregado só ao abrir um pack) — o conceito em `explorations/packs/d-maleta-3d.html` agradou; sem WebGL2 a carta abre direto, e máquina lenta perde o bloom.
+- 2026-11-25 — Pack tem dois modos de pool: "Por time" ou "Cartas escolhidas"; no segundo só as marcadas saem e os times deixam de valer — resposta 1A do dono, é o modelo mais fácil de entender e a prévia de chances continua exata.
+- 2026-11-25 — Carta exclusiva e carta inativa (fora do elenco) entram no pack só se marcadas a dedo; herói jogado aposentado nunca — resposta 2 do dono; aposentado já não pode ser dado por código.
+- 2026-11-25 — Escolha de cartas abre num modal (`<dialog>` nativo, fecha com Esc, clique fora ou "Pronto") com uma grade de blocos clicáveis (arte, OVR na cor da raridade, nome, herói · tipo · time, check quando marcada), com busca, chips de tipo e raridade e "Mostrar inativas" — pedido do dono: nada de `<select>` nativo, e o modal porque a grade dentro do formulário ficava apertada (quem rola é o contêiner, não a grade, senão as linhas se sobrepõem). Ao trocar para "Cartas escolhidas" a grade já vem com o pool que saía por time, para nada mudar até mexer.
+- 2026-11-25 — Ícone novo no `Icon`: `check`.
 
 ## Perguntas abertas
 - Celular fraco aguenta a maleta 3D? Hoje ela cai para 1x pixel e sem bloom quando os primeiros quadros passam de 25 ms; falta testar num aparelho real.

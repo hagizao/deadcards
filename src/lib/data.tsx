@@ -95,7 +95,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       settings,
       heroNames: [...new Set([...apiHeroes.map((h) => h.name), ...Object.keys(data.heroes)])].sort(),
       heroArt: (name) => {
-        const own = data.heroes[name];
+        const own = Object.hasOwn(data.heroes, name) ? data.heroes[name] : undefined;
         if (own) return own;
         const url = byName.get(name.toLowerCase())?.images?.icon_hero_card_webp;
         return url ? { name, url, zoom: 100, x: 50, y: 20 } : null;

@@ -15,7 +15,7 @@ Requisitos: Node 24+. Conta Cloudflare só é necessária para deploy; o dev rod
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars   # preencha as chaves da Twitch se for mexer no login
+cp .dev.vars.example .dev.vars   # gere o BETTER_AUTH_SECRET; chaves da Twitch só se for mexer no login
 npm run db:migrate               # cria as tabelas no D1 local
 npm run dev                      # site + Worker + D1 + R2 em http://localhost:5173
 ```

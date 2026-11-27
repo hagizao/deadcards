@@ -16,18 +16,16 @@ concurrency:
 permissions:
   contents: write
 
+# Os tokens ficam só nos passos que precisam deles: scripts de install do npm ci não os enxergam.
 jobs:
   release:
     runs-on: ubuntu-latest
     environment: production
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -36,20 +34,34 @@ jobs:
 
       - name: Nova versão
         id: version
+        env:
+          BUMP: ${{ inputs.bump }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           echo "prev=$(git describe --tags --abbrev=0 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
-          echo "tag=$(npm version ${{ inputs.bump }} -m 'chore(release): %s')" >> "$GITHUB_OUTPUT"
+          echo "tag=$(npm version "$BUMP" -m 'chore(release): %s')" >> "$GITHUB_OUTPUT"
 
-      - run: npm run db:migrate:remote
-      - run: npm run deploy
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npm run db:migrate:remote
+          npm run deploy
 
-      - run: git push --follow-tags
+      - name: Push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push --follow-tags
 
       - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREV: ${{ steps.version.outputs.prev }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          bash .github/scripts/release-notes.sh "${{ steps.version.outputs.prev }}" > notes.md
-          gh release create "${{ steps.version.outputs.tag }}" --title "${{ steps.version.outputs.tag }}" \
-            --notes-file notes.md --generate-notes \
-            ${{ steps.version.outputs.prev && format('--notes-start-tag {0}', steps.version.outputs.prev) || '' }}
+          bash .github/scripts/release-notes.sh "$PREV" > notes.md
+          gh release create "$TAG" --title "$TAG" --notes-file notes.md --generate-notes ${PREV:+--notes-start-tag "$PREV"}
