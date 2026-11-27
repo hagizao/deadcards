@@ -239,7 +239,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
 
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
-      <div className="noir-glass space-y-6 rounded-3xl p-5 sm:p-7">
+      <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <span className="rk-chip">{d.id ? "Modo Edição" : "Modo Criação"}</span>
@@ -357,7 +357,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
         </div>
         <Range label="Tamanho do rodapé (px)" value={d.footerSize ?? 12} min={8} max={20} onChange={(v) => set({ footerSize: v })} />
 
-        <div className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
+        <div className="space-y-3 border-l border-zinc-200/15 pl-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Arte própria da carta</span>
             <div className="flex gap-2">
@@ -402,7 +402,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
           )}
         </div>
 
-        <div className="space-y-3 rounded-2xl border border-amber-200/15 p-4">
+        <div className="space-y-3 border-l-2 border-amber-200/30 pl-4">
           <label className="flex items-center gap-2 text-sm font-bold text-amber-200">
             <input type="checkbox" checked={!!d.special} onChange={(e) => set({ special: e.target.checked || undefined })} className="accent-amber-300" />
             Carta especial
@@ -486,7 +486,7 @@ function TeamsForm() {
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-2">
-      <div className="noir-glass space-y-2 rounded-3xl p-5">
+      <div className="space-y-2">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Times ({teams.length})</h2>
           <button type="button" className={primary} onClick={() => setD({ id: "", name: "", tag: "", region: "Europa" })}>+ Novo time</button>
@@ -506,7 +506,7 @@ function TeamsForm() {
 
       <AnimatePresence>
         {d && (
-          <motion.div key={d.id || "new"} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="noir-glass space-y-4 rounded-3xl p-5">
+          <motion.div key={d.id || "new"} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="space-y-4 border-t border-zinc-200/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
             <h3 className="text-lg font-black tracking-[0.12em] text-white uppercase">{d.id ? `Editar ${d.name}` : "Novo time"}</h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Nome"><input className={input} value={d.name} maxLength={40} onChange={(e) => set({ name: e.target.value })} /></Field>
@@ -541,7 +541,7 @@ function BgFields({ bg, onChange, folder, title }: { bg?: BgSettings; onChange: 
   const b = bg ?? DEFAULT_BG;
   const set = (patch: Partial<BgSettings>) => onChange({ ...b, ...patch });
   return (
-    <div className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
+    <div className="space-y-3 border-l border-zinc-200/15 pl-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">{title}</span>
         <div className="flex gap-2">
@@ -575,7 +575,7 @@ function HeroesForm() {
 
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
-      <div className="noir-glass space-y-5 rounded-3xl p-5">
+      <div className="space-y-5">
         <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Arte dos heróis</h2>
         <div className="grid max-h-52 grid-cols-6 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-10">
           {heroNames.map((h) => {
@@ -618,6 +618,7 @@ function LookForm() {
   const [bg, setBg] = useState(settings.bg);
   const [homeHero, setHomeHero] = useState(settings.homeHero);
   const [featured, setFeatured] = useState(() => Array.from({ length: HOME_FEATURED_MAX }, (_, i) => settings.homeFeatured?.[i] ?? ""));
+  const [guide, setGuide] = useState(settings.homeGuide ?? "");
   const options = [...players].sort((a, b) => a.name.localeCompare(b.name));
   const tagOf = (p: Player) => teams.find((t) => t.id === p.teamId)?.tag ?? "FA";
   const [tiers, setTiers] = useState<TierBand[]>(() => structuredClone(settings.tierConfig ?? DEFAULT_TIER_CONFIG));
@@ -629,10 +630,10 @@ function LookForm() {
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-2">
-      <div className="noir-glass space-y-5 rounded-3xl p-5">
+      <div className="space-y-5">
         <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Fundo e capa</h2>
         <BgFields bg={bg} onChange={setBg} folder="bg" title="Fundo do site" />
-        <div className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
+        <div className="space-y-3 border-l border-zinc-200/15 pl-4">
           <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Imagem da capa (Home)</span>
           {homeHero && <img src={homeHero} alt="" className="h-28 rounded-lg object-cover" />}
           <div className="flex gap-2">
@@ -640,9 +641,9 @@ function LookForm() {
             {homeHero && <button type="button" className={ghost} onClick={() => setHomeHero(undefined)}>Remover</button>}
           </div>
         </div>
-        <fieldset className="space-y-3 rounded-2xl border border-zinc-200/10 p-4">
-          <legend className="px-1 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Cartas em destaque (Home)</legend>
-          <p className="text-xs text-zinc-400">A primeira fica no centro. Sem nenhuma escolhida, a Home mostra as maiores OVR.</p>
+        <fieldset className="space-y-3 border-l border-zinc-200/15 pl-4">
+          <legend className="px-1 text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Conheça o competitivo (Home)</legend>
+          <p className="text-xs text-zinc-400">As cartas do palco no topo da Home, na ordem em que giram. Sem nenhuma escolhida, a Home mostra as maiores OVR.</p>
           {featured.map((id, i) => (
             <select key={i} className={input} value={id} aria-label={`Destaque ${i + 1}`} onChange={(e) => setFeatured((f) => f.map((x, j) => (j === i ? e.target.value : x)))}>
               <option value="">{i + 1}. —</option>
@@ -654,8 +655,18 @@ function LookForm() {
             </select>
           ))}
         </fieldset>
+        <label className="block space-y-2 border-l border-zinc-200/15 pl-4">
+          <span className="block text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Como ler uma carta (Home)</span>
+          <span className="block text-xs text-zinc-400">A carta usada para explicar cada parte. Sem escolha, usa a primeira do palco.</span>
+          <select className={input} value={guide} onChange={(e) => setGuide(e.target.value)}>
+            <option value="">— A primeira do palco</option>
+            {options.map((p) => (
+              <option key={p.id} value={p.id}>{p.name} · {tagOf(p)} · {getPlayerOvr(p)}{p.special ? " · especial" : ""}</option>
+            ))}
+          </select>
+        </label>
       </div>
-      <div className="noir-glass space-y-3 rounded-3xl p-5">
+      <div className="space-y-3 border-t border-zinc-200/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Tier List</h2>
           <button type="button" className={ghost} onClick={() => setTiers(structuredClone(DEFAULT_TIER_CONFIG))}>Padrão</button>
@@ -671,7 +682,7 @@ function LookForm() {
         ))}
       </div>
       <div className="flex items-center gap-3 lg:col-span-2">
-        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { bg: bg ?? null, homeHero: homeHero ?? null, homeFeatured: featured.filter(Boolean), tierConfig: tiers }), "Aparência salva!")}>
+        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { bg: bg ?? null, homeHero: homeHero ?? null, homeFeatured: featured.filter(Boolean), homeGuide: guide || null, tierConfig: tiers }), "Aparência salva!")}>
           {busy ? "Salvando…" : "Salvar aparência"}
         </button>
         <Toast msg={msg} />
@@ -832,7 +843,7 @@ function PacksForm() {
 
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
-      <div className="noir-glass space-y-6 rounded-3xl p-5 sm:p-7">
+      <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-2">
           {types.map((t) => (
             <button key={t.id} type="button" aria-pressed={d?.id === t.id} onClick={() => { setD(editable(t)); setSim(null); }}
@@ -1079,7 +1090,7 @@ function CodesForm() {
 
   return (
     <div className="space-y-6">
-      <div className="noir-glass space-y-6 rounded-3xl p-5 sm:p-7">
+      <div className="space-y-6">
         <div>
           <h2 className="text-lg font-extrabold tracking-[0.12em] text-zinc-100 uppercase">Novo código</h2>
           <p className="mt-1 text-xs text-zinc-400">Quem digitar o código na aba Resgatar ganha a carta escolhida, ou o pack, que fica fechado no inventário até a pessoa abrir.</p>
@@ -1147,7 +1158,7 @@ function CodesForm() {
         </div>
       </div>
 
-      <div className="noir-glass space-y-3 rounded-3xl p-5 sm:p-7">
+      <div className="space-y-3 border-t border-zinc-200/15 pt-6">
         <h2 className="text-lg font-extrabold tracking-[0.12em] text-zinc-100 uppercase">Códigos criados</h2>
         {codes.length === 0 && <p className="text-xs text-zinc-400">Nenhum código ainda.</p>}
         {codes.map((c) => {
@@ -1182,7 +1193,7 @@ function SoundsForm() {
     else setMsg(`Erro: não deu para gerar ${id}.wav`);
   };
   return (
-    <div className="noir-glass space-y-5 rounded-3xl p-5 sm:p-7">
+    <div className="space-y-5">
       <div className="space-y-1.5">
         <h2 className="text-lg font-extrabold tracking-[0.12em] text-zinc-100 uppercase">Sons da abertura de pack</h2>
         <p className="text-sm text-zinc-400">

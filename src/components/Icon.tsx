@@ -3,6 +3,7 @@ const PATHS = {
   "chevron-down": "m6 9 6 6 6-6",
   "chevron-up": "m6 15 6-6 6 6",
   "chevron-right": "m9 5 7 7-7 7",
+  "chevron-left": "m15 5-7 7 7 7",
   "arrow-down": "M12 5v14m-6-6 6 6 6-6",
   check: "m5 12 5 5 9-10",
   "arrow-up": "M12 19V5m-6 6 6-6 6 6",
@@ -18,7 +19,9 @@ const PATHS = {
   gem: "M7 4h10l4 5-9 11L3 9zM3 9h18M12 20 8.5 9 10 4M12 20l3.5-11L14 4",
 };
 
-export function Icon({ name, className = "size-4" }: { name: keyof typeof PATHS; className?: string }) {
+export type IconName = keyof typeof PATHS;
+
+export function Icon({ name, className = "size-4" }: { name: IconName; className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${className}`} aria-hidden="true">
       <path d={PATHS[name]} />

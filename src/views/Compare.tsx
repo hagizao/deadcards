@@ -12,8 +12,11 @@ const S = strings({
     title: "Comparar cartas",
     subtitle: "Escolha duas cartas e veja a diferença de OVR e de cada atributo.",
     player: (n: number) => `Jogador ${n}`,
-    search: "Buscar nome, herói ou time…",
-    select: "Selecione uma carta",
+    search: "Buscar jogador ou time…",
+    selectPlayer: "Selecione um jogador",
+    selectHero: "Selecione o herói",
+    signature: "Assinatura",
+    version: (tag: string) => `Versão ${tag}`,
     none: "Nenhum jogador encontrado.",
     empty: "Escolha uma carta para comparar",
     main: "Principal",
@@ -29,8 +32,11 @@ const S = strings({
     title: "Compare cards",
     subtitle: "Pick two cards and see the difference in OVR and each attribute.",
     player: (n: number) => `Player ${n}`,
-    search: "Search name, hero or team…",
-    select: "Select a card",
+    search: "Search player or team…",
+    selectPlayer: "Select a player",
+    selectHero: "Select the hero",
+    signature: "Signature",
+    version: (tag: string) => `${tag} version`,
     none: "No player found.",
     empty: "Pick a card to compare",
     main: "Main",
@@ -46,8 +52,11 @@ const S = strings({
     title: "Comparar cartas",
     subtitle: "Elige dos cartas y mira la diferencia de OVR y de cada atributo.",
     player: (n: number) => `Jugador ${n}`,
-    search: "Buscar nombre, héroe o equipo…",
-    select: "Selecciona una carta",
+    search: "Buscar jugador o equipo…",
+    selectPlayer: "Selecciona un jugador",
+    selectHero: "Selecciona el héroe",
+    signature: "Insignia",
+    version: (tag: string) => `Versión ${tag}`,
     none: "No se encontró ningún jugador.",
     empty: "Elige una carta para comparar",
     main: "Principal",
@@ -76,7 +85,7 @@ export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
 
   return (
     <section className="space-y-6">
-      <div className="noir-glass rounded-2xl p-5 sm:p-7">
+      <div>
         <h1 className={pageTitle}>{t.title}</h1>
         <p className="mt-1.5 text-xs text-zinc-400">{t.subtitle}</p>
       </div>
@@ -95,7 +104,7 @@ export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
                 </div>
               </>
             ) : (
-              <div className="flex aspect-295/430 items-center justify-center rounded-2xl bg-zinc-900/60 p-4 text-center text-xs text-zinc-400">{t.empty}</div>
+              <div className="flex aspect-295/430 items-center justify-center rounded-2xl border-2 border-dashed border-zinc-200/15 p-4 text-center text-xs text-zinc-400">{t.empty}</div>
             )}
           </div>
         ))}
@@ -106,7 +115,7 @@ export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
       </div>
 
       {left && right && (
-        <div className="noir-glass grid gap-6 rounded-2xl p-5 sm:p-7 md:grid-cols-2">
+        <div className="grid gap-6 border-t border-zinc-200/15 pt-6 md:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-4">
             <h2 className="text-sm font-extrabold tracking-widest text-zinc-100 uppercase">{t.attributes}</h2>
             <table className="w-full table-fixed text-center">
@@ -145,22 +154,52 @@ function Diff({ value, other }: { value: number; other: number }) {
   );
 }
 
+/** Carta principal de quem é esta carta (a própria, se já for a principal). */
+const mainIdOf = (p: Player) => p.variantOf || p.id;
+
+/**
+ * Dois passos: o jogador (cartas principais, agrupadas por time com o nome do time abrindo cada grupo)
+ * e depois o herói, entre as cartas desse jogador. Escolher o jogador já mostra a carta de assinatura.
+ */
 function Picker({ label, value, onChange }: { label: string; value: string; onChange: (id: string) => void }) {
   const t = useT(S);
   const { players, teams } = useData();
   const [query, setQuery] = useState("");
   const id = useId();
   const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const matches = players.filter((p) => !isRetired(p) && normalize(`${p.name} ${p.hero} ${teamOf(teams, p).name}`).includes(normalize(query)));
   const current = players.find((p) => p.id === value);
-  const options = current && !matches.includes(current) ? [current, ...matches] : matches;
+  const mainId = current ? mainIdOf(current) : "";
+  const mains = players.filter((p) => isMainCard(p) && !isRetired(p));
+  const matches = mains.filter((p) => p.id === mainId || normalize(`${p.name} ${teamOf(teams, p).name} ${teamOf(teams, p).tag}`).includes(normalize(query)));
+  // um grupo por time, em ordem alfabética; dentro dele, do maior OVR para o menor
+  const byTeam = new Map<string, Player[]>();
+  for (const p of matches) {
+    const team = teamOf(teams, p).name;
+    byTeam.set(team, [...(byTeam.get(team) ?? []), p]);
+  }
+  const groups = [...byTeam]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([team, list]) => [team, list.sort((a, b) => getPlayerOvr(b) - getPlayerOvr(a) || a.name.localeCompare(b.name))] as const);
+  const versions = mainId
+    ? players.filter((p) => mainIdOf(p) === mainId && (!isRetired(p) || p.id === value)).sort((a, b) => Number(!isMainCard(a)) - Number(!isMainCard(b)) || a.hero.localeCompare(b.hero))
+    : [];
+  const kind = (p: Player) => (isMainCard(p) ? t.signature : isAltHero(p) ? t.otherHero : p.special ? p.specialText || t.special : t.version(teamOf(teams, p).tag));
+
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <label className="text-xs font-bold tracking-widest text-zinc-400 uppercase" htmlFor={id}>{label}</label>
       <input id={id} type="search" className={`${field} w-full min-w-0`} placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} />
-      <select className={`${field} w-full min-w-0`} aria-label={`${label}: ${t.select}`} value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">{t.select}</option>
-        {options.map((p) => <option key={p.id} value={p.id}>{p.name} · {getPlayerOvr(p)} · {isMainCard(p) ? t.main : isAltHero(p) ? t.otherHero : p.specialText || t.special} · {p.hero} · {teamOf(teams, p).tag}</option>)}
+      <select className={`${field} w-full min-w-0`} aria-label={`${label}: ${t.selectPlayer}`} value={mainId} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{t.selectPlayer}</option>
+        {groups.map(([team, list]) => (
+          <optgroup key={team} label={team}>
+            {list.map((p) => <option key={p.id} value={p.id}>{p.name} · {getPlayerOvr(p)}</option>)}
+          </optgroup>
+        ))}
+      </select>
+      <select className={`${field} w-full min-w-0 disabled:cursor-not-allowed disabled:opacity-50`} aria-label={`${label}: ${t.selectHero}`} value={current ? value : ""} disabled={!versions.length} onChange={(e) => onChange(e.target.value)}>
+        {!versions.length && <option value="">{t.selectHero}</option>}
+        {versions.map((p) => <option key={p.id} value={p.id}>{p.hero} · {getPlayerOvr(p)} · {kind(p)}</option>)}
       </select>
       {!matches.length && <p className="text-xs text-zinc-400" role="status">{t.none}</p>}
     </div>

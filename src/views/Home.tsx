@@ -1,21 +1,26 @@
 import { motion } from "motion/react";
-import type { CSSProperties } from "react";
-import type { Player, Team } from "../lib/types";
+import type { Team } from "../lib/types";
 import { useData } from "../lib/data";
-import { getPlayerOvr, isMainCard, regionClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
+import { getPlayerOvr, isMainCard, regionAccentClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
-import { Card } from "../components/Card";
-import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
-import { Icon } from "../components/Icon";
-import { easeOut, pageTitle, pill } from "../lib/ui";
+import { Icon, type IconName } from "../components/Icon";
+import { easeOut, pill, sectionTitle } from "../lib/ui";
+import { cascade, enter } from "../lib/motion";
+import type { Tier } from "../lib/rarity";
+import { areaStyle, areaTier } from "../lib/areas";
+import { Reveal } from "../components/Motion";
+import { Stage } from "./home/Stage";
+import { Welcome } from "./home/Welcome";
+import { CardGuide } from "./home/CardGuide";
+import { Roles } from "./home/Roles";
+import { NewCards } from "./home/NewCards";
 
 export type Area = "teams" | "tierlist" | "collection" | "compare" | "redeem";
 
 const S = strings({
   pt: {
-    featured: "Cartas em destaque", picked: "Escolhidas pela equipe", top: "As maiores OVR",
     explore: "Explore", ranking: "Ranking dos times", allTeams: (n: number) => `Ver os ${n} times`,
     none: "Nenhum time cadastrado ainda.", players: (n: number) => `${n} ${n === 1 ? "jogador" : "jogadores"}`,
     areas: {
@@ -28,7 +33,6 @@ const S = strings({
     meta: { teams: (n: number) => `${n} times`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cartas`, compare: () => "1 contra 1", redeem: () => "Precisa entrar" },
   },
   en: {
-    featured: "Featured cards", picked: "Picked by the team", top: "Highest OVR",
     explore: "Explore", ranking: "Team ranking", allTeams: (n: number) => `See all ${n} teams`,
     none: "No teams registered yet.", players: (n: number) => `${n} ${n === 1 ? "player" : "players"}`,
     areas: {
@@ -41,7 +45,6 @@ const S = strings({
     meta: { teams: (n: number) => `${n} teams`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cards`, compare: () => "1 vs 1", redeem: () => "Sign-in needed" },
   },
   es: {
-    featured: "Cartas destacadas", picked: "Elegidas por el equipo", top: "Los OVR más altos",
     explore: "Explora", ranking: "Ranking de equipos", allTeams: (n: number) => `Ver los ${n} equipos`,
     none: "Aún no hay equipos registrados.", players: (n: number) => `${n} ${n === 1 ? "jugador" : "jugadores"}`,
     areas: {
@@ -56,11 +59,9 @@ const S = strings({
 });
 
 const AREAS: Area[] = ["teams", "tierlist", "collection", "compare", "redeem"];
+const AREA_ICON: Record<Area, IconName> = { teams: "shield", tierlist: "bars", collection: "cards", compare: "versus", redeem: "ticket" };
 const FEATURED = 5;
 const RANKING = 4;
-
-// no leque (xl) a primeira escolhida fica no centro e as seguintes alternam esquerda/direita: 0 → 0, 1 → -1, 2 → 1, 3 → -2, 4 → 2
-const fanOffset = (i: number) => (i % 2 ? -(i + 1) / 2 : i / 2);
 
 export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (teamId: string) => void; onOpenCard: (id: string) => void; onNavigate: (area: Area) => void }) {
   const { teams, players, settings, me } = useData();
@@ -71,6 +72,8 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
   const featured = picked.length
     ? picked
     : players.filter(isMainCard).sort((a, b) => getPlayerOvr(b) - getPlayerOvr(a)).slice(0, FEATURED);
+
+  const guide = players.find((p) => p.id === settings.homeGuide) ?? featured[0];
 
   const ranked = teams
     .map((team) => ({ team, ...teamOvr(players, team.id) }))
@@ -85,32 +88,23 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
   };
 
   return (
-    <div className="flex flex-col gap-10">
-      {featured.length > 0 && (
-        <section className="noir-glass relative flex flex-col gap-6 overflow-hidden rounded-3xl py-5 sm:py-8" aria-labelledby="home-featured">
-          {settings.homeHero && <img src={settings.homeHero} alt="" className="pointer-events-none absolute inset-0 size-full object-cover opacity-20" />}
-          <div className="relative flex flex-col gap-1 px-5 sm:px-8">
-            <span className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">{picked.length ? t.picked : t.top}</span>
-            <h1 id="home-featured" className={pageTitle}>{t.featured}</h1>
-          </div>
-          <Fan cards={featured} onOpenCard={onOpenCard} />
-        </section>
-      )}
+    <div className="home-type flex flex-col gap-14">
+      {/* cada seção usa a cor da área com que conversa (lib/areas.ts); "contents" não muda o layout, só passa a cor */}
+      <div className="contents" style={areaStyle("teams")}><Stage cards={featured} onOpenCard={onOpenCard} onOpenTeam={onOpenTeam} /></div>
+      <div className="contents" style={areaStyle("redeem")}><Welcome onNavigate={onNavigate} /></div>
+      {guide && <div className="contents" style={areaStyle("collection")}><CardGuide sample={guide} /></div>}
+      <div className="contents" style={areaStyle("tierlist")}><Roles onOpenCard={onOpenCard} /></div>
+      <div className="contents" style={areaStyle("compare")}><NewCards onOpenCard={onOpenCard} /></div>
 
-      <section className="flex flex-col gap-4" aria-labelledby="home-explore">
-        <h2 id="home-explore" className={sectionTitle}>{t.explore}</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {AREAS.map((a) => <AreaTile key={a} title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />)}
-        </div>
-      </section>
 
-      <section className="flex flex-col gap-4" aria-labelledby="home-ranking">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <section className="flex flex-col gap-4" aria-labelledby="home-ranking" style={areaStyle("teams")}>
+        <Reveal className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="home-ranking" className={sectionTitle}>{t.ranking}</h2>
           {ranked.length > RANKING && <button type="button" className={pill(false)} onClick={() => onNavigate("teams")}>{t.allTeams(ranked.length)}</button>}
-        </div>
-        {ranked.length === 0 && <div className="noir-glass rounded-2xl p-6 text-sm text-zinc-300">{t.none}</div>}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        </Reveal>
+        {ranked.length === 0 && <div className="py-6 text-sm text-zinc-300">{t.none}</div>}
+        {/* sem caixas: linhas separadas por divisória fina, como no Explore; a cor da região fica no traço sob o número */}
+        <div className="grid grid-cols-1 divide-y divide-zinc-200/10 lg:grid-cols-2 lg:gap-x-8 lg:divide-y-0 lg:[&>*:nth-child(n+3)]:border-t lg:[&>*:nth-child(n+3)]:border-zinc-200/10">
           {ranked.slice(0, RANKING).map((r, idx) => (
             <TeamRow
               key={r.team.id}
@@ -123,40 +117,38 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
           ))}
         </div>
       </section>
+
+      <section className="flex flex-col gap-4" aria-labelledby="home-explore">
+        <Reveal><h2 id="home-explore" className={sectionTitle}>{t.explore}</h2></Reveal>
+        {/* sem caixas: as áreas são colunas separadas por um traço, como em "Quem faz o quê" */}
+        <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-5">
+          {AREAS.map((a, i) => (
+            <motion.li key={a} className="flex border-l border-zinc-200/15 pl-2" initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.06) }}>
+              <AreaTile icon={AREA_ICON[a]} tier={areaTier(a)} title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />
+            </motion.li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }
 
-const sectionTitle = "font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase sm:text-2xl";
 
-function Fan({ cards, onOpenCard }: { cards: Player[]; onOpenCard: (id: string) => void }) {
-  return (
-    <div className="relative flex snap-x snap-mandatory items-center justify-center-safe gap-2 overflow-x-auto overflow-y-hidden px-5 py-8 sm:px-8 xl:items-end xl:gap-0 xl:overflow-visible xl:px-4">
-      {cards.map((p, i) => {
-        const k = fanOffset(i);
-        return (
-          <div key={p.id} className="shrink-0 snap-center xl:order-(--fo) xl:translate-y-(--fy) xl:rotate-(--fr)" style={{ "--fo": k, "--fr": `${k * 3}deg`, "--fy": `${Math.abs(k) * 12}px` } as CSSProperties}>
-            <Card player={p} variant={k === 0 ? "team" : "medium"} onOpen={() => onOpenCard(p.id)} />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function AreaTile({ title, text, meta, onClick }: { title: string; text: string; meta: string | null; onClick: () => void }) {
+/** Atalho do Explore: ícone e nome na cor da raridade, para que serve e um número. Só acende um fundo no hover. */
+function AreaTile({ icon, tier, title, text, meta, onClick }: { icon: IconName; tier: Tier; title: string; text: string; meta: string | null; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="noir-glass flex min-h-11 cursor-pointer items-center gap-4 rounded-2xl p-5 text-left transition-colors hover:border-zinc-200/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+      className="group flex flex-1 cursor-pointer flex-col items-start gap-2 rounded-xl p-2 text-left transition-colors hover:bg-zinc-100/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10"
     >
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="font-display text-lg tracking-[0.11em] text-dl-text uppercase">{title}</span>
-        <span className="text-sm text-zinc-300">{text}</span>
-        {meta && <span className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">{meta}</span>}
+      <span className="flex w-full items-center justify-between gap-2">
+        <span aria-hidden="true" style={{ color: tier.c, filter: `drop-shadow(0 0 ${3 + tier.lvl * 2}px ${tier.c})` }}><Icon name={icon} className="size-6" /></span>
+        <Icon name="chevron-right" className="size-5 text-zinc-500 transition-[translate,color] duration-200 group-hover:translate-x-1 group-hover:text-zinc-200" />
       </span>
-      <Icon name="chevron-right" className="size-5 text-zinc-400" />
+      <span className="font-display text-lg tracking-[0.11em] whitespace-nowrap uppercase title-depth" style={{ color: tier.c }}>{title}</span>
+      <span className="text-sm text-pretty text-zinc-300">{text}</span>
+      {meta && <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{meta}</span>}
     </button>
   );
 }
@@ -176,20 +168,20 @@ function TeamRow({ r, idx, tier, meta, onOpen }: {
       onClick={onOpen}
       {...tiltHandlers}
       initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: true }}
       transition={{ delay: Math.min(idx, 8) * 0.05, duration: 0.25, ease: easeOut }}
       whileHover="hover"
       variants={{ hover: { y: -2 } }}
-      className={`home-team-box noir-glass team-region-card ${regionClass(r.team.region)} relative flex cursor-pointer items-center gap-4 overflow-hidden rounded-2xl p-4 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 sm:gap-5 sm:px-5`}
+      className={`${regionAccentClass(r.team.region)} flex min-h-28 cursor-pointer items-center gap-4 rounded-xl p-4 text-left transition-colors hover:bg-zinc-100/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10 sm:gap-5 sm:px-5`}
     >
-      <RegionBackdrop region={r.team.region} />
-      <span className="relative z-10 w-9 shrink-0 text-center text-xl font-black text-zinc-300 tabular-nums sm:text-2xl">#{idx + 1}</span>
+      <span className="w-9 shrink-0 border-b-2 border-(--team-accent) pb-0.5 text-center text-xl font-black text-zinc-300 tabular-nums sm:text-2xl">#{idx + 1}</span>
       <TeamLogo3D team={r.team} className="size-14 sm:size-16" radius={12} tilt={{ rotateX, rotateY }} />
-      <div className="relative z-10 min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="line-clamp-2 font-display text-base/tight font-extrabold tracking-wider text-balance text-dl-text uppercase sm:text-xl/tight">{r.team.name}</div>
-        <div className="mt-1 text-[11px] font-bold tracking-wider text-zinc-300 uppercase">{meta}</div>
+        <div className="text-[14px] font-bold tracking-wider text-zinc-300 uppercase">{meta}</div>
       </div>
-      <div className="relative z-10 flex shrink-0 flex-col items-center gap-1">
+      <div className="flex shrink-0 flex-col items-center gap-1">
         <div className="team-ovr-chip team-ovr-chip--stack">
           <span className="team-ovr-num">{r.count ? r.rounded : "--"}</span>
           <span className="team-ovr-lbl">OVR</span>

@@ -58,7 +58,7 @@ export function Settings({ link: initial }: { link?: LinkResult }) {
     <section aria-labelledby="settings-title" className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <h1 id="settings-title" className={pageTitle}>{t.title}</h1>
       {result && (
-        <div role="alert" className="noir-glass flex flex-col gap-3 rounded-2xl p-4 sm:p-6">
+        <div role="alert" className="flex flex-col gap-3 border-l-2 border-zinc-200/30 pl-4">
           <p className={`text-sm ${result.code === "confirm" ? "text-zinc-100" : "text-red-300"}`}>
             {result.code === "confirm" ? t.confirm(result.name, result.cards) : t[result.code]}
           </p>
@@ -70,8 +70,8 @@ export function Settings({ link: initial }: { link?: LinkResult }) {
           )}
         </div>
       )}
-      <section aria-labelledby="settings-accounts-title" className="noir-glass flex flex-col gap-3 rounded-2xl p-4 sm:p-6">
-        <h2 id="settings-accounts-title" className="font-display text-lg font-black text-dl-text">{t.accounts}</h2>
+      <section aria-labelledby="settings-accounts-title" className="flex flex-col gap-3 border-t border-zinc-200/15 pt-6">
+        <h2 id="settings-accounts-title" className="font-display text-lg font-black text-area title-depth">{t.accounts}</h2>
         <p className="text-sm text-zinc-400">{t.accountsHint}</p>
         <ul className="flex flex-wrap gap-2">
           {PROVIDERS.map(({ id, label }) => (

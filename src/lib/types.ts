@@ -64,6 +64,8 @@ export type Settings = {
   bg?: BgSettings;
   homeHero?: string;
   homeFeatured?: string[];
+  /** Carta usada em "Como ler uma carta" na Home; sem escolha, a primeira em destaque. */
+  homeGuide?: string;
 };
 
 export type AppData = {

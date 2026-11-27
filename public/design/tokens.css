@@ -18,6 +18,7 @@
   /* src/index.css @theme */
   --font-display: 'VALVE Pulp', 'VALVE Oracle', ui-sans-serif, system-ui, sans-serif;
   --color-dl-text: #ffefd7;
+  --color-area: #ffefd7; /* trocado por aba em src/lib/areas.ts */
   --color-dl-black: #10130d;
   --color-dl-bevel-from: #373d45;
   --color-dl-bevel-to: #4d5860;
@@ -47,7 +48,7 @@
   --team-accent-europa: rgba(250, 204, 21, 0.60);
   --team-accent-na: rgba(147, 197, 253, 0.60);
   --team-accent-brasil: rgba(52, 211, 153, 0.55);
-  --team-accent-americasul: rgba(56, 189, 248, 0.60);
-  --team-accent-asia: rgba(251, 191, 36, 0.55);
+  --team-accent-americasul: rgba(52, 211, 153, 0.60);
+  --team-accent-asia: rgba(248, 113, 113, 0.60);
   --team-accent-semtime: rgba(161, 161, 170, 0.50);
 }

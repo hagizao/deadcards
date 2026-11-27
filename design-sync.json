@@ -2,10 +2,11 @@
   "source": "src/index.css (@theme), src/styles/cards.css (:root, .team-region-*), src/lib/rarity.ts (RARITY_TIERS)",
   "tool": "html: public/design/, servido em /design/ (tokens.css, foundations.html, card.html, buttons.html, surfaces.html)",
   "naming": "Nomes de propriedade CSS como no código; valores só em TS viram --rarity-<key>-<c|hi|lo>; acentos de região viram --team-accent-<regiao>",
-  "synced": "2026-11-17",
+  "synced": "2026-11-27",
   "tokens": {
     "--font-display": "'VALVE Pulp', 'VALVE Oracle', ui-sans-serif, system-ui, sans-serif",
     "--color-dl-text": "#ffefd7",
+    "--color-area": "#ffefd7 (por aba: teams eternus, tierlist ascendant, collection oracle, compare archon, redeem arcanist; src/lib/areas.ts)",
     "--color-dl-black": "#10130d",
     "--color-dl-bevel-from": "#373d45",
     "--color-dl-bevel-to": "#4d5860",
@@ -29,8 +30,8 @@
     "--team-accent-europa": "rgba(250, 204, 21, 0.60)",
     "--team-accent-na": "rgba(147, 197, 253, 0.60)",
     "--team-accent-brasil": "rgba(52, 211, 153, 0.55)",
-    "--team-accent-americasul": "rgba(56, 189, 248, 0.60)",
-    "--team-accent-asia": "rgba(251, 191, 36, 0.55)",
+    "--team-accent-americasul": "rgba(52, 211, 153, 0.60)",
+    "--team-accent-asia": "rgba(248, 113, 113, 0.60)",
     "--team-accent-semtime": "rgba(161, 161, 170, 0.50)"
   },
   "components": {
@@ -51,6 +52,9 @@
     "Range": "in code only",
     "Account": "in code only",
     "Icon": "in code only",
-    "brand-badge": "in code only"
+    "brand-badge": "in code only",
+    "Motion (CountUp, FillBar, Reveal)": "in code only",
+    "Skeleton (CardSkeleton, ProfileSkeleton)": "in code only",
+    "Rail (useRail, RailArrows)": "in code only"
   }
 }

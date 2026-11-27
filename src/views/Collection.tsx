@@ -8,6 +8,7 @@ import { easeOut, field, pageTitle, pill, primaryBtn } from "../lib/ui";
 import { useMyCards } from "../lib/myCards";
 import { SignInOptions } from "./Login";
 import { Icon } from "../components/Icon";
+import { cascade, useSettled } from "../lib/motion";
 
 type Mode = "mine" | "all";
 type HeroMode = "signature" | "every";
@@ -103,6 +104,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
   const label = useLabel();
   const { teams, players, me } = useData();
   const [mode, setMode] = useState<Mode>("mine");
+  const settled = useSettled();
   const [heroMode, setHeroMode] = useState<HeroMode>("every");
   // ids das cartas que a pessoa tem; null enquanto carrega
   const { owned } = useMyCards();
@@ -135,7 +137,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
 
   return (
     <section className="space-y-5">
-      <div className="noir-glass space-y-4 rounded-2xl p-5 sm:p-7">
+      <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className={pageTitle}>{mine ? t.mine : t.all}</h1>
@@ -145,17 +147,17 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
                 : (me || !mine) && t.count(list.length)}
             </p>
           </div>
-          {/* ver todas as cartas: à direita, aceso quando ligado; desligado volta para a sua coleção */}
+          {/* ver todas as cartas: à direita, marcado quando ligado; desligado volta para a sua coleção */}
           <button type="button" aria-pressed={!mine} onClick={() => { setMode(mine ? "all" : "mine"); setLimit(PAGE); }}
-            className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-4 text-xs font-extrabold tracking-widest uppercase transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:scale-95 motion-reduce:transition-none ${
-              mine ? "bg-zinc-800/80 text-zinc-200 hover:bg-zinc-700 hover:text-white" : "bg-amber-300 text-zinc-950 shadow-[0_0_22px_rgb(252_211_77/0.45)] hover:bg-amber-200"}`}>
+            className={pill(!mine)}>
             <Icon name="cards" className="size-4" />
             {t.all}
           </button>
         </div>
         {alts.length > 0 && (
           <div role="group" aria-label={t.heroMode} className="flex flex-wrap gap-2">
-            {(["signature", "every"] as const).map((m) => (
+            {/* "todos os heróis" primeiro, à esquerda */}
+            {(["every", "signature"] as const).map((m) => (
               <button key={m} type="button" aria-pressed={heroMode === m} onClick={() => { setHeroMode(m); setLimit(PAGE); }} className={pill(heroMode === m)}>
                 {t[m]}
               </button>
@@ -205,8 +207,9 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
       {(me || !mine) && (
       <motion.div layout className="flex flex-wrap justify-center gap-6 sm:justify-start">
         <AnimatePresence mode="popLayout">
-          {list.slice(0, limit).map((p) => (
-            <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }} transition={{ duration: 0.2, ease: easeOut }}>
+          {list.slice(0, limit).map((p, i) => (
+            <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.92, y: settled ? 0 : 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92 }}
+              transition={{ duration: settled ? 0.2 : 0.35, ease: easeOut, delay: settled ? 0 : cascade(i) }}>
               {/* em "todas", a carta que você não tem fica em preto e branco; no destaque ela aparece normal */}
               <div className={me && !mine && !has(p.id) ? "opacity-80 grayscale transition hover:opacity-100" : undefined}>
                 <Card player={p} variant="medium" signature={every && isMainCard(p) && withAlts.has(p.id)} onOpen={() => onOpenCard(p.id)} />

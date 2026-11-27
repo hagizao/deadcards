@@ -1,4 +1,6 @@
+import { AnimatePresence, motion } from "motion/react";
 import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
+import { ProfileSkeleton } from "../components/Skeleton";
 import { Achievements } from "../components/Achievements";
 import { Card } from "../components/Card";
 import { CardExportButton } from "../components/CardExportButton";
@@ -11,7 +13,9 @@ import { MAX_FAVORITES, PROFILE_CARD_PATH, PROFILE_NAME_MAX, profilePlayer, prof
 import { getCardTier } from "../lib/rarity";
 import { useMyCards } from "../lib/myCards";
 import type { Player } from "../lib/types";
-import { field, pageTitle, pill, primaryBtn } from "../lib/ui";
+import { easeOut, field, pill, primaryBtn } from "../lib/ui";
+import { cascade, useSettled } from "../lib/motion";
+import { CountUp, FillBar } from "../components/Motion";
 
 const S = strings({
   pt: {
@@ -98,7 +102,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
   };
 
   if (error) return <p role="alert" className="text-sm text-red-300">{t[error]}</p>;
-  if (!profile) return <p role="status" className="text-sm text-zinc-400">{t.loading}</p>;
+  if (!profile) return <ProfileSkeleton label={t.loading} />;
 
   const owner = me?.id === profile.id;
   const card = profile.card;
@@ -109,7 +113,8 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
         ? <img src={profile.image} alt="" className="size-12 shrink-0 rounded-xl object-cover sm:size-14" />
         : <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-xl font-black text-dl-text sm:size-14">{profile.name.charAt(0).toUpperCase()}</span>}
       <div className="flex min-w-0 flex-col gap-0.5">
-        <h1 id="profile-title" className={`${pageTitle} truncate`}>{profile.name}</h1>
+        {/* nome do perfil um terço menor que o título das abas (pageTitle) */}
+        <h1 id="profile-title" className="truncate font-display text-2xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-[2rem]">{profile.name}</h1>
         {profile.handle && <p className="truncate text-sm font-semibold text-zinc-300">@{profile.handle}</p>}
         {card && <p className="truncate text-sm text-zinc-400">{card.name} · {card.hero}</p>}
       </div>
@@ -129,12 +134,12 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
       ) : (
         // carta do perfil à esquerda (só a carta, sem os atributos detalhados) e conquistas ocupando o resto da largura
         <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="noir-glass flex flex-col items-center gap-5 rounded-2xl p-4 sm:p-6 lg:w-fit lg:shrink-0">
+          <div className="flex flex-col items-center gap-5 lg:w-fit lg:shrink-0">
             <div className="w-full lg:max-w-80">{identity}</div>
             {card && <div ref={cardRef} className="w-fit max-w-full"><Card player={profilePlayer(card)} /></div>}
             {card && tier ? (
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <span className="font-display text-4xl leading-none font-black text-dl-text tabular-nums">{calculateOVR(card.stats)}</span>
+                <span className="font-display text-4xl/none font-black text-dl-text tabular-nums">{calculateOVR(card.stats)}</span>
                 <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">OVR</span>
                 <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.name}</span>
               </div>
@@ -146,11 +151,11 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
             </div>
             {copy && <p role="status" className={`text-sm ${copy === "copied" ? "text-emerald-300" : "text-red-300"}`}>{t[copy]}</p>}
           </div>
-          <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible />
+          <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />
         </div>
       )}
 
-      {editing && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible />}
+      {editing && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />}
       <ProfileFavorites ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} />
       <ProfileCards ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} onRedeem={onRedeem} />
     </section>
@@ -183,7 +188,7 @@ function ProfileFavorites({ ids, profileFavorites, owner, onOpenCard }: { ids: s
     .sort((a, b) => getPlayerOvr(b) - getPlayerOvr(a) || a.name.localeCompare(b.name)).slice(0, MAX_FAVORITES);
   if (!pinned.length && !owner) return null;
   return (
-    <section aria-labelledby="profile-favorites-title" className="noir-glass flex flex-col gap-4 rounded-2xl p-4 sm:p-6">
+    <section aria-labelledby="profile-favorites-title" className="flex flex-col gap-4 border-t border-zinc-200/15 pt-6">
       <h2 id="profile-favorites-title" className="flex items-center gap-2 font-display text-lg font-black text-amber-200">
         <Icon name="star" className="size-4 fill-current" />
         {t.favorites}
@@ -191,12 +196,17 @@ function ProfileFavorites({ ids, profileFavorites, owner, onOpenCard }: { ids: s
       </h2>
       {pinned.length ? (
         <ul className="flex flex-wrap justify-center gap-6">
-          {pinned.map((player) => (
-            <li key={player.id} className="relative drop-shadow-[0_0_28px_rgb(252_211_77/0.35)]">
-              <Card player={player} onOpen={() => onOpenCard(player.id)} />
-              <FavoriteStar label={t.favorites} />
-            </li>
-          ))}
+          {/* marcar ou desmarcar uma favorita no destaque faz a carta pular para cá (ou sair) e as outras abrirem espaço */}
+          <AnimatePresence mode="popLayout">
+            {pinned.map((player) => (
+              <motion.li key={player.id} layout className="relative drop-shadow-[0_0_28px_rgb(252_211_77/0.35)]"
+                initial={{ opacity: 0, y: 24, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 260, damping: 22 }}>
+                <Card player={player} onOpen={() => onOpenCard(player.id)} />
+                <FavoriteStar label={t.favorites} />
+              </motion.li>
+            ))}
+          </AnimatePresence>
         </ul>
       ) : <p className="text-sm text-zinc-400">{t.favoritesHint}</p>}
     </section>
@@ -209,6 +219,7 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
   const [q, setQ] = useState("");
   const [rarity, setRarity] = useState<string>();
   const [limit, setLimit] = useState(PAGE);
+  const settled = useSettled();
   const favorites = useFavorites(profileFavorites, owner);
   const query = useDeferredValue(q.trim().toLowerCase());
 
@@ -222,9 +233,9 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
   const pick = (key?: string) => { setRarity(key); setLimit(PAGE); };
 
   return (
-    <section aria-labelledby="profile-cards-title" className="noir-glass flex flex-col gap-5 rounded-2xl p-4 sm:p-6">
+    <section aria-labelledby="profile-cards-title" className="flex flex-col gap-5 border-t border-zinc-200/15 pt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="profile-cards-title" className="font-display text-lg font-black text-dl-text">{t.cards} · {summary.cards.length}</h2>
+        <h2 id="profile-cards-title" className="font-display text-lg font-black text-area title-depth">{t.cards} · {summary.cards.length}</h2>
         {owner && <button type="button" onClick={onRedeem} className={pill(false)}>{t.redeem}</button>}
       </div>
       {summary.cards.length ? (
@@ -233,11 +244,11 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
             <div className="flex min-w-48 flex-1 flex-col gap-2">
               <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.progress}</span>
               <div className="flex flex-wrap items-baseline gap-x-3">
-                <span className="font-display text-3xl font-black text-dl-text tabular-nums">{summary.percent}%</span>
+                <span className="font-display text-3xl font-black text-dl-text tabular-nums"><CountUp value={summary.percent} delay={0.15} />%</span>
                 <span className="text-sm text-zinc-400">{t.catalog(summary.cards.length, summary.total)}</span>
               </div>
               <div role="progressbar" aria-label={t.progress} aria-valuenow={summary.percent} aria-valuemin={0} aria-valuemax={100} className="h-1.5 rounded-full bg-zinc-800">
-                <div className="h-full rounded-full bg-dl-text" style={{ width: `${summary.percent}%` }} />
+                <FillBar pct={summary.percent} delay={0.15} className="h-full rounded-full" barClassName="bg-dl-text" />
               </div>
             </div>
             {summary.best && (
@@ -268,11 +279,12 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
               <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder={t.searchPlaceholder} aria-label={t.search} className={`${field} w-full sm:max-w-sm`} />
               {list.length ? (
                 <ul className="flex flex-wrap justify-center gap-6 sm:justify-start">
-                  {list.slice(0, limit).map((player) => (
-                    <li key={player.id} className="relative">
+                  {list.slice(0, limit).map((player, i) => (
+                    <motion.li key={player.id} className="relative" initial={{ opacity: 0, y: settled ? 0 : 16 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: settled ? 0.2 : 0.35, ease: easeOut, delay: settled ? 0 : cascade(i) }}>
                       <Card player={player} variant="medium" onOpen={() => onOpenCard(player.id)} />
                       {favorites.includes(player.id) && <FavoriteStar label={t.favorites} />}
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               ) : <p role="status" className="text-sm text-zinc-400">{t.noResults}</p>}
@@ -339,7 +351,7 @@ function ProfileEditor({ onSaved, onCancel }: { onSaved: (card: ProfileCard) => 
     : <p role="status" className="text-sm text-zinc-400">{t.loading}</p>;
 
   return (
-    <div className="noir-glass flex min-w-0 flex-col items-center gap-5 rounded-2xl p-3 sm:p-6 md:flex-row md:items-start">
+    <div className="flex min-w-0 flex-col items-center gap-5 md:flex-row md:items-start">
       <Card player={profilePlayer(card)} />
       <div className="flex w-full min-w-0 flex-1 flex-col gap-5">
         <form onSubmit={save} className="flex flex-col gap-4">

@@ -6,7 +6,8 @@ import { strings, useT } from "../lib/i18n";
 import { getCardTier, rarityStyleVars } from "../lib/rarity";
 import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
-import { field, pageTitle, pill } from "../lib/ui";
+import { easeOut, field, pageTitle, pill } from "../lib/ui";
+import { useSettled } from "../lib/motion";
 
 const S = strings({
   pt: {
@@ -34,6 +35,8 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
   const [mode, setMode] = useState<"players" | "teams">("players");
   const [region, setRegion] = useState("ALL");
   const [q, setQ] = useState("");
+  // na primeira vez o ranking sobe faixa por faixa (SS, S, A...); depois os filtros respondem na hora
+  const settled = useSettled(1200);
   const query = q.trim().toLowerCase();
 
   const rankedPlayers = players
@@ -53,7 +56,7 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
 
   return (
     <section className="space-y-5">
-      <div className="noir-glass flex flex-col justify-between gap-4 rounded-2xl p-5 sm:p-7 lg:flex-row lg:items-center">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div>
           <h1 className={pageTitle}>Tier List</h1>
           <p className="mt-1.5 text-xs text-zinc-400">{mode === "players" ? tr.rankedPlayers(rankedPlayers.length) : tr.rankedTeams(rankedTeams.length)}</p>
@@ -69,13 +72,14 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
         </div>
       </div>
 
-      <div className="tierlist-board overflow-hidden rounded-xl">
-        {cfg.map((tier) => {
+      <div className="tierlist-board">
+        {cfg.map((tier, row) => {
+          const rowDelay = settled ? 0 : row * 0.07;
           const pItems = mode === "players" ? rankedPlayers.filter((x) => tierKeyForOvr(x.ovr, cfg) === tier.key) : [];
           const tItems = mode === "teams" ? rankedTeams.filter((x) => (x.count ? tierKeyForOvr(x.rounded, cfg) : cfg[cfg.length - 1].key) === tier.key) : [];
           const empty = mode === "players" ? !pItems.length : !tItems.length;
           return (
-            <div key={tier.key} className="tierlist-row">
+            <motion.div key={tier.key} className="tierlist-row" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35, ease: easeOut, delay: rowDelay }}>
               <div className="tierlist-label-cell px-2 py-3" style={{ backgroundColor: tier.bg, color: tier.text }}>
                 <span className="text-2xl leading-none font-semibold tracking-wide sm:text-[26px]">{tier.key}</span>
                 <span className="mt-1 text-xs font-bold tracking-wider tabular-nums opacity-75">{tier.min}–{tier.max}</span>
@@ -91,7 +95,7 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
                       onClick={() => onOpenCard(p.id)}
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: Math.min(i, 10) * 0.02 }}
+                      transition={{ delay: rowDelay + Math.min(i, 10) * 0.02 }}
                       whileHover={{ y: -3 }}
                       className="rk-tier-item relative h-[112px] w-[92px] cursor-pointer overflow-hidden rounded-lg text-left"
                       style={rarityStyleVars(getCardTier(p, cfg)) as CSSProperties}
@@ -126,7 +130,7 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
                   </button>
                 ))}
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>

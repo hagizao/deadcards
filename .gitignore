@@ -10,3 +10,4 @@ dist
 skills-lock.json
 
 plans/
+.gridlines/

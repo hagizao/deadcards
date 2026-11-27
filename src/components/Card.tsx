@@ -1,5 +1,6 @@
-import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
-import type { CSSProperties, PointerEvent } from "react";
+import { motion, type MotionStyle, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
+import { useRef, type CSSProperties, type PointerEvent } from "react";
+import { setFlightOrigin } from "../lib/motion";
 import type { Player } from "../lib/types";
 import { getPlayerOvr, hexToRgba, teamOf, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
@@ -34,13 +35,25 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
   const ry = useMotionValue(0);
   const rotateX = useSpring(useTransform(ry, [-0.5, 0.5], [9, -9]), { stiffness: 220, damping: 18 });
   const rotateY = useSpring(useTransform(rx, [-0.5, 0.5], [-11, 11]), { stiffness: 220, damping: 18 });
+  const still = useReducedMotion();
+  // brilho que segue o mouse: aparece ao passar o mouse e some ao sair
+  const lit = useMotionValue(0);
+  const glow = useSpring(lit, { stiffness: 200, damping: 26 });
+  const gx = useTransform(rx, (v) => `${((v + 0.5) * 100).toFixed(1)}%`);
+  const gy = useTransform(ry, (v) => `${((v + 0.5) * 100).toFixed(1)}%`);
+  const root = useRef<HTMLDivElement>(null);
+  // só com mouse de verdade: no toque a carta não inclina nem brilha
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (still || e.pointerType !== "mouse") return;
     const r = e.currentTarget.getBoundingClientRect();
     rx.set((e.clientX - r.left) / r.width - 0.5);
     ry.set((e.clientY - r.top) / r.height - 0.5);
+    lit.set(1);
   };
-  const onLeave = () => { rx.set(0); ry.set(0); };
-  const still = useReducedMotion();
+  const onLeave = () => { rx.set(0); ry.set(0); lit.set(0); };
+  const foil = rk.lvl >= 3 || !!player.special;
+  // variáveis CSS animadas pelo motion; o tipo do motion não conhece --gx/--gy
+  const glare = { "--gx": gx, "--gy": gy, opacity: glow } as MotionStyle;
   const fgX = useSpring(useTransform(rx, [-0.5, 0.5], still ? [0, 0] : [-8, 8]), { stiffness: 220, damping: 18 });
   const fgY = useSpring(useTransform(ry, [-0.5, 0.5], still ? [0, 0] : [-6, 6]), { stiffness: 220, damping: 18 });
 
@@ -51,6 +64,7 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
 
   return (
     <motion.div
+      ref={root}
       className={`rk-wrap${player.special ? " sp-card" : ""}`}
       data-rarity={rk.key}
       style={{ ...(rarityStyleVars(rk) as CSSProperties), rotateX, rotateY, transformPerspective: 900 }}
@@ -80,6 +94,8 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
           {(rk.custom ? rk.glint : rk.lvl >= 3) && <div className="rk-glint" />}
           <Particles tierKey={rk} />
           {player.special && !rk.noSweep && <div className="sp-card-fx" />}
+          <motion.div aria-hidden="true" className="card-glare" style={glare} />
+          {foil && <motion.div aria-hidden="true" className="card-foil" style={glare} />}
 
           {/* herói de assinatura: faixa dourada na diagonal do canto superior direito */}
           {signature && <div className="sig-ribbon"><span>{t.signature}</span></div>}
@@ -124,7 +140,7 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
           </div>
 
           {onOpen && (
-            <button type="button" className="card-hover-overlay border-0" onClick={onOpen} aria-label={t.viewOf(player.name)}>
+            <button type="button" className="card-hover-overlay border-0" onClick={() => { setFlightOrigin(player.id, root.current); onOpen(); }} aria-label={t.viewOf(player.name)}>
               <span className={`card-hover-cta w-full ${medium ? "max-w-[170px]" : "max-w-[215px]"} rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-extrabold tracking-wider text-zinc-950 uppercase shadow-[0_0_24px_rgba(255,255,255,0.4)]`}>
                 {t.view}
               </span>

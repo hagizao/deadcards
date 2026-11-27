@@ -16,6 +16,7 @@ import { Legal } from "./views/Legal";
 import { Compare } from "./views/Compare";
 import { LANGS, LANG_LABEL, LangProvider, type Lang, strings, useLang, useT } from "./lib/i18n";
 import { Feedback } from "./views/Feedback";
+import { areaStyle, type AreaKey } from "./lib/areas";
 import { Icon } from "./components/Icon";
 import { Profile } from "./views/Profile";
 import { easeOut } from "./lib/ui";
@@ -33,7 +34,12 @@ function GitHubIcon() {
 }
 
 type Tab = "home" | "teams" | "tierlist" | "collection" | "redeem" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "settings";
+// ordem da navegação: a tela nova entra pelo lado de quem está à frente ou atrás no menu
+const TAB_ORDER: Tab[] = ["home", "teams", "tierlist", "collection", "redeem", "compare", "profile", "settings", "editor", "feedback", "privacy", "terms"];
 const TABS = ["teams", "tierlist", "collection", "redeem", "compare"] as const;
+// aba -> área de cor (o perfil mostra a coleção da pessoa)
+const TAB_AREA: Partial<Record<Tab, AreaKey>> = { teams: "teams", tierlist: "tierlist", collection: "collection", redeem: "redeem", compare: "compare", profile: "collection" };
+
 const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", redeem: "ticket", compare: "versus" } as const;
 
 const S = strings({
@@ -172,7 +178,7 @@ function LangMenu() {
         aria-label={t.language}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-black/50 bg-linear-to-b from-dl-bevel-from to-dl-bevel-to px-3 text-xs font-bold tracking-widest text-white uppercase text-shadow-xs hover:from-dl-bevel-hover-from hover:to-dl-bevel-hover-to focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:min-h-10 sm:text-sm"
+        className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-base font-bold tracking-widest text-zinc-200 uppercase transition-colors hover:bg-zinc-100/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:min-h-10 sm:text-lg"
       >
         <Flag lang={lang} />
         <span className="hidden sm:inline">{lang}</span>
@@ -256,6 +262,9 @@ const sharedProfile = () => /^\/u\/((?:@|%40)?[A-Za-z0-9._-]{1,64})$/.exec(locat
 function Shell() {
   const [profileId, setProfileId] = useState(sharedProfile);
   const [tab, setTab] = useState<Tab>(() => profileId ? "profile" : location.pathname === "/privacy" ? "privacy" : location.pathname === "/terms" ? "terms" : "home");
+  // direção da troca de aba, derivada durante a renderização (padrão do React para "valor anterior")
+  const [shown, setShown] = useState({ tab, dir: 0 });
+  if (shown.tab !== tab) setShown({ tab, dir: Math.sign(TAB_ORDER.indexOf(tab) - TAB_ORDER.indexOf(shown.tab)) });
   const [focusTeam, setFocusTeam] = useState<string>();
   const [spotlight, setSpotlight] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -279,13 +288,17 @@ function Shell() {
   return (
     <>
       <Background />
-      <header className="noir-glass sticky top-0 z-40 border-b border-zinc-200/15">
+      {/* cabeçalho sem caixa: no topo é transparente; rolando, uma sombra escura desce atrás dele para o menu seguir legível */}
+      <header className="sticky top-0 z-40">
+        <ScrollShade />
+        {/* uma faixa fina, que some nas pontas, marca onde o cabeçalho acaba */}
+        <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-zinc-200/35 to-transparent" />
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:h-20 sm:px-6 lg:px-8">
-          <button type="button" onClick={() => setTab("home")} className="brand-badge flex shrink-0 items-center gap-2.5 rounded-xl px-4 py-2.5 text-left sm:gap-3 sm:px-6 sm:py-3">
-            <span className="size-2.5 rounded-full bg-zinc-100 shadow-[0_0_12px_rgba(255,255,255,0.9)]" />
-            <span className="font-display text-base font-extrabold tracking-[0.18em] text-zinc-100 uppercase sm:text-xl">Cardslock</span>
+          <button type="button" onClick={() => setTab("home")} className="brand-badge group flex min-h-11 shrink-0 cursor-pointer items-center gap-3 rounded-md text-left active:scale-[0.98]">
+            <span aria-hidden="true" className="size-3 rotate-45 rounded-[3px] bg-dl-text shadow-[0_0_14px_rgba(255,239,215,0.8)] transition-transform duration-200 group-hover:rotate-135 motion-reduce:transition-none sm:size-3.5" />
+            <span className="font-display text-[1.625rem] font-black tracking-[0.2em] text-white uppercase title-depth sm:text-[2rem]">Cards<span className="text-dl-text">lock</span></span>
           </button>
-          <nav className="hidden flex-1 items-center justify-center gap-1 lg:flex" aria-label={t.mainNav}>
+          <nav className="hidden flex-1 items-center justify-center gap-1 xl:flex" aria-label={t.mainNav}>
             {TABS.map((id) => (
               <button
                 key={id}
@@ -293,14 +306,14 @@ function Shell() {
                 data-nav={id}
                 onClick={() => go(id)}
                 aria-current={tab === id ? "page" : undefined}
-                className={`relative flex min-h-10 cursor-pointer items-center rounded-lg px-3 text-sm font-bold tracking-widest whitespace-nowrap uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 xl:px-4 ${tab === id ? "text-dl-black" : "text-zinc-300 hover:bg-zinc-100/10 hover:text-white"}`}
+                className={`relative flex min-h-10 cursor-pointer items-center rounded-lg px-3 text-xl font-bold tracking-widest whitespace-nowrap uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 xl:px-4 ${tab === id ? "text-dl-black" : "text-zinc-300 hover:bg-zinc-100/10 hover:text-white"}`}
               >
                 {tab === id && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-dl-text shadow-[0_0_18px_rgba(255,239,215,0.35)]" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
                 <span className="relative">{t.tabs[id]}</span>
               </button>
             ))}
           </nav>
-          <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
+          <div className="ml-auto flex shrink-0 items-center gap-2 xl:ml-0">
             <LangMenu />
             <Account onProfile={() => { if (me) openProfile(me.handle ?? me.id); }} onSettings={() => setTab("settings")} onEditor={() => setTab("editor")} />
           </div>
@@ -308,12 +321,13 @@ function Shell() {
       </header>
 
       <ReducedMotionNotice />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
+      {/* clip no eixo x: a tela que entra deslizando de lado não pode criar rolagem horizontal no celular */}
+      <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 sm:px-6 sm:py-10 lg:px-8" style={areaStyle(TAB_AREA[tab])}>
         <motion.div
             key={tab}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.15, ease: easeOut }}
+            initial={{ opacity: 0, x: shown.dir * 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, ease: easeOut }}
           >
             {tab === "home" && <Home onOpenTeam={openTeam} onOpenCard={setSpotlight} onNavigate={go} />}
             {tab === "teams" && <Teams focusTeamId={focusTeam} onOpenCard={setSpotlight} />}
@@ -329,7 +343,7 @@ function Shell() {
           </motion.div>
       </main>
 
-      <footer className="mt-6 border-t border-zinc-200/10 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <footer className="mt-6 border-t border-zinc-200/10 pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-zinc-400 sm:px-6 lg:px-8">
           <a href={REPO} target="_blank" rel="noreferrer" className="flex items-center gap-2 font-bold tracking-wider text-zinc-300 uppercase hover:text-white">
             <GitHubIcon /> {t.github}
@@ -355,7 +369,7 @@ function Shell() {
         </div>
       </footer>
 
-      <nav className="noir-glass-strong fixed inset-x-0 bottom-0 z-40 flex border-t border-zinc-200/15 pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label={t.mainNav}>
+      <nav className="noir-glass-strong fixed inset-x-0 bottom-0 z-40 flex border-t border-zinc-200/15 pb-[env(safe-area-inset-bottom)] xl:hidden" aria-label={t.mainNav}>
         {TABS.map((id) => (
           <button
             key={id}
@@ -395,4 +409,16 @@ function ReducedMotionNotice() {
       </div>
     </div>
   );
+}
+
+/** Fundo do cabeçalho só depois de rolar: um degradê escuro, sem caixa nem borda, para o menu continuar legível. */
+function ScrollShade() {
+  const [down, setDown] = useState(false);
+  useEffect(() => {
+    const on = () => setDown(window.scrollY > 8);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+  return <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 -z-10 h-[170%] bg-linear-to-b from-dl-black from-55% to-transparent transition-opacity duration-200 ${down ? "opacity-100" : "opacity-0"}`} />;
 }

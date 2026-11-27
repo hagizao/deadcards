@@ -36,7 +36,7 @@ export function Feedback() {
   };
 
   return (
-    <section className="noir-glass mx-auto max-w-2xl space-y-4 rounded-2xl p-5 sm:p-7">
+    <section className="mx-auto max-w-2xl space-y-4">
       <div>
         <h1 className={pageTitle}>Feedback</h1>
         <p className="mt-1.5 text-xs text-zinc-400">Achou um bug ou tem uma ideia? Vira uma issue pública no GitHub do projeto.</p>

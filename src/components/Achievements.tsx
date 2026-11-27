@@ -1,20 +1,23 @@
-import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useState } from "react";
 import { ACHIEVEMENT_RARITIES, achievementsFor, type Achievement, type AchievementId, type AchievementRarity } from "../lib/achievements";
 import { useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
 import { MAX_FAVORITES } from "../lib/profile";
-import { pill } from "../lib/ui";
+import { easeOut, pill } from "../lib/ui";
+import { cascade, useSettled } from "../lib/motion";
+import { FillBar } from "./Motion";
 import { Icon } from "./Icon";
 
 type Text = { title: string; desc: (goal: number) => string };
 type Texts = {
-  heading: string; done: (n: number, total: number) => string; collection: (pct: number) => string; cards: (n: number, total: number) => string; all: string; unlocked: string; locked: string; showAll: (n: number) => string; showLess: string;
+  heading: string; done: (n: number, total: number) => string; collection: (pct: number) => string; cards: (n: number, total: number) => string; all: string; unlocked: string; fresh: string; locked: string; showAll: (n: number) => string; showLess: string;
   rarities: Record<AchievementRarity, string>; items: Record<AchievementId, Text>;
 };
 
 const S = strings<Texts>({
   pt: {
-    heading: "Conquistas", done: (n, total) => `${n} de ${total}`, collection: (p) => `${p}% da coleção`, cards: (n, total) => `${n} de ${total} cartas`, all: "Todas", unlocked: "Desbloqueada", locked: "Bloqueada", showAll: (n) => `Ver todas (${n})`, showLess: "Mostrar menos",
+    heading: "Conquistas", done: (n, total) => `${n} de ${total}`, collection: (p) => `${p}% da coleção`, cards: (n, total) => `${n} de ${total} cartas`, all: "Todas", unlocked: "Desbloqueada", fresh: "Nova!", locked: "Bloqueada", showAll: (n) => `Ver todas (${n})`, showLess: "Mostrar menos",
     rarities: { bronze: "Bronze", silver: "Prata", gold: "Ouro", diamond: "Diamante" },
     items: {
       "first-card": { title: "Primeira carta", desc: () => "Tenha sua primeira carta." },
@@ -46,7 +49,7 @@ const S = strings<Texts>({
     },
   },
   en: {
-    heading: "Achievements", done: (n, total) => `${n} of ${total}`, collection: (p) => `${p}% of the collection`, cards: (n, total) => `${n} of ${total} cards`, all: "All", unlocked: "Unlocked", locked: "Locked", showAll: (n) => `Show all (${n})`, showLess: "Show less",
+    heading: "Achievements", done: (n, total) => `${n} of ${total}`, collection: (p) => `${p}% of the collection`, cards: (n, total) => `${n} of ${total} cards`, all: "All", unlocked: "Unlocked", fresh: "New!", locked: "Locked", showAll: (n) => `Show all (${n})`, showLess: "Show less",
     rarities: { bronze: "Bronze", silver: "Silver", gold: "Gold", diamond: "Diamond" },
     items: {
       "first-card": { title: "First card", desc: () => "Get your first card." },
@@ -78,7 +81,7 @@ const S = strings<Texts>({
     },
   },
   es: {
-    heading: "Logros", done: (n, total) => `${n} de ${total}`, collection: (p) => `${p}% de la colección`, cards: (n, total) => `${n} de ${total} cartas`, all: "Todos", unlocked: "Desbloqueado", locked: "Bloqueado", showAll: (n) => `Ver todos (${n})`, showLess: "Mostrar menos",
+    heading: "Logros", done: (n, total) => `${n} de ${total}`, collection: (p) => `${p}% de la colección`, cards: (n, total) => `${n} de ${total} cartas`, all: "Todos", unlocked: "Desbloqueado", fresh: "¡Nuevo!", locked: "Bloqueado", showAll: (n) => `Ver todos (${n})`, showLess: "Mostrar menos",
     rarities: { bronze: "Bronce", silver: "Plata", gold: "Oro", diamond: "Diamante" },
     items: {
       "first-card": { title: "Primera carta", desc: () => "Consigue tu primera carta." },
@@ -121,13 +124,29 @@ const COLLAPSED = 12;
 const COLLAPSED_SMALL = 4;
 const RANK: Record<AchievementRarity, number> = { bronze: 0, silver: 1, gold: 2, diamond: 3 };
 
-export function Achievements({ ids, profileCard, favorites, collapsible = false }: { ids: string[]; profileCard: boolean; favorites: number; collapsible?: boolean }) {
+/** `seenKey`: só no seu perfil. Guarda no navegador as conquistas já vistas para destacar as que acabaram de sair. */
+export function Achievements({ ids, profileCard, favorites, collapsible = false, seenKey }: { ids: string[]; profileCard: boolean; favorites: number; collapsible?: boolean; seenKey?: string }) {
   const t = useT(S);
   const { players, teams } = useData();
   const [rarity, setRarity] = useState<AchievementRarity>();
   const [open, setOpen] = useState(!collapsible);
   const all = achievementsFor(players, teams, ids, { profileCard, favorites: Math.min(favorites, MAX_FAVORITES) });
   const done = all.filter((a) => a.done).length;
+  const settled = useSettled();
+  const doneIds = all.filter((a) => a.done).map((a) => a.id);
+  // conquistas desbloqueadas desde a última visita (lidas uma vez, ao abrir o perfil)
+  const [fresh] = useState(() => {
+    if (!seenKey) return new Set<string>();
+    const raw = localStorage.getItem(seenKey);
+    // primeira visita: tudo conta como já visto, para não acender tudo de uma vez
+    if (raw === null) return new Set<string>();
+    const seen = new Set<string>(JSON.parse(raw) as string[]);
+    return new Set(doneIds.filter((id) => !seen.has(id)));
+  });
+  const doneKey = doneIds.join(",");
+  useEffect(() => {
+    if (seenKey) localStorage.setItem(seenKey, JSON.stringify(doneKey ? doneKey.split(",") : []));
+  }, [seenKey, doneKey]);
   // progresso na coleção toda, na mesma linha do título
   const owned = new Set(ids);
   const mine = players.filter((p) => owned.has(p.id)).length;
@@ -141,17 +160,17 @@ export function Achievements({ ids, profileCard, favorites, collapsible = false 
     .map(({ a }) => a);
 
   return (
-    <section aria-labelledby="achievements-title" className="noir-glass flex min-w-0 flex-1 flex-col gap-5 rounded-2xl p-4 sm:p-6">
+    <section aria-labelledby="achievements-title" className="flex min-w-0 flex-1 flex-col gap-5 border-t border-zinc-200/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
       <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
         <div className="flex items-baseline gap-3">
-          <h2 id="achievements-title" className="font-display text-[1.6875rem] font-black text-dl-text">{t.heading}</h2>
+          <h2 id="achievements-title" className="font-display text-4xl font-black text-area title-depth">{t.heading}</h2>
           <span className="text-[1.3125rem] whitespace-nowrap text-zinc-300 tabular-nums">{t.done(done, all.length)}</span>
         </div>
         <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="text-[1.3125rem] font-extrabold whitespace-nowrap text-dl-text tabular-nums">{t.collection(pct)}</span>
+          <span className="text-[1.75rem] font-extrabold whitespace-nowrap text-dl-text tabular-nums">{t.collection(pct)}</span>
           <span className="text-[1.3125rem] whitespace-nowrap text-zinc-400 tabular-nums">{t.cards(mine, players.length)}</span>
           <div role="progressbar" aria-label={t.collection(pct)} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="h-2 max-w-60 min-w-24 flex-1 rounded-full bg-zinc-800">
-            <div className="h-full rounded-full bg-dl-text" style={{ width: `${pct}%` }} />
+            <FillBar pct={pct} delay={0.2} className="h-full rounded-full" barClassName="bg-dl-text" />
           </div>
         </div>
       </div>
@@ -169,7 +188,11 @@ export function Achievements({ ids, profileCard, favorites, collapsible = false 
         })}
       </div>
       <ul id="achievements-list" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {(open ? shown : shown.slice(0, COLLAPSED)).map((a, i) => <AchievementTile key={a.id} a={a} t={t} hide={!open && i >= COLLAPSED_SMALL} />)}
+        <AnimatePresence initial={false} mode="popLayout">
+          {(open ? shown : shown.slice(0, COLLAPSED)).map((a, i) => (
+            <AchievementTile key={a.id} a={a} t={t} hide={!open && i >= COLLAPSED_SMALL} fresh={fresh.has(a.id)} delay={settled ? 0 : cascade(i, 0.04)} />
+          ))}
+        </AnimatePresence>
       </ul>
       {collapsible && shown.length > COLLAPSED_SMALL && (
         <button type="button" aria-expanded={open} aria-controls="achievements-list" onClick={() => setOpen((o) => !o)} className={`${pill(false)} self-center ${!open && shown.length <= COLLAPSED ? "lg:hidden" : ""}`}>
@@ -181,12 +204,20 @@ export function Achievements({ ids, profileCard, favorites, collapsible = false 
   );
 }
 
-function AchievementTile({ a, t, hide }: { a: Achievement; t: Texts; hide: boolean }) {
+function AchievementTile({ a, t, hide, fresh, delay }: { a: Achievement; t: Texts; hide: boolean; fresh: boolean; delay: number }) {
   const text = t.items[a.id];
   const pct = Math.round((a.value / a.goal) * 100);
   return (
-    <li data-locked={a.done ? undefined : ""} className={`${TILE[a.rarity]} ${hide ? "max-lg:hidden" : ""} flex items-center gap-3 rounded-xl p-3`}>
-      <span className="ach-medal relative flex size-12 shrink-0 items-center justify-center rounded-full bg-zinc-950">
+    <motion.li
+      layout
+      data-locked={a.done ? undefined : ""}
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.3, ease: easeOut, delay }}
+      className={`${TILE[a.rarity]} ${hide ? "max-lg:hidden" : ""} flex items-center gap-3 rounded-xl p-3`}
+    >
+      <span className={`ach-medal relative flex size-12 shrink-0 items-center justify-center rounded-full bg-zinc-950 ${fresh ? "ach-fresh" : ""}`}>
         <Icon name={ICON[a.rarity]} className="size-6" />
         {!a.done && (
           <span className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-full bg-zinc-800 text-zinc-400">
@@ -206,16 +237,17 @@ function AchievementTile({ a, t, hide }: { a: Achievement; t: Texts; hide: boole
               {t.unlocked}
             </span>
           )}
+          {fresh && <span className="rounded-sm bg-dl-text px-1.5 py-0.5 whitespace-nowrap text-dl-black">{t.fresh}</span>}
         </span>
         {!a.done && (
           <div className="flex min-w-0 items-center gap-2">
             <div role="progressbar" aria-label={text.title} aria-valuenow={a.value} aria-valuemin={0} aria-valuemax={a.goal} className="h-1.5 min-w-8 flex-1 rounded-full bg-zinc-800">
-              <div className="h-full rounded-full bg-zinc-400" style={{ width: `${pct}%` }} />
+              <FillBar pct={pct} delay={delay + 0.15} className="h-full rounded-full" barClassName="bg-zinc-400" />
             </div>
             <span className="shrink-0 text-[11px] whitespace-nowrap text-zinc-400 tabular-nums">{a.value}/{a.goal}</span>
           </div>
         )}
       </div>
-    </li>
+    </motion.li>
   );
 }

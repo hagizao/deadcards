@@ -1,15 +1,18 @@
-import { motion } from "motion/react";
+import { animate, motion, usePresence, useReducedMotion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
-import { strings, useLocale, useT } from "../lib/i18n";
-import { STAT_KEYS, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
+import { strings, useT } from "../lib/i18n";
+import { STAT_NAMES } from "../lib/statNames";
+import { STAT_KEYS, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
 import { Icon } from "./Icon";
 import { easeOut, pill } from "../lib/ui";
+import { cascade, enter, flightOrigin, springFlight } from "../lib/motion";
+import { CountUp, FillBar } from "./Motion";
 import { MAX_FAVORITES } from "../lib/profile";
 import { toggleFavorite, useMyCards, type FavoriteResult } from "../lib/myCards";
 import type { ArtCredit } from "../lib/types";
@@ -20,20 +23,21 @@ const revealed = new Set<string>();
 const S = strings({
   pt: { notOwned: "Você não possui esta carta", favorite: "Favoritar", favorited: "Favorita", limit: `Até ${MAX_FAVORITES} favoritas. Abra uma favorita e desmarque para marcar outra.`, failed: "Não foi possível salvar a favorita.",
     owners: (n: number) => (n === 0 ? "Ninguém tem esta carta ainda" : n === 1 ? "1 conta tem esta carta" : `${n.toLocaleString("pt-BR")} contas têm esta carta`),
-    cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", history: "Histórico de OVR", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por",
-    stats: "Atributos", statNames: { MIR: "Mira", MAC: "Macro", SUP: "Suporte", MOV: "Movimentação", POL: "Pool de heróis", CON: "Consistência" } },
+    cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por",
+    stats: "Atributos" },
   en: { notOwned: "You don't own this card", favorite: "Favorite", favorited: "Favorite", limit: `Up to ${MAX_FAVORITES} favorites. Open one and unmark it to pick another.`, failed: "Could not save the favorite.",
     owners: (n: number) => (n === 0 ? "Nobody owns this card yet" : n === 1 ? "1 account owns this card" : `${n.toLocaleString("en-US")} accounts own this card`),
-    cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", history: "OVR history", versions: "Versions", main: "Main", version: "Version", artBy: "Art by",
-    stats: "Attributes", statNames: { MIR: "Aim", MAC: "Macro", SUP: "Support", MOV: "Movement", POL: "Hero pool", CON: "Consistency" } },
+    cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", versions: "Versions", main: "Main", version: "Version", artBy: "Art by",
+    stats: "Attributes" },
   es: { notOwned: "No tienes esta carta", favorite: "Marcar favorita", favorited: "Favorita", limit: `Hasta ${MAX_FAVORITES} favoritas. Abre una y desmárcala para marcar otra.`, failed: "No se pudo guardar la favorita.",
     owners: (n: number) => (n === 0 ? "Nadie tiene esta carta todavía" : n === 1 ? "1 cuenta tiene esta carta" : `${n.toLocaleString("es")} cuentas tienen esta carta`),
-    cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", history: "Historial de OVR", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de",
-    stats: "Atributos", statNames: { MIR: "Puntería", MAC: "Macro", SUP: "Apoyo", MOV: "Movimiento", POL: "Pool de héroes", CON: "Consistencia" } },
+    cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de",
+    stats: "Atributos" },
 });
 
 export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: string; onClose: () => void; onSwitch: (id: string) => void; onEdit?: (id: string) => void }) {
   const t = useT(S);
+  const statNames = useT(STAT_NAMES);
   const label = useLabel();
   const { teams, players, settings, heroIcon, me } = useData();
   const player = players.find((p) => p.id === playerId);
@@ -52,6 +56,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
     [playerId], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  const still = useReducedMotion();
+  const [fly] = useState(() => !still && !!flightOrigin(playerId));
+
   useLayoutEffect(() => {
     if (!reveal || !cardRef.current) return;
     revealed.add(playerId);
@@ -60,7 +67,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
       const tl = gsap.timeline({ delay: 0.12, onComplete: () => setExportReadyId(playerId) });
       tl.fromTo(flashRef.current, { opacity: 0, scale: 0.5 }, { opacity: 0.9, scale: 1.1, duration: 0.25, ease: "power2.out" })
         .to(flashRef.current, { opacity: 0, scale: 1.35, duration: 0.5, ease: "power2.in" });
-      tl.from(cardRef.current, { y: 40, scale: 0.85, opacity: 0, duration: 0.6, ease: "back.out(1.6)", clearProps: "transform,opacity" }, 0.05);
+      // vindo da grade a carta já chega voando; o pulo da revelação fica só para quando ela abre do nada
+      if (!fly) tl.from(cardRef.current, { y: 40, scale: 0.85, opacity: 0, duration: 0.6, ease: "back.out(1.6)", clearProps: "transform,opacity" }, 0.05);
       if (ovrEl) {
         const n = { v: 0 };
         ovrEl.nodeValue = "0";
@@ -74,6 +82,44 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
     return () => { ctx.revert(); if (ovrEl) ovrEl.nodeValue = String(ovr); };
   }, [reveal, playerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // a carta sai de onde estava na grade, cresce até aqui e, ao fechar, volta para o mesmo lugar
+  const flyRef = useRef<HTMLDivElement>(null);
+  // o painel rola por dentro (overflow) e cortaria a carta enquanto ela voa de fora dele: durante o voo ele deixa vazar
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const unclip = () => { if (scrollRef.current) scrollRef.current.style.overflow = "visible"; };
+  const reclip = () => { if (scrollRef.current) scrollRef.current.style.overflow = ""; };
+  const [isPresent, safeToRemove] = usePresence();
+  const [firstId] = useState(playerId);
+  const flightGap = (from: HTMLElement, el: HTMLElement) => {
+    const a = from.getBoundingClientRect(), b = el.getBoundingClientRect();
+    return { x: a.left + a.width / 2 - (b.left + b.width / 2), y: a.top + a.height / 2 - (b.top + b.height / 2), scale: a.width / b.width };
+  };
+  useLayoutEffect(() => {
+    const from = flightOrigin(firstId), el = flyRef.current;
+    if (!fly || !from || !el) return;
+    unclip();
+    const g = flightGap(from, el);
+    from.style.visibility = "hidden";
+    const a = animate(el, { x: [g.x, 0], y: [g.y, 0], scale: [g.scale, 1] }, springFlight);
+    a.then(reclip);
+    return () => { a.stop(); reclip(); from.style.visibility = ""; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- só na abertura; trocar de versão não voa de novo
+  useEffect(() => {
+    if (isPresent) return;
+    const from = flightOrigin(firstId), el = flyRef.current;
+    const done = () => { if (from) from.style.visibility = ""; safeToRemove(); };
+    if (!el || still) { done(); return; }
+    // volta para a grade só se ainda é a mesma carta que abriu; senão some no lugar
+    const flyBack = fly && from && playerId === firstId;
+    if (flyBack) unclip();
+    const back = flyBack ? flightGap(from, el) : null;
+    const a = back
+      ? animate(el, { x: back.x, y: back.y, scale: back.scale }, { duration: 0.3, ease: easeOut })
+      : animate(el, { opacity: 0, scale: 0.95 }, { duration: 0.18 });
+    a.then(done);
+    return () => a.stop();
+  }, [isPresent]); // eslint-disable-line react-hooks/exhaustive-deps -- roda uma vez, quando o destaque começa a fechar
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -83,7 +129,6 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   if (!player) return null;
   const team = teamOf(teams, player);
   if (!tier) return null;
-  const history = getPlayerHistory(player);
   const groupKey = player.variantOf || player.id;
   // herói jogado aposentado só aparece para quem tem a carta (ou quando é a carta aberta)
   const versions = players.filter((p) => (p.id === groupKey || p.variantOf === groupKey) && (!isRetired(p) || p.id === player.id || !!owned?.has(p.id)));
@@ -99,25 +144,30 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   };
 
   return (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-label={t.cardOf(player.name)}
     >
-      <motion.div
-        className="noir-glass-strong flex max-h-[92dvh] w-full max-w-4xl flex-col items-center gap-8 overflow-y-auto rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
-        onClick={(e) => e.stopPropagation()}
+      {/* fundo e vidro animam separados da carta, para a carta voar sem sumir junto com eles; clicar no fundo fecha (Esc também) */}
+      <motion.div aria-hidden="true" onClick={onClose} className="absolute inset-0 bg-black/75 backdrop-blur-md" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} />
+      <div className="relative flex max-h-[92dvh] w-full max-w-4xl">
+        <motion.div
+          aria-hidden="true"
+          className="noir-glass-strong absolute inset-0 rounded-3xl"
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.97 }}
+          transition={{ type: "spring", duration: 0.35, bounce: 0.12 }}
+        />
+      {/* sem rolagem lateral: o clarão da revelação passa da largura do painel no celular */}
+      <div
+        ref={scrollRef}
+        className="relative flex max-h-[92dvh] w-full flex-col items-center gap-8 overflow-x-hidden overflow-y-auto rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
       >
-        <motion.div key={player.id} className="relative max-w-full" initial={reveal ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15, ease: easeOut }}>
+        <div ref={flyRef} className="relative z-10 max-w-full">
+        <motion.div key={player.id} className="relative max-w-full" initial={reveal || fly ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2, ease: easeOut }}>
           {reveal && (
             <div ref={flashRef} aria-hidden="true" className="pointer-events-none absolute -inset-16 rounded-full opacity-0" style={{ background: `radial-gradient(circle, ${tier.hi} 0%, ${tier.c}99 30%, transparent 68%)` }} />
           )}
@@ -125,8 +175,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             <Card player={player} variant="editor" signature={isMainCard(player) && versions.some(isAltHero)} />
           </div>
         </motion.div>
+        </div>
 
-        <div className="w-full min-w-0 flex-1 space-y-5">
+        <motion.div className="w-full min-w-0 flex-1 space-y-5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ ...enter, delay: 0.08 }}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="font-display text-3xl font-black tracking-[0.12em] text-dl-text uppercase"><span ref={nameRef} key={player.id + player.name}>{player.name}</span></h2>
@@ -165,21 +216,21 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
 
           <div>
             <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.stats}</h3>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-3">
-              {STAT_KEYS.map((k) => (
-                <div key={k} className="flex items-baseline gap-2">
-                  <dt className="font-mono font-bold text-zinc-100">{k}</dt>
-                  <dd className="min-w-0 flex-1 truncate text-zinc-400">{t.statNames[k]}</dd>
-                  <dd className="font-bold text-zinc-100 tabular-nums">{player.stats[k]}</dd>
+            {/* barras enchem uma depois da outra; ao trocar de versão elas andam até o valor novo */}
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              {STAT_KEYS.map((k, i) => (
+                <div key={k} className="flex flex-col gap-1">
+                  <div className="flex items-baseline gap-2">
+                    <dt className="font-mono font-bold text-zinc-100">{k}</dt>
+                    <dd className="min-w-0 flex-1 truncate text-zinc-400">{statNames[k]}</dd>
+                    <dd className="font-bold text-zinc-100 tabular-nums"><CountUp value={player.stats[k]} delay={0.15 + cascade(i, 0.05)} /></dd>
+                  </div>
+                  <FillBar pct={((player.stats[k] - 40) / 59) * 100} delay={0.15 + cascade(i, 0.05)} className="h-1.5 rounded-full bg-zinc-800" style={{ background: `linear-gradient(90deg, ${tier.lo}, ${tier.c})` }} />
                 </div>
               ))}
             </dl>
           </div>
 
-          <div>
-            <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.history}</h3>
-            <HistoryChart points={history} color={tier.c} />
-          </div>
 
           {versions.length > 1 && (
             <div>
@@ -205,9 +256,10 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
               </div>
             </div>
           )}
-        </div>
-      </motion.div>
-    </motion.div>
+        </motion.div>
+      </div>
+      </div>
+    </div>
   );
 }
 
@@ -238,32 +290,5 @@ function ArtCreditLine({ credit, label }: { credit: ArtCredit; label: string }) 
         <span className="font-bold text-zinc-100">{credit.name}</span>
       )}
     </p>
-  );
-}
-
-function HistoryChart({ points, color }: { points: { date: string; ovr: number }[]; color: string }) {
-  const locale = useLocale();
-  // Datas são ISO (YYYY-MM-DD); formata dia/mês na ordem do idioma, caindo no texto original se não for data válida.
-  const short = (iso: string) => {
-    const d = new Date(iso);
-    return isNaN(+d) ? iso : d.toLocaleDateString(locale, { day: "2-digit", month: "2-digit", timeZone: "UTC" });
-  };
-  const W = 420, H = 160, P = 32;
-  const vals = points.map((p) => p.ovr);
-  const min = Math.min(...vals) - 2, max = Math.max(...vals) + 2;
-  const x = (i: number) => (points.length === 1 ? W / 2 : P + (i * (W - 2 * P)) / (points.length - 1));
-  const y = (v: number) => H - P - ((v - min) / Math.max(1, max - min)) * (H - 2 * P);
-  const d = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.ovr).toFixed(1)}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full rounded-xl border border-zinc-200/10 bg-black/40">
-      <motion.path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.9, ease: "easeOut" }} style={{ filter: `drop-shadow(0 0 6px ${color})` }} />
-      {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={x(i)} cy={y(p.ovr)} r="4" fill="#09090b" stroke={color} strokeWidth="2" />
-          <text x={x(i)} y={y(p.ovr) - 12} textAnchor="middle" fontSize="16" fontWeight="800" fill="#f4f4f5">{p.ovr}</text>
-          <text x={x(i)} y={H - 8} textAnchor="middle" fontSize="15" fill="#a1a1aa">{short(p.date)}</text>
-        </g>
-      ))}
-    </svg>
   );
 }

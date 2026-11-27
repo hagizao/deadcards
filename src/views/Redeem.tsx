@@ -95,7 +95,7 @@ export function Redeem({ onOpenCard }: { onOpenCard: (id: string) => void }) {
   const closeOpening = useCallback(() => { setOpening(null); loadPacks(); }, [loadPacks]);
   return (
     <section className="flex flex-col gap-6">
-      <div className="noir-glass flex flex-col gap-4 rounded-2xl p-5 sm:p-7">
+      <div className="flex flex-col gap-4">
         <div>
           <h1 className={pageTitle}>{t.title}</h1>
           <p className="mt-1.5 text-xs text-zinc-400">{me ? t.subtitle : t.signIn}</p>
@@ -106,8 +106,8 @@ export function Redeem({ onOpenCard }: { onOpenCard: (id: string) => void }) {
       </div>
 
       {me && packs && (
-        <div className="noir-glass flex flex-col gap-4 rounded-2xl p-5 sm:p-7">
-          <h2 className="text-sm font-extrabold tracking-[0.2em] text-dl-text uppercase">{t.packs} {packs.length > 0 && <span className="text-zinc-400">({packs.length})</span>}</h2>
+        <div className="flex flex-col gap-4 border-t border-zinc-200/15 pt-6">
+          <h2 className="text-sm font-extrabold tracking-[0.2em] text-area uppercase title-depth">{t.packs} {packs.length > 0 && <span className="text-zinc-400">({packs.length})</span>}</h2>
           {packs.length === 0 ? <p className="text-xs text-zinc-400">{t.noPacks}</p> : (
             <ul className="flex flex-wrap justify-center gap-6 sm:justify-start">
               {packs.map((p, i) => (

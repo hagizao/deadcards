@@ -88,6 +88,11 @@ export function regionClass(region: string): string {
   return "team-region-asia";
 }
 
+/** Só a cor da região (--team-accent), sem o fundo de caixa que a team-region-* traz. */
+export function regionAccentClass(region: string): string {
+  return regionClass(region).replace("team-region-", "accent-region-");
+}
+
 export function hexToRgba(hex: string, alpha = 1): string {
   let c = String(hex || "#18181b").replace("#", "").trim();
   if (c.length === 3) c = c.split("").map((x) => x + x).join("");
