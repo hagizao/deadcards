@@ -9,6 +9,8 @@ import type { Team } from "../lib/types";
 import { Card } from "../components/Card";
 import { easeOut, pageTitle, pill, sectionTitle } from "../lib/ui";
 import { cascade, useSettled } from "../lib/motion";
+import { useRail } from "../lib/rail";
+import { RailArrows } from "../components/Rail";
 
 const S = strings({
   pt: {
@@ -16,24 +18,29 @@ const S = strings({
     medium: "Cartas médias", large: "Cartas grandes", regions: "Times por região", noTeams: "Nenhum time ainda",
     teams: (n: number) => `${n} ${n === 1 ? "time" : "times"}`, show: (name: string) => `Ver o elenco de ${name}`,
     count: (n: number) => `${n} ${n === 1 ? "jogador" : "jogadores"} no elenco oficial`, emptyRoster: "Nenhum jogador cadastrado neste elenco ainda.",
+    prevRegions: "Regiões anteriores", nextRegions: "Mais regiões", prevCards: "Cartas anteriores", nextCards: "Mais cartas",
   },
   en: {
     title: "Rosters & cards", hint: "Pick a team to see its roster. Click a card to see its details.",
     medium: "Medium cards", large: "Large cards", regions: "Teams by region", noTeams: "No teams yet",
     teams: (n: number) => `${n} ${n === 1 ? "team" : "teams"}`, show: (name: string) => `Show ${name}'s roster`,
     count: (n: number) => `${n} ${n === 1 ? "player" : "players"} on the official roster`, emptyRoster: "No players registered on this roster yet.",
+    prevRegions: "Previous regions", nextRegions: "More regions", prevCards: "Previous cards", nextCards: "More cards",
   },
   es: {
     title: "Rosters y cartas", hint: "Elige un equipo para ver su roster. Haz clic en una carta para ver los detalles.",
     medium: "Cartas medianas", large: "Cartas grandes", regions: "Equipos por región", noTeams: "Aún no hay equipos",
     teams: (n: number) => `${n} ${n === 1 ? "equipo" : "equipos"}`, show: (name: string) => `Ver el roster de ${name}`,
     count: (n: number) => `${n} ${n === 1 ? "jugador" : "jugadores"} en el roster oficial`, emptyRoster: "Aún no hay jugadores registrados en este roster.",
+    prevRegions: "Regiones anteriores", nextRegions: "Más regiones", prevCards: "Cartas anteriores", nextCards: "Más cartas",
   },
 });
 
 const FREE = "Sem Time";
-// as quatro regiões do cabeçalho; os sem time ficam numa linha embaixo delas
+// as quatro regiões; "Sem time" entra por último, à direita, quando tem algum time
 const MAIN_REGIONS = REGIONS.filter((r) => r !== FREE);
+// largura das cartas do elenco (card-size-team e card-size-team-medium no cards.css)
+const CARD_W = { team: 295, medium: 222 } as const;
 
 export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpenCard: (id: string) => void }) {
   const { teams, players } = useData();
@@ -50,6 +57,10 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
     .sort((a, b) => b.o.exact - a.o.exact || a.team.name.localeCompare(b.team.name));
   const inRegion = (r: string) => ranked.filter(({ team }) => (team.region || "Europa") === r);
   const free = inRegion(FREE);
+  const regionList = free.length ? [...MAIN_REGIONS, FREE] : MAIN_REGIONS;
+  const [regionsEl, setRegionsEl] = useState<HTMLDivElement | null>(null);
+  // uma linha só: até 4 regiões à vista, as outras pelas setas
+  const regionRail = useRail(regionsEl, regionList.length, { item: 280, gap: 24, max: 4, fluid: true });
   // sem escolha, abre o time de maior OVR para a tela nunca começar vazia
   const current = ranked.find(({ team }) => team.id === picked) ?? ranked[0];
 
@@ -77,33 +88,33 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
         </button>
       </div>
 
-      {/* cabeçalho de regiões: colunas separadas pela linha fina, com os times encaixados em cada uma */}
-      <nav aria-label={t.regions} className="flex flex-col gap-6">
-        <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
-          {MAIN_REGIONS.map((r) => {
-            const list = inRegion(r);
-            return (
-              <div key={r} className={`${regionAccentClass(r)} flex flex-col gap-3 border-l border-zinc-200/15 pl-4`}>
-                <div className="flex flex-col gap-1">
-                  <h2 className="flex items-center gap-2.5 text-2xl font-extrabold tracking-widest text-zinc-100 uppercase">
-                    <span aria-hidden="true" className="size-3 rounded-full bg-(--team-accent) shadow-[0_0_10px_var(--team-accent)]" />
-                    {label(r)}
-                  </h2>
-                  <span className="text-xs text-zinc-500">{t.teams(list.length)}</span>
-                </div>
-                {list.length
-                  ? <ul className="flex flex-wrap gap-1">{list.map(logo)}</ul>
-                  : <p className="py-2 text-sm text-zinc-500">{t.noTeams}</p>}
-              </div>
-            );
-          })}
+      {/* cabeçalho de regiões: uma linha de colunas separadas pela linha fina, com os times encaixados; setas para as que não cabem */}
+      <nav aria-label={t.regions} className="flex flex-col gap-3">
+        <div className="flex min-h-11 justify-end">
+          <RailArrows rail={regionRail} prev={t.prevRegions} next={t.nextRegions} />
         </div>
-        {free.length > 0 && (
-          <div className={`${regionAccentClass(FREE)} flex flex-wrap items-center gap-x-4 gap-y-2 border-l border-zinc-200/15 pl-4`}>
-            <h2 className="text-2xl font-extrabold tracking-widest text-zinc-300 uppercase">{label(FREE)}</h2>
-            <ul className="flex flex-wrap gap-1">{free.map(logo)}</ul>
-          </div>
-        )}
+        <div ref={setRegionsEl} className="overflow-x-clip">
+          <motion.ul className="flex gap-6" {...regionRail.track}>
+            {regionList.map((r, i) => {
+              const list = inRegion(r);
+              return (
+                <li key={r} style={{ width: regionRail.size }} inert={regionRail.hidden(i) || undefined}
+                  className={`${regionAccentClass(r)} flex shrink-0 flex-col gap-3 border-l border-zinc-200/15 pl-4`}>
+                  <div className="flex flex-col gap-1">
+                    <h2 className="flex items-center gap-2.5 text-2xl font-extrabold tracking-widest text-zinc-100 uppercase">
+                      <span aria-hidden="true" className="size-3 shrink-0 rounded-full bg-(--team-accent) shadow-[0_0_10px_var(--team-accent)]" />
+                      {label(r)}
+                    </h2>
+                    <span className="text-xs text-zinc-500">{t.teams(list.length)}</span>
+                  </div>
+                  {list.length
+                    ? <ul className="flex flex-wrap gap-1">{list.map(logo)}</ul>
+                    : <p className="py-2 text-sm text-zinc-500">{t.noTeams}</p>}
+                </li>
+              );
+            })}
+          </motion.ul>
+        </div>
       </nav>
 
       {/* o time escolhido abre embaixo do cabeçalho */}
@@ -143,6 +154,9 @@ function TeamPanel({ team, ovr, size, onOpenCard }: { team: Team; ovr: { rounded
   const { players } = useData();
   const roster = activeRoster(players, team.id);
   const { rotateX, rotateY, ...tilt } = usePointerTilt();
+  const [rowEl, setRowEl] = useState<HTMLDivElement | null>(null);
+  // elenco numa linha só; as cartas que não cabem ficam atrás das setas
+  const rail = useRail(rowEl, roster.length, { item: CARD_W[size], gap: 24 });
   return (
     <motion.section
       aria-labelledby={`team-${team.id}`}
@@ -164,14 +178,18 @@ function TeamPanel({ team, ovr, size, onOpenCard }: { team: Team; ovr: { rounded
           </div>
           <p className="text-sm text-zinc-300">{label(team.region)} · {t.count(roster.length)}</p>
         </div>
+        <RailArrows rail={rail} prev={t.prevCards} next={t.nextCards} />
       </div>
-      <div className="flex flex-wrap justify-center gap-6 sm:justify-start">
-        {roster.length === 0 && <p className="w-full py-8 text-center text-sm text-zinc-400">{t.emptyRoster}</p>}
-        {roster.map((p, i) => (
-          <motion.div key={p.id} initial={{ opacity: 0, y: 12, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: Math.min(i, 5) * 0.04, duration: 0.25, ease: easeOut }}>
-            <Card player={p} variant={size} onOpen={() => onOpenCard(p.id)} />
-          </motion.div>
-        ))}
+      {roster.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{t.emptyRoster}</p>}
+      {/* corta só na horizontal: a carta sobe e brilha no hover sem ser cortada em cima e embaixo */}
+      <div ref={setRowEl} className="overflow-x-clip pt-2 pb-6">
+        <motion.ul className="flex gap-6" {...rail.track}>
+          {roster.map((p, i) => (
+            <motion.li key={p.id} className="shrink-0" inert={rail.hidden(i) || undefined} initial={{ opacity: 0, y: 12, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: Math.min(i, 5) * 0.04, duration: 0.25, ease: easeOut }}>
+              <Card player={p} variant={size} onOpen={() => onOpenCard(p.id)} />
+            </motion.li>
+          ))}
+        </motion.ul>
       </div>
     </motion.section>
   );
