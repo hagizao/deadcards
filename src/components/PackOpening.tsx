@@ -179,12 +179,21 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
     setSpot({ ...s, w: r?.width ?? 0, h: r?.height ?? 0 });
   };
 
-  // a resposta do servidor já chegou ou chega aqui; daí a tampa, o walkout e a carta
-  const play = useEffectEvent(async () => {
-    setStage("waiting");
-    const drawn = await request();
-    const c = kase.current;
-    if (!drawn || !c) return;
+  /** Revelação sem a maleta 3D: a carta aparece direto no centro. Serve para quem não tem WebGL2 e de saída quando a cena 3D falha. */
+  const revealFlat = (drawn: Drawn) => {
+    riser.current?.stop();
+    music.current?.stop();
+    music.current = null;
+    const p = players.find((x) => x.id === drawn.id);
+    const lvl = levelOf(p && getCardTier(p, settings.tierConfig!), !!p?.special);
+    const r = root.current?.getBoundingClientRect();
+    place({ x: (r?.width ?? 0) / 2, y: ((r?.height ?? 0) - BOTTOM) / 2, scale: 0.6 });
+    playReveal(lvl);
+    setStage("done");
+  };
+
+  /** A tampa, o walkout e a carta subindo, com as cores da raridade sorteada. */
+  const animate = async (c: PackCase, drawn: Drawn) => {
     const p = players.find((x) => x.id === drawn.id);
     const tr = p ? getCardTier(p, settings.tierConfig!) : null;
     const lvl = levelOf(tr, !!p?.special);
@@ -230,6 +239,22 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
       setTimeout(() => m.stop(0.8), CROWD_DELAY * 1000);
     }
     setStage("done");
+  };
+
+  // a resposta do servidor já chegou ou chega aqui; daí a tampa, o walkout e a carta
+  const play = useEffectEvent(async () => {
+    setStage("waiting");
+    const drawn = await request();
+    if (!drawn) return;
+    // a carta já foi sorteada e gravada: se a cena 3D sumiu (contexto WebGL perdido, recarga) ou falhar no meio,
+    // mostra a carta sem a animação em vez de deixar a tela presa no "…"
+    const c = kase.current;
+    if (!c) return revealFlat(drawn);
+    try {
+      await animate(c, drawn);
+    } catch {
+      revealFlat(drawn);
+    }
   });
 
   const onLatch = useEffectEvent((i: number, remaining: number) => {
@@ -272,13 +297,7 @@ export function PackOpening({ pack, onClose, onOpened }: { pack: InventoryPack; 
   const openFlat = async () => {
     setStage("waiting");
     const drawn = await request();
-    if (!drawn) return;
-    const p = players.find((x) => x.id === drawn.id);
-    const lvl = levelOf(p && getCardTier(p, settings.tierConfig!), !!p?.special);
-    const r = root.current?.getBoundingClientRect();
-    place({ x: (r?.width ?? 0) / 2, y: ((r?.height ?? 0) - BOTTOM) / 2, scale: 0.6 });
-    playReveal(lvl);
-    setStage("done");
+    if (drawn) revealFlat(drawn);
   };
 
   useEffect(() => {
