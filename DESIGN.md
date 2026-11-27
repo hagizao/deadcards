@@ -54,10 +54,12 @@ Fonte do design system: `src/index.css` (tokens `@theme`, `noir-glass`, `noir-gl
 - 2026-11-25 — Carta exclusiva e carta inativa (fora do elenco) entram no pack só se marcadas a dedo; herói jogado aposentado nunca — resposta 2 do dono; aposentado já não pode ser dado por código.
 - 2026-11-25 — Escolha de cartas abre num modal (`<dialog>` nativo, fecha com Esc, clique fora ou "Pronto") com uma grade de blocos clicáveis (arte, OVR na cor da raridade, nome, herói · tipo · time, check quando marcada), com busca, chips de tipo e raridade e "Mostrar inativas" — pedido do dono: nada de `<select>` nativo, e o modal porque a grade dentro do formulário ficava apertada (quem rola é o contêiner, não a grade, senão as linhas se sobrepõem). Ao trocar para "Cartas escolhidas" a grade já vem com o pool que saía por time, para nada mudar até mexer.
 - 2026-11-25 — Ícone novo no `Icon`: `check`.
+- 2026-11-27 — Home nova, pensada para quem não conhece o competitivo (pedido do dono: acolhedora, sem cara de loja e sem "ao vivo"): palco 3D com as cartas em destaque em arco (a ativa no centro; ao lado quem é o jogador: time, região, função explicada, herói de assinatura e dois pontos fortes) → boas-vindas (3 passos para quem chega; progresso da coleção para quem entrou) → "Como ler uma carta" (carta real numerada + atributos e raridades explicados) → "Quem faz o quê" (as 5 funções com os 3 maiores OVR de cada) → "Chegaram agora" → ranking dos times → Explore. Substitui a vitrine em leque. Código em `src/views/home/`.
+- 2026-11-27 — O palco gira sozinho a cada 7 s, pausa com mouse ou foco e para de vez quando a pessoa escolhe uma carta; sem autoplay com reduced motion.
 
 ## Perguntas abertas
 - Celular fraco aguenta a maleta 3D? Hoje ela cai para 1x pixel e sem bloom quando os primeiros quadros passam de 25 ms; falta testar num aparelho real.
-- A tarefa principal é achar e mostrar a sua carta ou a do streamer? (assumido) A Home ainda não personaliza nada para quem está logado ("sua carta").
+- A tarefa principal é achar e mostrar a sua carta ou a do streamer? (assumido) A Home mostra o progresso da coleção para quem entrou, mas ainda não a "sua carta".
 - A maioria acessa pelo celular (vindo do chat da Twitch) ou pelo desktop (com a stream aberta)?
 - Do FIFA, evitar os menus do FUT? (assumido)
 - Tema claro algum dia, ou só escuro? (assumido: só escuro)
