@@ -54,6 +54,7 @@ export const api = {
     call("/api/codes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   removeCode: (code: string) => call(`/api/codes/${encodeURIComponent(code)}`, { method: "DELETE" }),
   packTypes: () => get<PackType[]>("/api/pack-types"),
+  owners: () => get<{ owners: Record<string, number>; accounts: number }>("/api/owners"),
   savePackType: (id: string, body: Omit<PackType, "id" | "cards">) =>
     call(`/api/pack-types/${encodeURIComponent(id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   removePackType: (id: string) => call(`/api/pack-types/${encodeURIComponent(id)}`, { method: "DELETE" }),

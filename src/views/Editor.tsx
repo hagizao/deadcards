@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, useData } from "../lib/data";
 import { DEFAULT_TIER_CONFIG, POSITIONS, REGIONS, STAT_KEYS, calculateOVR, cardVersions, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, isRetired, ALT_HERO_DROP } from "../lib/cards";
 import { asPlayedHero, playedStats } from "../lib/cardKinds";
+import { UniversalCollection } from "../components/UniversalCollection";
 import { FRAME_PRESETS, RARITY_TIERS, getCardTier, type Tier } from "../lib/rarity";
 import { RARITY_KEYS, rarityKeyOf, type RarityKey } from "../lib/rarityBands";
 import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
@@ -22,6 +23,7 @@ const SECTIONS = [
   { id: "look", label: "Aparência" },
   { id: "packs", label: "Packs" },
   { id: "codes", label: "Códigos" },
+  { id: "universal", label: "Coleção universal" },
   { id: "sounds", label: "Sons" },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
@@ -128,6 +130,7 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
           {section === "look" && <LookForm />}
           {section === "packs" && <PacksForm />}
           {section === "codes" && <CodesForm />}
+          {section === "universal" && <UniversalCollection onEdit={pick} />}
           {section === "sounds" && <SoundsForm />}
         </motion.div>
       </AnimatePresence>

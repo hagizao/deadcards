@@ -371,6 +371,17 @@ export default {
       const rows = await env.DB.prepare("SELECT player_id FROM user_cards WHERE user_id = ?").bind(user.id).all<{ player_id: string }>();
       return Response.json(rows.results.map((r) => r.player_id));
     }
+    // coleção universal (Editor): quantas contas têm cada carta e quantas contas existem
+    if (url.pathname === "/api/owners") {
+      if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
+      if (request.method !== "GET") return bad("método não suportado", 405);
+      const [rows, accounts] = await env.DB.batch([
+        env.DB.prepare("SELECT player_id, COUNT(*) AS n FROM user_cards GROUP BY player_id"),
+        env.DB.prepare(`SELECT COUNT(*) AS n FROM "user"`),
+      ]);
+      const owners = Object.fromEntries((rows.results as { player_id: string; n: number }[]).map((r) => [r.player_id, r.n]));
+      return Response.json({ owners, accounts: (accounts.results[0] as { n: number } | undefined)?.n ?? 0 }, { headers: { "cache-control": "private, no-store" } });
+    }
     const promoteMatch = url.pathname.match(/^\/api\/players\/([^/]+)\/promote$/);
     if (promoteMatch) {
       if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
