@@ -44,7 +44,7 @@ function Countdown({ at, startsIn, started, ended }: { at: number; startsIn: str
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 15_000); return () => clearInterval(id); }, []);
   const left = Math.floor((at * 1000 - now) / 60_000);
-  if (left < -LIVE_MINUTES) return <span className="text-zinc-500">{ended}</span>;
+  if (left < -LIVE_MINUTES) return <span className="text-zinc-400">{ended}</span>;
   if (left < 0) return <span className="font-bold text-area">{started}</span>;
   const d = Math.floor(left / 1440), h = Math.floor((left % 1440) / 60), m = left % 60;
   return <>{startsIn} <span className="font-bold text-area tabular-nums">{d > 0 && `${d}d `}{(d > 0 || h > 0) && `${h}h `}{m}m</span></>;
@@ -88,7 +88,7 @@ export function Calendar() {
     <section className="flex flex-col gap-6" aria-labelledby="home-calendar">
       <Reveal className="flex flex-col gap-2">
         <h2 id="home-calendar" className={sectionTitle}>{t.title}</h2>
-        <p className="text-sm text-zinc-300">{t.lead}</p>
+        <p className="text-sm text-zinc-200">{t.lead}</p>
       </Reveal>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-10">
@@ -98,7 +98,7 @@ export function Calendar() {
             <div className="flex flex-col gap-1">
               {sameDay(selected, today) && <span className="text-xs font-bold tracking-widest text-area uppercase">{t.today}</span>}
               <h3 className="font-display text-2xl font-extrabold tracking-wide text-white title-depth first-letter:uppercase">{longDay.format(dateOf(selected))}</h3>
-              {dayEvents.length > 0 && <span className="text-xs text-zinc-400">{t.events(dayEvents.length)}</span>}
+              {dayEvents.length > 0 && <span className="text-xs text-zinc-300">{t.events(dayEvents.length)}</span>}
             </div>
             {dayEvents.length ? (
               <ul className="flex flex-col gap-5">
@@ -111,10 +111,10 @@ export function Calendar() {
                       </p>
                       <p className="flex flex-wrap items-center gap-x-2 text-xs">
                         <span className="font-bold text-zinc-200 tabular-nums">{time.format(new Date(ev.startsAt * 1000))}</span>
-                        <span className="text-zinc-400"><Countdown at={ev.startsAt} startsIn={t.startsIn} started={t.started} ended={t.ended} /></span>
+                        <span className="text-zinc-300"><Countdown at={ev.startsAt} startsIn={t.startsIn} started={t.started} ended={t.ended} /></span>
                       </p>
                       {ev.brazil && <BrazilTag text={t.brazil} />}
-                      {ev.t.description && <p className="text-xs text-zinc-400">{ev.t.description}</p>}
+                      {ev.t.description && <p className="text-xs text-zinc-300">{ev.t.description}</p>}
                       {(ev.stream || ev.watch) && (
                         <span className="flex flex-wrap gap-1.5">
                           {ev.stream && <WatchLink href={ev.stream} icon="play" text={t.stream} />}
@@ -127,7 +127,7 @@ export function Calendar() {
               </ul>
             ) : (
               <div className="flex flex-col gap-3">
-                <p className="text-sm text-zinc-400">{t.nothing}</p>
+                <p className="text-sm text-zinc-300">{t.nothing}</p>
                 {upcoming && (
                   <button type="button" onClick={() => pick(dayOf(new Date(upcoming.startsAt * 1000)))}
                     className="group flex min-h-11 w-fit cursor-pointer items-center gap-3 rounded-xl py-2 pr-3 text-left transition-colors hover:bg-zinc-100/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10">
@@ -135,9 +135,9 @@ export function Calendar() {
                     <span className="flex flex-col">
                       <span className="text-xs font-bold tracking-widest text-area uppercase">{t.upNext}</span>
                       <span className="text-sm font-bold text-white">{fullName(upcoming)}</span>
-                      <span className="text-xs text-zinc-400 tabular-nums first-letter:uppercase">{shortDay.format(new Date(upcoming.startsAt * 1000))} · {time.format(new Date(upcoming.startsAt * 1000))}</span>
+                      <span className="text-xs text-zinc-300 tabular-nums first-letter:uppercase">{shortDay.format(new Date(upcoming.startsAt * 1000))} · {time.format(new Date(upcoming.startsAt * 1000))}</span>
                     </span>
-                    <Icon name="chevron-right" className="size-4 text-zinc-500 transition-transform group-hover:translate-x-0.5" />
+                    <Icon name="chevron-right" className="size-4 text-zinc-400 transition-transform group-hover:translate-x-0.5" />
                   </button>
                 )}
               </div>
@@ -161,7 +161,7 @@ export function Calendar() {
               <button type="button" className={arrowBtn} aria-label={t.next} onClick={() => shift(1)}><Icon name="chevron-right" className="size-5" /></button>
             </div>
           </div>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold tracking-wider text-zinc-500 uppercase" aria-hidden="true">
+          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold tracking-wider text-zinc-400 uppercase" aria-hidden="true">
             {weekdays.map((w) => <span key={w}>{w}</span>)}
           </div>
           <AnimatePresence mode="wait" initial={false} custom={month.dir}>
@@ -211,11 +211,11 @@ export function Calendar() {
                               <TournamentLogo t={tr} className={logos.length > 1 ? "size-5 text-[8px] sm:size-8 sm:text-[11px]" : "size-9 text-[11px] sm:size-14 sm:text-base"} />
                             </span>
                           ))}
-                          {logos.length > LOGOS && <span className="text-[10px] font-bold text-zinc-400">+{logos.length - LOGOS}</span>}
+                          {logos.length > LOGOS && <span className="text-[10px] font-bold text-zinc-300">+{logos.length - LOGOS}</span>}
                         </span>
                       ) : (
                         <span className={`flex size-6 items-center justify-center rounded-full text-sm tabular-nums sm:size-7 ${
-                          isToday ? "bg-area font-black text-dl-black" : out ? "text-zinc-600" : "text-zinc-400"}`}>{day.d}</span>
+                          isToday ? "bg-area font-black text-dl-black" : out ? "text-zinc-500" : "text-zinc-100"}`}>{day.d}</span>
                       )}
                     </button>
                     <AnimatePresence>
@@ -233,7 +233,7 @@ export function Calendar() {
                           {tip.map((ev) => (
                             <span key={ev.id} className="flex flex-col gap-1">
                               <span className="font-display text-base/tight font-extrabold tracking-wide text-white uppercase">{fullName(ev)}</span>
-                              <span className="text-xs text-zinc-400"><Countdown at={ev.startsAt} startsIn={t.startsIn} started={t.started} ended={t.ended} /></span>
+                              <span className="text-xs text-zinc-300"><Countdown at={ev.startsAt} startsIn={t.startsIn} started={t.started} ended={t.ended} /></span>
                             </span>
                           ))}
                         </motion.div>
