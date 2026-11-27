@@ -1238,6 +1238,7 @@ const atTime = (day: Day, v: string) => {
   return v && Number.isFinite(h) && Number.isFinite(m) ? Math.round(new Date(day.y, day.m, day.d, h, m).getTime() / 1000) : null;
 };
 const checkbox = "size-5 cursor-pointer accent-br-green";
+const HAGIZAO_LIVE = "https://www.youtube.com/@hagizao/live";
 
 /** Campeonatos: nome, logo, descrição e link. Criados aqui, marcados no calendário acima. */
 function TournamentsForm() {
@@ -1296,7 +1297,12 @@ function TournamentsForm() {
               <Field label={`Descrição: aparece no painel do dia na Home (${d.description.length}/${TOURNAMENT_DESC_MAX})`}>
                 <textarea className={input} rows={3} maxLength={TOURNAMENT_DESC_MAX} value={d.description} onChange={(e) => set({ description: e.target.value })} />
               </Field>
-              <Field label="Link (opcional)"><input className={input} type="url" placeholder="https://" value={d.url ?? ""} maxLength={200} onChange={(e) => set({ url: e.target.value || undefined })} /></Field>
+              <Field label="Transmissão oficial (opcional)"><input className={input} type="url" placeholder="https://www.youtube.com/@canal/live" value={d.stream ?? ""} maxLength={200} onChange={(e) => set({ stream: e.target.value || undefined })} /></Field>
+              <div className="flex flex-col gap-2">
+                <Field label="Watchparty Hagizao (opcional)"><input className={input} type="url" placeholder={HAGIZAO_LIVE} value={d.watch ?? ""} maxLength={200} onChange={(e) => set({ watch: e.target.value || undefined })} /></Field>
+                {d.watch !== HAGIZAO_LIVE && <button type="button" className={`${ghost} w-fit`} onClick={() => set({ watch: HAGIZAO_LIVE })}>Usar o canal do Hagizao</button>}
+              </div>
+              <span className="text-xs text-zinc-500">Com "/live" no fim, o link do YouTube abre direto a live que estiver no ar.</span>
               <div className="flex flex-wrap items-center gap-3">
                 <button type="button" className={primary} disabled={busy || !d.name.trim()} onClick={save}>{busy ? "Salvando…" : d.id ? "Salvar" : "Criar campeonato"}</button>
                 <button type="button" className={ghost} onClick={() => setD(null)}>Cancelar</button>
