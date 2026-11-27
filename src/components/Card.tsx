@@ -1,12 +1,11 @@
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { CSSProperties, PointerEvent } from "react";
 import type { Player } from "../lib/types";
-import { getPlayerOvr, getPlayerTrend, hexToRgba, teamOf, useLabel } from "../lib/cards";
+import { getPlayerOvr, hexToRgba, teamOf, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
 import { getCardTier, ornamentSVG, particleSpecs, rarityStyleVars, ringSVG } from "../lib/rarity";
 import { useData } from "../lib/data";
 import { TeamLogo3D } from "./TeamLogo3D";
-import { TrendBadge } from "./TrendBadge";
 
 type Variant = "team" | "medium" | "editor";
 
@@ -92,10 +91,7 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
           <div className="relative z-10 flex items-start justify-between gap-2">
             {/* data-zone: áreas que a abertura de pack nunca pode mostrar antes da hora */}
             <div data-zone="ovr" className="flex flex-col items-start">
-              <div className="flex items-center gap-1.5">
-                <span data-ovr className={`${editor ? "text-6xl" : medium ? "text-4xl" : "text-5xl"} leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]`}>{ovr}</span>
-                <TrendBadge delta={getPlayerTrend(player)} size={editor ? "editor" : "card"} />
-              </div>
+              <span data-ovr className={`${editor ? "text-6xl" : medium ? "text-4xl" : "text-5xl"} leading-none font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]`}>{ovr}</span>
               <span className="mt-1.5 rounded-sm border border-white/25 bg-black/65 px-2 py-0.5 text-[10px] font-extrabold tracking-widest text-zinc-100 uppercase">
                 {label(player.position || "Flex")}
               </span>

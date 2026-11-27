@@ -1,13 +1,12 @@
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useData } from "../lib/data";
-import { activeRoster, REGIONS, regionClass, teamOvr, teamTrend, useLabel } from "../lib/cards";
+import { activeRoster, REGIONS, regionClass, teamOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
 import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
 import type { Team } from "../lib/types";
-import { TrendBadge } from "../components/TrendBadge";
 import { Card } from "../components/Card";
 
 import { Icon } from "../components/Icon";
@@ -103,7 +102,6 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
                     <span className="team-ovr-num">{o.count ? o.rounded : "--"}</span>
                     <span className="team-ovr-lbl">OVR</span>
                   </span>
-                  <TrendBadge delta={teamTrend(players, team.id)} size="editor" />
                 </div>
                 <p className="mt-1 text-xs text-zinc-300">{label(team.region)} · {t.count(roster.length)}</p>
               </div>

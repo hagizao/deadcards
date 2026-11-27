@@ -140,13 +140,12 @@ function blankPlayer(teamId: string): Player {
   return { id: "", teamId, name: "", position: "Carry", hero: "Abrams", stats, ovr: calculateOVR(stats), c1: "#0e7490", c2: "#082f49", history: [], footer: "Cardslock" };
 }
 
-function withHistory(p: Player, date: string, rebase: boolean): Player {
+function withHistory(p: Player, date: string): Player {
   const ovr = Math.min(99, Math.max(1, Math.round(p.ovr ?? calculateOVR(p.stats))));
   const history = (p.id ? getPlayerHistory(p) : []).map((h) => ({ ...h }));
   const same = history.find((h) => h.date === date);
   if (same) same.ovr = ovr; else history.push({ date, ovr });
   history.sort((a, b) => a.date.localeCompare(b.date));
-  if (rebase) history[history.length - 1].base = true;
   return { ...p, ovr, history };
 }
 
@@ -160,7 +159,6 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
     return blankPlayer(teams[0]?.id ?? "");
   });
   const [date, setDate] = useState(today);
-  const [rebase, setRebase] = useState(false);
   const [heroQuery, setHeroQuery] = useState("");
   // a mesma área de heróis serve para o de assinatura (1) e, na carta principal, para os heróis jogados (até MAX_PLAYED)
   const [heroTab, setHeroTab] = useState<"signature" | "played">("signature");
@@ -173,7 +171,7 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
   const set = (patch: Partial<Player>) => setD((p) => asPlayedHero({ ...p, ...patch }, players));
   const isPlayed = !!asPlayedHero(d, players).altHero;
   const setStat = (k: keyof Stats, v: number) => setD((p) => { const stats = { ...p.stats, [k]: v }; return { ...p, stats, ovr: calculateOVR(stats) }; });
-  const preview = withHistory({ ...d, name: d.name || "NOVO JOGADOR" }, date, rebase);
+  const preview = withHistory({ ...d, name: d.name || "NOVO JOGADOR" }, date);
   const frame = d.frame ?? { style: "deco" };
 
   const save = () => {
@@ -345,10 +343,6 @@ function PlayerForm({ editId, onEditId, versionOf, onNewVersion }: { editId: str
           <Field label={`OVR (média ${calculateOVR(d.stats)})`}>
             <input type="number" min={1} max={99} className={`${input} disabled:cursor-not-allowed disabled:opacity-40`} disabled={isPlayed} value={d.ovr ?? ""} onChange={(e) => set({ ovr: Number(e.target.value) })} />
           </Field>
-          <label className="flex items-center gap-2 pb-2.5 text-sm text-zinc-300 sm:col-span-2">
-            <input type="checkbox" checked={rebase} onChange={(e) => setRebase(e.target.checked)} className="accent-zinc-100" />
-            Nova base de overall (zera a variação ▲/▼)
-          </label>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-4">

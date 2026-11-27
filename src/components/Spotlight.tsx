@@ -4,11 +4,10 @@ import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { STAT_KEYS, getPlayerHistory, getPlayerOvr, getPlayerTrend, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
+import { STAT_KEYS, getPlayerHistory, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
-import { TrendBadge } from "./TrendBadge";
 import { Icon } from "./Icon";
 import { easeOut, pill } from "../lib/ui";
 import { MAX_FAVORITES } from "../lib/profile";
@@ -141,7 +140,6 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.custom ? t.special : tier.name}</span>
-            <TrendBadge delta={getPlayerTrend(player)} size="editor" />
             {canFavorite && (
               <button type="button" aria-pressed={fav} disabled={favBusy} onClick={flipFavorite}
                 className={`${pill(fav)} disabled:cursor-wait disabled:opacity-60`}>
