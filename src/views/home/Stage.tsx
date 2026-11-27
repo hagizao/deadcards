@@ -108,12 +108,12 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
             <motion.div key={p.id} className="flex flex-col gap-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={enter}>
               <div className="flex flex-col gap-2">
                 <p className="font-display text-4xl/none font-black tracking-[0.08em] text-white uppercase sm:text-5xl/none">{p.name}</p>
-                <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-300">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-300">
                   <TeamLogo3D team={team} className="size-7" radius={6} />
                   {label(team.name)}
                   <span aria-hidden="true" className="text-zinc-500">·</span>
                   {label(team.region)}
-                </p>
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -121,7 +121,7 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
                 <span className="flex items-center gap-2 rounded-lg bg-zinc-900/80 py-1 pr-3 pl-1 text-xs font-bold text-zinc-200">
                   {hero ? <img src={hero} alt="" className="size-7 rounded-md object-cover" /> : <Icon name="star" className="size-4" />}
                   <span className="flex flex-col leading-tight">
-                    <span className="text-[10px] tracking-widest text-zinc-400 uppercase">{t.signature}</span>
+                    <span className="text-[13px] tracking-widest text-zinc-400 uppercase">{t.signature}</span>
                     {p.hero}
                   </span>
                 </span>
@@ -130,7 +130,7 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
               {isRole(p.position) && <p className="max-w-md text-sm text-pretty text-zinc-300">{roles[p.position]}</p>}
 
               <div className="flex max-w-sm flex-col gap-2">
-                <span className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">{t.strengths}</span>
+                <span className="text-[14px] font-bold tracking-widest text-zinc-400 uppercase">{t.strengths}</span>
                 {best.map((k, i) => (
                   <div key={k} className="flex flex-col gap-1">
                     <div className="flex items-baseline justify-between gap-3 text-sm">

@@ -19,7 +19,9 @@ const PATHS = {
   gem: "M7 4h10l4 5-9 11L3 9zM3 9h18M12 20 8.5 9 10 4M12 20l3.5-11L14 4",
 };
 
-export function Icon({ name, className = "size-4" }: { name: keyof typeof PATHS; className?: string }) {
+export type IconName = keyof typeof PATHS;
+
+export function Icon({ name, className = "size-4" }: { name: IconName; className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${className}`} aria-hidden="true">
       <path d={PATHS[name]} />

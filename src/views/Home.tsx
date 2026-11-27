@@ -1,14 +1,16 @@
 import { motion } from "motion/react";
 import type { Team } from "../lib/types";
 import { useData } from "../lib/data";
-import { getPlayerOvr, isMainCard, regionClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
+import { getPlayerOvr, hexToRgba, isMainCard, regionClass, teamOvr, tierKeyForOvr, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
 import { RegionBackdrop } from "../components/RegionBackdrop";
 import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
-import { Icon } from "../components/Icon";
+import { Icon, type IconName } from "../components/Icon";
 import { easeOut, pill } from "../lib/ui";
-import { cascade } from "../lib/motion";
+import { cascade, enter } from "../lib/motion";
+import { RARITY_TIERS, type Tier } from "../lib/rarity";
+import type { RarityKey } from "../lib/rarityBands";
 import { Reveal } from "../components/Motion";
 import { Stage } from "./home/Stage";
 import { Welcome } from "./home/Welcome";
@@ -58,6 +60,10 @@ const S = strings({
 });
 
 const AREAS: Area[] = ["teams", "tierlist", "collection", "compare", "redeem"];
+const AREA_ICON: Record<Area, IconName> = { teams: "shield", tierlist: "bars", collection: "cards", compare: "versus", redeem: "ticket" };
+// cada área ganha a cor de uma raridade, da mais rara para a mais comum
+const AREA_RARITY: Record<Area, RarityKey> = { teams: "eternus", tierlist: "ascendant", collection: "oracle", compare: "archon", redeem: "arcanist" };
+const rarityOf = (key: RarityKey) => RARITY_TIERS.find((r) => r.key === key)!;
 const FEATURED = 5;
 const RANKING = 4;
 
@@ -86,7 +92,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
   };
 
   return (
-    <div className="flex flex-col gap-14">
+    <div className="home-type flex flex-col gap-14">
       <Stage cards={featured} onOpenCard={onOpenCard} onOpenTeam={onOpenTeam} />
       <Welcome onNavigate={onNavigate} />
       {guide && <CardGuide sample={guide} />}
@@ -116,13 +122,14 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
 
       <section className="flex flex-col gap-4" aria-labelledby="home-explore">
         <Reveal><h2 id="home-explore" className={sectionTitle}>{t.explore}</h2></Reveal>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {/* sem caixas: as áreas são colunas separadas por um traço, como em "Quem faz o quê" */}
+        <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-5">
           {AREAS.map((a, i) => (
-            <Reveal key={a} delay={cascade(i, 0.06)} className="flex flex-col">
-              <AreaTile title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />
-            </Reveal>
+            <motion.li key={a} className="flex border-l border-zinc-200/15 pl-2" initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.06) }}>
+              <AreaTile icon={AREA_ICON[a]} tier={rarityOf(AREA_RARITY[a])} title={t.areas[a][0]} text={t.areas[a][1]} meta={meta[a]} onClick={() => onNavigate(a)} />
+            </motion.li>
           ))}
-        </div>
+        </ul>
       </section>
     </div>
   );
@@ -130,19 +137,21 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
 
 const sectionTitle = "font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase sm:text-2xl";
 
-function AreaTile({ title, text, meta, onClick }: { title: string; text: string; meta: string | null; onClick: () => void }) {
+/** Atalho do Explore: ícone e nome na cor da raridade, para que serve e um número. Só acende um fundo no hover. */
+function AreaTile({ icon, tier, title, text, meta, onClick }: { icon: IconName; tier: Tier; title: string; text: string; meta: string | null; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="noir-glass flex min-h-11 flex-1 cursor-pointer items-center gap-4 rounded-2xl p-5 text-left transition-colors hover:border-zinc-200/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+      className="group flex flex-1 cursor-pointer flex-col items-start gap-2 rounded-xl p-2 text-left transition-colors hover:bg-zinc-100/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10"
     >
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="font-display text-lg tracking-[0.11em] text-dl-text uppercase">{title}</span>
-        <span className="text-sm text-zinc-300">{text}</span>
-        {meta && <span className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">{meta}</span>}
+      <span className="flex w-full items-center justify-between gap-2">
+        <span aria-hidden="true" style={{ color: tier.c, filter: `drop-shadow(0 0 ${3 + tier.lvl * 2}px ${tier.c})` }}><Icon name={icon} className="size-6" /></span>
+        <Icon name="chevron-right" className="size-5 text-zinc-500 transition-[translate,color] duration-200 group-hover:translate-x-1 group-hover:text-zinc-200" />
       </span>
-      <Icon name="chevron-right" className="size-5 text-zinc-400" />
+      <span className="font-display text-lg tracking-[0.11em] whitespace-nowrap uppercase" style={{ color: tier.c, textShadow: `0 0 ${4 + tier.lvl * 3}px ${hexToRgba(tier.c, 0.45)}` }}>{title}</span>
+      <span className="text-sm text-pretty text-zinc-300">{text}</span>
+      {meta && <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{meta}</span>}
     </button>
   );
 }
@@ -174,7 +183,7 @@ function TeamRow({ r, idx, tier, meta, onOpen }: {
       <TeamLogo3D team={r.team} className="size-14 sm:size-16" radius={12} tilt={{ rotateX, rotateY }} />
       <div className="relative z-10 min-w-0 flex-1">
         <div className="line-clamp-2 font-display text-base/tight font-extrabold tracking-wider text-balance text-dl-text uppercase sm:text-xl/tight">{r.team.name}</div>
-        <div className="mt-1 text-[11px] font-bold tracking-wider text-zinc-300 uppercase">{meta}</div>
+        <div className="mt-1 text-[14px] font-bold tracking-wider text-zinc-300 uppercase">{meta}</div>
       </div>
       <div className="relative z-10 flex shrink-0 flex-col items-center gap-1">
         <div className="team-ovr-chip team-ovr-chip--stack">
