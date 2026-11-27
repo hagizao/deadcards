@@ -249,6 +249,11 @@
       background-color: #101013;
     }
 
+    /* silhueta da carta carregando (components/Skeleton.tsx) */
+    .card-skeleton {
+      clip-path: polygon(0 0, 100% 0, 100% 88%, 50% 100%, 0 88%);
+    }
+
     .card-size-team {
       width: 295px;
       height: 430px;

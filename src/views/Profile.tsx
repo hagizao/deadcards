@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
+import { ProfileSkeleton } from "../components/Skeleton";
 import { Achievements } from "../components/Achievements";
 import { Card } from "../components/Card";
 import { CardExportButton } from "../components/CardExportButton";
@@ -98,7 +99,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
   };
 
   if (error) return <p role="alert" className="text-sm text-red-300">{t[error]}</p>;
-  if (!profile) return <p role="status" className="text-sm text-zinc-400">{t.loading}</p>;
+  if (!profile) return <ProfileSkeleton label={t.loading} />;
 
   const owner = me?.id === profile.id;
   const card = profile.card;
