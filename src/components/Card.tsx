@@ -1,9 +1,9 @@
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
-import { useEffect, useRef, type CSSProperties, type PointerEvent } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 import type { Player } from "../lib/types";
 import { getPlayerOvr, getPlayerTrend, hexToRgba, teamOf, useLabel } from "../lib/cards";
 import { strings, useT } from "../lib/i18n";
-import { getCardTier, ornamentSVG, particleSpecs, rarityStyleVars, ringSVG, silhouetteFrames } from "../lib/rarity";
+import { getCardTier, ornamentSVG, particleSpecs, rarityStyleVars, ringSVG } from "../lib/rarity";
 import { useData } from "../lib/data";
 import { TeamLogo3D } from "./TeamLogo3D";
 import { TrendBadge } from "./TrendBadge";
@@ -27,16 +27,6 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
   const ovr = getPlayerOvr(player);
   const rk = getCardTier(player, settings.tierConfig!);
   const medium = variant === "medium";
-  // molduras com silhueta animada: a casca e o miolo mudam de forma juntos
-  const shell = useRef<HTMLDivElement>(null);
-  const inner = useRef<HTMLDivElement>(null);
-  const frame = rk.custom ? rk.frame : undefined;
-  useEffect(() => {
-    const m = silhouetteFrames(frame);
-    if (!m || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const anims = [shell.current, inner.current].map((el) => el?.animate(m.keyframes, { duration: m.duration, iterations: Infinity, easing: "ease-in-out" }));
-    return () => anims.forEach((a) => a?.cancel());
-  }, [frame]);
   const editor = variant === "editor";
   const art = player.art?.url ? { url: player.art.url, zoom: player.art.zoom ?? 100, x: player.art.x ?? 50, y: player.art.y ?? 50 } : heroArt(player.hero);
 
@@ -64,8 +54,8 @@ export function Card({ player, variant = "team", onOpen, signature }: { player: 
       onPointerMove={onMove}
       onPointerLeave={onLeave}
     >
-      <div ref={shell} className={`deadlock-card-shell ${sizeClass} group select-none`}>
-        <div ref={inner} className="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5" style={topPad ? { paddingTop: topPad } : undefined}>
+      <div className={`deadlock-card-shell ${sizeClass} group select-none`}>
+        <div className="deadlock-card-inner flex flex-col justify-between p-4 sm:p-5" style={topPad ? { paddingTop: topPad } : undefined}>
           {art ? (
             <div className="hero-bg-wrap pointer-events-none absolute inset-0 overflow-hidden">
               <img
