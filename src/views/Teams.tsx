@@ -11,6 +11,7 @@ import { Card } from "../components/Card";
 
 import { Icon } from "../components/Icon";
 import { easeOut, pageTitle, pill } from "../lib/ui";
+import { cascade, useSettled } from "../lib/motion";
 
 const S = strings({
   pt: {
@@ -40,6 +41,7 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
   const [region, setRegion] = useState("ALL");
   const [desc, setDesc] = useState(true);
   const [size, setSize] = useState<"team" | "medium">("team");
+  const settled = useSettled();
   const [open, setOpen] = useState<Record<string, boolean>>(focusTeamId ? { [focusTeamId]: true } : {});
 
   useEffect(() => {
@@ -82,13 +84,16 @@ export function Teams({ focusTeamId, onOpenCard }: { focusTeamId?: string; onOpe
 
       {visible.length === 0 && <div className="noir-glass rounded-2xl p-10 text-center text-sm text-zinc-300">{t.noTeams}</div>}
 
-      {visible.map(({ team, o }) => {
+      {visible.map(({ team, o }, i) => {
         const roster = activeRoster(players, team.id);
         const isOpen = !!open[team.id];
         return (
           <motion.div
             layout
             key={team.id}
+            initial={{ opacity: 0, y: settled ? 0 : 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: easeOut, delay: settled ? 0 : cascade(i, 0.05, 8) }}
             id={`team-card-${team.id}`}
             style={{ scrollMarginTop: "6.5rem" }}
             className={`noir-glass team-region-card ${regionClass(team.region)} rounded-2xl p-4 sm:p-6`}
