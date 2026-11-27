@@ -296,7 +296,7 @@ function Shell() {
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:h-20 sm:px-6 lg:px-8">
           <button type="button" onClick={() => setTab("home")} className="brand-badge group flex min-h-11 shrink-0 cursor-pointer items-center gap-3 rounded-md text-left active:scale-[0.98]">
             <span aria-hidden="true" className="size-3 rotate-45 rounded-[3px] bg-dl-text shadow-[0_0_14px_rgba(255,239,215,0.8)] transition-transform duration-200 group-hover:rotate-135 motion-reduce:transition-none sm:size-3.5" />
-            <span className="font-display text-[1.625rem] font-black tracking-[0.2em] text-white uppercase title-depth sm:text-[2rem]">Cards<span className="text-dl-text">lock</span></span>
+            <span className="font-display text-xl font-black tracking-[0.2em] text-white uppercase title-depth sm:text-[2rem]">Cards<span className="text-dl-text">lock</span></span>
           </button>
           <nav className="hidden flex-1 items-center justify-center gap-1 xl:flex" aria-label={t.mainNav}>
             {TABS.map((id) => (
