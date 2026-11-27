@@ -30,11 +30,11 @@ export function Roles({ onOpenCard }: { onOpenCard: (id: string) => void }) {
         <h2 id="home-roles" className="font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase sm:text-2xl">{t.title}</h2>
         <p className="max-w-2xl text-sm text-pretty text-zinc-300">{t.lead}</p>
       </Reveal>
-      <ul className="flex flex-wrap gap-3">
+      <ul className="flex flex-wrap gap-x-8 gap-y-10">
         {ROLES.map((role, i) => (
           <motion.li
             key={role}
-            className="noir-glass flex min-w-56 flex-1 basis-56 flex-col gap-4 rounded-2xl p-4"
+            className="flex min-w-56 flex-1 basis-56 flex-col gap-4 border-l border-zinc-200/15 pl-4"
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}

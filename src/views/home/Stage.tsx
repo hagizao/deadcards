@@ -78,19 +78,20 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
     <section
       aria-labelledby="home-stage"
       aria-roledescription="carousel"
-      className="noir-glass relative isolate overflow-hidden rounded-3xl"
+      className="relative isolate"
       onPointerEnter={() => setPaused(true)}
       onPointerLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
       {/* luz do palco: as cores da carta ativa e da raridade dela, trocando com um fade lento */}
-      {settings.homeHero && <img src={settings.homeHero} alt="" className="pointer-events-none absolute inset-0 -z-10 size-full object-cover opacity-15" />}
+      {/* sem caixa: capa e luz saem um pouco do palco e somem nas bordas, sem canto aparente */}
+      {settings.homeHero && <img src={settings.homeHero} alt="" className="pointer-events-none absolute -top-12 -left-10 -z-10 h-[calc(100%+6rem)] w-[calc(100%+5rem)] max-w-none mask-[radial-gradient(ellipse_closest-side,#000_45%,transparent)] object-cover opacity-20" />}
       <AnimatePresence initial={false}>
         <motion.div
           key={p.id}
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
+          className="pointer-events-none absolute -inset-16 -z-10 mask-[radial-gradient(ellipse_closest-side,#000_40%,transparent)]"
           style={{ background: `radial-gradient(55% 70% at 72% 45%, ${hexToRgba(tier.c, 0.3)}, transparent 70%), radial-gradient(45% 60% at 15% 85%, ${hexToRgba(p.c1, 0.35)}, transparent 70%)` }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -99,7 +100,7 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
         />
       </AnimatePresence>
 
-      <div className="flex flex-col gap-2 p-5 sm:p-8 lg:flex-row lg:items-center lg:gap-8">
+      <div className="flex flex-col gap-2 py-2 lg:flex-row lg:items-center lg:gap-8">
         <div className="relative z-20 order-2 flex flex-col gap-5 lg:order-1 lg:w-[40%] lg:shrink-0">
           <h1 id="home-stage" className={pageTitle}>{t.title}</h1>
 

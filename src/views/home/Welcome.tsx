@@ -52,7 +52,7 @@ export function Welcome({ onNavigate }: { onNavigate: (area: Area) => void }) {
     const mine = owned ? players.filter((p) => owned.has(p.id)).length : 0;
     const pct = total ? Math.round((mine / total) * 100) : 0;
     return (
-      <section aria-labelledby="home-welcome" className="noir-glass flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl p-4 sm:p-6">
+      <section aria-labelledby="home-welcome" className="flex flex-wrap items-center gap-x-8 gap-y-4">
         <div className="flex min-w-60 flex-1 flex-col gap-2">
           <h2 id="home-welcome" className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.mine}</h2>
           <div className="flex flex-wrap items-baseline gap-x-3">
@@ -72,8 +72,8 @@ export function Welcome({ onNavigate }: { onNavigate: (area: Area) => void }) {
   }
 
   return (
-    <section aria-labelledby="home-welcome" className="noir-glass flex flex-col gap-5 rounded-2xl p-4 sm:p-6">
-      <h2 id="home-welcome" className="font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase">{t.title}</h2>
+    <section aria-labelledby="home-welcome" className="flex flex-col gap-5">
+      <h2 id="home-welcome" className="font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase sm:text-2xl">{t.title}</h2>
       <ol className="grid gap-4 md:grid-cols-3">
         {t.steps.map(([title, text], i) => (
           <motion.li key={title} className="flex gap-3" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.08) }}>
