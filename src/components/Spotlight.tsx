@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { animate, motion, usePresence, useReducedMotion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
@@ -10,6 +10,8 @@ import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
 import { Icon } from "./Icon";
 import { easeOut, pill } from "../lib/ui";
+import { cascade, enter, flightOrigin, springFlight } from "../lib/motion";
+import { CountUp, FillBar } from "./Motion";
 import { MAX_FAVORITES } from "../lib/profile";
 import { toggleFavorite, useMyCards, type FavoriteResult } from "../lib/myCards";
 import type { ArtCredit } from "../lib/types";
@@ -52,6 +54,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
     [playerId], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  const still = useReducedMotion();
+  const [fly] = useState(() => !still && !!flightOrigin(playerId));
+
   useLayoutEffect(() => {
     if (!reveal || !cardRef.current) return;
     revealed.add(playerId);
@@ -60,7 +65,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
       const tl = gsap.timeline({ delay: 0.12, onComplete: () => setExportReadyId(playerId) });
       tl.fromTo(flashRef.current, { opacity: 0, scale: 0.5 }, { opacity: 0.9, scale: 1.1, duration: 0.25, ease: "power2.out" })
         .to(flashRef.current, { opacity: 0, scale: 1.35, duration: 0.5, ease: "power2.in" });
-      tl.from(cardRef.current, { y: 40, scale: 0.85, opacity: 0, duration: 0.6, ease: "back.out(1.6)", clearProps: "transform,opacity" }, 0.05);
+      // vindo da grade a carta já chega voando; o pulo da revelação fica só para quando ela abre do nada
+      if (!fly) tl.from(cardRef.current, { y: 40, scale: 0.85, opacity: 0, duration: 0.6, ease: "back.out(1.6)", clearProps: "transform,opacity" }, 0.05);
       if (ovrEl) {
         const n = { v: 0 };
         ovrEl.nodeValue = "0";
@@ -73,6 +79,36 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
     });
     return () => { ctx.revert(); if (ovrEl) ovrEl.nodeValue = String(ovr); };
   }, [reveal, playerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // a carta sai de onde estava na grade, cresce até aqui e, ao fechar, volta para o mesmo lugar
+  const flyRef = useRef<HTMLDivElement>(null);
+  const [isPresent, safeToRemove] = usePresence();
+  const [firstId] = useState(playerId);
+  const flightGap = (from: HTMLElement, el: HTMLElement) => {
+    const a = from.getBoundingClientRect(), b = el.getBoundingClientRect();
+    return { x: a.left + a.width / 2 - (b.left + b.width / 2), y: a.top + a.height / 2 - (b.top + b.height / 2), scale: a.width / b.width };
+  };
+  useLayoutEffect(() => {
+    const from = flightOrigin(firstId), el = flyRef.current;
+    if (!fly || !from || !el) return;
+    const g = flightGap(from, el);
+    from.style.visibility = "hidden";
+    const a = animate(el, { x: [g.x, 0], y: [g.y, 0], scale: [g.scale, 1] }, springFlight);
+    return () => { a.stop(); from.style.visibility = ""; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- só na abertura; trocar de versão não voa de novo
+  useEffect(() => {
+    if (isPresent) return;
+    const from = flightOrigin(firstId), el = flyRef.current;
+    const done = () => { if (from) from.style.visibility = ""; safeToRemove(); };
+    if (!el || still) { done(); return; }
+    // volta para a grade só se ainda é a mesma carta que abriu; senão some no lugar
+    const back = fly && from && playerId === firstId ? flightGap(from, el) : null;
+    const a = back
+      ? animate(el, { x: back.x, y: back.y, scale: back.scale }, { duration: 0.3, ease: easeOut })
+      : animate(el, { opacity: 0, scale: 0.95 }, { duration: 0.18 });
+    a.then(done);
+    return () => a.stop();
+  }, [isPresent]); // eslint-disable-line react-hooks/exhaustive-deps -- roda uma vez, quando o destaque começa a fechar
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -99,25 +135,28 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   };
 
   return (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-label={t.cardOf(player.name)}
     >
-      <motion.div
-        className="noir-glass-strong flex max-h-[92dvh] w-full max-w-4xl flex-col items-center gap-8 overflow-y-auto rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
-        onClick={(e) => e.stopPropagation()}
+      {/* fundo e vidro animam separados da carta, para a carta voar sem sumir junto com eles; clicar no fundo fecha (Esc também) */}
+      <motion.div aria-hidden="true" onClick={onClose} className="absolute inset-0 bg-black/75 backdrop-blur-md" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} />
+      <div className="relative flex max-h-[92dvh] w-full max-w-4xl">
+        <motion.div
+          aria-hidden="true"
+          className="noir-glass-strong absolute inset-0 rounded-3xl"
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.97 }}
+          transition={{ type: "spring", duration: 0.35, bounce: 0.12 }}
+        />
+      <div
+        className="relative flex max-h-[92dvh] w-full flex-col items-center gap-8 overflow-y-auto rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
       >
-        <motion.div key={player.id} className="relative max-w-full" initial={reveal ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15, ease: easeOut }}>
+        <div ref={flyRef} className="relative z-10 max-w-full">
+        <motion.div key={player.id} className="relative max-w-full" initial={reveal || fly ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2, ease: easeOut }}>
           {reveal && (
             <div ref={flashRef} aria-hidden="true" className="pointer-events-none absolute -inset-16 rounded-full opacity-0" style={{ background: `radial-gradient(circle, ${tier.hi} 0%, ${tier.c}99 30%, transparent 68%)` }} />
           )}
@@ -125,8 +164,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
             <Card player={player} variant="editor" signature={isMainCard(player) && versions.some(isAltHero)} />
           </div>
         </motion.div>
+        </div>
 
-        <div className="w-full min-w-0 flex-1 space-y-5">
+        <motion.div className="w-full min-w-0 flex-1 space-y-5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ ...enter, delay: 0.08 }}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="font-display text-3xl font-black tracking-[0.12em] text-dl-text uppercase"><span ref={nameRef} key={player.id + player.name}>{player.name}</span></h2>
@@ -165,12 +205,16 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
 
           <div>
             <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.stats}</h3>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-3">
-              {STAT_KEYS.map((k) => (
-                <div key={k} className="flex items-baseline gap-2">
-                  <dt className="font-mono font-bold text-zinc-100">{k}</dt>
-                  <dd className="min-w-0 flex-1 truncate text-zinc-400">{t.statNames[k]}</dd>
-                  <dd className="font-bold text-zinc-100 tabular-nums">{player.stats[k]}</dd>
+            {/* barras enchem uma depois da outra; ao trocar de versão elas andam até o valor novo */}
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              {STAT_KEYS.map((k, i) => (
+                <div key={k} className="flex flex-col gap-1">
+                  <div className="flex items-baseline gap-2">
+                    <dt className="font-mono font-bold text-zinc-100">{k}</dt>
+                    <dd className="min-w-0 flex-1 truncate text-zinc-400">{t.statNames[k]}</dd>
+                    <dd className="font-bold text-zinc-100 tabular-nums"><CountUp value={player.stats[k]} delay={0.15 + cascade(i, 0.05)} /></dd>
+                  </div>
+                  <FillBar pct={((player.stats[k] - 40) / 59) * 100} delay={0.15 + cascade(i, 0.05)} className="h-1.5 rounded-full bg-zinc-800" style={{ background: `linear-gradient(90deg, ${tier.lo}, ${tier.c})` }} />
                 </div>
               ))}
             </dl>
@@ -205,9 +249,10 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
               </div>
             </div>
           )}
-        </div>
-      </motion.div>
-    </motion.div>
+        </motion.div>
+      </div>
+      </div>
+    </div>
   );
 }
 
