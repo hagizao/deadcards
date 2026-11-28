@@ -12,7 +12,7 @@ import { Account } from "./components/Account";
 import { finishLink, type LinkResult } from "./lib/authClient";
 import { Editor } from "./views/Editor";
 import { Legal } from "./views/Legal";
-import { Compare } from "./views/Compare";
+import { Lab } from "./views/Lab";
 import { LANGS, LANG_LABEL, LangProvider, type Lang, strings, useLang, useT } from "./lib/i18n";
 import { Feedback } from "./views/Feedback";
 import { areaStyle, areaTier, type AreaKey } from "./lib/areas";
@@ -45,7 +45,7 @@ const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", redee
 
 const S = strings({
   pt: {
-    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", redeem: "Resgatar", compare: "Comparar" },
+    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", redeem: "Resgatar", compare: "Lab" },
     mainNav: "Navegação principal",
     projectLinks: "Links do projeto",
     language: "Idioma",
@@ -64,7 +64,7 @@ const S = strings({
     rmClose: "Fechar aviso",
   },
   en: {
-    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", redeem: "Redeem", compare: "Compare" },
+    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", redeem: "Redeem", compare: "Lab" },
     mainNav: "Main navigation",
     projectLinks: "Project links",
     language: "Language",
@@ -83,7 +83,7 @@ const S = strings({
     rmClose: "Dismiss notice",
   },
   es: {
-    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", redeem: "Canjear", compare: "Comparar" },
+    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", redeem: "Canjear", compare: "Lab" },
     mainNav: "Navegación principal",
     projectLinks: "Enlaces del proyecto",
     language: "Idioma",
@@ -253,10 +253,13 @@ function Shell() {
   const [focusTeam, setFocusTeam] = useState(start.team);
   const [team, setTeam] = useState(start.team);
   const [spotlight, setSpotlight] = useState<string | null>(start.card ?? null);
+  // aba de dentro do Lab e o elenco de um link compartilhado (some quando a pessoa mexe no elenco)
+  const [lab, setLab] = useState(start.lab);
+  const [squad, setSquad] = useState(start.squad);
   const [editId, setEditId] = useState<string | null>(null);
   const { me, teams } = useData();
   const t = useT(S);
-  const go = (id: Tab) => { setFocusTeam(undefined); setTeam(undefined); setTab(id); };
+  const go = (id: Tab) => { setFocusTeam(undefined); setTeam(undefined); setLab(undefined); setSquad(undefined); setTab(id); };
   const openTeam = (id: string) => { const key = teamKey(teams, id); setFocusTeam(key); setTeam(key); setTab("teams"); };
   const editCard = (id: string) => { setSpotlight(null); setEditId(id); setTab("editor"); };
   const openProfile = (id: string) => { setProfileId(id); setTab("profile"); };
@@ -269,12 +272,12 @@ function Shell() {
   // cada tela vira uma entrada no histórico: o voltar do navegador volta para a tela anterior (e fecha a carta aberta)
   const first = useRef(true);
   useEffect(() => {
-    const path = routePath({ tab, profile: profileId, team, card: spotlight ?? undefined });
+    const path = routePath({ tab, profile: profileId, team, card: spotlight ?? undefined, lab, squad });
     if (location.pathname !== path) history[first.current ? "replaceState" : "pushState"](null, "", path);
     // o título da prévia (carta, time, perfil) vale só para quem chegou pelo link; navegando, volta ao do site
     if (!first.current) document.title = "Cardslock";
     first.current = false;
-  }, [tab, profileId, team, spotlight]);
+  }, [tab, profileId, team, spotlight, lab, squad]);
   useEffect(() => {
     const back = () => {
       const r = parseRoute(location.pathname);
@@ -283,6 +286,8 @@ function Shell() {
       setTeam(r.team);
       setFocusTeam(r.team);
       setSpotlight(r.card ?? null);
+      setLab(r.lab);
+      setSquad(r.squad);
     };
     addEventListener("popstate", back);
     return () => removeEventListener("popstate", back);
@@ -340,7 +345,7 @@ function Shell() {
             {tab === "tierlist" && <TierList onOpenCard={setSpotlight} onOpenTeam={openTeam} />}
             {tab === "collection" && <Collection onOpenCard={setSpotlight} />}
             {tab === "redeem" && <Redeem onOpenCard={setSpotlight} />}
-            {tab === "compare" && <Compare onOpenCard={setSpotlight} />}
+            {tab === "compare" && <Lab sub={lab ?? "dream"} squad={squad} onSub={(s) => { setSquad(undefined); setLab(s === "compare" ? "compare" : undefined); }} onSquadEdit={() => setSquad(undefined)} onOpenCard={setSpotlight} />}
             {tab === "profile" && profileId && <Profile key={profileId} userId={profileId} onOpenCard={setSpotlight} onRedeem={() => setTab("redeem")} />}
             {tab === "settings" && me && <Settings link={linkResult} />}
             {tab === "art" && me && <ArtSubmit />}

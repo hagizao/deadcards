@@ -1,10 +1,10 @@
 import type { Env } from "./worker";
 import { getPlayerOvr } from "./lib/cardKinds";
-import { CARD_RE, PROFILE_RE, TEAM_RE, teamByKey } from "./lib/route";
+import { CARD_RE, PROFILE_RE, SQUAD_RE, TEAM_RE, squadName, teamByKey } from "./lib/route";
 import { imgUrl, parse, playerFromRow } from "./rows";
 
 /**
- * Links compartilhados (/c/<carta>, /t/<time>, /u/<perfil>): o Worker devolve o mesmo index.html do site,
+ * Links compartilhados (/c/<carta>, /t/<time>, /u/<perfil>, /lab/elenco/<cartas>): o Worker devolve o mesmo index.html do site,
  * com título, descrição e imagem da carta, do time ou do perfil, para a prévia do Discord, X e WhatsApp.
  */
 
@@ -12,10 +12,29 @@ export type ShareMeta = { title: string; description: string; image?: string; la
 
 const SITE = "Cardslock";
 
-export const isSharePath = (path: string) => CARD_RE.test(path) || TEAM_RE.test(path) || PROFILE_RE.test(path);
+export const isSharePath = (path: string) => CARD_RE.test(path) || TEAM_RE.test(path) || PROFILE_RE.test(path) || !!SQUAD_RE.exec(path)?.[1];
 
-export async function shareMeta(env: Env, path: string, origin: string): Promise<ShareMeta | null> {
+export async function shareMeta(env: Env, path: string, origin: string, search = ""): Promise<ShareMeta | null> {
   const abs = (u?: string | null) => (u ? new URL(u, origin).href : undefined);
+
+  const squad = SQUAD_RE.exec(path)?.[1];
+  if (squad) {
+    // até 6 cartas; a ordem é a das vagas, e carta que não existe mais fica de fora
+    const ids = squad.split(".");
+    const { results } = await env.DB.prepare(`SELECT * FROM players WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids).all<Record<string, string | number | null>>();
+    const byId = new Map(results.map((row) => [String(row.id), playerFromRow(row)]));
+    const cards = ids.map((id) => byId.get(id)).filter((p) => !!p);
+    if (!cards.length) return null;
+    const ovr = Math.round(cards.reduce((a, p) => a + getPlayerOvr(p), 0) / cards.length);
+    const first = cards[0];
+    const hero = first.art?.url ? null : await env.DB.prepare("SELECT image_key FROM heroes WHERE name = ?").bind(first.hero).first<string>("image_key");
+    return {
+      title: `${squadName(new URLSearchParams(search).get("n")) || "Elenco dos sonhos"} · ${SITE}`,
+      description: `OVR ${ovr} · ${cards.map((p) => `${p.name} (${p.hero})`).join(", ")}`,
+      image: abs(first.art?.url ?? imgUrl(hero)),
+      large: true,
+    };
+  }
 
   const card = CARD_RE.exec(path)?.[1];
   if (card) {
@@ -90,7 +109,7 @@ export function metaTags(m: ShareMeta, url: string): string {
 /** O index.html do site com a prévia do link; sem a carta, o time ou o perfil, devolve o site como está. */
 export async function sharePage(env: Env, request: Request, url: URL): Promise<Response> {
   const page = await env.ASSETS.fetch(new Request(new URL("/", url), request));
-  const meta = await shareMeta(env, url.pathname, url.origin).catch(() => null);
+  const meta = await shareMeta(env, url.pathname, url.origin, url.search).catch(() => null);
   if (!meta || !page.headers.get("content-type")?.includes("text/html")) return page;
   const res = new HTMLRewriter()
     .on("title", { element: (el) => { el.setInnerContent(meta.title); } })

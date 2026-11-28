@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRoute, routePath, teamByKey, teamKey, teamSlug } from "../src/lib/route";
+import { parseRoute, routePath, squadName, squadPath, teamByKey, teamKey, teamSlug } from "../src/lib/route";
 
 describe("rotas do site", () => {
   it("lê carta, time, perfil e abas do endereço", () => {
@@ -25,7 +25,7 @@ describe("rotas do site", () => {
   });
 
   it("ida e volta dão o mesmo estado", () => {
-    for (const r of [{ tab: "compare" }, { tab: "teams", team: "t1" }, { tab: "home", card: "p1" }, { tab: "profile", profile: "x" }] as const) {
+    for (const r of [{ tab: "compare" }, { tab: "compare", lab: "compare" }, { tab: "compare", squad: "p-1.p-2" }, { tab: "teams", team: "t1" }, { tab: "home", card: "p1" }, { tab: "profile", profile: "x" }] as const) {
       expect(parseRoute(routePath(r))).toEqual(r);
     }
   });
@@ -43,5 +43,24 @@ describe("rotas do site", () => {
     expect(teamByKey(teams, "be")).toBeUndefined();
     expect(teamByKey(teams, "t-4")?.id).toBe("t-4");
     expect(teamByKey(teams, "nada")).toBeUndefined();
+  });
+
+  it("Lab: /lab abre o Elenco dos sonhos; /lab/comparar e o /compare antigo, o Comparar; elenco com até 6 cartas", () => {
+    expect(parseRoute("/lab")).toEqual({ tab: "compare" });
+    expect(parseRoute("/lab/elenco")).toEqual({ tab: "compare" });
+    expect(parseRoute("/lab/comparar")).toEqual({ tab: "compare", lab: "compare" });
+    expect(parseRoute("/compare")).toEqual({ tab: "compare", lab: "compare" });
+    expect(parseRoute("/lab/elenco/a.b-1.c_2")).toEqual({ tab: "compare", squad: "a.b-1.c_2" });
+    expect(parseRoute("/lab/elenco/a.b.c.d.e.f.g")).toEqual({ tab: "home" });
+    expect(parseRoute("/lab/elenco/a..b")).toEqual({ tab: "home" });
+    expect(parseRoute("/lab/elenco/a,b")).toEqual({ tab: "home" });
+    expect(routePath({ tab: "compare" })).toBe("/lab");
+  });
+
+  it("link do elenco: vagas vazias saem, nome curto e sem espaço sobrando", () => {
+    expect(squadPath(["a", "", "b"], "  Melhor   dos EUA ")).toBe("/lab/elenco/a.b?n=Melhor%20dos%20EUA");
+    expect(squadPath([], "")).toBe("/lab");
+    expect(squadName("x".repeat(80))).toHaveLength(40);
+    expect(squadName(null)).toBe("");
   });
 });
