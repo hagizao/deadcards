@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import { useData } from "../../lib/data";
 import { strings, useLocale, useT } from "../../lib/i18n";
 import { enter } from "../../lib/motion";
@@ -60,6 +60,8 @@ export function Calendar() {
   const [month, setMonth] = useState({ y: today.y, m: today.m, dir: 0 });
   // campeonato aceso pelo mouse ou foco: as logos dele brilham no mês todo e o balão abre
   const [hot, setHot] = useState<{ id: string; cell: string } | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
 
   const events: Ev[] = schedule
     .flatMap((s) => { const tr = tournaments.find((x) => x.id === s.tournamentId); return tr ? [{ ...s, t: tr }] : []; })
@@ -76,8 +78,10 @@ export function Calendar() {
   const cells = monthCells(month.y, month.m);
 
   const shift = (dir: number) => setMonth(({ y, m }) => { const d = new Date(y, m + dir, 1); return { y: d.getFullYear(), m: d.getMonth(), dir }; });
-  const pick = (day: Day) => {
+  const pick = (day: Day, fromGrid = false) => {
     setSelected(day);
+    // no celular o painel do dia fica abaixo do mês: leva a pessoa até ele
+    if (fromGrid && !matchMedia("(min-width: 64rem)").matches) panel.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
     if (day.y !== month.y || day.m !== month.m) setMonth({ y: day.y, m: day.m, dir: Math.sign(dateOf(day).getTime() - first.getTime()) });
   };
 
@@ -94,7 +98,7 @@ export function Calendar() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-10">
         {/* o dia escolhido: tudo o que tem nele, com hora, descrição e link; a legenda fica no pé, na altura da última semana */}
         <div className="order-2 flex flex-col justify-between gap-8 border-t border-zinc-200/15 pt-6 lg:order-1 lg:border-t-0 lg:border-r lg:pt-0 lg:pr-10">
-          <div className="flex flex-col gap-5" aria-live="polite">
+          <div ref={panel} className="flex scroll-mt-24 flex-col gap-5" aria-live="polite">
             <div className="flex flex-col gap-1">
               {sameDay(selected, today) && <span className="text-xs font-bold tracking-widest text-area uppercase">{t.today}</span>}
               <h3 className="font-display text-2xl font-extrabold tracking-wide text-white title-depth first-letter:uppercase">{longDay.format(dateOf(selected))}</h3>
@@ -104,7 +108,7 @@ export function Calendar() {
               <ul className="flex flex-col gap-5">
                 {dayEvents.map((ev) => (
                   <li key={ev.id} className="flex gap-4">
-                    <TournamentLogo t={ev.t} className="size-12 text-base" />
+                    <TournamentLogo t={ev.t} className="size-12 object-left text-base" />
                     <div className="flex min-w-0 flex-col gap-1.5">
                       <p className="font-display text-base/tight font-extrabold tracking-wide text-white uppercase">
                         {ev.t.name}{ev.label && <span className="text-area"> {ev.label}</span>}
@@ -130,14 +134,14 @@ export function Calendar() {
                 <p className="text-sm text-zinc-300">{t.nothing}</p>
                 {upcoming && (
                   <button type="button" onClick={() => pick(dayOf(new Date(upcoming.startsAt * 1000)))}
-                    className="group flex min-h-11 w-fit cursor-pointer items-center gap-3 rounded-xl py-2 pr-3 text-left transition-colors hover:bg-zinc-100/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10">
-                    <TournamentLogo t={upcoming.t} className="size-10 text-sm" />
+                    className="group flex min-h-11 w-fit cursor-pointer items-center gap-3 rounded-xl py-2 text-left transition-opacity focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-100 active:opacity-70">
+                    <TournamentLogo t={upcoming.t} className="size-10 object-left text-sm" />
                     <span className="flex flex-col">
                       <span className="text-xs font-bold tracking-widest text-area uppercase">{t.upNext}</span>
-                      <span className="text-sm font-bold text-white">{fullName(upcoming)}</span>
+                      <span className="text-sm font-bold text-white underline-offset-4 group-hover:underline">{fullName(upcoming)}</span>
                       <span className="text-xs text-zinc-300 tabular-nums first-letter:uppercase">{shortDay.format(new Date(upcoming.startsAt * 1000))} · {time.format(new Date(upcoming.startsAt * 1000))}</span>
                     </span>
-                    <Icon name="chevron-right" className="size-4 text-zinc-400 transition-transform group-hover:translate-x-0.5" />
+                    <Icon name="chevron-right" className="size-4 text-zinc-400 transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
                   </button>
                 )}
               </div>
@@ -183,11 +187,13 @@ export function Calendar() {
                 const br = evs.some((ev) => ev.brazil);
                 const tip = hot?.cell === k ? evs.filter((ev) => ev.t.id === hot.id) : [];
                 const col = i % 7;
+                // nas duas primeiras semanas o balão abre para baixo, para não cobrir o nome do mês
+                const below = i < 14;
                 return (
                   <div key={k} className="relative">
                     <button
                       type="button"
-                      onClick={() => pick(day)}
+                      onClick={() => pick(day, true)}
                       onFocus={() => evs[0] && setHot({ id: evs[0].t.id, cell: k })}
                       onBlur={() => setHot(null)}
                       aria-pressed={isSel}
@@ -223,11 +229,11 @@ export function Calendar() {
                         <motion.div
                           id={`cal-tip-${k}`}
                           role="tooltip"
-                          initial={{ opacity: 0, y: 4 }}
+                          initial={{ opacity: 0, y: below ? -4 : 4 }}
                           animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 4 }}
+                          exit={{ opacity: 0, y: below ? -4 : 4 }}
                           transition={{ duration: 0.15 }}
-                          className={`pointer-events-none absolute bottom-[calc(100%+0.5rem)] z-30 flex w-max max-w-72 flex-col gap-3 rounded-xl bg-zinc-950 p-3 text-left shadow-[0_12px_32px_rgba(0,0,0,0.65)] sm:max-w-80 ${
+                          className={`pointer-events-none absolute ${below ? "top-[calc(100%+0.5rem)]" : "bottom-[calc(100%+0.5rem)]"} z-30 flex w-max max-w-72 flex-col gap-3 rounded-xl bg-zinc-950 p-3 text-left shadow-[0_12px_32px_rgba(0,0,0,0.65)] sm:max-w-80 ${
                             col < 2 ? "left-0" : col > 4 ? "right-0" : "left-1/2 -translate-x-1/2"}`}
                         >
                           {tip.map((ev) => (

@@ -25,7 +25,7 @@ export interface Env {
 }
 
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
-const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home", "packs", "events"];
+const UPLOAD_FOLDERS = ["players", "teams", "heroes", "home", "packs", "events"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "altHero", "inactive", "exclusive", "art"];
 const ID_RE = /^[\w-]{1,64}$/;
@@ -121,7 +121,7 @@ async function appData(env: Env): Promise<Response> {
     env.DB.prepare("SELECT * FROM settings"),
     env.DB.prepare("SELECT * FROM tournaments ORDER BY created_at, id"),
     // calendário: do mês passado em diante (o resto do histórico não aparece no site)
-    env.DB.prepare(`SELECT * FROM tournament_dates WHERE starts_at >= unixepoch() - ${SCHEDULE_PAST_DAYS} * 86400 ORDER BY starts_at, id`),
+    env.DB.prepare("SELECT * FROM tournament_dates WHERE starts_at >= unixepoch() - ? ORDER BY starts_at, id").bind(SCHEDULE_PAST_DAYS * 86400),
   ]);
   const s = Object.fromEntries((settings.results as { key: string; value_json: string }[]).map((r) => [r.key, parse<unknown>(r.value_json, null)]));
   return Response.json({
