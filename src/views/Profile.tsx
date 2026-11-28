@@ -147,10 +147,10 @@ export function Profile({ userId, onOpenCard, onRedeem, onArtist }: { userId: st
   // ficha do dossiê: foto 3×4 com carimbo, número da ficha à máquina de escrever, nome em destaque
   const identity = (
     <div className="flex min-w-0 items-center gap-7">
-      <div className="relative shrink-0 -rotate-2 bg-dl-text p-1 pb-3 shadow-[0_8px_20px_rgb(0_0_0/0.5)]">
+      <div className="relative shrink-0 -rotate-2 bg-dl-text p-1 shadow-[0_8px_20px_rgb(0_0_0/0.5)]">
         {profile.image
-          ? <img src={profile.image} alt="" className="aspect-3/4 w-16 object-cover grayscale-[0.35] sm:w-20" />
-          : <span aria-hidden="true" className="flex aspect-3/4 w-16 items-center justify-center bg-zinc-800 font-display text-2xl font-black text-dl-text sm:w-20">{profile.name.charAt(0).toUpperCase()}</span>}
+          ? <img src={profile.image} alt="" className="aspect-square w-16 object-cover grayscale-[0.35] sm:w-20" />
+          : <span aria-hidden="true" className="flex aspect-square w-16 items-center justify-center bg-zinc-800 font-display text-2xl font-black text-dl-text sm:w-20">{profile.name.charAt(0).toUpperCase()}</span>}
         {/* no perfil de artista o carimbo da ficha diz Artista, em rosa */}
         <span aria-hidden={!profile.artist} className={`dossier-stamp absolute -right-4 bottom-1 rotate-[-14deg] ${profile.artist ? "dossier-stamp-artist" : ""}`}>{profile.artist ? t.artistStamp : t.stamp}</span>
       </div>
