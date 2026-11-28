@@ -44,4 +44,12 @@ describe("Curtidas das cartas especiais", () => {
     expect((await likes("PUT", "nao-existe", cookie)).status).toBe(404);
     expect(await (await likes("GET", "comum")).json()).toEqual({ count: 0, liked: false });
   });
+
+  it("o artista não curte a própria arte e vê que ela é dele", async () => {
+    const { cookie, userId } = await login("artista");
+    await env.DB.prepare("INSERT INTO card_artists (player_id, user_id) VALUES ('esp', ?)").bind(userId).run();
+    expect((await likes("PUT", "esp", cookie)).status).toBe(400);
+    expect(await (await likes("GET", "esp", cookie)).json()).toEqual({ count: 0, liked: false, own: true });
+    expect(await (await likes("GET", "esp")).json()).toEqual({ count: 0, liked: false });
+  });
 });

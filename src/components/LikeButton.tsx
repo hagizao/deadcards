@@ -6,15 +6,15 @@ import type { CardLikes } from "../lib/likes";
 import { Icon } from "./Icon";
 
 const S = strings({
-  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: ["Dê uma moral para o ", "artista", "."], signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida.", likes: "Curtidas", own: "Curtidas do seu perfil." },
-  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: ["Cheer on the ", "artist", "."], signIn: "Sign in to like", failed: "Could not save the like.", likes: "Likes", own: "Your profile likes." },
-  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: ["Anima al ", "artista", "."], signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta.", likes: "Me gusta", own: "Los me gusta de tu perfil." },
+  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: ["Dê uma moral para o ", "artista", "."], signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida.", likes: "Curtidas", own: "Curtidas do seu perfil.", ownArt: "Curtidas da sua arte." },
+  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: ["Cheer on the ", "artist", "."], signIn: "Sign in to like", failed: "Could not save the like.", likes: "Likes", own: "Your profile likes.", ownArt: "Likes on your art." },
+  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: ["Anima al ", "artista", "."], signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta.", likes: "Me gusta", own: "Los me gusta de tu perfil.", ownArt: "Los me gusta de tu arte." },
 });
 
 /**
  * Curtir: botão grande, com o total à vista de todos, para dar moral para quem fez a arte.
  * `path` é a API das curtidas (de uma carta especial ou do perfil do artista). Sem login, o mesmo botão leva para entrar;
- * `own` (o seu próprio perfil) mostra só o total, sem curtir.
+ * `own` (o seu próprio perfil) mostra só o total, sem curtir; o mesmo vale para a sua própria arte, que o servidor marca com `own`.
  * `onArtist`: a palavra "artista" da dica vira link para o perfil do artista no site (a dica aparece mesmo sem login).
  */
 export function LikeButton({ path, own = false, onArtist }: { path: string; own?: boolean; onArtist?: () => void }) {
@@ -59,7 +59,7 @@ export function LikeButton({ path, own = false, onArtist }: { path: string; own?
     }
   };
 
-  const look = `flex min-h-12 cursor-pointer items-center gap-3 rounded-full px-5 text-base font-extrabold tracking-wide uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300 disabled:cursor-wait ${
+  const look = `flex min-h-12 cursor-pointer items-center gap-3 rounded-full px-5 text-base font-extrabold tracking-wide uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300 disabled:cursor-wait disabled:opacity-70 ${
     liked
       ? "bg-rose-500/30 text-white ring-1 ring-rose-300/70 hover:bg-rose-500/40 active:bg-rose-500/50"
       : "bg-rose-500/15 text-rose-200 ring-1 ring-rose-400/50 hover:bg-rose-500/25 hover:text-white active:bg-rose-500/35"
@@ -73,7 +73,7 @@ export function LikeButton({ path, own = false, onArtist }: { path: string; own?
     </>
   );
 
-  if (own) return (
+  if (own || likes?.own) return (
     <div className="flex w-fit flex-col items-center gap-1.5">
       <span className="flex min-h-12 items-center gap-3 rounded-full bg-rose-500/15 px-5 text-base font-extrabold tracking-wide text-rose-200 uppercase ring-1 ring-rose-400/50">
         <Icon name="heart" className="size-6 fill-current" />
@@ -81,7 +81,7 @@ export function LikeButton({ path, own = false, onArtist }: { path: string; own?
         <span aria-hidden="true" className="h-5 w-px bg-current opacity-40" />
         <span className="font-display text-xl tabular-nums">{likes ? likes.count.toLocaleString() : "–"}</span>
       </span>
-      <span className="text-xs whitespace-nowrap text-zinc-400">{t.own}</span>
+      <span className="w-0 min-w-full text-center text-xs text-balance text-zinc-400">{own ? t.own : t.ownArt}</span>
     </div>
   );
 
@@ -96,13 +96,13 @@ export function LikeButton({ path, own = false, onArtist }: { path: string; own?
         <a href="/login" className={look} aria-label={`${t.signIn} · ${t.count(likes?.count ?? 0)}`} title={t.signIn}>{body}</a>
       )}
       {onArtist ? (
-        <span className="text-xs whitespace-nowrap text-zinc-400">
+        <span className="w-0 min-w-full text-center text-xs text-balance text-zinc-400">
           {t.hint[0]}
           <button type="button" onClick={onArtist} className="cursor-pointer rounded-sm font-bold text-rose-200 underline decoration-rose-300/50 underline-offset-2 transition hover:text-rose-100 hover:decoration-rose-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">{t.hint[1]}</button>
           {t.hint[2]}
         </span>
-      ) : <span className="text-xs whitespace-nowrap text-zinc-400">{me ? t.hint.join("") : t.signIn}</span>}
-      {failed && <p role="alert" className="max-w-52 text-center text-sm text-red-300">{t.failed}</p>}
+      ) : <span className="w-0 min-w-full text-center text-xs text-balance text-zinc-400">{me ? t.hint.join("") : t.signIn}</span>}
+      {failed && <p role="alert" className="w-0 min-w-full text-center text-sm text-red-300">{t.failed}</p>}
     </div>
   );
 }
