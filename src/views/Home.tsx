@@ -16,7 +16,7 @@ import { Calendar } from "./home/Calendar";
 import { Welcome } from "./home/Welcome";
 import { CardGuide } from "./home/CardGuide";
 import { Roles } from "./home/Roles";
-import { NewCards } from "./home/NewCards";
+import { ArtistsHall } from "./home/ArtistsHall";
 
 export type Area = "teams" | "tierlist" | "collection" | "compare" | "redeem";
 
@@ -96,7 +96,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
       <div className="contents" style={areaStyle("redeem")}><Welcome onNavigate={onNavigate} /></div>
       {guide && <div className="contents" style={areaStyle("collection")}><CardGuide sample={guide} /></div>}
       <div className="contents" style={areaStyle("tierlist")}><Roles onOpenCard={onOpenCard} /></div>
-      <div className="contents" style={areaStyle("compare")}><NewCards onOpenCard={onOpenCard} /></div>
+      <div className="contents" style={areaStyle("compare")}><ArtistsHall onOpenCard={onOpenCard} /></div>
 
 
       <section className="flex flex-col gap-4" aria-labelledby="home-ranking" style={areaStyle("teams")}>

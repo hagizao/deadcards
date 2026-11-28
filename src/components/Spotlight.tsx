@@ -278,7 +278,7 @@ function useOwnerCount(id: string | undefined) {
   return id && result?.id === id ? result.count : undefined;
 }
 
-function ArtCreditLine({ credit, label }: { credit: ArtCredit; label: string }) {
+export function ArtCreditLine({ credit, label }: { credit: ArtCredit; label: string }) {
   return (
     <p className="mt-1 text-xs text-zinc-400">
       {label}{" "}

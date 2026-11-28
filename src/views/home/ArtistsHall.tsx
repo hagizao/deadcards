@@ -2,32 +2,32 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import type { Player } from "../../lib/types";
 import { useData } from "../../lib/data";
-import { getPlayerHistory, isMainCard, isRetired } from "../../lib/cards";
+import { getPlayerHistory } from "../../lib/cards";
 import { strings, useT } from "../../lib/i18n";
 import { sectionTitle } from "../../lib/ui";
 import { Card } from "../../components/Card";
+import { ArtCreditLine } from "../../components/Spotlight";
 import { RailArrows } from "../../components/Rail";
 import { useRail } from "../../lib/rail";
 import { Reveal } from "../../components/Motion";
 
 const S = strings({
-  pt: { title: "Chegaram agora", lead: "Os jogadores que entraram por último no site.", prev: "Cartas anteriores", next: "Mais cartas" },
-  en: { title: "Just arrived", lead: "The latest players added to the site.", prev: "Previous cards", next: "More cards" },
-  es: { title: "Recién llegados", lead: "Los últimos jugadores que entraron al sitio.", prev: "Cartas anteriores", next: "Más cartas" },
+  pt: { title: "Hall dos artistas", lead: "As cartas especiais e quem desenhou cada uma.", prev: "Cartas anteriores", next: "Mais cartas", artBy: "Arte por" },
+  en: { title: "Artists' hall", lead: "The special cards and who drew each one.", prev: "Previous cards", next: "More cards", artBy: "Art by" },
+  es: { title: "Salón de artistas", lead: "Las cartas especiales y quién dibujó cada una.", prev: "Cartas anteriores", next: "Más cartas", artBy: "Arte de" },
 });
 
-const COUNT = 8;
 // data em que a carta entrou: o primeiro ponto do histórico de OVR (sem histórico, vai para o fim)
 const addedAt = (p: Player) => getPlayerHistory(p)[0]?.date ?? "";
 
-/** As cartas principais mais recentes numa faixa sem barra de rolagem: as setas (ou arrastar) passam as cartas. */
-export function NewCards({ onOpenCard }: { onOpenCard: (id: string) => void }) {
+/** Todas as cartas especiais com arte, da mais nova para a mais antiga, numa faixa sem barra de rolagem. */
+// especial sem arte própria não tem artista para homenagear, então fica de fora
+export function ArtistsHall({ onOpenCard }: { onOpenCard: (id: string) => void }) {
   const t = useT(S);
   const { players } = useData();
   const latest = players
-    .filter((p) => isMainCard(p) && !isRetired(p) && !p.inactive)
-    .sort((a, b) => addedAt(b).localeCompare(addedAt(a)) || b.id.localeCompare(a.id))
-    .slice(0, COUNT);
+    .filter((p) => p.special && p.art?.url && !p.inactive)
+    .sort((a, b) => addedAt(b).localeCompare(addedAt(a)) || b.id.localeCompare(a.id));
 
   // carta média: 222 px, com gap-5 (20 px) entre elas
   const [railEl, setRailEl] = useState<HTMLDivElement | null>(null);
@@ -36,10 +36,10 @@ export function NewCards({ onOpenCard }: { onOpenCard: (id: string) => void }) {
   if (!latest.length) return null;
 
   return (
-    <section aria-labelledby="home-new" className="flex flex-col gap-4">
+    <section aria-labelledby="home-artists" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <Reveal className="flex flex-col gap-2">
-          <h2 id="home-new" className={`${sectionTitle} deco-star`}>{t.title}</h2>
+          <h2 id="home-artists" className={`${sectionTitle} deco-star`}>{t.title}</h2>
           <p className="text-sm text-zinc-300">{t.lead}</p>
         </Reveal>
         <RailArrows rail={rail} prev={t.prev} next={t.next} />
@@ -48,8 +48,9 @@ export function NewCards({ onOpenCard }: { onOpenCard: (id: string) => void }) {
       <div ref={setRailEl} className={`${rail.fade} overflow-x-clip px-6 pt-6 pb-10 rail-glow`}>
         <motion.ul className="flex gap-5" {...rail.track}>
           {latest.map((p, i) => (
-            <li key={p.id} className="shrink-0" inert={rail.hidden(i) || undefined}>
+            <li key={p.id} className="flex shrink-0 flex-col items-center gap-3" inert={rail.hidden(i) || undefined}>
               <Card player={p} variant="medium" onOpen={() => onOpenCard(p.id)} />
+              {p.art?.credit && <ArtCreditLine credit={p.art.credit} label={t.artBy} />}
             </li>
           ))}
         </motion.ul>
