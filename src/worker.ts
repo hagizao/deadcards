@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { createAuth, currentUser } from "./auth";
 import { favorite, profileCard, publicProfile } from "./profile";
+import { cardLikes } from "./likes";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
@@ -468,6 +469,13 @@ export default {
       if (!ID_RE.test(id)) return bad("id inválido");
       const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM user_cards WHERE player_id = ?").bind(id).first<number>("n");
       return Response.json({ count: count ?? 0 }, { headers: { "cache-control": "public, max-age=60" } });
+    }
+    // curtidas das cartas especiais: o total é público; curtir exige login
+    const likesOf = url.pathname.match(/^\/api\/cards\/([^/]+)\/likes$/);
+    if (likesOf) {
+      const id = decode(likesOf[1]);
+      if (id === null || !ID_RE.test(id)) return bad("id inválido");
+      return cardLikes(env, request, id);
     }
     // coleção universal (Editor): quantas contas têm cada carta e quantas contas existem
     if (url.pathname === "/api/owners") {
