@@ -68,7 +68,7 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
             <option value="ALL">{tr.allRegions}</option>
             {REGIONS.map((r) => <option key={r} value={r}>{label(r)}</option>)}
           </select>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr.placeholder} aria-label={tr.search} className={`${field} w-40`} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr.placeholder} aria-label={tr.search} className={`${field} w-full sm:w-40`} />
         </div>
       </div>
 
@@ -80,7 +80,8 @@ export function TierList({ onOpenCard, onOpenTeam }: { onOpenCard: (id: string) 
           const empty = mode === "players" ? !pItems.length : !tItems.length;
           return (
             <motion.div key={tier.key} className="tierlist-row" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35, ease: easeOut, delay: rowDelay }}>
-              <div className="tierlist-label-cell px-2 py-3" style={{ backgroundColor: tier.bg, color: tier.text }}>
+              {/* a cor da faixa é dado (vem da configuração): fica no texto e numa barra fina, sobre fundo escuro, para não competir com as cartas */}
+              <div className="tierlist-label-cell px-2 py-3" style={{ backgroundColor: `color-mix(in oklch, ${tier.bg} 12%, #09090b)`, color: tier.bg, boxShadow: `inset 3px 0 0 ${tier.bg}` }}>
                 <span className="text-2xl leading-none font-semibold tracking-wide sm:text-[26px]">{tier.key}</span>
                 <span className="mt-1 text-xs font-bold tracking-wider tabular-nums opacity-75">{tier.min}–{tier.max}</span>
               </div>
