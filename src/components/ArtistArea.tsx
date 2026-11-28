@@ -15,7 +15,7 @@ import { field, pill } from "../lib/ui";
 
 const S = strings({
   pt: {
-    artist: "Artista", lead: (name: string) => `Cartas com a arte de ${name}`, cards: (n: number) => (n === 1 ? "1 carta" : `${n} cartas`),
+    lead: (n: number, name: string) => `${n === 1 ? "1 carta" : `${n} cartas`} com arte de ${name}`,
     likes: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), portfolio: "Portfólio", empty: "As cartas com a arte desta pessoa aparecem aqui.",
     admin: "Admin · Artista", mark: "Marcar como artista", marked: "É artista", unmark: "Tirar o selo de artista", unmarkHint: "Segure “É artista” para tirar o selo: a pessoa perde as cartas vinculadas e a carta do perfil, que ela monta de novo sem as opções de artista.", linked: "Cartas com a arte desta pessoa", none: "Nenhuma carta vinculada.",
     unlink: "Desvincular", link: "Vincular", search: "Buscar carta especial para vincular", searchPlaceholder: "Jogador, herói, time ou artista…",
@@ -23,7 +23,7 @@ const S = strings({
     retired: "fora de circulação", prev: "Cartas anteriores", next: "Próximas cartas",
   },
   en: {
-    artist: "Artist", lead: (name: string) => `Cards with art by ${name}`, cards: (n: number) => (n === 1 ? "1 card" : `${n} cards`),
+    lead: (n: number, name: string) => `${n === 1 ? "1 card" : `${n} cards`} with art by ${name}`,
     likes: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), portfolio: "Portfolio", empty: "Cards with this person's art show up here.",
     admin: "Admin · Artist", mark: "Mark as artist", marked: "Is an artist", unmark: "Remove the artist badge", unmarkHint: "Hold “Is an artist” to remove the badge: this person loses the linked cards and their profile card, which they build again without the artist options.", linked: "Cards with this person's art", none: "No linked cards.",
     unlink: "Unlink", link: "Link", search: "Search a special card to link", searchPlaceholder: "Player, hero, team or artist…",
@@ -31,7 +31,7 @@ const S = strings({
     retired: "out of circulation", prev: "Previous cards", next: "Next cards",
   },
   es: {
-    artist: "Artista", lead: (name: string) => `Cartas con arte de ${name}`, cards: (n: number) => (n === 1 ? "1 carta" : `${n} cartas`),
+    lead: (n: number, name: string) => `${n === 1 ? "1 carta" : `${n} cartas`} con arte de ${name}`,
     likes: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), portfolio: "Portafolio", empty: "Las cartas con el arte de esta persona aparecen aquí.",
     admin: "Admin · Artista", mark: "Marcar como artista", marked: "Es artista", unmark: "Quitar el sello de artista", unmarkHint: "Mantén presionado “Es artista” para quitar el sello: la persona pierde las cartas vinculadas y la carta del perfil, que vuelve a crear sin las opciones de artista.", linked: "Cartas con el arte de esta persona", none: "Ninguna carta vinculada.",
     unlink: "Desvincular", link: "Vincular", search: "Buscar carta especial para vincular", searchPlaceholder: "Jugador, héroe, equipo o artista…",
@@ -66,31 +66,30 @@ export function ArtistShowcase({ artist, userId, name, own, onOpenCard, headerCl
     <section aria-labelledby="profile-artist-title" className="contents">
       <div className={`flex min-w-0 flex-wrap items-end justify-between gap-4 ${headerClassName}`}>
         <div className="flex flex-col gap-2">
-          {/* título um terço maior que o das conquistas, em degradê rosa com brilho */}
-          <h2 id="profile-artist-title" className="flex items-center gap-3 font-display text-5xl font-black tracking-wide uppercase">
-            <Icon name="brush" className="size-11 -rotate-12 text-rose-300 drop-shadow-[0_0_12px_rgb(244_63_94/0.7)]" />
-            <span className="bg-linear-to-r from-rose-200 via-rose-400 to-fuchsia-500 bg-clip-text text-transparent drop-shadow-[0_0_18px_rgb(244_63_94/0.55)]">{t.artist}</span>
+          {/* o carimbo da ficha já diz "Artista": o título é o que a vitrine mostra */}
+          <h2 id="profile-artist-title" className="flex items-center gap-2 font-display text-xl font-black text-balance text-zinc-100 sm:text-2xl">
+            <Icon name="brush" className="size-6 shrink-0 -rotate-12 text-rose-300" />
+            {t.lead(cards.length, name)}
           </h2>
-          <p className="text-sm text-zinc-300">{t.lead(name)} · {t.cards(cards.length)}</p>
           {portfolio && (
             <a href={portfolio} target="_blank" rel="noopener noreferrer" className={`${pill(false)} self-start`}>
               {t.portfolio} <span aria-hidden="true">↗</span>
             </a>
           )}
         </div>
-        <div className="flex flex-col items-end gap-3">
-          <LikeButton path={artistLikesPath(userId)} own={own} />
-          <RailArrows rail={rail} prev={t.prev} next={t.next} />
-        </div>
+        <LikeButton path={artistLikesPath(userId)} own={own} />
       </div>
       {cards.length ? (
-        <div className={`min-w-0 ${railClassName}`}>
+        <div className={`relative min-w-0 ${railClassName}`}>
+          {/* as setas ficam junto da faixa, no espaço de cima dela */}
+          <div className="absolute top-0 right-4 z-10 lg:right-16"><RailArrows rail={rail} prev={t.prev} next={t.next} /></div>
           {/* o fade das pontas é uma máscara e corta tudo fora da caixa: o padding em volta dá lugar ao brilho e à subida do hover.
-              pt-17 = o pt-12 da coluna da carta + metade da diferença de altura (430 − 389): os centros das cartas se alinham */}
-          <div ref={setRowEl} className={`${rail.fadeStrong} overflow-x-clip px-16 pt-17 pb-28 rail-glow`}>
+              pt-17 = o pt-12 da coluna da carta + metade da diferença de altura (430 − 389): os centros das cartas se alinham.
+              No celular cabe uma carta: o padding lateral a centraliza e o fade é curto, para não apagar a carta */}
+          <div ref={setRowEl} className={`rail-fade ${rail.at > 0 ? "[--fade-l:2rem] lg:[--fade-l:10rem]" : ""} ${rail.at < rail.last ? "[--fade-r:2rem] lg:[--fade-r:10rem]" : ""} overflow-x-clip px-[max(1rem,calc((100%-266px)/2))] pt-14 pb-12 rail-glow lg:px-16 lg:pt-17 lg:pb-28`}>
             <motion.ul className="flex gap-6" {...rail.track}>
               {cards.map((p, i) => (
-                <li key={p.id} className="h-[389px] w-[266px] shrink-0 drop-shadow-[0_0_24px_rgb(244_63_94/0.3)]" inert={rail.hidden(i) || undefined}>
+                <li key={p.id} className="h-[389px] w-[266px] shrink-0" inert={rail.hidden(i) || undefined}>
                   <div className="origin-top-left scale-120"><Card player={p} variant="medium" onOpen={() => onOpenCard(p.id)} /></div>
                 </li>
               ))}

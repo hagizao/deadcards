@@ -1,6 +1,7 @@
 import { useState, type RefObject } from "react";
 import { strings, useT } from "../lib/i18n";
 import { captureCard, downloadBlob, pngName } from "../lib/cardImage";
+import { pill } from "../lib/ui";
 
 const S = strings({
   pt: { export: "Exportar PNG", saving: "Exportando…", error: "Não foi possível exportar a carta. Tente de novo." },
@@ -33,7 +34,7 @@ export function CardExportButton({ cardRef, name, disabled }: { cardRef: RefObje
         type="button"
         onClick={download}
         disabled={exporting || disabled}
-        className="min-h-11 cursor-pointer rounded-lg bg-zinc-800 px-3 text-xs font-bold text-zinc-100 hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-600 disabled:cursor-wait disabled:opacity-60"
+        className={`${pill(false)} disabled:cursor-wait disabled:opacity-60`}
       >
         {exporting ? t.saving : t.export}
       </button>

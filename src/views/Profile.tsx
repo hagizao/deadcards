@@ -157,9 +157,9 @@ export function Profile({ userId, onOpenCard, onRedeem, onArtist }: { userId: st
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="font-typewriter text-xs tracking-[0.2em] text-zinc-300 uppercase">{t.file} {fileNo(profile.id)}</span>
         {/* nome do perfil um terço menor que o título das abas (pageTitle) */}
-        <h1 id="profile-title" className="font-display text-2xl font-extrabold tracking-[0.11em] text-balance wrap-break-word text-area uppercase title-depth sm:text-[2rem] lg:text-2xl">{profile.name}</h1>
+        <h1 id="profile-title" className={`font-display text-2xl font-extrabold tracking-[0.11em] text-balance wrap-break-word ${profile.artist ? "text-dl-text" : "text-area"} uppercase title-depth sm:text-[2rem] lg:text-2xl`}>{profile.name}</h1>
         {profile.handle && <p className="truncate text-sm font-semibold text-zinc-300">@{profile.handle}</p>}
-        {card && <p className="truncate text-sm text-zinc-400">{card.name} · {card.hero}</p>}
+        {card && <p className="truncate text-sm text-zinc-400">{card.name === profile.name ? card.hero : `${card.name} · ${card.hero}`}</p>}
       </div>
     </div>
   );
