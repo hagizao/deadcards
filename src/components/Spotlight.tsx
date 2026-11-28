@@ -204,7 +204,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
                 </p>
               )}
               {player.art?.credit && (
-                <ArtCreditLine credit={player.art.credit} label={t.artBy} />
+                <ArtCreditLine credit={player.art.credit} label={t.artBy} size="text-base" />
               )}
             </div>
             {(player.special || artistKey) && !preview && (
@@ -212,8 +212,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
               <div className="order-last flex w-full flex-col items-start gap-2 sm:order-0 sm:w-auto sm:items-center">
                 {player.special && <LikeButton path={likesPath(player.id)} />}
                 {artistKey && onOpenProfile && (
-                  <button type="button" onClick={() => onOpenProfile(artistKey)} className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-bold tracking-widest text-rose-200 uppercase transition hover:bg-rose-500/10 hover:text-rose-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-rose-500/20 sm:min-h-9">
-                    <Icon name="brush" className="size-3.5" />
+                  <button type="button" onClick={() => onOpenProfile(artistKey)} className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-md px-2 text-[10px] font-bold tracking-widest text-rose-200 uppercase transition hover:bg-rose-500/10 hover:text-rose-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-rose-500/20 sm:min-h-9">
+                    <Icon name="brush" className="size-3" />
                     {t.profile}
                   </button>
                 )}
@@ -304,10 +304,11 @@ function useOwnerCount(id: string | undefined) {
 
 /** `onProfile`: o artista tem perfil no site; o nome leva até ele e o link de fora vira "portfólio ↗". */
 /** O nome do artista leva ao link que ele mandou (o perfil dele no site fica junto do curtir, no Spotlight). */
-export function ArtCreditLine({ credit, label }: { credit: ArtCredit; label: string }) {
+/** `size`: a classe de tamanho do texto (no Spotlight o crédito é maior que na Home). */
+export function ArtCreditLine({ credit, label, size = "text-xs" }: { credit: ArtCredit; label: string; size?: string }) {
   const external = !!credit.url && /^https?:\/\//i.test(credit.url);
   return (
-    <p className="mt-1 text-xs text-zinc-400">
+    <p className={`mt-1 text-zinc-400 ${size}`}>
       {label}{" "}
       {external ? (
         <a href={credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm font-bold text-zinc-100 underline decoration-zinc-500 underline-offset-2 transition hover:decoration-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">
