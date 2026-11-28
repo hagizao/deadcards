@@ -188,4 +188,20 @@ describe("Banco de artes", () => {
     expect((await list(cookie))[0]).toMatchObject({ status: "rejected" });
     expect((await list(cookie))[0].reason).toBeUndefined();
   });
+
+  it("guardada libera espaço no limite, pode voltar para análise e ainda vai para carta", async () => {
+    const { cookie } = await login("guardado");
+    for (let i = 0; i < 10; i++) await send(cookie);
+    expect((await send(cookie)).status).toBe(409);
+    const adm = await admin();
+    const [s] = await list(cookie);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "saved" })).status).toBe(200);
+    expect((await list(cookie)).find((x) => x.id === s.id)?.status).toBe("saved");
+    expect((await send(cookie)).status).toBe(200);
+    await seedPlayer("p3");
+    await env.DB.prepare(`UPDATE players SET extra_json = '{"special":true}' WHERE id = 'p3'`).run();
+    expect((await json(adm.cookie, `${s.id}/use`, "POST", { playerId: "p3" })).status).toBe(200);
+    expect((await list(cookie)).find((x) => x.id === s.id)?.status).toBe("used");
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "nope" })).status).toBe(400);
+  });
 });

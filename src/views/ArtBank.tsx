@@ -12,8 +12,8 @@ import { field, pill, primaryBtn } from "../lib/ui";
 
 // Editor (só admin, em português como o resto do Editor): o banco de artes enviadas pelas pessoas.
 // O fluxo é ver a arte numa carta, baixar e aplicar à mão no Editor da carta; "Usada" marca que já foi.
-const STATUS = { pending: "Em análise", used: "Usada", rejected: "Recusada" } as const;
-const TONE = { pending: "text-amber-200", used: "text-emerald-300", rejected: "text-zinc-400" } as const;
+const STATUS = { pending: "Em análise", saved: "Guardada", used: "Usada", rejected: "Recusada" } as const;
+const TONE = { pending: "text-amber-200", saved: "text-sky-300", used: "text-emerald-300", rejected: "text-zinc-400" } as const;
 // abaixo disso a arte tende a ficar borrada na carta grande e no PNG exportado
 const MIN_W = 600;
 const MIN_H = 840;
@@ -203,7 +203,8 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
       <div className="flex flex-wrap gap-2">
         <a href={s.image} download={`${name}.${s.ext}`} className={primaryBtn}>Baixar</a>
         {s.fg && <a href={s.fg} download={`${name}-frente.${s.fgExt ?? s.ext}`} className={pill(false)}>Baixar frente</a>}
-        {s.status === "pending" && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "used" }), "Marcada como usada.")}>Marcar usada</button>}
+        {s.status === "pending" && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "saved" }), "Arte guardada no banco para usar depois.")}>Guardar p/ depois</button>}
+        {(s.status === "pending" || s.status === "saved") && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "used" }), "Marcada como usada.")}>Marcar usada</button>}
         {s.status === "pending" && !rejecting && <button type="button" className={pill(false)} onClick={() => setRejecting(true)}>Recusar</button>}
         {s.status !== "pending" && !s.usedPlayerId && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "pending" }), "De volta para análise.")}>Voltar p/ análise</button>}
         <HoldButton className={pill(false)} label="Apagar esta arte do banco" onConfirm={() => void run(() => call(s.id, "DELETE"), "Arte apagada.")}>Segure p/ apagar</HoldButton>

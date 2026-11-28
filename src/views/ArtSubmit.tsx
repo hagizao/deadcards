@@ -25,7 +25,7 @@ const S = strings({
     consent: "Autorizo o Cardslock a usar esta arte nas cartas especiais, com o meu crédito.",
     send: "Enviar arte", sending: "Enviando…", sent: "Arte enviada! Ela fica em análise.",
     reason: "Motivo:", mine: "Minhas artes", none: "Você ainda não enviou nenhuma arte.", limit: (n: number) => `Até ${n} artes em análise ou recusadas por vez; apague as recusadas para enviar mais.`,
-    status: { pending: "Em análise", used: "Usada numa carta", rejected: "Recusada" },
+    status: { pending: "Em análise", saved: "Guardada no banco do Cardslock", used: "Usada numa carta", rejected: "Recusada" },
     del: "Apagar", delLabel: "Apagar esta arte",
     errors: { consent: "Marque as duas confirmações.", credit: "Confira o nome e o link do crédito: o link é obrigatório.", image: "A imagem precisa ser PNG, JPG ou WebP de até 5 MB.", limit: `Você já tem ${ART_PENDING_MAX} artes em análise ou recusadas. Apague uma recusada para enviar outra.`, login: "Entre para enviar artes.", failed: "Não foi possível enviar agora." },
   },
@@ -44,7 +44,7 @@ const S = strings({
     consent: "I allow Cardslock to use this art on special cards, with my credit.",
     send: "Submit art", sending: "Submitting…", sent: "Art submitted! It is now under review.",
     reason: "Reason:", mine: "My art", none: "You haven't submitted any art yet.", limit: (n: number) => `Up to ${n} pieces under review or declined at a time; delete declined ones to submit more.`,
-    status: { pending: "Under review", used: "Used on a card", rejected: "Declined" },
+    status: { pending: "Under review", saved: "Saved in the Cardslock bank", used: "Used on a card", rejected: "Declined" },
     del: "Delete", delLabel: "Delete this art",
     errors: { consent: "Check both confirmations.", credit: "Check the credit name and link: the link is required.", image: "The image must be PNG, JPG or WebP up to 5 MB.", limit: `You already have ${ART_PENDING_MAX} pieces under review or declined. Delete a declined one to submit another.`, login: "Sign in to submit art.", failed: "Could not submit right now." },
   },
@@ -63,14 +63,14 @@ const S = strings({
     consent: "Autorizo a Cardslock a usar esta arte en cartas especiales, con mi crédito.",
     send: "Enviar arte", sending: "Enviando…", sent: "¡Arte enviada! Queda en revisión.",
     reason: "Motivo:", mine: "Mis artes", none: "Todavía no enviaste ninguna arte.", limit: (n: number) => `Hasta ${n} artes en revisión o rechazadas a la vez; borra las rechazadas para enviar más.`,
-    status: { pending: "En revisión", used: "Usada en una carta", rejected: "Rechazada" },
+    status: { pending: "En revisión", saved: "Guardada en el banco de Cardslock", used: "Usada en una carta", rejected: "Rechazada" },
     del: "Borrar", delLabel: "Borrar esta arte",
     errors: { consent: "Marca las dos confirmaciones.", credit: "Revisa el nombre y el enlace del crédito: el enlace es obligatorio.", image: "La imagen debe ser PNG, JPG o WebP de hasta 5 MB.", limit: `Ya tienes ${ART_PENDING_MAX} artes en revisión o rechazadas. Borra una rechazada para enviar otra.`, login: "Inicia sesión para enviar artes.", failed: "No se pudo enviar ahora." },
   },
 });
 
 type ErrorCode = keyof (typeof S)["pt"]["errors"];
-const STATUS_TONE = { pending: "text-amber-200", used: "text-emerald-300", rejected: "text-zinc-400" } as const;
+const STATUS_TONE = { pending: "text-amber-200", saved: "text-sky-300", used: "text-emerald-300", rejected: "text-zinc-400" } as const;
 
 /** Imagem local para a prévia: um endereço blob: que some quando a imagem muda ou a tela fecha. Nada sobe antes do envio. */
 function useLocalImage() {

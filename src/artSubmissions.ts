@@ -56,6 +56,7 @@ const creditOf = (v: unknown): ArtCredit | null => {
 // duas imagens de até 5 MB mais o meta e as bordas do multipart
 const MAX_BODY = 2 * ART_SUBMISSION_MAX_BYTES + 64 * 1024;
 // recusadas contam no limite até a pessoa apagar: senão cada recusa libera espaço para mais um envio
+// guardadas e usadas não contam: guardar uma arte libera espaço para a pessoa mandar outra
 const COUNTED = "status IN ('pending', 'rejected')";
 
 const imageUrl = (id: string, layer: "bg" | "fg") => `/api/art-submissions/${id}/image/${layer}`;
@@ -130,7 +131,7 @@ async function create(env: Env, request: Request, userId: string): Promise<Respo
 /** Leva a arte para uma carta especial: copia as imagens para players/ (públicas) e grava arte, ajuste e crédito na carta. */
 async function applyToCard(env: Env, row: Row, request: Request): Promise<Response> {
   // cada uso copia as imagens: arte já usada ou recusada não entra de novo
-  if (row.status !== "pending") return bad("só dá para usar arte em análise", 409, "not_pending");
+  if (row.status !== "pending" && row.status !== "saved") return bad("só dá para usar arte em análise ou guardada", 409, "not_pending");
   const body = (await request.json().catch(() => null)) as { playerId?: unknown } | null;
   const playerId = body?.playerId;
   if (typeof playerId !== "string" || !ID_RE.test(playerId)) return bad("carta inválida");
@@ -141,9 +142,9 @@ async function applyToCard(env: Env, row: Row, request: Request): Promise<Respon
   if (extra.special !== true) return bad("as artes do banco só vão em cartas especiais", 400, "not_special");
 
   // reserva a arte antes de copiar: dois "usar" ao mesmo tempo não aplicam a mesma arte em duas cartas
-  const claim = await env.DB.prepare("UPDATE art_submissions SET status = 'used', used_player_id = ? WHERE id = ? AND status = 'pending'").bind(playerId, row.id).run();
+  const claim = await env.DB.prepare("UPDATE art_submissions SET status = 'used', used_player_id = ? WHERE id = ? AND status IN ('pending', 'saved')").bind(playerId, row.id).run();
   if (!claim.meta.changes) return bad("só dá para usar arte em análise", 409, "not_pending");
-  const release = () => env.DB.prepare("UPDATE art_submissions SET status = 'pending', used_player_id = NULL WHERE id = ?").bind(row.id).run();
+  const release = () => env.DB.prepare("UPDATE art_submissions SET status = ?, used_player_id = NULL WHERE id = ?").bind(row.status, row.id).run();
 
   const copy = async (key: string) => {
     const obj = await env.ASSETS_BUCKET.get(key);
@@ -216,7 +217,8 @@ export async function artSubmissions(env: Env, request: Request, rest: string): 
   if (request.method === "PATCH") {
     if (!user.admin) return bad("sem permissão", 403);
     const body = (await request.json().catch(() => null)) as { status?: unknown; reason?: unknown } | null;
-    if (body?.status !== "rejected" && body?.status !== "pending" && body?.status !== "used") return bad("status inválido");
+    // saved: guardada para usar depois; sai da conta do limite, então a pessoa pode mandar mais
+    if (!body || !["pending", "saved", "used", "rejected"].includes(body.status as string)) return bad("status inválido");
     // "usada" à mão (o admin baixou e aplicou fora daqui) não tem carta e pode voltar atrás;
     // a usada pelo "usar" fica presa: cada uso copia as imagens para uma carta
     // o motivo só vale na recusa; voltar para análise ou marcar usada apaga o motivo antigo

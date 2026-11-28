@@ -13,7 +13,8 @@ export type ArtLayout = ArtLayer & { fg?: ArtLayer; frame?: string; frameTune?: 
 
 export type ArtSubmission = {
   id: string;
-  status: "pending" | "used" | "rejected";
+  /** saved: guardada no banco para usar depois (não conta no limite de quem enviou). */
+  status: "pending" | "saved" | "used" | "rejected";
   /** Endereços privados (só quem enviou e admins abrem). */
   image: string;
   /** Extensão dos arquivos (png, jpg, webp), para o download sair com o nome certo. */

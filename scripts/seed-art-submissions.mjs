@@ -61,6 +61,7 @@ const items = [
   { id: "seed-3", user: 1, credit: ["Pintora", "https://x.com/pintora"], size: [420, 600], colors: [[60, 20, 10], [220, 90, 30], [255, 240, 180]], layout: { zoom: 130, x: 45, y: 35, frame: "chamas" }, at: now - 26 * H },
   { id: "seed-4", user: 2, credit: ["Rabisco", null], size: [1000, 1400], colors: [[10, 10, 30], [60, 70, 160], [180, 200, 255]], layout: { zoom: 100, x: 50, y: 50, frame: "gelo" }, at: now - 50 * H },
   { id: "seed-5", user: 2, credit: ["Rabisco", "https://artstation.com/rabisco"], size: [900, 1260], colors: [[20, 30, 10], [90, 140, 40], [230, 255, 170]], layout: { zoom: 120, x: 50, y: 45 }, status: "rejected", reason: "Não combina com o estilo das cartas.", at: now - 80 * H },
+  { id: "seed-6", user: 1, credit: ["Pintora", "https://x.com/pintora"], size: [900, 1260], colors: [[30, 10, 40], [120, 60, 200], [240, 220, 255]], layout: { zoom: 100, x: 50, y: 50, frame: "deco" }, status: "saved", at: now - 100 * H },
 ];
 
 const q = (v) => (v === null || v === undefined ? "NULL" : typeof v === "number" ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
