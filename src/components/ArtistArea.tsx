@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { useDeferredValue, useEffect, useState } from "react";
 import { Card } from "./Card";
+import { HoldButton } from "./HoldButton";
 import { Icon } from "./Icon";
 import { LikeButton } from "./LikeButton";
 import { RailArrows } from "./Rail";
@@ -16,7 +17,7 @@ const S = strings({
   pt: {
     artist: "Artista", lead: (name: string) => `Cartas com a arte de ${name}`, cards: (n: number) => (n === 1 ? "1 carta" : `${n} cartas`),
     likes: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), portfolio: "Portfólio", empty: "As cartas com a arte desta pessoa aparecem aqui.",
-    admin: "Admin · Artista", mark: "Marcar como artista", marked: "É artista", linked: "Cartas com a arte desta pessoa", none: "Nenhuma carta vinculada.",
+    admin: "Admin · Artista", mark: "Marcar como artista", marked: "É artista", unmark: "Tirar o selo de artista", unmarkHint: "Segure “É artista” para tirar o selo: a pessoa perde as cartas vinculadas e a carta do perfil, que ela monta de novo sem as opções de artista.", linked: "Cartas com a arte desta pessoa", none: "Nenhuma carta vinculada.",
     unlink: "Desvincular", link: "Vincular", search: "Buscar carta especial para vincular", searchPlaceholder: "Jogador, herói, time ou artista…",
     linkHint: "Vincular dá a carta para a pessoa e faz o Arte por da carta levar a este perfil.", artBy: "Arte por", failed: "Não foi possível salvar. Tente de novo.",
     retired: "fora de circulação", prev: "Cartas anteriores", next: "Próximas cartas",
@@ -24,7 +25,7 @@ const S = strings({
   en: {
     artist: "Artist", lead: (name: string) => `Cards with art by ${name}`, cards: (n: number) => (n === 1 ? "1 card" : `${n} cards`),
     likes: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), portfolio: "Portfolio", empty: "Cards with this person's art show up here.",
-    admin: "Admin · Artist", mark: "Mark as artist", marked: "Is an artist", linked: "Cards with this person's art", none: "No linked cards.",
+    admin: "Admin · Artist", mark: "Mark as artist", marked: "Is an artist", unmark: "Remove the artist badge", unmarkHint: "Hold “Is an artist” to remove the badge: this person loses the linked cards and their profile card, which they build again without the artist options.", linked: "Cards with this person's art", none: "No linked cards.",
     unlink: "Unlink", link: "Link", search: "Search a special card to link", searchPlaceholder: "Player, hero, team or artist…",
     linkHint: "Linking gives the card to this person and makes the card's Art by lead to this profile.", artBy: "Art by", failed: "Could not save. Try again.",
     retired: "out of circulation", prev: "Previous cards", next: "Next cards",
@@ -32,7 +33,7 @@ const S = strings({
   es: {
     artist: "Artista", lead: (name: string) => `Cartas con arte de ${name}`, cards: (n: number) => (n === 1 ? "1 carta" : `${n} cartas`),
     likes: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), portfolio: "Portafolio", empty: "Las cartas con el arte de esta persona aparecen aquí.",
-    admin: "Admin · Artista", mark: "Marcar como artista", marked: "Es artista", linked: "Cartas con el arte de esta persona", none: "Ninguna carta vinculada.",
+    admin: "Admin · Artista", mark: "Marcar como artista", marked: "Es artista", unmark: "Quitar el sello de artista", unmarkHint: "Mantén presionado “Es artista” para quitar el sello: la persona pierde las cartas vinculadas y la carta del perfil, que vuelve a crear sin las opciones de artista.", linked: "Cartas con el arte de esta persona", none: "Ninguna carta vinculada.",
     unlink: "Desvincular", link: "Vincular", search: "Buscar carta especial para vincular", searchPlaceholder: "Jugador, héroe, equipo o artista…",
     linkHint: "Vincular le da la carta a esta persona y hace que el Arte de la carta lleve a este perfil.", artBy: "Arte de", failed: "No se pudo guardar. Intenta de nuevo.",
     retired: "fuera de circulación", prev: "Cartas anteriores", next: "Siguientes cartas",
@@ -104,6 +105,9 @@ export function ArtistShowcase({ artist, userId, name, own, onOpenCard, headerCl
 const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /** Só admin: marcar a conta como artista e vincular as cartas com a arte dela. `onChanged` recarrega o perfil. */
+// botão de marcar/tirar o selo de artista: pílula cheia, rosa quando a conta é artista
+const artistToggle = "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 text-xs font-bold tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 disabled:cursor-wait disabled:opacity-60 sm:min-h-9";
+
 export function ArtistAdminPanel({ userId, onChanged }: { userId: string; onChanged: () => void }) {
   const t = useT(S);
   const { players, teams, reload } = useData();
@@ -111,6 +115,7 @@ export function ArtistAdminPanel({ userId, onChanged }: { userId: string; onChan
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
   const query = normalize(useDeferredValue(q).trim());
 
   useEffect(() => {
@@ -148,15 +153,32 @@ export function ArtistAdminPanel({ userId, onChanged }: { userId: string; onChan
 
   return (
     <section aria-labelledby="profile-artist-admin" className="flex flex-col gap-4 rounded-2xl bg-zinc-900/70 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="profile-artist-admin" className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.admin}</h2>
-        <button type="button" aria-pressed={!!state?.artist} disabled={!state || busy}
-          onClick={() => void send(artistPath(userId), state?.artist ? "DELETE" : "PUT")}
-          className={`${pill(!!state?.artist)} disabled:cursor-wait disabled:opacity-60`}>
-          <Icon name="brush" className="size-4" />
-          {state?.artist ? t.marked : t.mark}
+      {/* recolhida por padrão: abre ao clicar no título */}
+      <h2 id="profile-artist-admin">
+        <button type="button" aria-expanded={open} aria-controls="profile-artist-admin-body" onClick={() => setOpen((o) => !o)}
+          className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-lg text-xs font-bold tracking-widest text-zinc-400 uppercase transition-colors hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white sm:min-h-9">
+          {t.admin}
+          <Icon name={open ? "chevron-up" : "chevron-down"} className="size-4" />
         </button>
+      </h2>
+      {open && (
+      <div id="profile-artist-admin-body" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        {state?.artist ? (
+          // tirar o selo apaga a carta do perfil e tira as cartas vinculadas da coleção: segurar para confirmar
+          <HoldButton onConfirm={() => void send(artistPath(userId), "DELETE")} disabled={busy} label={t.unmark}
+            className={`${artistToggle} bg-rose-500/15 text-rose-200 ring-1 ring-rose-400/50 hover:bg-rose-500/25 hover:text-white active:bg-rose-500/35`}>
+            <span className="flex items-center gap-2"><Icon name="brush" className="size-4" />{t.marked}</span>
+          </HoldButton>
+        ) : (
+          <button type="button" disabled={!state || busy} onClick={() => void send(artistPath(userId), "PUT")}
+            className={`${artistToggle} bg-zinc-800/80 text-zinc-200 hover:bg-zinc-700 hover:text-white active:bg-zinc-600`}>
+            <Icon name="brush" className="size-4" />
+            {t.mark}
+          </button>
+        )}
       </div>
+      {state?.artist && <p className="text-xs text-zinc-400">{t.unmarkHint}</p>}
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-bold text-zinc-100">{t.linked}</span>
@@ -190,6 +212,8 @@ export function ArtistAdminPanel({ userId, onChanged }: { userId: string; onChan
         )}
       </div>
       {failed && <p role="alert" className="text-sm text-red-300">{t.failed}</p>}
+      </div>
+      )}
     </section>
   );
 }

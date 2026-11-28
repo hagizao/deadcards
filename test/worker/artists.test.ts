@@ -51,11 +51,25 @@ describe("Artistas", () => {
     expect(await (await call("DELETE", artistCardPath(artist, "arte1"), admin)).json()).toEqual<ArtistAdmin>({ artist: true, cards: [] });
     expect((await profileOf(artist)).cards).toEqual(["arte1"]);
 
-    // tirar o selo esconde a área e o link, mas guarda os vínculos
+    // tirar o selo esconde a área e o link, tira as cartas vinculadas e a carta do perfil, mas guarda os vínculos
     await call("PUT", artistCardPath(artist, "arte2"), admin);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO user_favorites (user_id, player_id) VALUES (?, 'arte2')").bind(artist),
+      env.DB.prepare("INSERT INTO profile_cards (user_id, snapshot, updated_at) VALUES (?, '{}', 1)").bind(artist),
+      env.DB.prepare("INSERT INTO profile_card_history (user_id, snapshot, updated_at) VALUES (?, '{}', 1)").bind(artist),
+    ]);
     expect(await (await call("DELETE", artistPath(artist), admin)).json()).toEqual<ArtistAdmin>({ artist: false, cards: ["arte2"] });
-    expect((await profileOf(artist)).artist).toBeNull();
+    const after = await profileOf(artist);
+    expect(after.artist).toBeNull();
+    expect(after.cards).toEqual(["arte1"]);
+    expect(after.favorites).toEqual([]);
+    expect(after.card).toBeNull();
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM profile_card_history WHERE user_id = ?").bind(artist).first("n")).toBe(0);
     expect((await (await call("GET", "/api/data")).json<AppData>()).artists).toEqual({});
+
+    // voltar a ser artista devolve as cartas vinculadas
+    await call("PUT", artistPath(artist), admin);
+    expect((await profileOf(artist)).cards.sort()).toEqual(["arte1", "arte2"]);
   });
 
   it("uma carta tem um artista só: vincular a outra conta troca o dono", async () => {

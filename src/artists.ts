@@ -42,7 +42,9 @@ async function adminView(env: Env, userId: string): Promise<ArtistAdmin> {
 }
 
 /**
- * Só admin. /api/artists/<conta>: GET lê, PUT marca como artista, DELETE tira o selo (as cartas vinculadas ficam guardadas).
+ * Só admin. /api/artists/<conta>: GET lê, PUT marca como artista (e devolve as cartas vinculadas à coleção),
+ * DELETE tira o selo: a conta perde as cartas vinculadas (da coleção e dos favoritos) e a carta do perfil, que ela monta de novo
+ * sem as opções de artista. Os vínculos ficam guardados para o caso de ela voltar a ser artista.
  * /api/artists/<conta>/cards/<carta>: PUT vincula a arte da carta à conta (e dá a carta para ela), DELETE desvincula (a carta fica na coleção).
  */
 export async function artists(env: Env, request: Request, rest: string): Promise<Response> {
@@ -57,8 +59,18 @@ export async function artists(env: Env, request: Request, rest: string): Promise
   if (!(await env.DB.prepare(`SELECT 1 FROM "user" WHERE id = ?`).bind(userId).first())) return json({ code: "no_user" }, 404);
 
   if (!card) {
-    if (request.method === "PUT") await env.DB.prepare("INSERT OR IGNORE INTO artists (user_id) VALUES (?)").bind(userId).run();
-    if (request.method === "DELETE") await env.DB.prepare("DELETE FROM artists WHERE user_id = ?").bind(userId).run();
+    const linked = "SELECT player_id FROM card_artists WHERE user_id = ?";
+    if (request.method === "PUT") await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO artists (user_id) VALUES (?)").bind(userId),
+      env.DB.prepare(`INSERT OR IGNORE INTO user_cards (user_id, player_id) SELECT user_id, player_id FROM card_artists WHERE user_id = ?`).bind(userId),
+    ]);
+    if (request.method === "DELETE") await env.DB.batch([
+      env.DB.prepare("DELETE FROM artists WHERE user_id = ?").bind(userId),
+      env.DB.prepare(`DELETE FROM user_cards WHERE user_id = ? AND player_id IN (${linked})`).bind(userId, userId),
+      env.DB.prepare(`DELETE FROM user_favorites WHERE user_id = ? AND player_id IN (${linked})`).bind(userId, userId),
+      env.DB.prepare("DELETE FROM profile_cards WHERE user_id = ?").bind(userId),
+      env.DB.prepare("DELETE FROM profile_card_history WHERE user_id = ?").bind(userId),
+    ]);
   } else if (request.method === "PUT") {
     if (!(await env.DB.prepare("SELECT 1 FROM players WHERE id = ?").bind(playerId).first())) return json({ code: "no_card" }, 404);
     // vincular já marca como artista, troca o dono da arte se a carta era de outra conta e dá a carta (sem duplicar)
