@@ -13,50 +13,50 @@ const S = strings({
   pt: {
     title: "Enviar arte",
     lead: "Mande sua arte para o banco de artes do Cardslock. Teste à vontade numa carta especial: só você vê a prévia, e nada aparece no site até ser usado.",
-    image: "Arte", pick: "Escolher imagem", change: "Trocar imagem", fg: "Camada da frente (opcional)", fgHint: "PNG transparente com o que sai da moldura.", remove: "Remover",
+    image: "Arte", pick: "Escolher imagem", change: "Trocar imagem", fg: "Fundo e personagem separados (opcional)", fgHint: "Mande a imagem de cima só com o fundo e o personagem aqui, num PNG transparente. Separados, eles ganham efeito paralaxe: o personagem se mexe na frente do fundo quando a carta inclina. Passe o mouse na prévia para ver.", remove: "Remover",
     formats: `PNG, JPG ou WebP, até ${ART_SUBMISSION_MAX_BYTES / 1024 / 1024} MB.`,
     preview: "Testar na carta", card: "Carta da prévia", frame: "Moldura especial", frameDefault: "Padrão da carta",
-    zoom: "Zoom", x: "X", y: "Y", fgZoom: "Zoom da frente", fgX: "X da frente", fgY: "Y da frente",
-    credit: "Seu nome no crédito", creditPh: "@seunome", link: "Seu link (opcional)", linkPh: "https://instagram.com/seunome",
+    zoom: "Zoom", x: "X", y: "Y", fgZoom: "Zoom do personagem", fgX: "X do personagem", fgY: "Y do personagem",
+    credit: "Seu nome no crédito", creditPh: "@seunome", link: "Seu link", linkPh: "https://instagram.com/seunome",
     own: "Fiz esta arte (não é de IA nem de outra pessoa).",
     consent: "Autorizo o Cardslock a usar esta arte nas cartas especiais, com o meu crédito.",
     send: "Enviar arte", sending: "Enviando…", sent: "Arte enviada! Ela fica em análise.",
     mine: "Minhas artes", none: "Você ainda não enviou nenhuma arte.", limit: (n: number) => `Até ${n} artes em análise ou recusadas por vez; apague as recusadas para enviar mais.`,
     status: { pending: "Em análise", used: "Usada numa carta", rejected: "Recusada" },
     del: "Apagar", delLabel: "Apagar esta arte",
-    errors: { consent: "Marque as duas confirmações.", credit: "Confira o nome e o link do crédito.", image: "A imagem precisa ser PNG, JPG ou WebP de até 5 MB.", limit: `Você já tem ${ART_PENDING_MAX} artes em análise ou recusadas. Apague uma recusada para enviar outra.`, login: "Entre para enviar artes.", failed: "Não foi possível enviar agora." },
+    errors: { consent: "Marque as duas confirmações.", credit: "Confira o nome e o link do crédito: o link é obrigatório.", image: "A imagem precisa ser PNG, JPG ou WebP de até 5 MB.", limit: `Você já tem ${ART_PENDING_MAX} artes em análise ou recusadas. Apague uma recusada para enviar outra.`, login: "Entre para enviar artes.", failed: "Não foi possível enviar agora." },
   },
   en: {
     title: "Submit art",
     lead: "Send your art to the Cardslock art bank. Test it freely on a special card: only you see the preview, and nothing shows on the site until it is used.",
-    image: "Art", pick: "Choose image", change: "Change image", fg: "Front layer (optional)", fgHint: "Transparent PNG with what pops out of the frame.", remove: "Remove",
+    image: "Art", pick: "Choose image", change: "Change image", fg: "Background and character apart (optional)", fgHint: "Send the image above with just the background, and the character here as a transparent PNG. Apart, they get a parallax effect: the character moves in front of the background as the card tilts. Hover the preview to see it.", remove: "Remove",
     formats: `PNG, JPG or WebP, up to ${ART_SUBMISSION_MAX_BYTES / 1024 / 1024} MB.`,
     preview: "Test on a card", card: "Preview card", frame: "Special frame", frameDefault: "Card default",
-    zoom: "Zoom", x: "X", y: "Y", fgZoom: "Front zoom", fgX: "Front X", fgY: "Front Y",
-    credit: "Your name in the credit", creditPh: "@yourname", link: "Your link (optional)", linkPh: "https://instagram.com/yourname",
+    zoom: "Zoom", x: "X", y: "Y", fgZoom: "Character zoom", fgX: "Character X", fgY: "Character Y",
+    credit: "Your name in the credit", creditPh: "@yourname", link: "Your link", linkPh: "https://instagram.com/yourname",
     own: "I made this art (not AI and not someone else's).",
     consent: "I allow Cardslock to use this art on special cards, with my credit.",
     send: "Submit art", sending: "Submitting…", sent: "Art submitted! It is now under review.",
     mine: "My art", none: "You haven't submitted any art yet.", limit: (n: number) => `Up to ${n} pieces under review or declined at a time; delete declined ones to submit more.`,
     status: { pending: "Under review", used: "Used on a card", rejected: "Declined" },
     del: "Delete", delLabel: "Delete this art",
-    errors: { consent: "Check both confirmations.", credit: "Check the credit name and link.", image: "The image must be PNG, JPG or WebP up to 5 MB.", limit: `You already have ${ART_PENDING_MAX} pieces under review or declined. Delete a declined one to submit another.`, login: "Sign in to submit art.", failed: "Could not submit right now." },
+    errors: { consent: "Check both confirmations.", credit: "Check the credit name and link: the link is required.", image: "The image must be PNG, JPG or WebP up to 5 MB.", limit: `You already have ${ART_PENDING_MAX} pieces under review or declined. Delete a declined one to submit another.`, login: "Sign in to submit art.", failed: "Could not submit right now." },
   },
   es: {
     title: "Enviar arte",
     lead: "Manda tu arte al banco de artes de Cardslock. Pruébala libremente en una carta especial: solo tú ves la vista previa y nada aparece en el sitio hasta que se use.",
-    image: "Arte", pick: "Elegir imagen", change: "Cambiar imagen", fg: "Capa delantera (opcional)", fgHint: "PNG transparente con lo que sale del marco.", remove: "Quitar",
+    image: "Arte", pick: "Elegir imagen", change: "Cambiar imagen", fg: "Fondo y personaje por separado (opcional)", fgHint: "Manda la imagen de arriba solo con el fondo y el personaje aquí, en un PNG transparente. Por separado, tienen efecto paralaje: el personaje se mueve delante del fondo cuando la carta se inclina. Pasa el mouse por la vista previa para verlo.", remove: "Quitar",
     formats: `PNG, JPG o WebP, hasta ${ART_SUBMISSION_MAX_BYTES / 1024 / 1024} MB.`,
     preview: "Probar en la carta", card: "Carta de la vista previa", frame: "Marco especial", frameDefault: "El de la carta",
-    zoom: "Zoom", x: "X", y: "Y", fgZoom: "Zoom delantero", fgX: "X delantera", fgY: "Y delantera",
-    credit: "Tu nombre en el crédito", creditPh: "@tunombre", link: "Tu enlace (opcional)", linkPh: "https://instagram.com/tunombre",
+    zoom: "Zoom", x: "X", y: "Y", fgZoom: "Zoom del personaje", fgX: "X del personaje", fgY: "Y del personaje",
+    credit: "Tu nombre en el crédito", creditPh: "@tunombre", link: "Tu enlace", linkPh: "https://instagram.com/tunombre",
     own: "Hice esta arte (no es de IA ni de otra persona).",
     consent: "Autorizo a Cardslock a usar esta arte en cartas especiales, con mi crédito.",
     send: "Enviar arte", sending: "Enviando…", sent: "¡Arte enviada! Queda en revisión.",
     mine: "Mis artes", none: "Todavía no enviaste ninguna arte.", limit: (n: number) => `Hasta ${n} artes en revisión o rechazadas a la vez; borra las rechazadas para enviar más.`,
     status: { pending: "En revisión", used: "Usada en una carta", rejected: "Rechazada" },
     del: "Borrar", delLabel: "Borrar esta arte",
-    errors: { consent: "Marca las dos confirmaciones.", credit: "Revisa el nombre y el enlace del crédito.", image: "La imagen debe ser PNG, JPG o WebP de hasta 5 MB.", limit: `Ya tienes ${ART_PENDING_MAX} artes en revisión o rechazadas. Borra una rechazada para enviar otra.`, login: "Inicia sesión para enviar artes.", failed: "No se pudo enviar ahora." },
+    errors: { consent: "Marca las dos confirmaciones.", credit: "Revisa el nombre y el enlace del crédito: el enlace es obligatorio.", image: "La imagen debe ser PNG, JPG o WebP de hasta 5 MB.", limit: `Ya tienes ${ART_PENDING_MAX} artes en revisión o rechazadas. Borra una rechazada para enviar otra.`, login: "Inicia sesión para enviar artes.", failed: "No se pudo enviar ahora." },
   },
 });
 
@@ -169,23 +169,24 @@ export function ArtSubmit() {
             )}
           </fieldset>
 
-          {bg.url && (
-            <fieldset className="flex flex-col gap-3">
-              <legend className="mb-3 text-xs font-bold tracking-widest text-zinc-300 uppercase">{t.fg}</legend>
-              <div className="flex flex-wrap items-center gap-3">
+          {/* sempre à vista: a explicação do paralaxe é o convite para mandar fundo e personagem separados */}
+          <fieldset className="flex flex-col gap-3">
+            <legend className="mb-3 text-xs font-bold tracking-widest text-zinc-300 uppercase">{t.fg}</legend>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+              <div className="flex shrink-0 flex-wrap items-center gap-3">
                 <ImageInput label={fg.file ? t.change : t.pick} onFile={fg.setFile} />
                 {fg.file && <button type="button" onClick={() => fg.setFile(undefined)} className={pill(false)}>{t.remove}</button>}
-                <span className="text-xs text-zinc-400">{t.fgHint}</span>
               </div>
-              {fg.url && (
-                <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-                  <Range label={t.fgZoom} value={layout.fg!.zoom} min={50} max={300} onChange={(v) => setFg({ zoom: v })} />
-                  <Range label={t.fgX} value={layout.fg!.x} min={0} max={100} onChange={(v) => setFg({ x: v })} />
-                  <Range label={t.fgY} value={layout.fg!.y} min={0} max={100} onChange={(v) => setFg({ y: v })} />
-                </div>
-              )}
-            </fieldset>
-          )}
+              <p className="max-w-prose text-xs text-zinc-300">{t.fgHint}</p>
+            </div>
+            {bg.url && fg.url && (
+              <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+                <Range label={t.fgZoom} value={layout.fg!.zoom} min={50} max={300} onChange={(v) => setFg({ zoom: v })} />
+                <Range label={t.fgX} value={layout.fg!.x} min={0} max={100} onChange={(v) => setFg({ x: v })} />
+                <Range label={t.fgY} value={layout.fg!.y} min={0} max={100} onChange={(v) => setFg({ y: v })} />
+              </div>
+            )}
+          </fieldset>
 
           <fieldset className="flex flex-col gap-4">
             <legend className="mb-3 text-xs font-bold tracking-widest text-zinc-300 uppercase">{t.preview}</legend>
@@ -213,7 +214,7 @@ export function ArtSubmit() {
             </label>
             <label htmlFor={ids.link} className="flex min-w-0 flex-1 basis-56 flex-col gap-1.5 text-sm font-semibold text-zinc-100">
               {t.link}
-              <input id={ids.link} type="url" maxLength={300} placeholder={t.linkPh} value={credit.url} onChange={(e) => setCredit((c) => ({ ...c, url: e.target.value }))} className={field} />
+              <input id={ids.link} type="url" required maxLength={300} placeholder={t.linkPh} value={credit.url} onChange={(e) => setCredit((c) => ({ ...c, url: e.target.value }))} className={field} />
             </label>
           </div>
 
