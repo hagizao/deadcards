@@ -46,6 +46,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, preview }: { pl
   const player = preview ?? players.find((p) => p.id === playerId);
   const cardRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
+  // o clarão termina maior que a carta (e invisível): fica na tela só durante a revelação, senão cria rolagem no painel
+  const [flashDone, setFlashDone] = useState<string>();
   const nameRef = useRef<HTMLSpanElement>(null);
   const { owned, favorites } = useMyCards();
   const [favIssue, setFavIssue] = useState<{ id: string; r: Exclude<FavoriteResult, "ok"> }>();
@@ -66,7 +68,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, preview }: { pl
     revealed.add(playerId);
     const ovrEl = cardRef.current.querySelector("[data-ovr]")?.firstChild;
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ delay: 0.12 });
+      const tl = gsap.timeline({ delay: 0.12, onComplete: () => setFlashDone(playerId) });
       tl.fromTo(flashRef.current, { opacity: 0, scale: 0.5 }, { opacity: 0.9, scale: 1.1, duration: 0.25, ease: "power2.out" })
         .to(flashRef.current, { opacity: 0, scale: 1.35, duration: 0.5, ease: "power2.in" });
       // vindo da grade a carta já chega voando; o pulo da revelação fica só para quando ela abre do nada
@@ -166,11 +168,11 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, preview }: { pl
       {/* sem rolagem lateral: o clarão da revelação passa da largura do painel no celular */}
       <div
         ref={scrollRef}
-        className="relative flex max-h-[92dvh] w-full flex-col items-center gap-8 overflow-x-hidden overflow-y-auto rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
+        className="relative flex max-h-[92dvh] w-full scrollbar-none flex-col items-center gap-8 overflow-x-hidden overflow-y-auto overscroll-contain rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
       >
         <div ref={flyRef} className="relative z-10 max-w-full">
         <motion.div key={player.id} className="relative max-w-full" initial={reveal || fly ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2, ease: easeOut }}>
-          {reveal && (
+          {reveal && flashDone !== playerId && (
             <div ref={flashRef} aria-hidden="true" className="pointer-events-none absolute -inset-16 rounded-full opacity-0" style={{ background: `radial-gradient(circle, ${tier.hi} 0%, ${tier.c}99 30%, transparent 68%)` }} />
           )}
           <div ref={cardRef} className="relative">
