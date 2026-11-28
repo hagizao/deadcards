@@ -180,8 +180,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, preview }: { pl
         </div>
 
         <motion.div className="w-full min-w-0 flex-1 space-y-5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ ...enter, delay: 0.08 }}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
+          {/* no celular o curtir desce para a linha de baixo, com a largura toda; do sm em diante fica no topo, ao lado do fechar */}
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="min-w-0 flex-1 basis-[calc(100%-3.5rem)] sm:basis-0">
               <h2 className="font-display text-3xl font-black tracking-[0.12em] text-dl-text uppercase"><span ref={nameRef} key={player.id + player.name}>{player.name}</span></h2>
               <p className="mt-1 text-sm text-zinc-300">{label(team.name)} ({team.tag}) · {label(player.position || "Flex")} · {player.hero}</p>
               {player.special && owners !== undefined && (
@@ -198,6 +199,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, preview }: { pl
               )}
               {player.art?.credit && <ArtCreditLine credit={player.art.credit} label={t.artBy} />}
             </div>
+            {player.special && !preview && <div className="order-last w-full sm:order-0 sm:w-auto"><LikeButton id={player.id} /></div>}
             <button type="button" onClick={onClose} aria-label={t.close} className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-zinc-800/60 text-zinc-300 transition hover:bg-zinc-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:size-9"><Icon name="x" /></button>
           </div>
 
@@ -216,8 +218,6 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, preview }: { pl
             {player.special && player.specialText && <span className="text-xs font-bold text-amber-200">✦ {player.specialText}</span>}
           </div>
           {favIssue?.id === player.id && <p role="alert" className="text-sm text-red-300">{t[favIssue.r]}</p>}
-          {/* curtir é só para carta especial (a arte de alguém), e fica bem à vista */}
-          {player.special && !preview && <LikeButton id={player.id} />}
 
           <div>
             <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.stats}</h3>

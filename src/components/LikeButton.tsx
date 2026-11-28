@@ -71,19 +71,17 @@ export function LikeButton({ id }: { id: string }) {
   );
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div ref={scope} className="flex flex-wrap items-center gap-3">
-        {me ? (
-          <motion.button type="button" aria-pressed={liked} aria-label={`${liked ? t.liked : t.like} · ${t.count(likes?.count ?? 0)}`} disabled={busy}
-            whileTap={still ? undefined : { scale: 0.95 }} onClick={flip} className={look}>
-            {body}
-          </motion.button>
-        ) : (
-          <a href="/login" className={look} aria-label={`${t.signIn} · ${t.count(likes?.count ?? 0)}`} title={t.signIn}>{body}</a>
-        )}
-        <span className="text-xs text-zinc-400">{me ? t.hint : t.signIn}</span>
-      </div>
-      {failed && <p role="alert" className="text-sm text-red-300">{t.failed}</p>}
+    <div ref={scope} className="flex flex-col items-start gap-1.5 sm:items-end">
+      {me ? (
+        <motion.button type="button" aria-pressed={liked} aria-label={`${liked ? t.liked : t.like} · ${t.count(likes?.count ?? 0)}`} disabled={busy}
+          whileTap={still ? undefined : { scale: 0.95 }} onClick={flip} className={look}>
+          {body}
+        </motion.button>
+      ) : (
+        <a href="/login" className={look} aria-label={`${t.signIn} · ${t.count(likes?.count ?? 0)}`} title={t.signIn}>{body}</a>
+      )}
+      <span className="max-w-52 text-xs text-zinc-400 sm:text-right">{me ? t.hint : t.signIn}</span>
+      {failed && <p role="alert" className="max-w-52 text-sm text-red-300 sm:text-right">{t.failed}</p>}
     </div>
   );
 }
