@@ -7,6 +7,7 @@ import { strings, useT } from "../lib/i18n";
 import { STAT_NAMES } from "../lib/statNames";
 import { STAT_KEYS, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
+import type { Player } from "../lib/types";
 import { Card } from "./Card";
 import { CardExportButton } from "./CardExportButton";
 import { Icon } from "./Icon";
@@ -35,12 +36,13 @@ const S = strings({
     stats: "Atributos" },
 });
 
-export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: string; onClose: () => void; onSwitch: (id: string) => void; onEdit?: (id: string) => void }) {
+/** `preview`: uma carta que não está nos dados (a prévia de uma arte enviada), sem donos, versões nem favoritar. */
+export function Spotlight({ playerId, onClose, onSwitch, onEdit, preview }: { playerId: string; onClose: () => void; onSwitch: (id: string) => void; onEdit?: (id: string) => void; preview?: Player }) {
   const t = useT(S);
   const statNames = useT(STAT_NAMES);
   const label = useLabel();
   const { teams, players, settings, heroIcon, me } = useData();
-  const player = players.find((p) => p.id === playerId);
+  const player = preview ?? players.find((p) => p.id === playerId);
   const cardRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLSpanElement>(null);
@@ -48,7 +50,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   const { owned, favorites } = useMyCards();
   const [favIssue, setFavIssue] = useState<{ id: string; r: Exclude<FavoriteResult, "ok"> }>();
   const [favBusy, setFavBusy] = useState(false);
-  const owners = useOwnerCount(player?.special ? playerId : undefined);
+  const owners = useOwnerCount(player?.special && !preview ? playerId : undefined);
   const tier = player ? getCardTier(player, settings.tierConfig!) : null;
   const ovr = player ? getPlayerOvr(player) : 0;
   const reveal = useMemo(
@@ -131,7 +133,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   if (!tier) return null;
   const groupKey = player.variantOf || player.id;
   // herói jogado aposentado só aparece para quem tem a carta (ou quando é a carta aberta)
-  const versions = players.filter((p) => (p.id === groupKey || p.variantOf === groupKey) && (!isRetired(p) || p.id === player.id || !!owned?.has(p.id)));
+  const versions = preview ? [player] : players.filter((p) => (p.id === groupKey || p.variantOf === groupKey) && (!isRetired(p) || p.id === player.id || !!owned?.has(p.id)));
   // só dá para favoritar carta que está na sua coleção
   const canFavorite = !!owned?.has(player.id);
   const fav = favorites.includes(player.id);
@@ -188,7 +190,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
                   {t.owners(owners)}
                 </p>
               )}
-              {me && owned && !owned.has(player.id) && (
+              {me && owned && !preview && !owned.has(player.id) && (
                 <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-zinc-800/80 px-3 py-1 text-xs font-bold text-zinc-300">
                   <span aria-hidden="true" className="size-2 rounded-full bg-zinc-500" />
                   {t.notOwned}
