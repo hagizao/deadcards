@@ -580,6 +580,10 @@ select { color-scheme: dark; }
 .ritual-tint-artist {
   background: var(--artist-gradient);
 }
+/* no fundo do site o degradê entra com metade da saturação, para não gritar atrás do conteúdo */
+.ritual-tint-artist {
+  filter: saturate(0.5);
+}
 .dossier-showcase::before {
   content: "";
   position: absolute;
