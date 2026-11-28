@@ -29,6 +29,7 @@ O dev roda tudo local (Vite + `@cloudflare/vite-plugin`) em `http://localhost:51
 | `npm run db:pull` | Substitui o D1 local por uma cópia de produção (guarda o antigo em `.wrangler/backup/`) |
 | `npm run db:import -- <save.json> [--remote]` | Importa um save JSON para D1 e R2 |
 | `npm run design:guide` | Depois do `build`, regenera `public/design/app.css` e `card.html` a partir do código |
+| `npm run ritual:render -- <url do dev>` | Com o `dev` rodando, regrava o vídeo do fundo (`public/ritual/`) a partir de `src/lib/ritualBackdrop.ts`; precisa de ffmpeg e de Playwright (`PW_DIR`) |
 | `npm run deploy` | Build + deploy no Cloudflare |
 
 ## Arquitetura
