@@ -6,9 +6,9 @@ import { likesPath, type CardLikes } from "../lib/likes";
 import { Icon } from "./Icon";
 
 const S = strings({
-  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: "Dê moral para o artista", signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida." },
-  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: "Cheer on the artist", signIn: "Sign in to like", failed: "Could not save the like." },
-  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: "Anima al artista", signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta." },
+  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: "Dê uma moral para o artista.", signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida." },
+  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: "Cheer on the artist.", signIn: "Sign in to like", failed: "Could not save the like." },
+  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: "Anima al artista.", signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta." },
 });
 
 /**
