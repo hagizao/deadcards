@@ -140,7 +140,10 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
       {picking !== null && (
         <div ref={panel} className="flex scroll-mt-24 flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-2xl font-extrabold tracking-widest text-area uppercase title-depth">{t.picking(picking + 1)}</h2>
+            <h2 className="font-display text-2xl font-extrabold tracking-widest text-area uppercase title-depth">
+              {/* clicar no título recolhe a lista, como o Pronto */}
+              <button type="button" aria-expanded="true" onClick={() => setPicking(null)} className="flex cursor-pointer items-center gap-2 rounded-md text-left transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-100 active:opacity-60">{t.picking(picking + 1)}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="size-5 shrink-0"><path d="m6 15 6-6 6 6" /></svg></button>
+            </h2>
             <button type="button" className={pill(true)} onClick={() => setPicking(null)}>{t.done}</button>
           </div>
           <Picker label={t.pick} value={slots[picking]} onChange={(id) => setSlot(picking, id)} />
