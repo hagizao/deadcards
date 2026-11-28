@@ -573,17 +573,14 @@ select { color-scheme: dark; }
   mix-blend-mode: color;
 }
 /* perfil de artista: a arte atrás da ficha e o ritual do fundo do site pintados no degradê do pincel do título (rosa → fúcsia) */
-:root {
-  --artist-gradient: linear-gradient(115deg, var(--color-rose-200), var(--color-rose-400) 45%, var(--color-fuchsia-500));
-}
+/* no fundo do site e na arte atrás da ficha o degradê entra apagado (as mesmas cores com só 25% do croma, misturadas com cinza),
+   para não gritar atrás do conteúdo. A mistura "color" pega matiz e saturação dessa camada: a saturação está nas cores, não num filter */
 .dossier-hero-artist::after,
 .ritual-tint-artist {
-  background: var(--artist-gradient);
-}
-/* o degradê entra com bem menos saturação (0,5 e depois mais 15% a menos), no fundo do site e na arte atrás da ficha, para não gritar atrás do conteúdo */
-.ritual-tint-artist,
-.dossier-hero-artist::after {
-  filter: saturate(0.425);
+  background: linear-gradient(115deg,
+    color-mix(in oklch, var(--color-rose-200) 25%, #8a8a8a),
+    color-mix(in oklch, var(--color-rose-400) 25%, #8a8a8a) 45%,
+    color-mix(in oklch, var(--color-fuchsia-500) 25%, #8a8a8a));
 }
 .dossier-showcase::before {
   content: "";
