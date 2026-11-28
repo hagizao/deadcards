@@ -120,7 +120,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
   const art = card && heroArt(card.hero);
   // ficha do dossiê: foto 3×4 com carimbo, número da ficha à máquina de escrever, nome em destaque
   const identity = (
-    <div className="flex min-w-0 items-center gap-4">
+    <div className="flex min-w-0 items-center gap-7">
       <div className="relative shrink-0 -rotate-2 bg-dl-text p-1 pb-3 shadow-[0_8px_20px_rgb(0_0_0/0.5)]">
         {profile.image
           ? <img src={profile.image} alt="" className="aspect-3/4 w-16 object-cover grayscale-[0.35] sm:w-20" />
@@ -130,7 +130,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="font-typewriter text-xs tracking-[0.2em] text-zinc-300 uppercase">{t.file} {fileNo(profile.id)}</span>
         {/* nome do perfil um terço menor que o título das abas (pageTitle) */}
-        <h1 id="profile-title" className="truncate font-display text-2xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-[2rem]">{profile.name}</h1>
+        <h1 id="profile-title" className="font-display text-2xl font-extrabold tracking-[0.11em] text-balance wrap-break-word text-area uppercase title-depth sm:text-[2rem]">{profile.name}</h1>
         {profile.handle && <p className="truncate text-sm font-semibold text-zinc-300">@{profile.handle}</p>}
         {card && <p className="truncate text-sm text-zinc-400">{card.name} · {card.hero}</p>}
       </div>
