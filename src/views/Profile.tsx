@@ -103,7 +103,7 @@ function issueOf(error: unknown): Issue {
   return (ISSUES as string[]).includes(code) ? code as Issue : "unavailable";
 }
 
-/** `onArtist`: avisa se o perfil aberto é de artista, para o fundo do site pegar o degradê rosa. */
+/** `onArtist`: avisa se o perfil aberto é de artista, para o fundo do site ficar em grafite. */
 export function Profile({ userId, onOpenCard, onRedeem, onArtist }: { userId: string; onOpenCard: (id: string) => void; onRedeem: () => void; onArtist: (artist: boolean) => void }) {
   const t = useT(S);
   const { me, settings, heroArt } = useData();

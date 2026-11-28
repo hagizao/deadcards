@@ -572,15 +572,12 @@ select { color-scheme: dark; }
   background: var(--hero-c);
   mix-blend-mode: color;
 }
-/* perfil de artista: a arte atrás da ficha e o ritual do fundo do site pintados no degradê do pincel do título (rosa → fúcsia) */
-/* no fundo do site e na arte atrás da ficha o degradê entra apagado (as mesmas cores com 55% do croma, misturadas com cinza),
-   para não gritar atrás do conteúdo. A mistura "color" pega matiz e saturação dessa camada: a saturação está nas cores, não num filter */
+/* perfil de artista: a arte atrás da ficha e o ritual do fundo do site ficam em grafite, sem cor.
+   A mistura "color" com cinza tira a saturação: as cartas do artista viram a cor da página e o rosa fica só nos detalhes
+   (carimbo, pincel, curtir) */
 .dossier-hero-artist::after,
 .ritual-tint-artist {
-  background: linear-gradient(115deg,
-    color-mix(in oklch, var(--color-rose-200) 55%, #8a8a8a),
-    color-mix(in oklch, var(--color-rose-400) 55%, #8a8a8a) 45%,
-    color-mix(in oklch, var(--color-fuchsia-500) 55%, #8a8a8a));
+  background: #8a8a8a;
 }
 .dossier-showcase::before {
   content: "";
