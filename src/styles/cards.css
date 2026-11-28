@@ -204,6 +204,8 @@
       position: relative;
       padding: var(--rk-pad, 2px);
       clip-path: var(--rk-clip, polygon(0 0, 100% 0, 100% 88%, 50% 100%, 0 88%));
+      /* o clip-path só corta o desenho: sem isto o brilho girando da borda (::before, bem maior que a carta) conta como conteúdo e faz o painel em volta rolar */
+      overflow: clip;
       background: var(--rk-bg, linear-gradient(145deg, rgba(244, 244, 245, 0.58), rgba(113, 113, 122, 0.2) 45%, rgba(228, 228, 231, 0.48)));
       transition: transform 0.2s var(--ease-out);
     }
