@@ -4,8 +4,8 @@ import { favorite, profileCard, publicProfile } from "./profile";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
-import { HOME_FEATURED_MAX, SCHEDULE_LABEL_MAX, TOURNAMENT_DESC_MAX, TOURNAMENT_NAME_MAX, type ArtCredit } from "./lib/types";
-import { imgUrl, parse, playerFromRow } from "./rows";
+import { HOME_FEATURED_MAX, SCHEDULE_LABEL_MAX, TOURNAMENT_DESC_MAX, TOURNAMENT_NAME_MAX } from "./lib/types";
+import { artCredit, imgUrl, parse, playerFromRow } from "./rows";
 import { packTypes, packs } from "./packs";
 import { artSubmissions } from "./artSubmissions";
 import { ART_SUBMISSIONS_PATH } from "./lib/artSubmissions";
@@ -69,18 +69,6 @@ function httpUrl(v: unknown): string | null {
   } catch { return null; }
 }
 
-function artCredit(v: unknown): ArtCredit | null | undefined {
-  if (v === undefined || v === null) return undefined;
-  const c = v as { name?: unknown; url?: unknown };
-  const name = typeof c.name === "string" ? c.name.trim() : "";
-  if (!name || name.length > 60) return null;
-  if (c.url === undefined || c.url === "") return { name };
-  if (typeof c.url !== "string" || c.url.length > 300) return null;
-  try {
-    const u = new URL(c.url);
-    return u.protocol === "https:" || u.protocol === "http:" ? { name, url: u.href } : null;
-  } catch { return null; }
-}
 
 
 async function cachedFetch(env: Env, path: string): Promise<Response> {

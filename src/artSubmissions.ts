@@ -1,6 +1,7 @@
 import { currentUser } from "./auth";
 import type { Env } from "./worker";
 import type { ArtCredit } from "./lib/types";
+import { artCredit, parse } from "./rows";
 import { ART_PENDING_MAX, ART_SUBMISSION_MAX_BYTES, type ArtLayout, type ArtSubmission } from "./lib/artSubmissions";
 
 /**
@@ -40,17 +41,14 @@ export function layoutOf(v: unknown, hasFg: boolean): ArtLayout {
   return out;
 }
 
-function creditOf(v: unknown): ArtCredit | null {
-  const c = (v && typeof v === "object" ? v : {}) as { name?: unknown; url?: unknown };
-  const name = typeof c.name === "string" ? c.name.trim() : "";
-  if (!name || name.length > 60) return null;
-  if (c.url === undefined || c.url === null || c.url === "") return { name };
-  if (typeof c.url !== "string" || c.url.length > 300) return null;
-  try {
-    const u = new URL(c.url);
-    return u.protocol === "https:" || u.protocol === "http:" ? { name, url: u.href } : null;
-  } catch { return null; }
-}
+const creditOf = (v: unknown): ArtCredit | null => {
+  const c = v && typeof v === "object" ? (v as { name?: unknown; url?: unknown }) : {};
+  return artCredit({ ...c, url: c.url ?? undefined }) ?? null;
+};
+// duas imagens de até 5 MB mais o meta e as bordas do multipart
+const MAX_BODY = 2 * ART_SUBMISSION_MAX_BYTES + 64 * 1024;
+// recusadas contam no limite até a pessoa apagar: senão cada recusa libera espaço para mais um envio
+const COUNTED = "status IN ('pending', 'rejected')";
 
 const imageUrl = (id: string, layer: "bg" | "fg") => `/api/art-submissions/${id}/image/${layer}`;
 
@@ -60,7 +58,7 @@ function toSubmission(r: Row, withUser: boolean): ArtSubmission {
     status: r.status,
     image: imageUrl(r.id, "bg"),
     ...(r.fg_key ? { fg: imageUrl(r.id, "fg") } : {}),
-    layout: JSON.parse(r.layout_json) as ArtLayout,
+    layout: parse<ArtLayout>(r.layout_json, { zoom: 100, x: 50, y: 50 }),
     credit: r.credit_url ? { name: r.credit_name, url: r.credit_url } : { name: r.credit_name },
     createdAt: r.created_at,
     ...(r.used_player_id ? { usedPlayerId: r.used_player_id } : {}),
@@ -79,6 +77,11 @@ async function readImage(form: FormData, field: string): Promise<{ buf: ArrayBuf
 }
 
 async function create(env: Env, request: Request, userId: string): Promise<Response> {
+  // o corpo só é lido depois de saber o tamanho e o limite: sem isso, qualquer conta faria o worker carregar envios enormes
+  const length = Number(request.headers.get("content-length"));
+  if (!length || length > MAX_BODY) return bad("imagem PNG, JPG ou WebP de até 5 MB", 413, "image");
+  const counted = async () => (await env.DB.prepare(`SELECT COUNT(*) AS n FROM art_submissions WHERE user_id = ? AND ${COUNTED}`).bind(userId).first<number>("n")) ?? 0;
+  if ((await counted()) >= ART_PENDING_MAX) return bad(`até ${ART_PENDING_MAX} artes em análise ou recusadas por vez`, 409, "limit");
   const form = await request.formData().catch(() => null);
   if (!form) return bad("envio inválido");
   let meta: Record<string, unknown>;
@@ -92,27 +95,36 @@ async function create(env: Env, request: Request, userId: string): Promise<Respo
   const fg = await readImage(form, "fg");
   if (fg === "bad") return bad("camada da frente PNG, JPG ou WebP de até 5 MB", 400, "image");
 
-  const pending = await env.DB.prepare("SELECT COUNT(*) AS n FROM art_submissions WHERE user_id = ? AND status = 'pending'").bind(userId).first<number>("n");
-  if ((pending ?? 0) >= ART_PENDING_MAX) return bad(`até ${ART_PENDING_MAX} artes em análise por vez`, 409, "limit");
-
   const id = crypto.randomUUID();
-  const key = (img: { ext: string }, layer: string) => `submissions/${id}-${layer}.${img.ext}`;
-  await env.ASSETS_BUCKET.put(key(image, "bg"), image.buf, { httpMetadata: { contentType: image.type } });
-  if (fg) await env.ASSETS_BUCKET.put(key(fg, "fg"), fg.buf, { httpMetadata: { contentType: fg.type } });
-  await env.DB.prepare(
-    "INSERT INTO art_submissions (id, user_id, image_key, fg_key, layout_json, credit_name, credit_url, status, created_at) VALUES (?,?,?,?,?,?,?, 'pending', ?)",
-  ).bind(id, userId, key(image, "bg"), fg ? key(fg, "fg") : null, JSON.stringify(layoutOf(meta.layout, !!fg)), credit.name, credit.url ?? null, Date.now()).run();
+  const bgKey = `submissions/${id}-bg.${image.ext}`;
+  const fgKey = fg ? `submissions/${id}-fg.${fg.ext}` : null;
+  // a contagem e a gravação são um comando só: envios em paralelo não passam do limite
+  const ins = await env.DB.prepare(
+    "INSERT INTO art_submissions (id, user_id, image_key, fg_key, layout_json, credit_name, credit_url, status, created_at) " +
+    `SELECT ?,?,?,?,?,?,?, 'pending', ? WHERE (SELECT COUNT(*) FROM art_submissions WHERE user_id = ? AND ${COUNTED}) < ?`,
+  ).bind(id, userId, bgKey, fgKey, JSON.stringify(layoutOf(meta.layout, !!fg)), credit.name, credit.url ?? null, Date.now(), userId, ART_PENDING_MAX).run();
+  if (!ins.meta.changes) return bad(`até ${ART_PENDING_MAX} artes em análise ou recusadas por vez`, 409, "limit");
+  try {
+    await env.ASSETS_BUCKET.put(bgKey, image.buf, { httpMetadata: { contentType: image.type } });
+    if (fg && fgKey) await env.ASSETS_BUCKET.put(fgKey, fg.buf, { httpMetadata: { contentType: fg.type } });
+  } catch (err) {
+    await env.ASSETS_BUCKET.delete([bgKey, ...(fgKey ? [fgKey] : [])]).catch(() => {});
+    await env.DB.prepare("DELETE FROM art_submissions WHERE id = ?").bind(id).run();
+    throw err;
+  }
   return Response.json({ id });
 }
 
 /** Leva a arte para uma carta especial: copia as imagens para players/ (públicas) e grava arte, ajuste e crédito na carta. */
 async function applyToCard(env: Env, row: Row, request: Request): Promise<Response> {
+  // cada uso copia as imagens: arte já usada ou recusada não entra de novo
+  if (row.status !== "pending") return bad("só dá para usar arte em análise", 409, "not_pending");
   const body = (await request.json().catch(() => null)) as { playerId?: unknown } | null;
   const playerId = body?.playerId;
   if (typeof playerId !== "string" || !ID_RE.test(playerId)) return bad("carta inválida");
   const player = await env.DB.prepare("SELECT extra_json FROM players WHERE id = ?").bind(playerId).first<{ extra_json: string | null }>();
   if (!player) return bad("carta não encontrada", 404);
-  const extra = JSON.parse(player.extra_json || "{}") as Record<string, unknown>;
+  const extra = parse<Record<string, unknown>>(player.extra_json, {});
   // artes do banco só vão em cartas especiais
   if (extra.special !== true) return bad("as artes do banco só vão em cartas especiais", 400, "not_special");
 
@@ -126,7 +138,7 @@ async function applyToCard(env: Env, row: Row, request: Request): Promise<Respon
   const url = await copy(row.image_key);
   if (!url) return bad("imagem da arte não encontrada", 404);
   const fgUrl = row.fg_key ? await copy(row.fg_key) : null;
-  const layout = JSON.parse(row.layout_json) as ArtLayout;
+  const layout = parse<ArtLayout>(row.layout_json, { zoom: 100, x: 50, y: 50 });
   const credit: ArtCredit = row.credit_url ? { name: row.credit_name, url: row.credit_url } : { name: row.credit_name };
   extra.art = { url, zoom: layout.zoom, x: layout.x, y: layout.y, credit, ...(fgUrl && layout.fg ? { fg: { url: fgUrl, ...layout.fg } } : {}) };
   await env.DB.batch([
@@ -176,8 +188,8 @@ export async function artSubmissions(env: Env, request: Request, rest: string): 
   }
 
   if (request.method === "DELETE") {
-    // quem enviou só apaga enquanto está em análise; o admin apaga qualquer uma (a carta que já usa a arte fica com a cópia dela)
-    if (!user.admin && row.status !== "pending") return bad("só dá para apagar arte em análise", 409, "not_pending");
+    // quem enviou apaga a arte em análise ou recusada; o admin apaga qualquer uma (a carta que já usa a arte fica com a cópia dela)
+    if (!user.admin && row.status === "used") return bad("arte já usada numa carta", 409, "not_pending");
     await env.ASSETS_BUCKET.delete([row.image_key, ...(row.fg_key ? [row.fg_key] : [])]);
     await env.DB.prepare("DELETE FROM art_submissions WHERE id = ?").bind(row.id).run();
     return Response.json({ ok: true });

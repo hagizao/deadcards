@@ -94,6 +94,38 @@ describe("Banco de artes", () => {
     expect(await list(cookie)).toEqual([]);
   });
 
+  it("recusa envio maior que o limite antes de ler o corpo", async () => {
+    const { cookie } = await login("grandao");
+    const res = await SELF.fetch(base, { method: "POST", headers: { cookie, origin: "http://test", "content-length": String(11 * 1024 * 1024), "content-type": "multipart/form-data; boundary=x" }, body: "x" });
+    expect(res.status).toBe(413);
+  });
+
+  it("envios em paralelo não passam do limite", async () => {
+    const { cookie } = await login("rajada");
+    const res = await Promise.all(Array.from({ length: 15 }, () => send(cookie)));
+    expect(res.filter((r) => r.status === 200)).toHaveLength(10);
+    expect(await list(cookie)).toHaveLength(10);
+    // cada envio aceito tem a imagem no R2; os recusados pelo limite não deixam nada
+    const keys = new Set((await env.ASSETS_BUCKET.list({ prefix: "submissions/" })).objects.map((o) => o.key));
+    const rows = await env.DB.prepare("SELECT image_key FROM art_submissions").all<{ image_key: string }>();
+    expect(rows.results.every((r) => keys.has(r.image_key))).toBe(true);
+    expect([...keys].filter((k) => k.endsWith("-bg.png"))).toHaveLength(rows.results.length);
+  });
+
+  it("recusada conta no limite até quem enviou apagar; arte recusada não vai para carta", async () => {
+    const { cookie } = await login("recusado");
+    for (let i = 0; i < 10; i++) await send(cookie);
+    const adm = await admin();
+    const [s] = await list(cookie);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "rejected" })).status).toBe(200);
+    expect((await send(cookie)).status).toBe(409);
+    await seedPlayer("p2");
+    await env.DB.prepare(`UPDATE players SET extra_json = '{"special":true}' WHERE id = 'p2'`).run();
+    expect((await json(adm.cookie, `${s.id}/use`, "POST", { playerId: "p2" })).status).toBe(409);
+    expect((await json(cookie, s.id, "DELETE")).status).toBe(200);
+    expect((await send(cookie)).status).toBe(200);
+  });
+
   it("quem enviou apaga a própria arte em análise", async () => {
     const { cookie } = await login("artista5");
     await send(cookie);
