@@ -132,6 +132,8 @@ export function Achievements({ ids, profileCard, favorites, collapsible = false,
   const [open, setOpen] = useState(!collapsible);
   const all = achievementsFor(players, teams, ids, { profileCard, favorites: Math.min(favorites, MAX_FAVORITES) });
   const done = all.filter((a) => a.done).length;
+  // conta nova (nada desbloqueado): só as próximas 3, em vez de uma parede de zeros
+  const cap = done === 0 ? 3 : COLLAPSED;
   const settled = useSettled();
   const doneIds = all.filter((a) => a.done).map((a) => a.id);
   // conquistas desbloqueadas desde a última visita (lidas uma vez, ao abrir o perfil)
@@ -189,13 +191,13 @@ export function Achievements({ ids, profileCard, favorites, collapsible = false,
       </div>
       <ul id="achievements-list" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <AnimatePresence initial={false} mode="popLayout">
-          {(open ? shown : shown.slice(0, COLLAPSED)).map((a, i) => (
-            <AchievementTile key={a.id} a={a} t={t} hide={!open && i >= COLLAPSED_SMALL} fresh={fresh.has(a.id)} delay={settled ? 0 : cascade(i, 0.04)} />
+          {(open ? shown : shown.slice(0, cap)).map((a, i) => (
+            <AchievementTile key={a.id} a={a} t={t} hide={!open && i >= Math.min(cap, COLLAPSED_SMALL)} fresh={fresh.has(a.id)} delay={settled ? 0 : cascade(i, 0.04)} />
           ))}
         </AnimatePresence>
       </ul>
       {collapsible && shown.length > COLLAPSED_SMALL && (
-        <button type="button" aria-expanded={open} aria-controls="achievements-list" onClick={() => setOpen((o) => !o)} className={`${pill(false)} self-center ${!open && shown.length <= COLLAPSED ? "lg:hidden" : ""}`}>
+        <button type="button" aria-expanded={open} aria-controls="achievements-list" onClick={() => setOpen((o) => !o)} className={`${pill(false)} self-center ${!open && shown.length <= cap ? "lg:hidden" : ""}`}>
           {open ? t.showLess : t.showAll(shown.length)}
           <Icon name={open ? "chevron-up" : "chevron-down"} className="size-4" />
         </button>

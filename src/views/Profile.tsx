@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useDeferredValue, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { ProfileSkeleton } from "../components/Skeleton";
 import { Achievements } from "../components/Achievements";
 import { ArtistAdminPanel, ArtistShowcase } from "../components/ArtistArea";
@@ -29,7 +29,7 @@ const S = strings({
     save: "Salvar carta", saving: "Salvando…", cancel: "Cancelar", unsaved: "Alterações não salvas.",
     loading: "Carregando perfil…", history: "Histórico de versões",
     edit: "Editar minha carta", create: "Montar minha carta", share: "Copiar link", copied: "Link copiado.", copyFailed: "Não foi possível copiar o link.",
-    file: "Ficha nº", stamp: "Arquivado", artistStamp: "Artista",
+    file: "Ficha nº", stamp: "Jogador", artistStamp: "Artista",
     noCard: "Ainda não montou uma carta.", cards: "Coleção", noCards: "Nenhuma carta na coleção ainda.", redeem: "Resgatar carta",
     not_found: "Perfil não encontrado.",
     invalid_card: "Confira o nome, o herói e os atributos.", unavailable: "Não foi possível carregar agora.", login: "Entre para editar sua carta.",
@@ -49,7 +49,7 @@ const S = strings({
     save: "Save card", saving: "Saving…", cancel: "Cancel", unsaved: "Unsaved changes.",
     loading: "Loading profile…", history: "Version history",
     edit: "Edit my card", create: "Build my card", share: "Copy link", copied: "Link copied.", copyFailed: "Could not copy the link.",
-    file: "File no.", stamp: "On file", artistStamp: "Artist",
+    file: "File no.", stamp: "Player", artistStamp: "Artist",
     noCard: "No card built yet.", cards: "Collection", noCards: "No cards in the collection yet.", redeem: "Redeem a card",
     not_found: "Profile not found.",
     invalid_card: "Check the name, hero and attributes.", unavailable: "Could not load right now.", login: "Sign in to edit your card.",
@@ -69,7 +69,7 @@ const S = strings({
     save: "Guardar carta", saving: "Guardando…", cancel: "Cancelar", unsaved: "Cambios sin guardar.",
     loading: "Cargando perfil…", history: "Historial de versiones",
     edit: "Editar mi carta", create: "Armar mi carta", share: "Copiar enlace", copied: "Enlace copiado.", copyFailed: "No se pudo copiar el enlace.",
-    file: "Ficha n.º", stamp: "Archivado", artistStamp: "Artista",
+    file: "Ficha n.º", stamp: "Jugador", artistStamp: "Artista",
     noCard: "Todavía no armó una carta.", cards: "Colección", noCards: "Todavía no hay cartas en la colección.", redeem: "Canjear carta",
     not_found: "Perfil no encontrado.",
     invalid_card: "Revisa el nombre, el héroe y los atributos.", unavailable: "No se pudo cargar ahora.", login: "Inicia sesión para editar tu carta.",
@@ -173,28 +173,36 @@ export function Profile({ userId, onOpenCard, onRedeem, onArtist }: { userId: st
           <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">OVR</span>
           <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.name}</span>
         </div>
-      ) : <p className="text-sm text-zinc-400">{t.noCard}</p>}
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        {owner && <button type="button" onClick={() => setEditing(true)} className={primaryBtn}>{card ? t.edit : t.create}</button>}
-        <button type="button" onClick={share} className={pill(false)}>{t.share}</button>
-        {card && <CardExportButton cardRef={cardRef} name={card.name} />}
-      </div>
+      ) : (
+        // sem carta: um molde do tamanho da carta no lugar dela, com o montar dentro
+        <div className="flex aspect-295/430 w-[295px] max-w-full flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-zinc-200/15 bg-zinc-950/40 p-6 text-center">
+          <p className="text-sm text-zinc-300">{t.noCard}</p>
+          {owner && <button type="button" onClick={() => setEditing(true)} className={primaryBtn}>{t.create}</button>}
+        </div>
+      )}
+      {card && (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {owner && <button type="button" onClick={() => setEditing(true)} className={primaryBtn}>{t.edit}</button>}
+          <button type="button" onClick={share} className={pill(false)}>{t.share}</button>
+          <CardExportButton cardRef={cardRef} name={card.name} />
+        </div>
+      )}
       {copy && <p role="status" className={`text-sm ${copy === "copied" ? "text-emerald-300" : "text-red-300"}`}>{t[copy]}</p>}
     </>
   );
 
   return (
     <section className="flex flex-col gap-6" aria-labelledby="profile-title">
-      {editing ? (
-        <>
-          {identity}
+      {editing && (
+        <EditorDialog title={card ? t.edit : t.create} onClose={() => setEditing(false)}>
           <ProfileEditor
             artist={!!profile.artist}
             onCancel={() => setEditing(false)}
             onSaved={(saved) => { setProfile({ ...profile, card: saved }); setEditing(false); }}
           />
-        </>
-      ) : (
+        </EditorDialog>
+      )}
+      {(
         // carta do perfil à esquerda (só a carta, sem os atributos detalhados) e conquistas ocupando o resto da largura;
         // atrás, a arte da carta (a própria ou a do herói), grande e na cor da raridade dela
         // no perfil de artista vira grade: ficha e cabeçalho da vitrine em cima, carta e faixa de cartas embaixo, alinhadas
@@ -224,7 +232,7 @@ export function Profile({ userId, onOpenCard, onRedeem, onArtist }: { userId: st
       )}
 
       {me?.admin && <ArtistAdminPanel userId={profile.id} onChanged={() => setVersion((v) => v + 1)} />}
-      {(editing || profile.artist) && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />}
+      {profile.artist && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />}
       <ProfileFavorites ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} />
       <ProfileCards ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} onRedeem={onRedeem} />
     </section>
@@ -370,6 +378,25 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
 }
 
 /** `artist`: só artistas veem a opção de usar arte própria na carta. */
+/** O editor da carta abre numa janela por cima do perfil (fecha com Esc ou Cancelar): o perfil embaixo não muda de lugar. */
+function EditorDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  // sem close() na limpeza: no modo estrito o efeito roda duas vezes, e o evento close fecharia o editor logo ao abrir
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  return (
+    <dialog ref={ref} aria-labelledby="profile-editor-title" onClose={onClose}
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(64rem,calc(100%-2rem))] max-w-none rounded-3xl bg-zinc-900 p-0 text-zinc-100 backdrop:bg-zinc-950/80">
+      <div className="flex flex-col gap-5 p-4 sm:p-6">
+        <h2 id="profile-editor-title" className="font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase">{title}</h2>
+        {children}
+      </div>
+    </dialog>
+  );
+}
+
 function ProfileEditor({ artist, onSaved, onCancel }: { artist: boolean; onSaved: (card: ProfileCard) => void; onCancel: () => void }) {
   const t = useT(S);
   const locale = useLocale();
