@@ -8,6 +8,8 @@
     "--color-dl-text": "#ffefd7",
     "--color-area": "#ffefd7 (por aba: teams eternus, tierlist ascendant, collection oracle, compare archon, redeem arcanist; src/lib/areas.ts)",
     "--color-dl-black": "#10130d",
+    "--color-br-green": "#00b84a (br-frame: dia em que o Brasil joga no calendário)",
+    "--color-br-yellow": "#ffd400",
     "--color-dl-bevel-from": "#373d45",
     "--color-dl-bevel-to": "#4d5860",
     "--color-dl-bevel-hover-from": "#4c5561",
@@ -48,6 +50,7 @@
     "TeamLogo3D": "in code only",
     "team-ovr-chip": "in code only",
     "RegionBackdrop": "in code only",
+    "BootScreen (também no index.html)": "in code only",
     "HoldButton": "in code only",
     "Range": "in code only",
     "Account": "in code only",
@@ -55,6 +58,8 @@
     "brand-badge": "in code only",
     "Motion (CountUp, FillBar, Reveal)": "in code only",
     "Skeleton (CardSkeleton, ProfileSkeleton)": "in code only",
-    "Rail (useRail, RailArrows)": "in code only"
+    "Rail (useRail, RailArrows, arrowBtn)": "in code only",
+    "TournamentLogo": "in code only",
+    "Calendar (Home)": "in code only"
   }
 }

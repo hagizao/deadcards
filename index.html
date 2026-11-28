@@ -4,9 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cardslock</title>
+    <!-- fundo escuro desde o primeiro quadro, antes do CSS chegar: sem clarão branco no F5 -->
+    <style>html { background: #09090b; }</style>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- tela de carregamento antes do JavaScript: a mesma marcação do src/components/BootScreen.tsx (o React troca quando monta) -->
+    <div id="root"><div class="flex min-h-dvh flex-col items-center justify-center gap-6 boot-screen"><div class="flex items-center gap-4"><span aria-hidden="true" class="size-4 rotate-45 boot-mark rounded-[3px] bg-dl-text sm:size-5"></span><span class="font-display text-3xl font-black tracking-[0.2em] text-white uppercase title-depth sm:text-5xl">Cards<span class="text-dl-text">lock</span></span></div><span aria-hidden="true" class="boot-bar h-0.5 w-40 rounded-full bg-zinc-200/10 sm:w-56"></span></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

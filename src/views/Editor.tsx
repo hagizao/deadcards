@@ -6,9 +6,12 @@ import { asPlayedHero, playedStats } from "../lib/cardKinds";
 import { UniversalCollection } from "../components/UniversalCollection";
 import { FRAME_PRESETS, RARITY_TIERS, getCardTier, type Tier } from "../lib/rarity";
 import { RARITY_KEYS, rarityKeyOf, type RarityKey } from "../lib/rarityBands";
-import { HOME_FEATURED_MAX, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
+import { HOME_FEATURED_MAX, SCHEDULE_LABEL_MAX, TOURNAMENT_DESC_MAX, TOURNAMENT_NAME_MAX, type ScheduleEntry, type Tournament, type BgSettings, type Player, type Stats, type Team, type TierBand } from "../lib/types";
 import { Card } from "../components/Card";
 import { TeamLogo } from "../components/TeamLogo";
+import { TournamentLogo } from "../components/TournamentLogo";
+import { dateOf, dayKey, dayOf, groupByDay, monthCells, sameDay, weekdayNames, type Day } from "../lib/calendar";
+import { arrowBtn } from "../lib/ui";
 import { HoldButton } from "../components/HoldButton";
 import { Icon } from "../components/Icon";
 import { Range } from "../components/Range";
@@ -22,6 +25,7 @@ const SECTIONS = [
   { id: "teams", label: "Times" },
   { id: "heroes", label: "Heróis" },
   { id: "look", label: "Aparência" },
+  { id: "calendar", label: "Calendário" },
   { id: "packs", label: "Packs" },
   { id: "codes", label: "Códigos" },
   { id: "universal", label: "Coleção universal" },
@@ -129,6 +133,7 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
           {section === "teams" && <TeamsForm />}
           {section === "heroes" && <HeroesForm />}
           {section === "look" && <LookForm />}
+          {section === "calendar" && <div className="flex flex-col gap-10"><CalendarEditor /><TournamentsForm /></div>}
           {section === "packs" && <PacksForm />}
           {section === "codes" && <CodesForm />}
           {section === "universal" && <UniversalCollection onEdit={pick} />}
@@ -1221,6 +1226,284 @@ function SoundsForm() {
         })}
       </ul>
       <Toast msg={msg} />
+    </div>
+  );
+}
+
+/** Hora "HH:MM" no fuso de quem edita; o banco guarda segundos UTC. */
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const hhmm = (sec: number) => { const d = new Date(sec * 1000); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const atTime = (day: Day, v: string) => {
+  const [h, m] = v.split(":").map(Number);
+  return v && Number.isFinite(h) && Number.isFinite(m) ? Math.round(new Date(day.y, day.m, day.d, h, m).getTime() / 1000) : null;
+};
+const checkbox = "size-5 cursor-pointer accent-br-green";
+const HAGIZAO_LIVE = "https://www.youtube.com/@hagizao/live";
+
+/** Campeonatos: nome, logo, descrição e link. Criados aqui, marcados no calendário acima. */
+function TournamentsForm() {
+  const { tournaments, schedule, reload } = useData();
+  const [d, setD] = useState<Tournament | null>(null);
+  const { busy, msg, run } = useSaver(reload);
+  const set = (patch: Partial<Tournament>) => setD((t) => (t ? { ...t, ...patch } : t));
+  const [now] = useState(() => Date.now() / 1000);
+  const upcoming = (id: string) => schedule.filter((s) => s.tournamentId === id && s.startsAt >= now - 86400).length;
+
+  const save = () => {
+    if (!d || !d.name.trim()) return;
+    const id = d.id || newId("tour");
+    run(async () => { await api.save("tournaments", id, { ...d, id }); setD(null); }, `Campeonato "${d.name.trim()}" salvo!`);
+  };
+
+  return (
+    <div className="flex flex-col gap-4 border-t border-zinc-200/15 pt-8">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Campeonatos ({tournaments.length})</h2>
+          <p className="text-sm text-zinc-400">Crie o campeonato uma vez, com logo e descrição. Depois é só clicar num dia do calendário e escolher ele.</p>
+        </div>
+        {!d && <button type="button" className={primary} onClick={() => setD({ id: "", name: "", description: "" })}>+ Novo campeonato</button>}
+      </div>
+
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          {tournaments.map((t) => (
+            <motion.div layout key={t.id} className={`flex items-center gap-3 rounded-xl p-2.5 transition-colors ${d?.id === t.id ? "bg-zinc-100/10" : "bg-zinc-950/50"}`}>
+              <TournamentLogo t={t} className="size-12 text-sm" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-bold text-zinc-100">{t.name}</p>
+                <p className="text-xs text-zinc-400">{upcoming(t.id)} {upcoming(t.id) === 1 ? "dia marcado" : "dias marcados"} daqui em diante</p>
+              </div>
+              <button type="button" className={ghost} onClick={() => setD(structuredClone(t))}>Editar</button>
+              <HoldButton className={danger} disabled={busy} onConfirm={() => run(async () => { await api.remove("tournaments", t.id); if (d?.id === t.id) setD(null); }, "Campeonato e dias excluídos.")} label={`Excluir ${t.name} e todos os dias dele`}>✕</HoldButton>
+            </motion.div>
+          ))}
+          {!tournaments.length && <p className="text-sm text-zinc-400">Nenhum campeonato ainda.</p>}
+        </div>
+
+        <AnimatePresence mode="wait">
+          {d && (
+            <motion.div key={d.id || "new"} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="flex flex-col gap-4 rounded-2xl bg-zinc-950/60 p-5">
+              <h3 className="text-base font-black tracking-[0.12em] text-white uppercase">{d.id ? `Editar ${d.name}` : "Novo campeonato"}</h3>
+              <div className="flex items-center gap-4">
+                <TournamentLogo t={{ ...d, name: d.name || "?" }} className="size-20 text-xl" />
+                <div className="flex flex-col gap-2">
+                  <ImagePick folder="events" label={d.logo ? "Trocar logo" : "Enviar logo"} onUrl={(logo) => set({ logo })} />
+                  {d.logo && <button type="button" className={ghost} onClick={() => set({ logo: undefined })}>Remover logo</button>}
+                  <span className="text-xs text-zinc-500">Quadrada e com fundo transparente fica melhor.</span>
+                </div>
+              </div>
+              <Field label="Nome"><input className={input} value={d.name} maxLength={TOURNAMENT_NAME_MAX} placeholder="Ex.: Copa Brasil" onChange={(e) => set({ name: e.target.value })} /></Field>
+              <Field label={`Descrição: aparece no painel do dia na Home (${d.description.length}/${TOURNAMENT_DESC_MAX})`}>
+                <textarea className={input} rows={3} maxLength={TOURNAMENT_DESC_MAX} value={d.description} onChange={(e) => set({ description: e.target.value })} />
+              </Field>
+              <Field label="Transmissão oficial (padrão dos dias novos)"><input className={input} type="url" placeholder="https://www.youtube.com/@canal/live" value={d.stream ?? ""} maxLength={200} onChange={(e) => set({ stream: e.target.value || undefined })} /></Field>
+              <div className="flex flex-col gap-2">
+                <Field label="Watchparty Hagizao (padrão dos dias novos)"><input className={input} type="url" placeholder={HAGIZAO_LIVE} value={d.watch ?? ""} maxLength={200} onChange={(e) => set({ watch: e.target.value || undefined })} /></Field>
+                {d.watch !== HAGIZAO_LIVE && <button type="button" className={`${ghost} w-fit`} onClick={() => set({ watch: HAGIZAO_LIVE })}>Usar o canal do Hagizao</button>}
+              </div>
+              <span className="text-xs text-zinc-500">Esses links já vêm preenchidos ao marcar um dia, e cada dia pode mudar ou tirar. Com "/live" no fim, o YouTube abre direto a live que estiver no ar.</span>
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="button" className={primary} disabled={busy || !d.name.trim()} onClick={save}>{busy ? "Salvando…" : d.id ? "Salvar" : "Criar campeonato"}</button>
+                <button type="button" className={ghost} onClick={() => setD(null)}>Cancelar</button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      <Toast msg={msg} />
+    </div>
+  );
+}
+
+/** Calendário do Editor: o mesmo mês da Home. Clicar num dia mostra à esquerda o que tem nele e onde marcar um campeonato. */
+function CalendarEditor() {
+  const { tournaments, schedule } = useData();
+  const [now] = useState(() => new Date());
+  const today = dayOf(now);
+  const [selected, setSelected] = useState<Day>(today);
+  const [month, setMonth] = useState({ y: today.y, m: today.m });
+  const byDay = groupByDay([...schedule].sort((a, b) => a.startsAt - b.startsAt));
+  const tourOf = (id: string) => tournaments.find((t) => t.id === id);
+  const monthName = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(month.y, month.m, 1));
+  const longDay = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" }).format(dateOf(selected));
+  const shift = (dir: number) => setMonth(({ y, m }) => { const d = new Date(y, m + dir, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const pick = (day: Day) => { setSelected(day); if (day.y !== month.y || day.m !== month.m) setMonth({ y: day.y, m: day.m }); };
+  const dayEntries = byDay.get(dayKey(selected)) ?? [];
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Calendário</h2>
+        <p className="text-sm text-zinc-400">Clique num dia para ver e marcar campeonatos. A hora é a do seu fuso; cada visitante vê no dele.</p>
+      </div>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-10">
+        {/* o dia escolhido: o que já tem e onde marcar mais */}
+        <div className="order-2 flex flex-col gap-5 lg:order-1 lg:border-r lg:border-zinc-200/15 lg:pr-10">
+          <div className="flex flex-col gap-1">
+            {sameDay(selected, today) && <span className="text-xs font-bold tracking-widest text-area uppercase">Hoje</span>}
+            <h3 className="font-display text-2xl font-extrabold tracking-wide text-white first-letter:uppercase">{longDay}</h3>
+            <span className="text-xs text-zinc-400">{dayEntries.length ? `${dayEntries.length} ${dayEntries.length === 1 ? "campeonato" : "campeonatos"}` : "Nada marcado"}</span>
+          </div>
+          {dayEntries.map((e) => <DayEntry key={`${e.id}:${e.startsAt}:${e.label}:${e.tournamentId}:${e.brazil}`} entry={e} day={selected} tournaments={tournaments} />)}
+          {tournaments.length
+            ? <AddToDay key={dayKey(selected)} day={selected} tournaments={tournaments} />
+            : <p className="text-sm text-zinc-400">Crie um campeonato logo abaixo para marcar dias.</p>}
+        </div>
+
+        {/* o mês: número do dia, logos dos campeonatos e a borda verde e amarela quando o Brasil joga */}
+        <div className="order-1 flex flex-col gap-3 lg:order-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-display text-xl font-extrabold tracking-wider text-white uppercase" aria-live="polite">{monthName}</p>
+            <div className="flex gap-2">
+              <button type="button" className={arrowBtn} aria-label="Mês anterior" onClick={() => shift(-1)}><Icon name="chevron-left" className="size-5" /></button>
+              <button type="button" className={arrowBtn} aria-label="Próximo mês" onClick={() => shift(1)}><Icon name="chevron-right" className="size-5" /></button>
+            </div>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold tracking-wider text-zinc-500 uppercase" aria-hidden="true">
+            {weekdayNames("pt-BR").map((w) => <span key={w}>{w}</span>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {monthCells(month.y, month.m).map((day) => {
+              const k = dayKey(day);
+              const evs = byDay.get(k) ?? [];
+              const logos = [...new Map(evs.flatMap((e) => { const t = tourOf(e.tournamentId); return t ? [[t.id, t] as const] : []; })).values()];
+              const isSel = sameDay(day, selected);
+              const isToday = sameDay(day, today);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => pick(day)}
+                  aria-pressed={isSel}
+                  aria-label={[new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long" }).format(dateOf(day)), ...evs.map((e) => `${tourOf(e.tournamentId)?.name ?? ""} ${e.label}`.trim())].join(". ")}
+                  className={`flex min-h-16 cursor-pointer flex-col items-center gap-1 rounded-lg p-1 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-zinc-100 active:bg-zinc-100/15 sm:min-h-20 ${
+                    isSel ? "bg-zinc-100/10 shadow-[inset_0_-2px_0_var(--color-zinc-100)]" : "hover:bg-zinc-100/5"} ${evs.some((e) => e.brazil) ? "br-frame" : ""}`}
+                >
+                  <span className={`flex size-6 items-center justify-center rounded-full text-xs tabular-nums ${
+                    isToday ? "bg-zinc-100 font-black text-zinc-950" : day.m !== month.m ? "text-zinc-600" : "font-bold text-zinc-300"}`}>{day.d}</span>
+                  {logos.length > 0 && (
+                    <span className="flex flex-wrap items-center justify-center gap-0.5">
+                      {logos.slice(0, 2).map((t) => <TournamentLogo key={t.id} t={t} className="size-5 text-[8px] sm:size-7 sm:text-[10px]" />)}
+                      {logos.length > 2 && <span className="text-[10px] font-bold text-zinc-400">+{logos.length - 2}</span>}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Um campeonato já marcado no dia: troca campeonato, hora, edição e Brasil, ou exclui. */
+function DayEntry({ entry, day, tournaments }: { entry: ScheduleEntry; day: Day; tournaments: Tournament[] }) {
+  const { reload } = useData();
+  const { busy, msg, run } = useSaver(reload);
+  const [tour, setTour] = useState(entry.tournamentId);
+  const [time, setTime] = useState(() => hhmm(entry.startsAt));
+  const [label, setLabel] = useState(entry.label);
+  const [brazil, setBrazil] = useState(entry.brazil);
+  const [stream, setStream] = useState(entry.stream ?? "");
+  const [watch, setWatch] = useState(!!entry.watch);
+  const at = atTime(day, time);
+  const changed = tour !== entry.tournamentId || at !== entry.startsAt || label.trim() !== entry.label || brazil !== entry.brazil
+    || stream.trim() !== (entry.stream ?? "") || watch !== !!entry.watch;
+  const t = tournaments.find((x) => x.id === tour);
+  return (
+    <div className={`flex flex-col gap-3 rounded-xl bg-zinc-950/60 p-3 ${brazil ? "br-frame" : ""}`}>
+      <div className="flex items-center gap-3">
+        {t && <TournamentLogo t={t} className="size-11 text-xs" />}
+        <select aria-label="Campeonato" className={`${input} min-w-0 flex-1`} value={tour} onChange={(e) => setTour(e.target.value)}>
+          {tournaments.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </select>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Hora"><input className={`${input} w-32`} type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
+        <Field label="Edição"><input className={`${input} w-32`} value={label} maxLength={SCHEDULE_LABEL_MAX} placeholder="EU #67" onChange={(e) => setLabel(e.target.value)} /></Field>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-bold text-zinc-200"><input type="checkbox" checked={brazil} onChange={(e) => setBrazil(e.target.checked)} className={checkbox} />Brasil joga</label>
+      </div>
+      <WatchFields stream={stream} onStream={setStream} watch={watch} onWatch={setWatch} />
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className={primary} disabled={busy || !changed || at === null}
+          onClick={() => run(() => api.save("schedule", entry.id, { tournamentId: tour, startsAt: at, label: label.trim(), brazil, stream: stream.trim(), watch: watch ? (entry.watch ?? HAGIZAO_LIVE) : "" }), "Salvo.")}>Salvar</button>
+        <HoldButton className={danger} disabled={busy} onConfirm={() => run(() => api.remove("schedule", entry.id), "Excluído do dia.")} label="Tirar do dia">Tirar do dia</HoldButton>
+        <Toast msg={msg} />
+      </div>
+    </div>
+  );
+}
+
+/** Marcar um campeonato no dia escolhido: escolhe pela logo, põe a hora e pronto. */
+function AddToDay({ day, tournaments }: { day: Day; tournaments: Tournament[] }) {
+  const { reload } = useData();
+  const { busy, msg, run } = useSaver(reload);
+  const [tour, setTour] = useState(tournaments[0]?.id ?? "");
+  const [time, setTime] = useState("18:00");
+  const [label, setLabel] = useState("");
+  const [brazil, setBrazil] = useState(false);
+  // os links vêm do campeonato escolhido e dá para mudar só neste dia
+  const [stream, setStream] = useState(tournaments[0]?.stream ?? "");
+  const [watch, setWatch] = useState(!!tournaments[0]?.watch);
+  const choose = (t: Tournament) => { setTour(t.id); setStream(t.stream ?? ""); setWatch(!!t.watch); };
+  const at = atTime(day, time);
+  const add = () => {
+    if (at === null || !tour) return;
+    const watchUrl = watch ? (tournaments.find((t) => t.id === tour)?.watch ?? HAGIZAO_LIVE) : "";
+    run(async () => { await api.save("schedule", newId("day"), { tournamentId: tour, startsAt: at, label: label.trim(), brazil, stream: stream.trim(), watch: watchUrl }); setLabel(""); setBrazil(false); }, "Marcado!");
+  };
+  return (
+    <div className="flex flex-col gap-3 rounded-xl bg-zinc-100/5 p-4">
+      <p className="text-xs font-black tracking-[0.12em] text-zinc-300 uppercase">Marcar neste dia</p>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Campeonato">
+        {tournaments.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            aria-pressed={tour === t.id}
+            onClick={() => choose(t)}
+            className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl py-1.5 pr-3 pl-1.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:opacity-80 ${
+              tour === t.id ? "bg-zinc-100 text-zinc-950" : "bg-zinc-950/60 text-zinc-300 hover:text-white"}`}
+          >
+            <TournamentLogo t={t} className="size-8 text-[10px]" />
+            {t.name}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Hora"><input className={`${input} w-32`} type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
+        <Field label="Edição (opcional)"><input className={`${input} w-32`} value={label} maxLength={SCHEDULE_LABEL_MAX} placeholder="EU #67" onChange={(e) => setLabel(e.target.value)} /></Field>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-bold text-zinc-200"><input type="checkbox" checked={brazil} onChange={(e) => setBrazil(e.target.checked)} className={checkbox} />Brasil joga</label>
+      </div>
+      <WatchFields stream={stream} onStream={setStream} watch={watch} onWatch={setWatch} />
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className={primary} disabled={busy || at === null || !tour} onClick={add}>{busy ? "Marcando…" : "+ Marcar"}</button>
+        <Toast msg={msg} />
+      </div>
+    </div>
+  );
+}
+
+/** Onde assistir naquele dia: a transmissão oficial e a watchparty do Hagizao, que liga e desliga. */
+function WatchFields({ stream, onStream, watch, onWatch }: { stream: string; onStream: (v: string) => void; watch: boolean; onWatch: (v: boolean) => void }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Field label="Transmissão oficial"><input className={input} type="url" placeholder="https://www.youtube.com/@canal/live" value={stream} maxLength={200} onChange={(e) => onStream(e.target.value)} /></Field>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={watch}
+        onClick={() => onWatch(!watch)}
+        className={`flex min-h-11 w-fit cursor-pointer items-center gap-3 rounded-xl py-2 pr-4 pl-2 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:opacity-80 ${
+          watch ? "bg-red-600/30 text-red-50 hover:bg-red-600/40" : "bg-zinc-950/60 text-zinc-400 hover:text-zinc-200"}`}
+      >
+        <span className={`flex h-6 w-10 items-center rounded-full p-0.5 transition-colors ${watch ? "bg-red-600" : "bg-zinc-700"}`}>
+          <span className={`size-5 rounded-full bg-white shadow-sm transition-transform duration-200 motion-reduce:transition-none ${watch ? "translate-x-4" : ""}`} />
+        </span>
+        Watchparty Hagizao
+      </button>
     </div>
   );
 }

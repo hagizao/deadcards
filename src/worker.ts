@@ -4,7 +4,7 @@ import { favorite, profileCard, publicProfile } from "./profile";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
-import { HOME_FEATURED_MAX, type ArtCredit } from "./lib/types";
+import { HOME_FEATURED_MAX, SCHEDULE_LABEL_MAX, TOURNAMENT_DESC_MAX, TOURNAMENT_NAME_MAX, type ArtCredit } from "./lib/types";
 import { imgUrl, parse, playerFromRow } from "./rows";
 import { packTypes, packs } from "./packs";
 
@@ -23,7 +23,7 @@ export interface Env {
 }
 
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
-const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home", "packs"];
+const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home", "packs", "events"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "altHero", "inactive", "exclusive", "art"];
 const ID_RE = /^[\w-]{1,64}$/;
@@ -47,6 +47,25 @@ const CACHE_TTL_SECONDS = 60 * 60 * 6;
 const ALLOWED_PATHS = ["/v1/assets/heroes", "/v1/analytics/hero-stats", "/v1/patches"];
 const UPSERT_CACHE =
   "INSERT INTO api_cache (cache_key, body, fetched_at) VALUES (?, ?, ?) ON CONFLICT(cache_key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at";
+
+// calendário: datas entre 2024 e 2100 (segundos UTC); o site recebe do mês passado em diante
+const SCHEDULE_MIN = Date.UTC(2024, 0, 1) / 1000;
+const SCHEDULE_MAX = Date.UTC(2100, 0, 1) / 1000;
+const SCHEDULE_PAST_DAYS = 31;
+// logo de campeonato: enviada pelo Editor (R2, /img/...) ou arquivo do site em public/tournaments/
+const STATIC_LOGO = /^\/tournaments\/[\w-]{1,64}\.(png|webp|svg|jpg)$/;
+const tournamentLogo = (v: unknown) => keyOf(v) ?? (typeof v === "string" && STATIC_LOGO.test(v) ? v : null);
+
+/** Link http(s) de até 200 caracteres, normalizado; null se não servir. */
+/** Link opcional: vazio vira null; inválido também (quem chama recusa se veio algo). */
+const optUrl = (v: unknown) => (v === undefined || v === null || v === "" ? null : httpUrl(v));
+function httpUrl(v: unknown): string | null {
+  if (typeof v !== "string" || v.length > 200) return null;
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : null;
+  } catch { return null; }
+}
 
 function artCredit(v: unknown): ArtCredit | null | undefined {
   if (v === undefined || v === null) return undefined;
@@ -93,11 +112,14 @@ async function syncFromDeadlockApi(env: Env): Promise<void> {
 }
 
 async function appData(env: Env): Promise<Response> {
-  const [teams, players, heroes, settings] = await env.DB.batch([
+  const [teams, players, heroes, settings, tournaments, schedule] = await env.DB.batch([
     env.DB.prepare("SELECT * FROM teams ORDER BY rowid"),
     env.DB.prepare("SELECT * FROM players ORDER BY rowid"),
     env.DB.prepare("SELECT * FROM heroes"),
     env.DB.prepare("SELECT * FROM settings"),
+    env.DB.prepare("SELECT * FROM tournaments ORDER BY created_at, id"),
+    // calendário: do mês passado em diante (o resto do histórico não aparece no site)
+    env.DB.prepare("SELECT * FROM tournament_dates WHERE starts_at >= unixepoch() - ? ORDER BY starts_at, id").bind(SCHEDULE_PAST_DAYS * 86400),
   ]);
   const s = Object.fromEntries((settings.results as { key: string; value_json: string }[]).map((r) => [r.key, parse<unknown>(r.value_json, null)]));
   const bg = s.bg as Record<string, unknown> | null;
@@ -107,6 +129,19 @@ async function appData(env: Env): Promise<Response> {
       return { id: t.id, name: t.name, tag: t.tag, region: t.region, logo: imgUrl(t.logo_key), ...(tbg ? { bg: tbg } : {}) };
     }),
     players: (players.results as Record<string, string | number | null>[]).map(playerFromRow),
+    tournaments: (tournaments.results as { id: string; name: string; description: string; logo_key: string | null; stream_url: string | null; watch_url: string | null }[])
+      .map((t) => ({
+        id: t.id, name: t.name, description: t.description,
+        ...(t.logo_key ? { logo: t.logo_key.startsWith("/") ? t.logo_key : imgUrl(t.logo_key) } : {}),
+        ...(t.stream_url ? { stream: t.stream_url } : {}),
+        ...(t.watch_url ? { watch: t.watch_url } : {}),
+      })),
+    schedule: (schedule.results as { id: string; tournament_id: string; starts_at: number; label: string; brazil: number; stream_url: string | null; watch_url: string | null }[])
+      .map((d) => ({
+        id: d.id, tournamentId: d.tournament_id, startsAt: d.starts_at, label: d.label, brazil: d.brazil === 1,
+        ...(d.stream_url ? { stream: d.stream_url } : {}),
+        ...(d.watch_url ? { watch: d.watch_url } : {}),
+      })),
     heroes: Object.fromEntries((heroes.results as { name: string; image_key: string; zoom: number; x: number; y: number }[])
       .map((h) => [h.name, { name: h.name, url: imgUrl(h.image_key), zoom: h.zoom, x: h.x, y: h.y }])),
     settings: {
@@ -221,6 +256,37 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
       if (!key) return bad("imagem do herói obrigatória");
       await db.prepare("INSERT INTO heroes (name, image_key, zoom, x, y) VALUES (?,?,?,?,?) ON CONFLICT(name) DO UPDATE SET image_key=excluded.image_key, zoom=excluded.zoom, x=excluded.x, y=excluded.y")
         .bind(id, key, num(b.zoom, 100), num(b.x, 50), num(b.y, 30)).run();
+    }
+  } else if (kind === "tournaments") {
+    if (del) await db.batch([db.prepare("DELETE FROM tournament_dates WHERE tournament_id = ?").bind(id), db.prepare("DELETE FROM tournaments WHERE id = ?").bind(id)]);
+    else {
+      const name = typeof b.name === "string" ? b.name.trim() : "";
+      const description = typeof b.description === "string" ? b.description.trim() : "";
+      const stream = optUrl(b.stream), watch = optUrl(b.watch);
+      if (!name || name.length > TOURNAMENT_NAME_MAX) return bad(`nome do campeonato obrigatório, até ${TOURNAMENT_NAME_MAX} caracteres`);
+      if (description.length > TOURNAMENT_DESC_MAX) return bad(`descrição até ${TOURNAMENT_DESC_MAX} caracteres`);
+      if ((stream === null && b.stream) || (watch === null && b.watch)) return bad("link inválido: use http(s), até 200 caracteres");
+      await db.prepare(
+        "INSERT INTO tournaments (id, name, description, logo_key, stream_url, watch_url) VALUES (?,?,?,?,?,?) " +
+        "ON CONFLICT(id) DO UPDATE SET name=excluded.name, description=excluded.description, logo_key=excluded.logo_key, stream_url=excluded.stream_url, watch_url=excluded.watch_url",
+      ).bind(id, name, description, tournamentLogo(b.logo), stream, watch).run();
+    }
+  } else if (kind === "schedule") {
+    if (del) await db.prepare("DELETE FROM tournament_dates WHERE id = ?").bind(id).run();
+    else {
+      const label = typeof b.label === "string" ? b.label.trim() : "";
+      if (typeof b.tournamentId !== "string" || !ID_RE.test(b.tournamentId)) return bad("campeonato inválido");
+      if (typeof b.startsAt !== "number" || !Number.isInteger(b.startsAt) || b.startsAt < SCHEDULE_MIN || b.startsAt > SCHEDULE_MAX) return bad("data inválida");
+      if (label.length > SCHEDULE_LABEL_MAX) return bad(`rótulo até ${SCHEDULE_LABEL_MAX} caracteres`);
+      if (b.brazil !== undefined && typeof b.brazil !== "boolean") return bad("brazil deve ser verdadeiro ou falso");
+      const stream = optUrl(b.stream), watch = optUrl(b.watch);
+      if ((stream === null && b.stream) || (watch === null && b.watch)) return bad("link inválido: use http(s), até 200 caracteres");
+      if (!(await db.prepare("SELECT 1 FROM tournaments WHERE id = ?").bind(b.tournamentId).first())) return bad("campeonato não existe", 404);
+      await db.prepare(
+        "INSERT INTO tournament_dates (id, tournament_id, starts_at, label, brazil, stream_url, watch_url) VALUES (?,?,?,?,?,?,?) " +
+        "ON CONFLICT(id) DO UPDATE SET tournament_id=excluded.tournament_id, starts_at=excluded.starts_at, label=excluded.label, brazil=excluded.brazil, " +
+        "stream_url=excluded.stream_url, watch_url=excluded.watch_url",
+      ).bind(id, b.tournamentId, b.startsAt, label, b.brazil === true ? 1 : 0, stream, watch).run();
     }
   } else if (kind === "settings" && !del) {
     const rows: Record<string, unknown> = {};
@@ -431,7 +497,7 @@ export default {
       if (id === null || !ID_RE.test(id)) return bad("id inválido");
       return promote(env, id);
     }
-    const admin = url.pathname.match(/^\/api\/(players|teams|heroes|settings|upload)\/([^/]+)$/);
+    const admin = url.pathname.match(/^\/api\/(players|teams|heroes|settings|tournaments|schedule|upload)\/([^/]+)$/);
     if (admin) {
       if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
       const id = decode(admin[2]);

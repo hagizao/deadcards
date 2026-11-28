@@ -17,6 +17,8 @@ const PATHS = {
   lock: "M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3",
   medal: "M8 3h3l1 5M16 3h-3l-1 5M12 21a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 12.5v5",
   gem: "M7 4h10l4 5-9 11L3 9zM3 9h18M12 20 8.5 9 10 4M12 20l3.5-11L14 4",
+  play: "M8 5.5v13l10.5-6.5z",
+  users: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.3a3.5 3.5 0 0 1 0 6.4M21.5 20a6.5 6.5 0 0 0-4-6",
 };
 
 export type IconName = keyof typeof PATHS;

@@ -33,6 +33,25 @@
   --color-ach-silver: #d6dee8;
   --color-ach-gold: #f5c84b;
   --color-ach-diamond: #8ff3ff;
+  /* dia em que o Brasil joga no calendário da Home */
+  --color-br-green: #00b84a;
+  --color-br-yellow: #ffd400;
+}
+
+/* moldura em degradê verde e amarelo: dia em que o Brasil joga (calendário da Home e a legenda dele) */
+@utility br-frame {
+  position: relative;
+  box-shadow: 0 0 14px color-mix(in oklab, var(--color-br-green) 45%, transparent);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 3px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, var(--color-br-green), var(--color-br-yellow));
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    pointer-events: none;
+  }
 }
 
 /* volume dos títulos: degraus escuros logo abaixo (a "espessura"), sombra no chão e um brilho leve na cor do próprio texto */
@@ -77,6 +96,42 @@
 }
 
 /* esqueleto de carregamento: bloco escuro com um brilho passando (só transform, sem repaint por frame) */
+/* tela de carregamento (BootScreen e index.html): luz quente atrás da marca, losango pulsando e barra andando */
+@utility boot-screen {
+  background: radial-gradient(40% 35% at 50% 48%, rgb(255 239 215 / 0.07), transparent 70%);
+}
+@utility boot-mark {
+  box-shadow: 0 0 18px rgb(255 239 215 / 0.8);
+  animation: boot-pulse 1.6s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@utility boot-bar {
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent, var(--color-dl-text), transparent);
+    animation: boot-sweep 1.3s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &::after { animation: none; transform: translateX(75%); }
+  }
+}
+@keyframes boot-pulse {
+  0%, 100% { opacity: 1; scale: 1; }
+  50% { opacity: 0.55; scale: 0.85; }
+}
+@keyframes boot-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+
 @utility skeleton {
   position: relative;
   overflow: hidden;

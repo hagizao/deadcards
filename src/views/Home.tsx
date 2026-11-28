@@ -12,6 +12,7 @@ import type { Tier } from "../lib/rarity";
 import { areaStyle, areaTier } from "../lib/areas";
 import { Reveal } from "../components/Motion";
 import { Stage } from "./home/Stage";
+import { Calendar } from "./home/Calendar";
 import { Welcome } from "./home/Welcome";
 import { CardGuide } from "./home/CardGuide";
 import { Roles } from "./home/Roles";
@@ -91,6 +92,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
     <div className="home-type flex flex-col gap-14">
       {/* cada seção usa a cor da área com que conversa (lib/areas.ts); "contents" não muda o layout, só passa a cor */}
       <div className="contents" style={areaStyle("teams")}><Stage cards={featured} onOpenCard={onOpenCard} onOpenTeam={onOpenTeam} /></div>
+      <div className="contents" style={areaStyle("teams")}><Calendar /></div>
       <div className="contents" style={areaStyle("redeem")}><Welcome onNavigate={onNavigate} /></div>
       {guide && <div className="contents" style={areaStyle("collection")}><CardGuide sample={guide} /></div>}
       <div className="contents" style={areaStyle("tierlist")}><Roles onOpenCard={onOpenCard} /></div>
