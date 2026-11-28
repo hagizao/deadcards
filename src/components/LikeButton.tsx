@@ -61,7 +61,7 @@ export function LikeButton({ path, own = false, onArtist }: { path: string; own?
 
   const look = `flex min-h-12 cursor-pointer items-center gap-3 rounded-full px-5 text-base font-extrabold tracking-wide uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300 disabled:cursor-wait ${
     liked
-      ? "bg-rose-500 text-white shadow-[0_0_24px_rgba(244,63,94,0.45)] hover:bg-rose-400 active:bg-rose-600"
+      ? "bg-rose-500/30 text-white ring-1 ring-rose-300/70 hover:bg-rose-500/40 active:bg-rose-500/50"
       : "bg-rose-500/15 text-rose-200 ring-1 ring-rose-400/50 hover:bg-rose-500/25 hover:text-white active:bg-rose-500/35"
   }`;
   const body = (

@@ -202,9 +202,12 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
           <div className="flex flex-wrap items-start gap-3">
             <div className="min-w-0 flex-1 basis-[calc(100%-3.5rem)] sm:basis-0">
               <h2 className="font-display text-3xl font-black tracking-[0.12em] text-dl-text uppercase"><span ref={nameRef} key={player.id + player.name}>{player.name}</span></h2>
-              <p className="mt-1 text-sm text-zinc-300">{label(team.name)} ({team.tag}) · {label(player.position || "Flex")} · {player.hero}</p>
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-balance text-zinc-300">
+                <span>{label(team.name)} ({team.tag}) · {label(player.position || "Flex")} · {player.hero}</span>
+                <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.custom ? t.special : tier.name}</span>
+              </p>
               {player.special && owners !== undefined && (
-                <p className="mt-2 flex items-center gap-2 text-sm font-bold text-amber-200">
+                <p className="mt-2 flex items-center gap-2 text-sm font-bold text-zinc-300">
                   <Icon name="cards" className="size-4" />
                   {t.owners(owners)}
                 </p>
@@ -228,7 +231,6 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.custom ? t.special : tier.name}</span>
             {canFavorite && (
               <button type="button" aria-pressed={fav} disabled={favBusy} onClick={flipFavorite}
                 className={`${pill(fav)} disabled:cursor-wait disabled:opacity-60`}>
@@ -238,9 +240,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
             )}
             {/* a prévia de uma arte enviada não é uma carta do site: não tem link para compartilhar */}
             {!preview && <ShareCardButton key={player.id} id={player.id} name={player.name} />}
-            {onEdit && <button type="button" onClick={() => onEdit(player.id)} className={`${pill(true)} ml-auto hover:bg-white`}>{t.edit}</button>}
-            {player.special && player.specialText && <span className="text-sm font-bold text-amber-200">✦ {player.specialText}</span>}
+            {onEdit && <button type="button" onClick={() => onEdit(player.id)} className={`${pill(false)} ml-auto`}>{t.edit}</button>}
           </div>
+          {player.special && player.specialText && <p className="text-sm font-bold text-zinc-200">✦ {player.specialText}</p>}
           {favIssue?.id === player.id && <p role="alert" className="text-sm text-red-300">{t[favIssue.r]}</p>}
 
           <div>
@@ -269,11 +271,12 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
                   const icon = heroIcon(v.hero);
                   const on = v.id === player.id;
                   // herói jogado é só o rosto do herói; principal, especial e versão de outro time ganham legenda
-                  const caption = isAltHero(v) ? null : isMainCard(v) ? t.main : `${v.special ? t.special : t.version} · ${teamOf(teams, v).tag}`;
+                  const caption = isAltHero(v) ? null : isMainCard(v) ? t.main : v.special ? t.special : t.version;
+                  const full = caption && !isMainCard(v) ? `${caption} · ${teamOf(teams, v).tag}` : caption;
                   // versão que você não tem fica em preto e branco
                   const missing = !!me && !!owned && !owned.has(v.id);
                   return (
-                    <button key={v.id} type="button" onClick={() => onSwitch(v.id)} aria-pressed={on} aria-label={caption ? `${caption} · ${v.hero}` : v.hero} title={v.hero}
+                    <button key={v.id} type="button" onClick={() => onSwitch(v.id)} aria-pressed={on} aria-label={full ? `${full} · ${v.hero}` : v.hero} title={full ? `${full} · ${v.hero}` : v.hero}
                       className="group flex w-16 cursor-pointer flex-col items-center gap-1 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
                       <span className={`flex size-14 items-center justify-center overflow-hidden rounded-full bg-zinc-900 transition group-hover:scale-105 group-active:scale-95 motion-reduce:transition-none ${on ? "ring-2 ring-dl-text ring-offset-2 ring-offset-zinc-950" : "ring-1 ring-zinc-200/15"} ${missing ? "opacity-60 grayscale" : ""}`}>
                         {icon ? <img src={icon} alt="" className="size-full scale-110 object-cover" /> : <span className="text-[10px] font-bold text-zinc-300">{v.hero.slice(0, 3)}</span>}
