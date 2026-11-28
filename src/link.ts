@@ -98,6 +98,15 @@ export async function accountLink(env: Env, request: Request, step: string): Pro
     // um pack por código por pessoa: o repetido fica na conta apagada e some com ela
     env.DB.prepare("UPDATE OR IGNORE user_packs SET user_id = ?1 WHERE user_id = ?2").bind(target, source),
     env.DB.prepare("UPDATE pack_openings SET user_id = ?1 WHERE user_id = ?2").bind(target, source),
+    // artista: o selo, as cartas com a arte e as curtidas dadas e recebidas vêm junto (o que repete fica e some com a conta apagada)
+    env.DB.prepare("INSERT OR IGNORE INTO artists (user_id, created_at) SELECT ?1, created_at FROM artists WHERE user_id = ?2").bind(target, source),
+    env.DB.prepare("UPDATE card_artists SET user_id = ?1 WHERE user_id = ?2").bind(target, source),
+    env.DB.prepare("UPDATE OR IGNORE card_likes SET user_id = ?1 WHERE user_id = ?2").bind(target, source),
+    env.DB.prepare("UPDATE OR IGNORE profile_likes SET user_id = ?1 WHERE user_id = ?2").bind(target, source),
+    env.DB.prepare("UPDATE OR IGNORE profile_likes SET artist_id = ?1 WHERE artist_id = ?2").bind(target, source),
+    // juntas, a conta pode ter curtido a si mesma: essas saem
+    env.DB.prepare("DELETE FROM profile_likes WHERE user_id = ?1 AND artist_id = ?1").bind(target),
+    env.DB.prepare("DELETE FROM card_likes WHERE user_id = ?1 AND player_id IN (SELECT player_id FROM card_artists WHERE user_id = ?1)").bind(target),
     env.DB.prepare(`DELETE FROM "user" WHERE id = ?`).bind(source),
   ]);
   return json(
