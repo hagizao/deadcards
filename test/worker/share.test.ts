@@ -28,7 +28,10 @@ describe("prévia dos links compartilhados", () => {
 
   it("time e perfil; o que não existe fica sem prévia própria", async () => {
     await seedPlayer("share2");
+    expect((await shareMeta(env, "/t/tm", origin))?.title).toBe("Team (TM) · Cardslock");
+    // link antigo, pelo id, continua valendo
     expect((await shareMeta(env, "/t/t1", origin))?.title).toBe("Team (TM) · Cardslock");
+    expect(await shareMeta(env, "/t/xx", origin)).toBeNull();
     expect((await shareMeta(env, "/u/nao-existe", origin))).toBeNull();
     expect((await shareMeta(env, "/c/nao-existe", origin))).toBeNull();
   });

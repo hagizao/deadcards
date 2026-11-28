@@ -18,7 +18,24 @@ export const TEAM_RE = new RegExp(`^/t/(${ID})/?$`);
 export const PROFILE_RE = /^\/u\/((?:@|%40)?[A-Za-z0-9._-]{1,64})\/?$/;
 
 export const cardPath = (id: string) => `/c/${id}`;
-export const teamPath = (id: string) => `/t/${id}`;
+export const teamPath = (key: string) => `/t/${key}`;
+
+type TeamRef = { id: string; tag: string };
+/** A sigla do time como aparece no link: minúscula, só letras e números (LEV → lev). */
+export const teamSlug = (tag: string) => tag.normalize("NFD").toLowerCase().replace(/[^a-z0-9]/g, "");
+const slugOwner = (teams: TeamRef[], slug: string) => {
+  const same = slug ? teams.filter((t) => teamSlug(t.tag) === slug) : [];
+  return same.length === 1 ? same[0] : undefined;
+};
+/** A chave do time no link: a sigla quando só ele tem essa sigla (vale para times novos também); senão, o id. */
+export function teamKey(teams: TeamRef[], id: string): string {
+  const team = teams.find((t) => t.id === id);
+  return team && slugOwner(teams, teamSlug(team.tag)) === team ? teamSlug(team.tag) : id;
+}
+/** O time de um link: pelo id (links antigos e siglas repetidas) ou pela sigla. */
+export function teamByKey<T extends TeamRef>(teams: T[], key: string): T | undefined {
+  return teams.find((t) => t.id === key) ?? (slugOwner(teams, key.toLowerCase()) as T | undefined);
+}
 
 /** O endereço vira estado: carta abre por cima da Home, time abre na aba Times, endereço desconhecido cai na Home. */
 export function parseRoute(path: string): Route {

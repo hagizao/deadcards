@@ -43,19 +43,20 @@ const MAIN_REGIONS = REGIONS.filter((r) => r !== FREE);
 // largura das cartas do elenco (card-size-team e card-size-team-medium no cards.css)
 const CARD_W = { team: 295, medium: 222 } as const;
 
-export function Teams({ focusTeamId, onOpenCard, onPick }: { focusTeamId?: string; onOpenCard: (id: string) => void; onPick?: (id: string) => void }) {
+/** `focusTeamId` rola até o time (vindo de outra tela); `teamId` é o time do endereço, que o voltar do navegador troca. */
+export function Teams({ focusTeamId, teamId, onOpenCard, onPick }: { focusTeamId?: string; teamId?: string; onOpenCard: (id: string) => void; onPick?: (id: string) => void }) {
   const { teams, players } = useData();
   const t = useT(S);
   const label = useLabel();
   const still = useReducedMotion();
   const settled = useSettled();
   const [size, setSize] = useState<"team" | "medium">("team");
-  const [picked, setPicked] = useState<string | null>(focusTeamId ?? null);
-  // outro time pedido de fora (link, voltar do navegador): troca o escolhido, derivado na renderização
-  const [asked, setAsked] = useState(focusTeamId);
-  if (asked !== focusTeamId) {
-    setAsked(focusTeamId);
-    if (focusTeamId) setPicked(focusTeamId);
+  const [picked, setPicked] = useState<string | null>(teamId ?? focusTeamId ?? null);
+  // o time do endereço mudou por fora (link, voltar do navegador): troca o escolhido, derivado na renderização
+  const [asked, setAsked] = useState(teamId);
+  if (asked !== teamId) {
+    setAsked(teamId);
+    setPicked(teamId ?? null);
   }
   // clicar no nome de uma região recolhe os logos de todas, e as cartas sobem para a vista
   const [open, setOpen] = useState(true);

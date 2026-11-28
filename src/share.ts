@@ -1,6 +1,6 @@
 import type { Env } from "./worker";
 import { getPlayerOvr } from "./lib/cardKinds";
-import { CARD_RE, PROFILE_RE, TEAM_RE } from "./lib/route";
+import { CARD_RE, PROFILE_RE, TEAM_RE, teamByKey } from "./lib/route";
 import { imgUrl, parse, playerFromRow } from "./rows";
 
 /**
@@ -33,12 +33,14 @@ export async function shareMeta(env: Env, path: string, origin: string): Promise
     };
   }
 
-  const team = TEAM_RE.exec(path)?.[1];
-  if (team) {
-    const row = await env.DB.prepare("SELECT name, tag, region, logo_key FROM teams WHERE id = ?").bind(team)
-      .first<{ name: string; tag: string; region: string | null; logo_key: string | null }>();
+  const key = TEAM_RE.exec(path)?.[1];
+  if (key) {
+    // o link traz a sigla (ou o id): os times são poucos, então resolve com a lista inteira, igual ao site
+    const { results } = await env.DB.prepare("SELECT id, name, tag, region, logo_key FROM teams")
+      .all<{ id: string; name: string; tag: string; region: string | null; logo_key: string | null }>();
+    const row = teamByKey(results, key);
     if (!row) return null;
-    const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM players WHERE team_id = ?").bind(team).first<number>("n");
+    const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM players WHERE team_id = ?").bind(row.id).first<number>("n");
     return {
       title: `${row.name} (${row.tag}) · ${SITE}`,
       description: `${row.region || "Europa"} · ${count ?? 0} ${count === 1 ? "carta" : "cartas"} no ${SITE}`,
@@ -46,9 +48,9 @@ export async function shareMeta(env: Env, path: string, origin: string): Promise
     };
   }
 
-  const key = PROFILE_RE.exec(path)?.[1];
-  if (key) {
-    const handle = key.replace(/^(@|%40)/, "");
+  const profile = PROFILE_RE.exec(path)?.[1];
+  if (profile) {
+    const handle = profile.replace(/^(@|%40)/, "");
     const userId = await env.DB.prepare("SELECT user_id FROM profile_handles WHERE handle = ?").bind(handle).first<string>("user_id") ?? handle;
     const user = await env.DB.prepare(`SELECT name, image FROM "user" WHERE id = ?`).bind(userId).first<{ name: string; image: string | null }>();
     if (!user) return null;

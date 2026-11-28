@@ -22,7 +22,7 @@ import { Profile } from "./views/Profile";
 import { easeOut } from "./lib/ui";
 import { Settings } from "./views/Settings";
 import { ArtSubmit } from "./views/ArtSubmit";
-import { parseRoute, routePath } from "./lib/route";
+import { parseRoute, routePath, teamByKey, teamKey } from "./lib/route";
 
 const REPO = "https://github.com/hagizao/deadcards";
 
@@ -248,15 +248,16 @@ function Shell() {
   // direção da troca de aba, derivada durante a renderização (padrão do React para "valor anterior")
   const [shown, setShown] = useState({ tab, dir: 0 });
   if (shown.tab !== tab) setShown({ tab, dir: Math.sign(TAB_ORDER.indexOf(tab) - TAB_ORDER.indexOf(shown.tab)) });
-  // focusTeam rola até o time (vindo de outra tela); team é o time escolhido, que vai para o endereço
+  // focusTeam rola até o time (vindo de outra tela); team é o time escolhido, que vai para o endereço.
+  // os dois guardam a chave do link (a sigla, ou o id quando a sigla se repete)
   const [focusTeam, setFocusTeam] = useState(start.team);
   const [team, setTeam] = useState(start.team);
   const [spotlight, setSpotlight] = useState<string | null>(start.card ?? null);
   const [editId, setEditId] = useState<string | null>(null);
-  const { me } = useData();
+  const { me, teams } = useData();
   const t = useT(S);
   const go = (id: Tab) => { setFocusTeam(undefined); setTeam(undefined); setTab(id); };
-  const openTeam = (id: string) => { setFocusTeam(id); setTeam(id); setTab("teams"); };
+  const openTeam = (id: string) => { const key = teamKey(teams, id); setFocusTeam(key); setTeam(key); setTab("teams"); };
   const editCard = (id: string) => { setSpotlight(null); setEditId(id); setTab("editor"); };
   const openProfile = (id: string) => { setProfileId(id); setTab("profile"); };
   useEffect(() => { window.scrollTo(0, 0); }, [tab, profileId]);
@@ -335,7 +336,7 @@ function Shell() {
             transition={{ duration: 0.25, ease: easeOut }}
           >
             {tab === "home" && <Home onOpenTeam={openTeam} onOpenCard={setSpotlight} onNavigate={go} />}
-            {tab === "teams" && <Teams focusTeamId={focusTeam} onOpenCard={setSpotlight} onPick={setTeam} />}
+            {tab === "teams" && <Teams focusTeamId={focusTeam && teamByKey(teams, focusTeam)?.id} teamId={team && teamByKey(teams, team)?.id} onOpenCard={setSpotlight} onPick={(id) => setTeam(teamKey(teams, id))} />}
             {tab === "tierlist" && <TierList onOpenCard={setSpotlight} onOpenTeam={openTeam} />}
             {tab === "collection" && <Collection onOpenCard={setSpotlight} />}
             {tab === "redeem" && <Redeem onOpenCard={setSpotlight} />}
