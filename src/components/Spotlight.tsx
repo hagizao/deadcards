@@ -10,6 +10,7 @@ import { getCardTier } from "../lib/rarity";
 import type { Player } from "../lib/types";
 import { Card } from "./Card";
 import { ShareCardButton } from "./ShareCardButton";
+import { LikeButton } from "./LikeButton";
 import { Icon } from "./Icon";
 import { easeOut, pill } from "../lib/ui";
 import { cascade, enter, flightOrigin, springFlight } from "../lib/motion";
@@ -215,6 +216,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, preview }: { pl
             {player.special && player.specialText && <span className="text-xs font-bold text-amber-200">✦ {player.specialText}</span>}
           </div>
           {favIssue?.id === player.id && <p role="alert" className="text-sm text-red-300">{t[favIssue.r]}</p>}
+          {/* curtir é só para carta especial (a arte de alguém), e fica bem à vista */}
+          {player.special && !preview && <LikeButton id={player.id} />}
 
           <div>
             <h3 className="mb-2 text-xs font-bold tracking-[0.2em] text-zinc-400 uppercase">{t.stats}</h3>
