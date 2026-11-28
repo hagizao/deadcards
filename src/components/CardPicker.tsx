@@ -20,7 +20,7 @@ const S = strings({
 const mainIdOf = (p: Player) => p.variantOf || p.id;
 const regionOf = (team: Team) => team.region || "Europa";
 // filtro ligado fica na cor da área (o roxo do título do Lab); clicar de novo desliga
-const chip = "flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full px-3 text-xs font-bold text-zinc-300 transition-colors hover:bg-zinc-100/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/15 aria-pressed:bg-area/15 aria-pressed:text-area sm:min-h-9";
+const chip = "flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 text-lg font-bold text-zinc-300 transition-colors hover:bg-zinc-100/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/15 aria-pressed:bg-area/15 aria-pressed:text-area";
 const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /** Rosto do herói num círculo; sem ícone, as três primeiras letras. */
@@ -90,14 +90,14 @@ export function Picker({ label, value, onChange }: { label: string; value: strin
         <div role="group" aria-label={t.region} className="flex flex-wrap items-center gap-1">
           {regions.map((r) => (
             <button key={r} type="button" aria-pressed={region === r} className={chip} onClick={() => setRegion(region === r ? "" : r)}>
-              <RegionIcon region={r} className="size-4" />{role(r)}
+              <RegionIcon region={r} className="size-6" />{role(r)}
             </button>
           ))}
         </div>
         <div role="group" aria-label={t.role} className="flex flex-wrap items-center gap-1">
           {positions.map((r) => (
             <button key={r} type="button" aria-pressed={position === r} className={chip} onClick={() => setPosition(position === r ? "" : r)}>
-              <RoleIcon position={r} className="size-4" />{role(r)}
+              <RoleIcon position={r} className="size-6" />{role(r)}
             </button>
           ))}
         </div>
