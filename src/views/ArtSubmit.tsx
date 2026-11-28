@@ -13,7 +13,9 @@ const S = strings({
   pt: {
     title: "Enviar arte",
     lead: "Mande sua arte para o banco de artes do Cardslock. Teste à vontade numa carta especial: só você vê a prévia, e nada aparece no site até ser usado.",
-    image: "Arte", pick: "Escolher imagem", change: "Trocar imagem", fg: "Fundo e personagem separados (opcional)", fgHint: "Mande a imagem de cima só com o fundo e o personagem aqui, num PNG transparente. Separados, eles ganham efeito paralaxe: o personagem se mexe na frente do fundo quando a carta inclina. Passe o mouse na prévia para ver.", remove: "Remover",
+    image: "Arte", pick: "Escolher imagem", change: "Trocar imagem", single: "Imagem única", split: "Fundo e personagem separados",
+    splitHint: "Separados, eles ganham efeito paralaxe: o personagem se mexe na frente do fundo quando a carta inclina. Passe o mouse (ou o dedo) na prévia para ver.",
+    whole: "Imagem", bgLayer: "Fundo", fgLayer: "Personagem", fgFormat: "PNG transparente, só o personagem.",
     formats: `PNG, JPG ou WebP, até ${ART_SUBMISSION_MAX_BYTES / 1024 / 1024} MB.`,
     preview: "Testar na carta", card: "Carta da prévia", frame: "Moldura especial", frameDefault: "Padrão da carta",
     zoom: "Zoom", x: "X", y: "Y", fgZoom: "Zoom do personagem", fgX: "X do personagem", fgY: "Y do personagem",
@@ -29,7 +31,9 @@ const S = strings({
   en: {
     title: "Submit art",
     lead: "Send your art to the Cardslock art bank. Test it freely on a special card: only you see the preview, and nothing shows on the site until it is used.",
-    image: "Art", pick: "Choose image", change: "Change image", fg: "Background and character apart (optional)", fgHint: "Send the image above with just the background, and the character here as a transparent PNG. Apart, they get a parallax effect: the character moves in front of the background as the card tilts. Hover the preview to see it.", remove: "Remove",
+    image: "Art", pick: "Choose image", change: "Change image", single: "Single image", split: "Background and character apart",
+    splitHint: "Apart, they get a parallax effect: the character moves in front of the background as the card tilts. Hover (or drag a finger over) the preview to see it.",
+    whole: "Image", bgLayer: "Background", fgLayer: "Character", fgFormat: "Transparent PNG with just the character.",
     formats: `PNG, JPG or WebP, up to ${ART_SUBMISSION_MAX_BYTES / 1024 / 1024} MB.`,
     preview: "Test on a card", card: "Preview card", frame: "Special frame", frameDefault: "Card default",
     zoom: "Zoom", x: "X", y: "Y", fgZoom: "Character zoom", fgX: "Character X", fgY: "Character Y",
@@ -45,7 +49,9 @@ const S = strings({
   es: {
     title: "Enviar arte",
     lead: "Manda tu arte al banco de artes de Cardslock. Pruébala libremente en una carta especial: solo tú ves la vista previa y nada aparece en el sitio hasta que se use.",
-    image: "Arte", pick: "Elegir imagen", change: "Cambiar imagen", fg: "Fondo y personaje por separado (opcional)", fgHint: "Manda la imagen de arriba solo con el fondo y el personaje aquí, en un PNG transparente. Por separado, tienen efecto paralaje: el personaje se mueve delante del fondo cuando la carta se inclina. Pasa el mouse por la vista previa para verlo.", remove: "Quitar",
+    image: "Arte", pick: "Elegir imagen", change: "Cambiar imagen", single: "Imagen única", split: "Fondo y personaje por separado",
+    splitHint: "Por separado, tienen efecto paralaje: el personaje se mueve delante del fondo cuando la carta se inclina. Pasa el mouse (o el dedo) por la vista previa para verlo.",
+    whole: "Imagen", bgLayer: "Fondo", fgLayer: "Personaje", fgFormat: "PNG transparente, solo el personaje.",
     formats: `PNG, JPG o WebP, hasta ${ART_SUBMISSION_MAX_BYTES / 1024 / 1024} MB.`,
     preview: "Probar en la carta", card: "Carta de la vista previa", frame: "Marco especial", frameDefault: "El de la carta",
     zoom: "Zoom", x: "X", y: "Y", fgZoom: "Zoom del personaje", fgX: "X del personaje", fgY: "Y del personaje",
@@ -81,11 +87,37 @@ function ImageInput({ label, onFile }: { label: string; onFile: (f: File) => voi
   );
 }
 
+/** Uma camada da arte: escolher a imagem e, com ela escolhida, ajustar zoom e posição. */
+function Layer({ title, hint, image, value, labels, onChange }: {
+  title: string; hint: string; image: ReturnType<typeof useLocalImage>;
+  value: { zoom: number; x: number; y: number }; labels: { pick: string; change: string; zoom: string; x: string; y: string };
+  onChange: (patch: Partial<{ zoom: number; x: number; y: number }>) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="min-w-24 text-sm font-semibold text-zinc-100">{title}</span>
+        <ImageInput label={image.file ? labels.change : labels.pick} onFile={image.setFile} />
+        <span className="text-xs text-zinc-400">{hint}</span>
+      </div>
+      {image.url && (
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+          <Range label={labels.zoom} value={value.zoom} min={50} max={300} onChange={(v) => onChange({ zoom: v })} />
+          <Range label={labels.x} value={value.x} min={0} max={100} onChange={(v) => onChange({ x: v })} />
+          <Range label={labels.y} value={value.y} min={0} max={100} onChange={(v) => onChange({ y: v })} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ArtSubmit() {
   const t = useT(S);
   const { players, teams } = useData();
   const bg = useLocalImage();
   const fg = useLocalImage();
+  // fundo e personagem separados: duas imagens, e a carta faz o paralaxe entre elas
+  const [split, setSplit] = useState(false);
   // cartas principais em uso, da maior OVR para a menor: a prévia começa na primeira
   const cards = players.filter((p) => isMainCard(p) && !isRetired(p)).sort((a, b) => getPlayerOvr(b) - getPlayerOvr(a) || a.name.localeCompare(b.name));
   const [layout, setLayout] = useState<ArtLayout>({ zoom: 100, x: 50, y: 50, fg: { zoom: 100, x: 50, y: 50 }, frame: "deco" });
@@ -104,6 +136,8 @@ export function ArtSubmit() {
   const player = cards.find((p) => p.id === playerId) ?? cards[0];
   const set = (patch: Partial<ArtLayout>) => setLayout((l) => ({ ...l, ...patch }));
   const setFg = (patch: Partial<NonNullable<ArtLayout["fg"]>>) => setLayout((l) => ({ ...l, fg: { ...l.fg!, ...patch } }));
+  const chooseSplit = (on: boolean) => { setSplit(on); if (!on) fg.setFile(undefined); };
+  const labels = { pick: t.pick, change: t.change, zoom: t.zoom, x: t.x, y: t.y };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -124,6 +158,7 @@ export function ArtSubmit() {
       setMsg({ ok: true, text: t.sent });
       bg.setFile(undefined);
       fg.setFile(undefined);
+      setSplit(false);
       setOwn(false);
       setConsent(false);
       await load();
@@ -154,38 +189,18 @@ export function ArtSubmit() {
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-7">
-          <fieldset className="flex flex-col gap-3">
+          <fieldset className="flex flex-col gap-5">
             <legend className="mb-3 text-xs font-bold tracking-widest text-zinc-300 uppercase">{t.image}</legend>
-            <div className="flex flex-wrap items-center gap-3">
-              <ImageInput label={bg.file ? t.change : t.pick} onFile={bg.setFile} />
-              <span className="text-xs text-zinc-400">{t.formats}</span>
-            </div>
-            {bg.url && (
-              <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-                <Range label={t.zoom} value={layout.zoom} min={50} max={300} onChange={(v) => set({ zoom: v })} />
-                <Range label={t.x} value={layout.x} min={0} max={100} onChange={(v) => set({ x: v })} />
-                <Range label={t.y} value={layout.y} min={0} max={100} onChange={(v) => set({ y: v })} />
-              </div>
-            )}
-          </fieldset>
-
-          {/* sempre à vista: a explicação do paralaxe é o convite para mandar fundo e personagem separados */}
-          <fieldset className="flex flex-col gap-3">
-            <legend className="mb-3 text-xs font-bold tracking-widest text-zinc-300 uppercase">{t.fg}</legend>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-              <div className="flex shrink-0 flex-wrap items-center gap-3">
-                <ImageInput label={fg.file ? t.change : t.pick} onFile={fg.setFile} />
-                {fg.file && <button type="button" onClick={() => fg.setFile(undefined)} className={pill(false)}>{t.remove}</button>}
+              <div role="group" aria-label={t.image} className="flex shrink-0 flex-wrap gap-2">
+                <button type="button" aria-pressed={!split} onClick={() => chooseSplit(false)} className={pill(!split)}>{t.single}</button>
+                <button type="button" aria-pressed={split} onClick={() => chooseSplit(true)} className={pill(split)}>{t.split}</button>
               </div>
-              <p className="max-w-prose text-xs text-zinc-300">{t.fgHint}</p>
+              {/* a explicação do paralaxe fica ao lado da opção: é o convite para mandar separado */}
+              <p className="max-w-prose text-xs text-zinc-300">{t.splitHint}</p>
             </div>
-            {bg.url && fg.url && (
-              <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-                <Range label={t.fgZoom} value={layout.fg!.zoom} min={50} max={300} onChange={(v) => setFg({ zoom: v })} />
-                <Range label={t.fgX} value={layout.fg!.x} min={0} max={100} onChange={(v) => setFg({ x: v })} />
-                <Range label={t.fgY} value={layout.fg!.y} min={0} max={100} onChange={(v) => setFg({ y: v })} />
-              </div>
-            )}
+            <Layer title={split ? t.bgLayer : t.whole} hint={t.formats} image={bg} value={layout} labels={labels} onChange={set} />
+            {split && <Layer title={t.fgLayer} hint={t.fgFormat} image={fg} value={layout.fg!} labels={{ ...labels, zoom: t.fgZoom, x: t.fgX, y: t.fgY }} onChange={setFg} />}
           </fieldset>
 
           <fieldset className="flex flex-col gap-4">
@@ -230,7 +245,7 @@ export function ArtSubmit() {
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
-            <button type="submit" disabled={busy || !bg.file} className={primaryBtn}>{busy ? t.sending : t.send}</button>
+            <button type="submit" disabled={busy || !bg.file || (split && !fg.file)} className={primaryBtn}>{busy ? t.sending : t.send}</button>
             {msg && <p role={msg.ok ? "status" : "alert"} className={`text-sm ${msg.ok ? "text-emerald-300" : "text-red-300"}`}>{msg.text}</p>}
           </div>
         </div>
