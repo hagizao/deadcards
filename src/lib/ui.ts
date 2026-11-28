@@ -25,3 +25,5 @@ export const primaryBtn = `min-h-11 sm:min-h-9 inline-flex items-center justify-
 export const pageTitle = "font-display text-4xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-5xl";
 /** O título de seção leva o ornamento art déco (deco-title no index.css); o símbolo antes do texto é escolhido por seção (deco-clock, deco-eye...). */
 export const sectionTitle = "deco-title font-display text-xl font-extrabold tracking-[0.11em] text-area uppercase title-depth sm:text-2xl";
+/** Na Home, com várias áreas na mesma tela, o texto do título fica claro e a cor da área vai só no símbolo e na linha (--deco-c). */
+export const homeTitle = "deco-title font-display text-xl font-extrabold tracking-[0.11em] text-dl-text uppercase title-depth [--deco-c:var(--color-area)] sm:text-2xl";

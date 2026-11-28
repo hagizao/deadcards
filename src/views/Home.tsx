@@ -6,7 +6,7 @@ import { strings, useT } from "../lib/i18n";
 import { TeamLogo3D } from "../components/TeamLogo3D";
 import { usePointerTilt } from "../lib/tilt";
 import { Icon, type IconName } from "../components/Icon";
-import { easeOut, pill, sectionTitle } from "../lib/ui";
+import { easeOut, pill, homeTitle } from "../lib/ui";
 import { cascade, enter } from "../lib/motion";
 import type { Tier } from "../lib/rarity";
 import { areaStyle, areaTier } from "../lib/areas";
@@ -101,7 +101,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
 
       <section className="flex flex-col gap-4" aria-labelledby="home-ranking" style={areaStyle("teams")}>
         <Reveal className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="home-ranking" className={`${sectionTitle} deco-podium`}>{t.ranking}</h2>
+          <h2 id="home-ranking" className={`${homeTitle} deco-podium`}>{t.ranking}</h2>
           {ranked.length > RANKING && <button type="button" className={pill(false)} onClick={() => onNavigate("teams")}>{t.allTeams(ranked.length)}</button>}
         </Reveal>
         {ranked.length === 0 && <div className="py-6 text-sm text-zinc-300">{t.none}</div>}
@@ -121,7 +121,7 @@ export function Home({ onOpenTeam, onOpenCard, onNavigate }: { onOpenTeam: (team
       </section>
 
       <section className="flex flex-col gap-4" aria-labelledby="home-explore">
-        <Reveal><h2 id="home-explore" className={`${sectionTitle} deco-gem`}>{t.explore}</h2></Reveal>
+        <Reveal><h2 id="home-explore" className={`${homeTitle} deco-gem`}>{t.explore}</h2></Reveal>
         {/* sem caixas: as áreas são colunas separadas por um traço, como em "Quem faz o quê" */}
         <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-5">
           {AREAS.map((a, i) => (

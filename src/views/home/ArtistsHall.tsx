@@ -4,7 +4,7 @@ import type { Player } from "../../lib/types";
 import { useData } from "../../lib/data";
 import { getPlayerHistory } from "../../lib/cards";
 import { strings, useT } from "../../lib/i18n";
-import { sectionTitle } from "../../lib/ui";
+import { homeTitle } from "../../lib/ui";
 import { Card } from "../../components/Card";
 import { ArtCreditLine } from "../../components/Spotlight";
 import { RailArrows } from "../../components/Rail";
@@ -39,7 +39,7 @@ export function ArtistsHall({ onOpenCard }: { onOpenCard: (id: string) => void }
     <section aria-labelledby="home-artists" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <Reveal className="flex flex-col gap-2">
-          <h2 id="home-artists" className={`${sectionTitle} deco-star`}>{t.title}</h2>
+          <h2 id="home-artists" className={`${homeTitle} deco-star`}>{t.title}</h2>
           <p className="text-sm text-zinc-300">{t.lead}</p>
         </Reveal>
         <RailArrows rail={rail} prev={t.prev} next={t.next} />
