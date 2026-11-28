@@ -185,7 +185,9 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
         className="relative flex max-h-[92dvh] w-full scrollbar-none flex-col items-center gap-8 overflow-x-hidden overflow-y-auto overscroll-contain rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
       >
         <div ref={flyRef} className="relative z-10 max-w-full">
-        <motion.div key={player.id} className="relative max-w-full" initial={reveal || fly ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2, ease: easeOut }}>
+        <motion.div key={player.id} className="relative max-w-full" initial={reveal || fly ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2, ease: easeOut }}
+          onAnimationStart={() => { if (!reveal && !fly && scrollRef.current) scrollRef.current.dataset.moving = ""; }}
+          onAnimationComplete={() => { if (!reveal && !fly) delete scrollRef.current?.dataset.moving; }}>
           {reveal && flashDone !== playerId && (
             <div ref={flashRef} aria-hidden="true" className="pointer-events-none absolute -inset-16 rounded-full opacity-0" style={{ background: `radial-gradient(circle, ${tier.hi} 0%, ${tier.c}99 30%, transparent 68%)` }} />
           )}
