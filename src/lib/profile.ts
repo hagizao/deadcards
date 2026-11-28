@@ -1,3 +1,4 @@
+import type { ArtistInfo } from "./artists";
 import { getPlayerOvr, POSITIONS, STAT_KEYS } from "./cards";
 import { getCardTier, RARITY_TIERS } from "./rarity";
 import type { Player, Stats, TierBand } from "./types";
@@ -14,7 +15,8 @@ export type ProfileCardVersion = { id: number; card: ProfileCard; updatedAt: num
 
 export type ProfileCardState = { history: ProfileCardVersion[] };
 
-export type PublicProfile = { id: string; handle: string | null; name: string; image: string | null; card: ProfileCard | null; cards: string[]; favorites: string[] };
+/** artist: a área de artista (selo, cartas com a arte da pessoa e curtidas); `null` para quem não é artista. */
+export type PublicProfile = { id: string; handle: string | null; name: string; image: string | null; card: ProfileCard | null; cards: string[]; favorites: string[]; artist: ArtistInfo | null };
 
 export const profileUrl = (key: string) => `/u/${key}`;
 

@@ -74,7 +74,7 @@ function toSubmission(r: Row, withUser: boolean): ArtSubmission {
     createdAt: r.created_at,
     ...(r.used_player_id ? { usedPlayerId: r.used_player_id } : {}),
     ...(r.status === "rejected" && r.reject_reason ? { reason: r.reject_reason } : {}),
-    ...(withUser ? { user: r.user_name ?? "?" } : {}),
+    ...(withUser ? { user: r.user_name ?? "?", userId: r.user_id } : {}),
   };
 }
 

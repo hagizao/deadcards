@@ -1,3 +1,4 @@
+import { artistInfo } from "./artists";
 import { currentUser } from "./auth";
 import type { Env } from "./worker";
 import { MAX_FAVORITES, parseProfileCard, type ProfileCard, type ProfileCardState, type PublicProfile } from "./lib/profile";
@@ -51,6 +52,7 @@ export async function publicProfile(env: Env, key: string): Promise<Response> {
     card: card.results[0] ? JSON.parse(card.results[0].snapshot!) as ProfileCard : null,
     cards: cards.results.map((r) => r.player_id!),
     favorites: favorites.results.map((r) => r.player_id!),
+    artist: await artistInfo(env, userId),
   };
   return Response.json(result, { headers: { "cache-control": "no-store" } });
 }

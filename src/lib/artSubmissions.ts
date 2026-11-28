@@ -30,6 +30,8 @@ export type ArtSubmission = {
   reason?: string;
   /** Nome de quem enviou: só na lista do admin. */
   user?: string;
+  /** Conta de quem enviou: só na lista do admin, para vincular a arte ao artista. */
+  userId?: string;
 };
 
 /** A carta da prévia: a carta escolhida como especial, com a moldura e a arte testadas (e o crédito, se houver). */

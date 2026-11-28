@@ -84,4 +84,6 @@ export type AppData = {
   settings: Settings;
   tournaments: Tournament[];
   schedule: ScheduleEntry[];
+  /** Carta → perfil do artista que fez a arte (o @ ou o id da conta). */
+  artists?: Record<string, string>;
 };

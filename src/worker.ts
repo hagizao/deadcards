@@ -2,6 +2,8 @@
 import { createAuth, currentUser } from "./auth";
 import { favorite, profileCard, publicProfile } from "./profile";
 import { cardLikes } from "./likes";
+import { artists, artistsByCard } from "./artists";
+import { ARTISTS_PATH } from "./lib/artists";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
 import { PROFILE_CARD_PATH } from "./lib/profile";
@@ -113,6 +115,8 @@ async function appData(env: Env): Promise<Response> {
     // calendário: do mês passado em diante (o resto do histórico não aparece no site)
     env.DB.prepare("SELECT * FROM tournament_dates WHERE starts_at >= unixepoch() - ? ORDER BY starts_at, id").bind(SCHEDULE_PAST_DAYS * 86400),
   ]);
+  // sem a migration dos artistas aplicada, o site continua no ar: só o "Arte por" não leva ao perfil
+  const artistOf = await artistsByCard(env).catch(() => ({}));
   const s = Object.fromEntries((settings.results as { key: string; value_json: string }[]).map((r) => [r.key, parse<unknown>(r.value_json, null)]));
   return Response.json({
     teams: (teams.results as Record<string, string | null>[]).map((t) => {
@@ -120,6 +124,8 @@ async function appData(env: Env): Promise<Response> {
       return { id: t.id, name: t.name, tag: t.tag, region: t.region, logo: imgUrl(t.logo_key), ...(tbg ? { bg: tbg } : {}) };
     }),
     players: (players.results as Record<string, string | number | null>[]).map(playerFromRow),
+    // carta → perfil do artista no site (só de quem está marcado como artista)
+    artists: artistOf,
     tournaments: (tournaments.results as { id: string; name: string; description: string; logo_key: string | null; stream_url: string | null; watch_url: string | null }[])
       .map((t) => ({
         id: t.id, name: t.name, description: t.description,
@@ -451,6 +457,7 @@ export default {
       if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
       return packTypes(env, request, url.pathname.slice("/api/pack-types/".length));
     }
+    if (url.pathname.startsWith(`${ARTISTS_PATH}/`)) return artists(env, request, url.pathname.slice(ARTISTS_PATH.length + 1));
     if (url.pathname === ART_SUBMISSIONS_PATH || url.pathname.startsWith(`${ART_SUBMISSIONS_PATH}/`)) return artSubmissions(env, request, url.pathname.slice(ART_SUBMISSIONS_PATH.length + 1));
     if (url.pathname === "/api/feedback") return request.method === "POST" ? feedback(env, request) : bad("método não suportado", 405);
     if (url.pathname === "/api/redeem") return request.method === "POST" ? redeem(env, request) : bad("método não suportado", 405);
