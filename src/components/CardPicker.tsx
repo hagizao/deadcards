@@ -103,23 +103,23 @@ export function Picker({ label, value, onChange }: { label: string; value: strin
         </div>
       </div>
 
-      <div role="group" aria-label={t.players} className="max-h-80 overflow-y-auto overscroll-contain">
+      <div role="group" aria-label={t.players} className="max-h-120 overflow-y-auto overscroll-contain">
         {groups.map(({ team, list }) => (
           <div key={team.id} className="flex flex-col">
-            <p className="flex items-center gap-2 px-2 pt-3 pb-1 text-[11px] font-bold tracking-widest text-area uppercase">
-              <span className="size-5 shrink-0 overflow-hidden rounded-sm"><TeamLogo team={team} /></span>
+            <p className="flex items-center gap-3 px-2 pt-5 pb-2 text-[22px] font-bold tracking-widest text-area uppercase">
+              <span className="size-10 shrink-0 overflow-hidden rounded-md"><TeamLogo team={team} /></span>
               <span className="truncate">{team.name}</span>
             </p>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(12rem,100%),1fr))] gap-1 p-1">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2 p-1">
               {list.map((p) => (
                 <button key={p.id} type="button" aria-pressed={p.id === mainId} onClick={() => onChange(p.id)}
-                  className="flex min-h-11 min-w-0 cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-zinc-100/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/15 aria-pressed:bg-zinc-100/15 aria-pressed:ring-1 aria-pressed:ring-dl-text">
-                  <HeroFace hero={p.hero} className="size-9 ring-1 ring-zinc-200/15" />
+                  className="flex min-h-16 min-w-0 cursor-pointer items-center gap-4 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-zinc-100/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/15 aria-pressed:bg-zinc-100/15 aria-pressed:ring-1 aria-pressed:ring-dl-text">
+                  <HeroFace hero={p.hero} className="size-14 ring-1 ring-zinc-200/15" />
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm font-bold text-white">{p.name}</span>
-                    <span className="truncate text-xs text-zinc-400">{role(p.position)} · {p.hero}</span>
+                    <span className="truncate text-lg font-bold text-white">{p.name}</span>
+                    <span className="truncate text-sm text-zinc-400">{role(p.position)} · {p.hero}</span>
                   </span>
-                  <span className="font-display text-lg font-black tabular-nums" style={{ color: getCardTier(p, settings.tierConfig!).c }}>{getPlayerOvr(p)}</span>
+                  <span className="font-display text-3xl font-black tabular-nums" style={{ color: getCardTier(p, settings.tierConfig!).c }}>{getPlayerOvr(p)}</span>
                 </button>
               ))}
             </div>
