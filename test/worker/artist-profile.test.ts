@@ -55,6 +55,17 @@ describe("Arte na carta de perfil", () => {
     expect((await SELF.fetch(`http://test${url}`)).status).toBe(200);
   });
 
+  it("enviar outra arte apaga do R2 a que não ficou na carta nem no histórico", async () => {
+    await makeArtist(userId);
+    const { url: saved } = await (await upload(cookie)).json<{ url: string }>();
+    expect((await call("PUT", PROFILE_CARD_PATH, cookie, card({ url: saved }))).status).toBe(200);
+    const { url: dropped } = await (await upload(cookie)).json<{ url: string }>();
+    const { url: latest } = await (await upload(cookie)).json<{ url: string }>();
+    expect((await SELF.fetch(`http://test${saved}`)).status).toBe(200);
+    expect((await SELF.fetch(`http://test${dropped}`)).status).toBe(404);
+    expect((await SELF.fetch(`http://test${latest}`)).status).toBe(200);
+  });
+
   it("salva a arte na carta; arte de outra conta ou de quem não é artista é recusada", async () => {
     await makeArtist(userId);
     const { url } = await (await upload(cookie)).json<{ url: string }>();
