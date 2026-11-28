@@ -1,5 +1,5 @@
 import { animate, motion, usePresence, useReducedMotion } from "motion/react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { useData } from "../lib/data";
@@ -168,7 +168,10 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.97 }}
           transition={{ type: "spring", duration: 0.35, bounce: 0.12 }}
-        />
+        >
+          {/* a aura troca de cor junto com a carta (versões, raridade, moldura) */}
+          <div className="spotlight-aura absolute inset-0 rounded-3xl transition-[border-color,box-shadow] duration-300" style={{ "--sp-c": tier.c, "--sp-hi": tier.hi } as CSSProperties} />
+        </motion.div>
       {/* sem rolagem lateral: o clarão da revelação passa da largura do painel no celular */}
       <div
         ref={scrollRef}
