@@ -51,13 +51,15 @@ const MAX_BODY = 2 * ART_SUBMISSION_MAX_BYTES + 64 * 1024;
 const COUNTED = "status IN ('pending', 'rejected')";
 
 const imageUrl = (id: string, layer: "bg" | "fg") => `/api/art-submissions/${id}/image/${layer}`;
+const extOf = (key: string) => key.split(".").pop() ?? "png";
 
 function toSubmission(r: Row, withUser: boolean): ArtSubmission {
   return {
     id: r.id,
     status: r.status,
     image: imageUrl(r.id, "bg"),
-    ...(r.fg_key ? { fg: imageUrl(r.id, "fg") } : {}),
+    ext: extOf(r.image_key),
+    ...(r.fg_key ? { fg: imageUrl(r.id, "fg"), fgExt: extOf(r.fg_key) } : {}),
     layout: parse<ArtLayout>(r.layout_json, { zoom: 100, x: 50, y: 50 }),
     credit: r.credit_url ? { name: r.credit_name, url: r.credit_url } : { name: r.credit_name },
     createdAt: r.created_at,
@@ -88,8 +90,9 @@ async function create(env: Env, request: Request, userId: string): Promise<Respo
   try { meta = JSON.parse(String(form.get("meta") ?? "")) as Record<string, unknown>; } catch { return bad("envio inválido"); }
   // as duas confirmações são obrigatórias: a arte é da pessoa (feita por ela, não por IA) e ela autoriza o uso com crédito
   if (meta.own !== true || meta.consent !== true) return bad("confirme que a arte é sua e autorize o uso", 400, "consent");
+  // o link é obrigatório: é por ele que quem vê a carta chega ao trabalho do artista
   const credit = creditOf(meta.credit);
-  if (!credit) return bad("crédito inválido: nome até 60 caracteres e link http(s)", 400, "credit");
+  if (!credit?.url) return bad("crédito inválido: nome até 60 caracteres e link http(s) obrigatório", 400, "credit");
   const image = await readImage(form, "image");
   if (!image || image === "bad") return bad("imagem PNG, JPG ou WebP de até 5 MB", 400, "image");
   const fg = await readImage(form, "fg");
@@ -204,9 +207,10 @@ export async function artSubmissions(env: Env, request: Request, rest: string): 
   if (request.method === "PATCH") {
     if (!user.admin) return bad("sem permissão", 403);
     const body = (await request.json().catch(() => null)) as { status?: unknown } | null;
-    if (body?.status !== "rejected" && body?.status !== "pending") return bad("status inválido");
-    // arte usada não volta para análise: cada uso copia as imagens para uma carta
-    const res = await env.DB.prepare("UPDATE art_submissions SET status = ? WHERE id = ? AND status != 'used'").bind(body.status, row.id).run();
+    if (body?.status !== "rejected" && body?.status !== "pending" && body?.status !== "used") return bad("status inválido");
+    // "usada" à mão (o admin baixou e aplicou fora daqui) não tem carta e pode voltar atrás;
+    // a usada pelo "usar" fica presa: cada uso copia as imagens para uma carta
+    const res = await env.DB.prepare("UPDATE art_submissions SET status = ? WHERE id = ? AND used_player_id IS NULL").bind(body.status, row.id).run();
     if (!res.meta.changes) return bad("arte já usada numa carta", 409, "not_pending");
     return Response.json({ ok: true });
   }

@@ -13,7 +13,10 @@ export type ArtSubmission = {
   status: "pending" | "used" | "rejected";
   /** Endereços privados (só quem enviou e admins abrem). */
   image: string;
+  /** Extensão dos arquivos (png, jpg, webp), para o download sair com o nome certo. */
+  ext: string;
   fg?: string;
+  fgExt?: string;
   layout: ArtLayout;
   credit: ArtCredit;
   createdAt: number;

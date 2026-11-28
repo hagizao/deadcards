@@ -42,6 +42,7 @@ describe("Banco de artes", () => {
     expect((await send(cookie, { meta: { ...meta, consent: false } })).status).toBe(400);
     expect((await send(cookie, { meta: { ...meta, own: undefined } })).status).toBe(400);
     expect((await send(cookie, { meta: { ...meta, credit: { name: "" } } })).status).toBe(400);
+    expect((await send(cookie, { meta: { ...meta, credit: { name: "@artista" } } })).status).toBe(400);
     expect((await send(cookie, { meta: { ...meta, credit: { name: "a", url: "javascript:alert(1)" } } })).status).toBe(400);
     expect((await send(cookie, { image: "<svg onload=alert(1)>" })).status).toBe(400);
     expect(await list(cookie)).toEqual([]);
@@ -146,5 +147,20 @@ describe("Banco de artes", () => {
     const [s] = await list(cookie);
     expect((await json(cookie, s.id, "DELETE")).status).toBe(200);
     expect(await list(cookie)).toEqual([]);
+  });
+
+  it("admin marca como usada à mão (sem carta) e pode voltar atrás; a lista traz a extensão", async () => {
+    const { cookie } = await login("artista6");
+    await send(cookie, { fg: PNG });
+    const [s] = await list(cookie);
+    expect([s.ext, s.fgExt]).toEqual(["png", "png"]);
+    expect((await json(cookie, s.id, "PATCH", { status: "used" })).status).toBe(403);
+    const adm = await admin();
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "used" })).status).toBe(200);
+    const [used] = await list(cookie);
+    expect([used.status, used.usedPlayerId]).toEqual(["used", undefined]);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "pending" })).status).toBe(200);
+    expect((await list(cookie))[0].status).toBe("pending");
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "aprovada" })).status).toBe(400);
   });
 });
