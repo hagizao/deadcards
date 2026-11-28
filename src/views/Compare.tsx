@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Picker, ScaledCard } from "../components/CardPicker";
 import { STAT_KEYS, getPlayerOvr, teamOf, useLabel } from "../lib/cards";
 import { useData } from "../lib/data";
@@ -13,6 +13,10 @@ const S = strings({
     player: (n: number) => `Jogador ${n}`,
     sides: ["Âmbar", "Safira"],
     empty: "Escolha uma carta para comparar",
+    pick: "Escolher carta",
+    change: "Trocar carta",
+    picking: (side: string) => `Escolhendo a carta ${side}`,
+    done: "Pronto",
     swap: "Trocar lados",
     attributes: "Atributos em confronto",
     attribute: "Atributo",
@@ -24,6 +28,10 @@ const S = strings({
     player: (n: number) => `Player ${n}`,
     sides: ["Amber", "Sapphire"],
     empty: "Pick a card to compare",
+    pick: "Pick a card",
+    change: "Change card",
+    picking: (side: string) => `Picking the ${side} card`,
+    done: "Done",
     swap: "Swap sides",
     attributes: "Head to head",
     attribute: "Attribute",
@@ -35,6 +43,10 @@ const S = strings({
     player: (n: number) => `Jugador ${n}`,
     sides: ["Ámbar", "Zafiro"],
     empty: "Elige una carta para comparar",
+    pick: "Elegir carta",
+    change: "Cambiar carta",
+    picking: (side: string) => `Eligiendo la carta ${side}`,
+    done: "Listo",
     swap: "Cambiar lados",
     attributes: "Atributos frente a frente",
     attribute: "Atributo",
@@ -60,16 +72,33 @@ export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
   const [ids, setIds] = useState(["", ""]);
   const selected = ids.map((id) => players.find((p) => p.id === id));
   const [left, right] = selected;
+  // o seletor abre na largura toda, acima das cartas (nas duas colunas ele ficava espremido)
+  const [picking, setPicking] = useState<number | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (picking === null) return;
+    panel.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }, [picking]);
 
   return (
     <section className="space-y-6">
       <p className="text-xs text-zinc-400">{t.subtitle}</p>
 
+      {picking !== null && (
+        <div ref={panel} className="flex scroll-mt-24 flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-2xl font-extrabold tracking-widest text-area uppercase title-depth">{t.picking(t.sides[picking])}</h2>
+            <button type="button" className={pill(true)} onClick={() => setPicking(null)}>{t.done}</button>
+          </div>
+          <Picker label={t.player(picking + 1)} value={ids[picking]} onChange={(id) => setIds(picking ? [ids[0], id] : [id, ids[1]])} />
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:gap-8">
         {selected.map((p, i) => (
           <div key={i} className={`${SIDES[i].glow} relative isolate flex min-w-0 flex-col gap-4`}>
             <span className={`deco-title font-display text-lg font-extrabold tracking-[0.14em] uppercase title-depth sm:text-2xl ${SIDES[i].label}`}>{t.sides[i]}</span>
-            <Picker label={t.player(i + 1)} value={ids[i]} onChange={(id) => setIds(i ? [ids[0], id] : [id, ids[1]])} />
+            <button type="button" aria-pressed={picking === i} className={`${pill(picking === i)} self-start`} onClick={() => setPicking(i)}>{p ? t.change : t.pick}</button>
             {p ? (
               <>
                 <ScaledCard player={p} onOpen={() => onOpenCard(p.id)} />

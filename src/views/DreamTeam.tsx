@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Picker, ScaledCard } from "../components/CardPicker";
 import { ShareLinkButton } from "../components/ShareCardButton";
 import { STAT_KEYS, getPlayerOvr, useLabel } from "../lib/cards";
@@ -21,6 +21,7 @@ const S = strings({
     averages: "Média dos atributos",
     slot: (n: number) => `Vaga ${n}`,
     pick: "Escolher carta",
+    picking: (n: number) => `Escolhendo a vaga ${n}`,
     change: "Trocar",
     remove: "Tirar",
     done: "Pronto",
@@ -37,6 +38,7 @@ const S = strings({
     averages: "Average attributes",
     slot: (n: number) => `Slot ${n}`,
     pick: "Pick a card",
+    picking: (n: number) => `Picking slot ${n}`,
     change: "Change",
     remove: "Remove",
     done: "Done",
@@ -53,6 +55,7 @@ const S = strings({
     averages: "Promedio de atributos",
     slot: (n: number) => `Puesto ${n}`,
     pick: "Elegir carta",
+    picking: (n: number) => `Eligiendo el puesto ${n}`,
     change: "Cambiar",
     remove: "Quitar",
     done: "Listo",
@@ -73,6 +76,12 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
   const [slots, setSlots] = useState(() => [...(squad ? squad.split(".") : []), ...emptySlots()].slice(0, SQUAD_MAX));
   const [name, setName] = useState(() => (squad ? squadName(new URLSearchParams(location.search).get("n")) : ""));
   const [picking, setPicking] = useState<number | null>(null);
+  // o seletor abre acima das vagas: leva a tela até ele (no celular a vaga clicada pode estar bem abaixo)
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (picking === null) return;
+    panel.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }, [picking]);
 
   const cards = slots.map((id) => (id ? players.find((p) => p.id === id) : undefined));
   const chosen = cards.filter((p): p is Player => !!p);
@@ -101,9 +110,9 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
         </div>
       </div>
 
-      <div className="noir-glass flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
         <div className="flex flex-col">
-          <span className="font-display text-5xl leading-none font-black text-white tabular-nums">{chosen.length ? avg(getPlayerOvr) : "–"}</span>
+          <span className="font-display text-5xl leading-none font-black text-area tabular-nums title-depth">{chosen.length ? avg(getPlayerOvr) : "–"}</span>
           <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.ovr}</span>
         </div>
         <div className="flex min-w-0 flex-col gap-2">
@@ -126,30 +135,32 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
         )}
       </div>
 
+      {picking !== null && (
+        <div ref={panel} className="flex scroll-mt-24 flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-2xl font-extrabold tracking-widest text-area uppercase title-depth">{t.picking(picking + 1)}</h2>
+            <button type="button" className={pill(true)} onClick={() => setPicking(null)}>{t.done}</button>
+          </div>
+          <Picker label={t.pick} value={slots[picking]} onChange={(id) => setSlot(picking, id)} />
+        </div>
+      )}
+
       <ol className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 xl:grid-cols-6">
         {cards.map((card, i) => (
           <li key={i} className="flex min-w-0 flex-col gap-3">
             <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.slot(i + 1)}</span>
-            {picking === i && (
-              <div className="flex flex-col gap-2">
-                <Picker label={t.pick} value={slots[i]} onChange={(id) => setSlot(i, id)} />
-                <button type="button" className={pill(true)} onClick={() => setPicking(null)}>{t.done}</button>
-              </div>
-            )}
             {card ? (
               <>
                 <ScaledCard player={card} onOpen={() => onOpenCard(card.id)} />
                 <p className="text-center text-xs wrap-break-word text-zinc-400"><span className="font-bold text-white">{card.name}</span> · {card.hero}</p>
-                {picking !== i && (
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <button type="button" className={pill(false)} onClick={() => setPicking(i)}>{t.change}</button>
-                    <button type="button" className={pill(false)} onClick={() => setSlot(i, "")}>{t.remove}</button>
-                  </div>
-                )}
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button type="button" aria-pressed={picking === i} className={pill(picking === i)} onClick={() => setPicking(i)}>{t.change}</button>
+                  <button type="button" className={pill(false)} onClick={() => setSlot(i, "")}>{t.remove}</button>
+                </div>
               </>
-            ) : picking !== i && (
-              <button type="button" onClick={() => setPicking(i)}
-                className="flex aspect-295/430 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-zinc-200/15 p-4 text-center text-xs font-bold text-zinc-300 transition-colors hover:border-zinc-200/40 hover:bg-zinc-100/5 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10">
+            ) : (
+              <button type="button" aria-pressed={picking === i} onClick={() => setPicking(i)}
+                className="flex aspect-295/430 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-zinc-200/15 p-4 text-center text-xs font-bold text-zinc-300 transition-colors hover:border-zinc-200/40 hover:bg-zinc-100/5 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10 aria-pressed:border-area aria-pressed:text-area">
                 <span aria-hidden="true" className="text-3xl leading-none">+</span>
                 {t.pick}
               </button>
