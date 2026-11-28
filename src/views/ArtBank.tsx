@@ -141,7 +141,8 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
   const otherName = !!s.user && norm(s.user) !== norm(s.credit.name);
 
   const card: Player = {
-    ...previewCard(base, { ...s.layout, frame: frame || undefined }, s.image, withFg ? s.fg : undefined, s.credit),
+    // as cores que o artista escolheu valem só na moldura que ele testou
+    ...previewCard(base, { ...s.layout, frame: frame || undefined, frameTune: frame === s.layout.frame ? s.layout.frameTune : undefined }, s.image, withFg ? s.fg : undefined, s.credit),
     id: `art-${s.id}`,
     specialText: undefined,
   };
@@ -150,6 +151,7 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
     `Zoom ${s.layout.zoom} · X ${s.layout.x} · Y ${s.layout.y}`,
     s.layout.fg && `Frente: zoom ${s.layout.fg.zoom} · X ${s.layout.fg.x} · Y ${s.layout.fg.y}`,
     s.layout.frame && `Moldura: ${FRAME_PRESETS[s.layout.frame]?.name ?? s.layout.frame}`,
+    s.layout.frameTune && [s.layout.frameTune.c1 && `Cor ${s.layout.frameTune.c1}`, s.layout.frameTune.c2 && `brilho ${s.layout.frameTune.c2}`, s.layout.frameTune.pad && `espessura ${s.layout.frameTune.pad}`].filter(Boolean).join(" · "),
   ].filter(Boolean).join("\n");
   const copy = () => void navigator.clipboard.writeText(layoutText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
 

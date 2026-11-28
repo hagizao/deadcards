@@ -18,6 +18,7 @@ const S = strings({
     whole: "Imagem", bgLayer: "Fundo", fgLayer: "Personagem", fgFormat: "PNG transparente, só o personagem.",
     formats: `PNG, JPG ou WebP, até ${ART_SUBMISSION_MAX_BYTES / 1024 / 1024} MB.`,
     preview: "Testar na carta", card: "Carta da prévia", frame: "Moldura especial", frameDefault: "Padrão da carta",
+    frameC1: "Cor da moldura", frameC2: "Cor do brilho", framePad: "Espessura", frameReset: "Cores originais",
     zoom: "Zoom", x: "X", y: "Y", fgZoom: "Zoom do personagem", fgX: "X do personagem", fgY: "Y do personagem",
     credit: "Seu nome no crédito", creditPh: "@seunome", link: "Seu link", linkPh: "https://instagram.com/seunome",
     own: "Fiz esta arte (não é de IA nem de outra pessoa).",
@@ -36,6 +37,7 @@ const S = strings({
     whole: "Image", bgLayer: "Background", fgLayer: "Character", fgFormat: "Transparent PNG with just the character.",
     formats: `PNG, JPG or WebP, up to ${ART_SUBMISSION_MAX_BYTES / 1024 / 1024} MB.`,
     preview: "Test on a card", card: "Preview card", frame: "Special frame", frameDefault: "Card default",
+    frameC1: "Frame color", frameC2: "Glow color", framePad: "Thickness", frameReset: "Original colors",
     zoom: "Zoom", x: "X", y: "Y", fgZoom: "Character zoom", fgX: "Character X", fgY: "Character Y",
     credit: "Your name in the credit", creditPh: "@yourname", link: "Your link", linkPh: "https://instagram.com/yourname",
     own: "I made this art (not AI and not someone else's).",
@@ -54,6 +56,7 @@ const S = strings({
     whole: "Imagen", bgLayer: "Fondo", fgLayer: "Personaje", fgFormat: "PNG transparente, solo el personaje.",
     formats: `PNG, JPG o WebP, hasta ${ART_SUBMISSION_MAX_BYTES / 1024 / 1024} MB.`,
     preview: "Probar en la carta", card: "Carta de la vista previa", frame: "Marco especial", frameDefault: "El de la carta",
+    frameC1: "Color del marco", frameC2: "Color del brillo", framePad: "Grosor", frameReset: "Colores originales",
     zoom: "Zoom", x: "X", y: "Y", fgZoom: "Zoom del personaje", fgX: "X del personaje", fgY: "Y del personaje",
     credit: "Tu nombre en el crédito", creditPh: "@tunombre", link: "Tu enlace", linkPh: "https://instagram.com/tunombre",
     own: "Hice esta arte (no es de IA ni de otra persona).",
@@ -136,6 +139,7 @@ export function ArtSubmit() {
   const player = cards.find((p) => p.id === playerId) ?? cards[0];
   const set = (patch: Partial<ArtLayout>) => setLayout((l) => ({ ...l, ...patch }));
   const setFg = (patch: Partial<NonNullable<ArtLayout["fg"]>>) => setLayout((l) => ({ ...l, fg: { ...l.fg!, ...patch } }));
+  const setTune = (patch: Partial<NonNullable<ArtLayout["frameTune"]>>) => setLayout((l) => ({ ...l, frameTune: { ...l.frameTune, ...patch } }));
   const chooseSplit = (on: boolean) => { setSplit(on); if (!on) fg.setFile(undefined); };
   const labels = { pick: t.pick, change: t.change, zoom: t.zoom, x: t.x, y: t.y };
 
@@ -185,7 +189,7 @@ export function ArtSubmit() {
         <div className="flex justify-center lg:sticky lg:top-28 lg:w-80 lg:shrink-0">
           {player && bg.url
             ? <Card player={previewCard(player, { ...layout, fg: fg.url ? layout.fg : undefined }, bg.url, fg.url, credit.name.trim() ? { name: credit.name.trim() } : undefined)} />
-            : player && <Card player={{ ...player, special: true, frame: layout.frame ? { style: layout.frame } : player.frame }} />}
+            : player && <Card player={{ ...player, special: true, frame: layout.frame ? { style: layout.frame, ...layout.frameTune } : player.frame }} />}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-7">
@@ -212,14 +216,33 @@ export function ArtSubmit() {
               </select>
             </label>
             <div role="group" aria-label={t.frame} className="flex flex-wrap gap-2">
-              <button type="button" aria-pressed={!layout.frame} onClick={() => set({ frame: undefined })} className={pill(!layout.frame)}>{t.frameDefault}</button>
+              <button type="button" aria-pressed={!layout.frame} onClick={() => set({ frame: undefined, frameTune: undefined })} className={pill(!layout.frame)}>{t.frameDefault}</button>
               {Object.entries(FRAME_PRESETS).map(([key, pr]) => (
-                <button key={key} type="button" aria-pressed={layout.frame === key} onClick={() => set({ frame: key })} className={pill(layout.frame === key)}>
+                // trocar de moldura volta às cores dela, como no Editor da carta
+                <button key={key} type="button" aria-pressed={layout.frame === key} onClick={() => set({ frame: key, frameTune: undefined })} className={pill(layout.frame === key)}>
                   <span aria-hidden="true" className="size-2.5 rounded-full" style={{ background: `linear-gradient(135deg, ${pr.c1}, ${pr.c2})` }} />
                   {pr.name}
                 </button>
               ))}
             </div>
+            {layout.frame && FRAME_PRESETS[layout.frame] && (
+              <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+                <label className="flex flex-col gap-1.5 text-xs font-bold tracking-wider text-zinc-300 uppercase">
+                  {t.frameC1}
+                  <input type="color" value={layout.frameTune?.c1 ?? FRAME_PRESETS[layout.frame].c1} onChange={(e) => setTune({ c1: e.target.value })}
+                    className="h-11 w-20 cursor-pointer rounded-lg bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:h-10" />
+                </label>
+                <label className="flex flex-col gap-1.5 text-xs font-bold tracking-wider text-zinc-300 uppercase">
+                  {t.frameC2}
+                  <input type="color" value={layout.frameTune?.c2 ?? FRAME_PRESETS[layout.frame].c2} onChange={(e) => setTune({ c2: e.target.value })}
+                    className="h-11 w-20 cursor-pointer rounded-lg bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:h-10" />
+                </label>
+                <div className="min-w-40 flex-1 sm:max-w-60">
+                  <Range label={t.framePad} value={layout.frameTune?.pad ?? FRAME_PRESETS[layout.frame].pad} min={2} max={10} onChange={(v) => setTune({ pad: v })} />
+                </div>
+                {layout.frameTune && <button type="button" onClick={() => set({ frameTune: undefined })} className={pill(false)}>{t.frameReset}</button>}
+              </div>
+            )}
           </fieldset>
 
           <div className="flex flex-wrap gap-4">

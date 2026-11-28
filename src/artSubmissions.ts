@@ -36,7 +36,15 @@ export function layoutOf(v: unknown, hasFg: boolean): ArtLayout {
   const fg = (l.fg && typeof l.fg === "object" ? l.fg : {}) as Record<string, unknown>;
   const out: ArtLayout = { zoom: clamp(l.zoom, 50, 300, 100), x: clamp(l.x, 0, 100, 50), y: clamp(l.y, 0, 100, 50) };
   if (hasFg) out.fg = { zoom: clamp(fg.zoom, 50, 300, 100), x: clamp(fg.x, 0, 100, 50), y: clamp(fg.y, 0, 100, 50) };
-  if (typeof l.frame === "string" && /^[a-z-]{1,32}$/.test(l.frame)) out.frame = l.frame;
+  if (typeof l.frame === "string" && /^[a-z-]{1,32}$/.test(l.frame)) {
+    out.frame = l.frame;
+    // cores só em hex e espessura nos limites do Editor; só valem junto com uma moldura
+    const tune = (l.frameTune && typeof l.frameTune === "object" ? l.frameTune : {}) as Record<string, unknown>;
+    const hex = (v: unknown) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : undefined);
+    const frameTune = { c1: hex(tune.c1), c2: hex(tune.c2), pad: tune.pad === undefined ? undefined : clamp(tune.pad, 2, 10, 4) };
+    const kept = Object.fromEntries(Object.entries(frameTune).filter(([, v]) => v !== undefined));
+    if (Object.keys(kept).length) out.frameTune = kept;
+  }
   if (typeof l.playerId === "string" && ID_RE.test(l.playerId)) out.playerId = l.playerId;
   return out;
 }

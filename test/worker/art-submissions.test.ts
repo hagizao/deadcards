@@ -163,4 +163,13 @@ describe("Banco de artes", () => {
     expect((await list(cookie))[0].status).toBe("pending");
     expect((await json(adm.cookie, s.id, "PATCH", { status: "aprovada" })).status).toBe(400);
   });
+
+  it("guarda as cores e a espessura da moldura só válidas e só com moldura", async () => {
+    const { cookie } = await login("artista7");
+    await send(cookie, { meta: { ...meta, layout: { zoom: 100, x: 50, y: 50, frame: "deco", frameTune: { c1: "#FF0000", c2: "red;}", pad: 99, x: 1 } } } });
+    await send(cookie, { meta: { ...meta, layout: { zoom: 100, x: 50, y: 50, frameTune: { c1: "#00ff00" } } } });
+    const [semMoldura, comMoldura] = await list(cookie);
+    expect(comMoldura.layout.frameTune).toEqual({ c1: "#ff0000", pad: 10 });
+    expect(semMoldura.layout.frameTune).toBeUndefined();
+  });
 });

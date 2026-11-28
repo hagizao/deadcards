@@ -6,7 +6,9 @@ export const ART_SUBMISSION_MAX_BYTES = 5 * 1024 * 1024;
 export const ART_SUBMISSIONS_PATH = "/api/art-submissions";
 
 export type ArtLayer = { zoom: number; x: number; y: number };
-export type ArtLayout = ArtLayer & { fg?: ArtLayer; frame?: string; playerId?: string };
+/** Cores e espessura da moldura, como no Editor da carta; sem elas, as da moldura escolhida. */
+export type FrameTune = { c1?: string; c2?: string; pad?: number };
+export type ArtLayout = ArtLayer & { fg?: ArtLayer; frame?: string; frameTune?: FrameTune; playerId?: string };
 
 export type ArtSubmission = {
   id: string;
@@ -30,7 +32,7 @@ export function previewCard(player: Player, layout: ArtLayout, image: string, fg
   return {
     ...player,
     special: true,
-    frame: layout.frame ? { style: layout.frame } : player.frame,
+    frame: layout.frame ? { style: layout.frame, ...layout.frameTune } : player.frame,
     art: {
       url: image, zoom: layout.zoom, x: layout.x, y: layout.y,
       ...(fg && layout.fg ? { fg: { url: fg, ...layout.fg } } : {}),
