@@ -44,10 +44,15 @@ const byIds = (players: Player[], ids: string[]) => ids.map((id) => players.find
 const CARD_W = 266;
 
 /**
+ * `headerClassName` e `railClassName` posicionam as duas partes na grade do perfil: o cabeçalho ao lado da ficha
+ * e a faixa ao lado da carta, com as cartas alinhadas a ela.
+ *
  * Vitrine do artista, no lugar das conquistas: as cartas ativas com a arte da pessoa numa faixa que rola para os lados
  * (como o elenco na aba Times), o botão de curtir o artista (o total soma as curtidas das cartas e as do perfil) e o portfólio.
  */
-export function ArtistShowcase({ artist, userId, name, own, onOpenCard }: { artist: ArtistInfo; userId: string; name: string; own: boolean; onOpenCard: (id: string) => void }) {
+export function ArtistShowcase({ artist, userId, name, own, onOpenCard, headerClassName = "", railClassName = "" }: {
+  artist: ArtistInfo; userId: string; name: string; own: boolean; onOpenCard: (id: string) => void; headerClassName?: string; railClassName?: string;
+}) {
   const t = useT(S);
   const { players } = useData();
   const cards = byIds(players, artist.cards).filter((p) => !isRetired(p));
@@ -56,8 +61,9 @@ export function ArtistShowcase({ artist, userId, name, own, onOpenCard }: { arti
   const rail = useRail(rowEl, cards.length, { item: CARD_W, gap: 24 });
 
   return (
-    <section aria-labelledby="profile-artist-title" className="flex min-w-0 flex-1 flex-col gap-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    // display: contents: o cabeçalho e a faixa viram células da grade do perfil
+    <section aria-labelledby="profile-artist-title" className="contents">
+      <div className={`flex min-w-0 flex-wrap items-end justify-between gap-4 ${headerClassName}`}>
         <div className="flex flex-col gap-2">
           {/* título um terço maior que o das conquistas, em degradê rosa com brilho */}
           <h2 id="profile-artist-title" className="flex items-center gap-3 font-display text-5xl font-black tracking-wide uppercase">
@@ -71,13 +77,16 @@ export function ArtistShowcase({ artist, userId, name, own, onOpenCard }: { arti
             </a>
           )}
         </div>
-        <LikeButton path={artistLikesPath(userId)} own={own} />
+        <div className="flex flex-col items-end gap-3">
+          <LikeButton path={artistLikesPath(userId)} own={own} />
+          <RailArrows rail={rail} prev={t.prev} next={t.next} />
+        </div>
       </div>
       {cards.length ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-end"><RailArrows rail={rail} prev={t.prev} next={t.next} /></div>
-          {/* o fade das pontas é uma máscara e corta tudo fora da caixa: o padding em volta dá lugar ao brilho e à subida do hover */}
-          <div ref={setRowEl} className={`${rail.fadeStrong} overflow-x-clip px-12 pt-12 pb-14 rail-glow`}>
+        <div className={`min-w-0 ${railClassName}`}>
+          {/* o fade das pontas é uma máscara e corta tudo fora da caixa: o padding em volta dá lugar ao brilho e à subida do hover.
+              pt-17 = o pt-12 da coluna da carta + metade da diferença de altura (430 − 389): os centros das cartas se alinham */}
+          <div ref={setRowEl} className={`${rail.fadeStrong} overflow-x-clip px-16 pt-17 pb-28 rail-glow`}>
             <motion.ul className="flex gap-6" {...rail.track}>
               {cards.map((p, i) => (
                 <li key={p.id} className="h-[389px] w-[266px] shrink-0 drop-shadow-[0_0_24px_rgb(244_63_94/0.3)]" inert={rail.hidden(i) || undefined}>
@@ -87,7 +96,7 @@ export function ArtistShowcase({ artist, userId, name, own, onOpenCard }: { arti
             </motion.ul>
           </div>
         </div>
-      ) : <p className="text-sm text-zinc-400">{t.empty}</p>}
+      ) : <p className={`text-sm text-zinc-400 ${railClassName}`}>{t.empty}</p>}
     </section>
   );
 }

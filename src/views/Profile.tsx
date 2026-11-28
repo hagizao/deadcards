@@ -151,6 +151,25 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
     </div>
   );
 
+  const cardBlock = (
+    <>
+      {card && <div ref={cardRef} className="w-fit max-w-full"><Card player={profilePlayer(card)} /></div>}
+      {card && tier ? (
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <span className="font-display text-4xl/none font-black text-dl-text tabular-nums">{calculateOVR(card.stats)}</span>
+          <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">OVR</span>
+          <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.name}</span>
+        </div>
+      ) : <p className="text-sm text-zinc-400">{t.noCard}</p>}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {owner && <button type="button" onClick={() => setEditing(true)} className={primaryBtn}>{card ? t.edit : t.create}</button>}
+        <button type="button" onClick={share} className={pill(false)}>{t.share}</button>
+        {card && <CardExportButton cardRef={cardRef} name={card.name} />}
+      </div>
+      {copy && <p role="status" className={`text-sm ${copy === "copied" ? "text-emerald-300" : "text-red-300"}`}>{t[copy]}</p>}
+    </>
+  );
+
   return (
     <section className="flex flex-col gap-6" aria-labelledby="profile-title">
       {editing ? (
@@ -165,32 +184,29 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
       ) : (
         // carta do perfil à esquerda (só a carta, sem os atributos detalhados) e conquistas ocupando o resto da largura;
         // atrás, a arte da carta (a própria ou a do herói), grande e na cor da raridade dela
-        <div className="relative isolate flex flex-col gap-6 lg:flex-row">
+        // no perfil de artista vira grade: ficha e cabeçalho da vitrine em cima, carta e faixa de cartas embaixo, alinhadas
+        <div className={`relative isolate flex flex-col gap-6 ${profile.artist ? "lg:grid lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-x-6" : "lg:flex-row"}`}>
           {art && tier && (
-            <div aria-hidden="true" className="dossier-hero pointer-events-none absolute -top-28 -left-56 -z-10 size-176" style={{ "--hero-c": tier.c } as CSSProperties}>
+            <div aria-hidden="true" className={`dossier-hero pointer-events-none absolute -top-28 -left-56 -z-10 size-176 ${profile.artist ? "dossier-hero-artist" : ""}`} style={{ "--hero-c": tier.c } as CSSProperties}>
               <img src={art.url} alt="" className="size-full object-cover object-top" style={card?.art ? { objectPosition: `${card.art.x ?? 50}% ${card.art.y ?? 50}%` } : undefined} />
             </div>
           )}
-          <div className="flex flex-col items-center gap-5 lg:w-fit lg:shrink-0">
-            <div className="w-full lg:max-w-96">{identity}</div>
-            {card && <div ref={cardRef} className="w-fit max-w-full"><Card player={profilePlayer(card)} /></div>}
-            {card && tier ? (
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <span className="font-display text-4xl/none font-black text-dl-text tabular-nums">{calculateOVR(card.stats)}</span>
-                <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">OVR</span>
-                <span className="rk-chip" style={{ color: tier.c, borderColor: tier.c }}>{tier.name}</span>
+          {profile.artist ? (
+            <>
+              <div className="flex flex-col items-center lg:col-start-1 lg:row-start-1"><div className="w-full lg:max-w-96">{identity}</div></div>
+              <div className="flex flex-col items-center gap-5 lg:col-start-1 lg:row-start-2 lg:pt-12">{cardBlock}</div>
+              <ArtistShowcase artist={profile.artist} userId={profile.id} name={profile.name} own={owner} onOpenCard={onOpenCard}
+                headerClassName="lg:col-start-2 lg:row-start-1" railClassName="lg:col-start-2 lg:row-start-2" />
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col items-center gap-5 lg:w-fit lg:shrink-0">
+                <div className="w-full lg:max-w-96">{identity}</div>
+                {cardBlock}
               </div>
-            ) : <p className="text-sm text-zinc-400">{t.noCard}</p>}
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {owner && <button type="button" onClick={() => setEditing(true)} className={primaryBtn}>{card ? t.edit : t.create}</button>}
-              <button type="button" onClick={share} className={pill(false)}>{t.share}</button>
-              {card && <CardExportButton cardRef={cardRef} name={card.name} />}
-            </div>
-            {copy && <p role="status" className={`text-sm ${copy === "copied" ? "text-emerald-300" : "text-red-300"}`}>{t[copy]}</p>}
-          </div>
-          {profile.artist
-            ? <ArtistShowcase artist={profile.artist} userId={profile.id} name={profile.name} own={owner} onOpenCard={onOpenCard} />
-            : <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />}
+              <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />
+            </>
+          )}
         </div>
       )}
 

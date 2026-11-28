@@ -572,6 +572,10 @@ select { color-scheme: dark; }
   background: var(--hero-c);
   mix-blend-mode: color;
 }
+/* perfil de artista: o fundo pinta a arte no mesmo degradê do pincel do título (rosa → fúcsia) */
+.dossier-hero-artist::after {
+  background: linear-gradient(115deg, var(--color-rose-200), var(--color-rose-400) 45%, var(--color-fuchsia-500));
+}
 .dossier-showcase::before {
   content: "";
   position: absolute;
