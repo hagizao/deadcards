@@ -6,9 +6,9 @@ import { likesPath, type CardLikes } from "../lib/likes";
 import { Icon } from "./Icon";
 
 const S = strings({
-  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: "Curta para dar moral para quem fez a arte", signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida." },
-  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: "Like it to cheer on the artist", signIn: "Sign in to like", failed: "Could not save the like." },
-  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: "Dale me gusta para animar a quien hizo el arte", signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta." },
+  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: "Dê moral para o artista", signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida." },
+  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: "Cheer on the artist", signIn: "Sign in to like", failed: "Could not save the like." },
+  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: "Anima al artista", signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta." },
 });
 
 /**
@@ -71,7 +71,7 @@ export function LikeButton({ id }: { id: string }) {
   );
 
   return (
-    <div ref={scope} className="flex flex-col items-start gap-1.5 sm:items-end">
+    <div ref={scope} className="flex w-fit flex-col items-center gap-1.5">
       {me ? (
         <motion.button type="button" aria-pressed={liked} aria-label={`${liked ? t.liked : t.like} · ${t.count(likes?.count ?? 0)}`} disabled={busy}
           whileTap={still ? undefined : { scale: 0.95 }} onClick={flip} className={look}>
@@ -80,8 +80,8 @@ export function LikeButton({ id }: { id: string }) {
       ) : (
         <a href="/login" className={look} aria-label={`${t.signIn} · ${t.count(likes?.count ?? 0)}`} title={t.signIn}>{body}</a>
       )}
-      <span className="max-w-52 text-xs text-zinc-400 sm:text-right">{me ? t.hint : t.signIn}</span>
-      {failed && <p role="alert" className="max-w-52 text-sm text-red-300 sm:text-right">{t.failed}</p>}
+      <span className="text-xs whitespace-nowrap text-zinc-400">{me ? t.hint : t.signIn}</span>
+      {failed && <p role="alert" className="max-w-52 text-center text-sm text-red-300">{t.failed}</p>}
     </div>
   );
 }
