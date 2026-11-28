@@ -11,7 +11,7 @@ import { POSITIONS, STAT_KEYS, calculateOVR, getPlayerOvr, teamOf, useLabel } fr
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
 import { MAX_FAVORITES, PROFILE_ART_PATH, PROFILE_CARD_PATH, PROFILE_NAME_MAX, profilePlayer, profileUrl, summarizeCollection, type ProfileCard, type ProfileCardState, type PublicProfile } from "../lib/profile";
-import { getCardTier } from "../lib/rarity";
+import { FRAME_PRESETS, getCardTier } from "../lib/rarity";
 import { useMyCards } from "../lib/myCards";
 import type { Player } from "../lib/types";
 import { easeOut, field, pill, primaryBtn } from "../lib/ui";
@@ -36,6 +36,8 @@ const S = strings({
     not_artist: "Só artistas podem usar arte própria na carta.", invalid_image: "Envie uma imagem PNG, JPG ou WebP de até 5 MB.",
     art: "Arte da carta", artHint: "Como artista, você pode usar uma arte sua na carta. Sem ela, a carta usa a arte do herói.",
     artUpload: "Enviar arte", artChange: "Trocar arte", artRemove: "Tirar arte", uploading: "Enviando…",
+    frame: "Moldura", frameHint: "Escolha uma moldura de carta especial e ajuste as cores e a espessura.", frameNone: "Sem moldura",
+    frameColor: "Cor da moldura", frameGlow: "Cor do brilho", frameWidth: "Espessura",
   },
   en: {
     favorites: "Favorites", favoritesHint: `Open a card and tap Favorite: up to ${MAX_FAVORITES} are featured here.`,
@@ -54,6 +56,8 @@ const S = strings({
     not_artist: "Only artists can use their own art on the card.", invalid_image: "Send a PNG, JPG or WebP image up to 5 MB.",
     art: "Card art", artHint: "As an artist, you can use your own art on the card. Without it, the card uses the hero art.",
     artUpload: "Upload art", artChange: "Change art", artRemove: "Remove art", uploading: "Uploading…",
+    frame: "Frame", frameHint: "Pick a special card frame and tune its colors and thickness.", frameNone: "No frame",
+    frameColor: "Frame color", frameGlow: "Glow color", frameWidth: "Thickness",
   },
   es: {
     favorites: "Favoritas", favoritesHint: `Abre una carta y toca Marcar favorita: hasta ${MAX_FAVORITES} se destacan aquí.`,
@@ -72,6 +76,8 @@ const S = strings({
     not_artist: "Solo los artistas pueden usar arte propio en la carta.", invalid_image: "Envía una imagen PNG, JPG o WebP de hasta 5 MB.",
     art: "Arte de la carta", artHint: "Como artista, puedes usar un arte tuyo en la carta. Sin él, la carta usa el arte del héroe.",
     artUpload: "Enviar arte", artChange: "Cambiar arte", artRemove: "Quitar arte", uploading: "Enviando…",
+    frame: "Marco", frameHint: "Elige un marco de carta especial y ajusta los colores y el grosor.", frameNone: "Sin marco",
+    frameColor: "Color del marco", frameGlow: "Color del brillo", frameWidth: "Grosor",
   },
 });
 
@@ -97,7 +103,8 @@ function issueOf(error: unknown): Issue {
   return (ISSUES as string[]).includes(code) ? code as Issue : "unavailable";
 }
 
-export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOpenCard: (id: string) => void; onRedeem: () => void }) {
+/** `onArtist`: avisa se o perfil aberto é de artista, para o fundo do site pegar o degradê rosa. */
+export function Profile({ userId, onOpenCard, onRedeem, onArtist }: { userId: string; onOpenCard: (id: string) => void; onRedeem: () => void; onArtist: (artist: boolean) => void }) {
   const t = useT(S);
   const { me, settings, heroArt } = useData();
   const [profile, setProfile] = useState<PublicProfile>();
@@ -117,6 +124,12 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
       .catch((e) => { if (!controller.signal.aborted) setError(issueOf(e)); });
     return () => controller.abort();
   }, [userId, version]);
+
+  const isArtist = !!profile?.artist;
+  useEffect(() => {
+    onArtist(isArtist);
+    return () => onArtist(false);
+  }, [isArtist, onArtist]);
 
   const share = () => {
     navigator.clipboard.writeText(location.origin + profileUrl(profile?.handle ?? userId))
@@ -482,6 +495,37 @@ function ProfileEditor({ artist, onSaved, onCancel }: { artist: boolean; onSaved
                   <Range label="Zoom" value={card.art.zoom ?? 100} min={50} max={300} onChange={(v) => update({ art: { ...card.art!, zoom: v } })} />
                   <Range label="X" value={card.art.x ?? 50} min={0} max={100} onChange={(v) => update({ art: { ...card.art!, x: v } })} />
                   <Range label="Y" value={card.art.y ?? 50} min={0} max={100} onChange={(v) => update({ art: { ...card.art!, y: v } })} />
+                </div>
+              )}
+            </fieldset>
+          )}
+          {artist && (
+            <fieldset className="flex flex-col gap-3" disabled={busy}>
+              <legend className="mb-3 text-sm font-bold text-zinc-100">{t.frame}</legend>
+              <p className="text-xs text-zinc-400">{t.frameHint}</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" aria-pressed={!card.frame} onClick={() => update({ frame: undefined })} className={pill(!card.frame)}>{t.frameNone}</button>
+                {Object.entries(FRAME_PRESETS).map(([key, preset]) => (
+                  <button key={key} type="button" aria-pressed={card.frame?.style === key} onClick={() => update({ frame: { style: key } })} className={pill(card.frame?.style === key)}>
+                    {/* amostra nas cores da própria moldura: dado, não tema */}
+                    <span aria-hidden="true" className="size-3 rounded-full" style={{ background: `linear-gradient(135deg, ${preset.c1}, ${preset.c2})` }} />
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+              {card.frame && (
+                <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+                  <label className="flex flex-col gap-1.5 text-xs font-bold text-zinc-300">
+                    {t.frameColor}
+                    <input type="color" className="h-11 w-full cursor-pointer rounded-lg bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+                      value={card.frame.c1 ?? FRAME_PRESETS[card.frame.style]?.c1} onChange={(e) => update({ frame: { ...card.frame!, c1: e.target.value } })} />
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-xs font-bold text-zinc-300">
+                    {t.frameGlow}
+                    <input type="color" className="h-11 w-full cursor-pointer rounded-lg bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+                      value={card.frame.c2 ?? FRAME_PRESETS[card.frame.style]?.c2} onChange={(e) => update({ frame: { ...card.frame!, c2: e.target.value } })} />
+                  </label>
+                  <Range label={t.frameWidth} value={card.frame.pad ?? FRAME_PRESETS[card.frame.style]?.pad ?? 4} min={2} max={10} onChange={(v) => update({ frame: { ...card.frame!, pad: v } })} />
                 </div>
               )}
             </fieldset>

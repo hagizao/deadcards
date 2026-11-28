@@ -22,11 +22,14 @@ export async function profileCard(env: Env, request: Request): Promise<Response>
 
   const card = parseProfileCard(await request.json().catch(() => null));
   if (!card) return json({ code: "invalid_card" }, 400);
-  if (card.art) {
-    // arte própria é só de artista, e só a que a própria conta enviou; quem deixou de ser artista pode manter a que já tinha
-    const kept = await env.DB.prepare("SELECT json_extract(snapshot, '$.art.url') AS url FROM profile_cards WHERE user_id = ?").bind(user.id).first<string | null>("url");
-    if (!card.art.url.startsWith(profileArtPrefix(user.id))) return json({ code: "invalid_card" }, 400);
-    if (kept !== card.art.url && !(await isArtist(env, user.id))) return json({ code: "not_artist" }, 403);
+  if (card.art && !card.art.url.startsWith(profileArtPrefix(user.id))) return json({ code: "invalid_card" }, 400);
+  if (card.art || card.frame) {
+    // arte própria e moldura são só de artista (a arte, só a que a própria conta enviou);
+    // quem deixou de ser artista pode manter a arte e a moldura que já tinha, sem trocar
+    const kept = await env.DB.prepare("SELECT json_extract(snapshot, '$.art.url') AS url, json_extract(snapshot, '$.frame') AS frame FROM profile_cards WHERE user_id = ?")
+      .bind(user.id).first<{ url: string | null; frame: string | null }>();
+    const changed = (card.art && kept?.url !== card.art.url) || (card.frame && kept?.frame !== JSON.stringify(card.frame));
+    if (changed && !(await isArtist(env, user.id))) return json({ code: "not_artist" }, 403);
   }
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO profile_cards (user_id, snapshot, updated_at) VALUES (?, ?, ?)

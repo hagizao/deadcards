@@ -17,7 +17,7 @@ const upload = (cookie: string, bytes: Uint8Array<ArrayBuffer> = PNG) => {
   form.set("image", new File([bytes], "arte.png"));
   return call("POST", PROFILE_ART_PATH, cookie, form);
 };
-const card = (art?: unknown) => JSON.stringify({ name: "Eu", hero: "Abrams", stats: { MIR: 50, MAC: 50, SUP: 50, MOV: 50, POL: 50, CON: 50 }, ...(art ? { art } : {}) });
+const card = (art?: unknown, frame?: unknown) => JSON.stringify({ name: "Eu", hero: "Abrams", stats: { MIR: 50, MAC: 50, SUP: 50, MOV: 50, POL: 50, CON: 50 }, ...(art ? { art } : {}), ...(frame ? { frame } : {}) });
 
 describe("Curtir o artista", () => {
   it("soma curtidas das cartas e do perfil; uma por conta; ninguém curte o próprio perfil", async () => {
@@ -70,5 +70,20 @@ describe("Arte na carta de perfil", () => {
     await env.DB.prepare("DELETE FROM artists WHERE user_id = ?").bind(userId).run();
     expect((await call("PUT", PROFILE_CARD_PATH, cookie, card({ url, zoom: 130, x: 40, y: 60 }))).status).toBe(200);
     expect((await call("PUT", PROFILE_CARD_PATH, cookie, card({ url: `/img/profile-art/${userId}/outra.png` }))).status).toBe(403);
+  });
+
+  it("moldura: só artista escolhe, só molduras do Editor e valores dentro dos limites", async () => {
+    const frame = { style: "deco", c1: "#ff3366", c2: "#ffffff", pad: 6 };
+    expect((await call("PUT", PROFILE_CARD_PATH, cookie, card(undefined, frame))).status).toBe(403);
+    await makeArtist(userId);
+    expect((await call("PUT", PROFILE_CARD_PATH, cookie, card(undefined, frame))).status).toBe(200);
+    expect((await (await call("GET", `/api/users/${userId}`)).json<PublicProfile>()).card?.frame).toEqual(frame);
+    for (const bad of [{ style: "constructor" }, { style: "deco", c1: "red" }, { style: "deco", pad: 11 }, { style: "deco", pad: 2.5 }])
+      expect((await call("PUT", PROFILE_CARD_PATH, cookie, card(undefined, bad))).status).toBe(400);
+
+    // deixou de ser artista: mantém a moldura que já tinha, mas não troca
+    await env.DB.prepare("DELETE FROM artists WHERE user_id = ?").bind(userId).run();
+    expect((await call("PUT", PROFILE_CARD_PATH, cookie, card(undefined, frame))).status).toBe(200);
+    expect((await call("PUT", PROFILE_CARD_PATH, cookie, card(undefined, { ...frame, pad: 8 }))).status).toBe(403);
   });
 });
