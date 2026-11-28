@@ -46,6 +46,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
   const label = useLabel();
   const { teams, players, settings, heroIcon, me, artists } = useData();
   const player = preview ?? players.find((p) => p.id === playerId);
+  // o artista vinculado à carta (handle ou id da conta), para o "ver perfil" ao lado do curtir
+  const artistKey = player?.art?.credit && !preview ? artists?.[player.id] : undefined;
   const cardRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   // o clarão termina maior que a carta (e invisível): fica na tela só durante a revelação, senão cria rolagem no painel
@@ -202,11 +204,21 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
                 </p>
               )}
               {player.art?.credit && (
-                <ArtCreditLine credit={player.art.credit} label={t.artBy} profileLabel={t.profile}
-                  onProfile={!preview && onOpenProfile && artists?.[player.id] ? () => onOpenProfile(artists[player.id]) : undefined} />
+                <ArtCreditLine credit={player.art.credit} label={t.artBy} />
               )}
             </div>
-            {player.special && !preview && <div className="order-last w-full sm:order-0 sm:w-auto"><LikeButton path={likesPath(player.id)} /></div>}
+            {(player.special || artistKey) && !preview && (
+              // curtir e, embaixo, o perfil do artista no site (quando a carta está vinculada a um)
+              <div className="order-last flex w-full flex-col items-start gap-2 sm:order-0 sm:w-auto sm:items-center">
+                {player.special && <LikeButton path={likesPath(player.id)} />}
+                {artistKey && onOpenProfile && (
+                  <button type="button" onClick={() => onOpenProfile(artistKey)} className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-bold tracking-widest text-rose-200 uppercase transition hover:bg-rose-500/10 hover:text-rose-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-rose-500/20 sm:min-h-9">
+                    <Icon name="brush" className="size-3.5" />
+                    {t.profile}
+                  </button>
+                )}
+              </div>
+            )}
             <button type="button" onClick={onClose} aria-label={t.close} className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-zinc-800/60 text-zinc-300 transition hover:bg-zinc-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:size-9"><Icon name="x" /></button>
           </div>
 
@@ -291,27 +303,19 @@ function useOwnerCount(id: string | undefined) {
 }
 
 /** `onProfile`: o artista tem perfil no site; o nome leva até ele e o link de fora vira "portfólio ↗". */
-/** O nome do artista leva ao link que ele mandou; com `onProfile` (artista com perfil no site), "ver perfil" embaixo leva ao perfil dele aqui. */
-export function ArtCreditLine({ credit, label, onProfile, profileLabel }: { credit: ArtCredit; label: string; onProfile?: () => void; profileLabel?: string }) {
+/** O nome do artista leva ao link que ele mandou (o perfil dele no site fica junto do curtir, no Spotlight). */
+export function ArtCreditLine({ credit, label }: { credit: ArtCredit; label: string }) {
   const external = !!credit.url && /^https?:\/\//i.test(credit.url);
   return (
-    <div className="mt-1 flex flex-col items-start gap-1 text-xs text-zinc-400">
-      <p>
-        {label}{" "}
-        {external ? (
-          <a href={credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm font-bold text-zinc-100 underline decoration-zinc-500 underline-offset-2 transition hover:decoration-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">
-            {credit.name} <span aria-hidden="true">↗</span>
-          </a>
-        ) : (
-          <span className="font-bold text-zinc-100">{credit.name}</span>
-        )}
-      </p>
-      {onProfile && (
-        <button type="button" onClick={onProfile} className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-sm font-bold text-rose-200 underline decoration-rose-300/50 underline-offset-2 transition hover:decoration-rose-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white sm:min-h-0">
-          <Icon name="brush" className="size-3.5" />
-          {profileLabel}
-        </button>
+    <p className="mt-1 text-xs text-zinc-400">
+      {label}{" "}
+      {external ? (
+        <a href={credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm font-bold text-zinc-100 underline decoration-zinc-500 underline-offset-2 transition hover:decoration-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">
+          {credit.name} <span aria-hidden="true">↗</span>
+        </a>
+      ) : (
+        <span className="font-bold text-zinc-100">{credit.name}</span>
       )}
-    </div>
+    </p>
   );
 }
