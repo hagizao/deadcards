@@ -6,17 +6,18 @@ import type { CardLikes } from "../lib/likes";
 import { Icon } from "./Icon";
 
 const S = strings({
-  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: "Dê uma moral para o artista.", signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida.", likes: "Curtidas", own: "Curtidas do seu perfil." },
-  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: "Cheer on the artist.", signIn: "Sign in to like", failed: "Could not save the like.", likes: "Likes", own: "Your profile likes." },
-  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: "Anima al artista.", signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta.", likes: "Me gusta", own: "Los me gusta de tu perfil." },
+  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: ["Dê uma moral para o ", "artista", "."], signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida.", likes: "Curtidas", own: "Curtidas do seu perfil." },
+  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: ["Cheer on the ", "artist", "."], signIn: "Sign in to like", failed: "Could not save the like.", likes: "Likes", own: "Your profile likes." },
+  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: ["Anima al ", "artista", "."], signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta.", likes: "Me gusta", own: "Los me gusta de tu perfil." },
 });
 
 /**
  * Curtir: botão grande, com o total à vista de todos, para dar moral para quem fez a arte.
  * `path` é a API das curtidas (de uma carta especial ou do perfil do artista). Sem login, o mesmo botão leva para entrar;
  * `own` (o seu próprio perfil) mostra só o total, sem curtir.
+ * `onArtist`: a palavra "artista" da dica vira link para o perfil do artista no site (a dica aparece mesmo sem login).
  */
-export function LikeButton({ path, own = false }: { path: string; own?: boolean }) {
+export function LikeButton({ path, own = false, onArtist }: { path: string; own?: boolean; onArtist?: () => void }) {
   const id = path;
   const t = useT(S);
   const { me } = useData();
@@ -94,7 +95,13 @@ export function LikeButton({ path, own = false }: { path: string; own?: boolean 
       ) : (
         <a href="/login" className={look} aria-label={`${t.signIn} · ${t.count(likes?.count ?? 0)}`} title={t.signIn}>{body}</a>
       )}
-      <span className="text-xs whitespace-nowrap text-zinc-400">{me ? t.hint : t.signIn}</span>
+      {onArtist ? (
+        <span className="text-xs whitespace-nowrap text-zinc-400">
+          {t.hint[0]}
+          <button type="button" onClick={onArtist} className="cursor-pointer rounded-sm font-bold text-rose-200 underline decoration-rose-300/50 underline-offset-2 transition hover:text-rose-100 hover:decoration-rose-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">{t.hint[1]}</button>
+          {t.hint[2]}
+        </span>
+      ) : <span className="text-xs whitespace-nowrap text-zinc-400">{me ? t.hint.join("") : t.signIn}</span>}
       {failed && <p role="alert" className="max-w-52 text-center text-sm text-red-300">{t.failed}</p>}
     </div>
   );
