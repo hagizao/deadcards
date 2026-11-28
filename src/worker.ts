@@ -119,7 +119,7 @@ async function appData(env: Env): Promise<Response> {
     env.DB.prepare("SELECT * FROM settings"),
     env.DB.prepare("SELECT * FROM tournaments ORDER BY created_at, id"),
     // calendário: do mês passado em diante (o resto do histórico não aparece no site)
-    env.DB.prepare(`SELECT * FROM tournament_dates WHERE starts_at >= unixepoch() - ${SCHEDULE_PAST_DAYS} * 86400 ORDER BY starts_at, id`),
+    env.DB.prepare("SELECT * FROM tournament_dates WHERE starts_at >= unixepoch() - ? ORDER BY starts_at, id").bind(SCHEDULE_PAST_DAYS * 86400),
   ]);
   const s = Object.fromEntries((settings.results as { key: string; value_json: string }[]).map((r) => [r.key, parse<unknown>(r.value_json, null)]));
   return Response.json({
