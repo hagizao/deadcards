@@ -128,6 +128,11 @@ async function applyToCard(env: Env, row: Row, request: Request): Promise<Respon
   // artes do banco só vão em cartas especiais
   if (extra.special !== true) return bad("as artes do banco só vão em cartas especiais", 400, "not_special");
 
+  // reserva a arte antes de copiar: dois "usar" ao mesmo tempo não aplicam a mesma arte em duas cartas
+  const claim = await env.DB.prepare("UPDATE art_submissions SET status = 'used', used_player_id = ? WHERE id = ? AND status = 'pending'").bind(playerId, row.id).run();
+  if (!claim.meta.changes) return bad("só dá para usar arte em análise", 409, "not_pending");
+  const release = () => env.DB.prepare("UPDATE art_submissions SET status = 'pending', used_player_id = NULL WHERE id = ?").bind(row.id).run();
+
   const copy = async (key: string) => {
     const obj = await env.ASSETS_BUCKET.get(key);
     if (!obj) return null;
@@ -135,16 +140,18 @@ async function applyToCard(env: Env, row: Row, request: Request): Promise<Respon
     await env.ASSETS_BUCKET.put(dest, await obj.arrayBuffer(), { httpMetadata: obj.httpMetadata });
     return `/img/${dest}`;
   };
-  const url = await copy(row.image_key);
-  if (!url) return bad("imagem da arte não encontrada", 404);
-  const fgUrl = row.fg_key ? await copy(row.fg_key) : null;
-  const layout = parse<ArtLayout>(row.layout_json, { zoom: 100, x: 50, y: 50 });
-  const credit: ArtCredit = row.credit_url ? { name: row.credit_name, url: row.credit_url } : { name: row.credit_name };
-  extra.art = { url, zoom: layout.zoom, x: layout.x, y: layout.y, credit, ...(fgUrl && layout.fg ? { fg: { url: fgUrl, ...layout.fg } } : {}) };
-  await env.DB.batch([
-    env.DB.prepare("UPDATE players SET extra_json = ? WHERE id = ?").bind(JSON.stringify(extra), playerId),
-    env.DB.prepare("UPDATE art_submissions SET status = 'used', used_player_id = ? WHERE id = ?").bind(playerId, row.id),
-  ]);
+  try {
+    const url = await copy(row.image_key);
+    if (!url) { await release(); return bad("imagem da arte não encontrada", 404); }
+    const fgUrl = row.fg_key ? await copy(row.fg_key) : null;
+    const layout = parse<ArtLayout>(row.layout_json, { zoom: 100, x: 50, y: 50 });
+    const credit: ArtCredit = row.credit_url ? { name: row.credit_name, url: row.credit_url } : { name: row.credit_name };
+    extra.art = { url, zoom: layout.zoom, x: layout.x, y: layout.y, credit, ...(fgUrl && layout.fg ? { fg: { url: fgUrl, ...layout.fg } } : {}) };
+    await env.DB.prepare("UPDATE players SET extra_json = ? WHERE id = ?").bind(JSON.stringify(extra), playerId).run();
+  } catch (err) {
+    await release();
+    throw err;
+  }
   return Response.json({ ok: true });
 }
 
@@ -198,7 +205,9 @@ export async function artSubmissions(env: Env, request: Request, rest: string): 
     if (!user.admin) return bad("sem permissão", 403);
     const body = (await request.json().catch(() => null)) as { status?: unknown } | null;
     if (body?.status !== "rejected" && body?.status !== "pending") return bad("status inválido");
-    await env.DB.prepare("UPDATE art_submissions SET status = ? WHERE id = ?").bind(body.status, row.id).run();
+    // arte usada não volta para análise: cada uso copia as imagens para uma carta
+    const res = await env.DB.prepare("UPDATE art_submissions SET status = ? WHERE id = ? AND status != 'used'").bind(body.status, row.id).run();
+    if (!res.meta.changes) return bad("arte já usada numa carta", 409, "not_pending");
     return Response.json({ ok: true });
   }
   return bad("método não suportado", 405);

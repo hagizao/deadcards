@@ -88,6 +88,7 @@ describe("Banco de artes", () => {
     expect((await SELF.fetch(`http://test${art.url}`)).status).toBe(200);
     const [used] = await list(cookie);
     expect([used.status, used.usedPlayerId]).toEqual(["used", "p1"]);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "pending" })).status).toBe(409);
     // usada, quem enviou não apaga mais; o admin pode
     expect((await json(cookie, s.id, "DELETE")).status).toBe(409);
     expect((await json(adm.cookie, s.id, "DELETE")).status).toBe(200);
@@ -124,6 +125,19 @@ describe("Banco de artes", () => {
     expect((await json(adm.cookie, `${s.id}/use`, "POST", { playerId: "p2" })).status).toBe(409);
     expect((await json(cookie, s.id, "DELETE")).status).toBe(200);
     expect((await send(cookie)).status).toBe(200);
+  });
+
+  it("dois usos ao mesmo tempo aplicam a arte numa carta só", async () => {
+    const { cookie } = await login("disputada");
+    await send(cookie);
+    const [s] = await list(cookie);
+    const adm = await admin();
+    for (const id of ["p3", "p4"]) {
+      await seedPlayer(id);
+      await env.DB.prepare(`UPDATE players SET extra_json = '{"special":true}' WHERE id = ?`).bind(id).run();
+    }
+    const res = await Promise.all(["p3", "p4"].map((id) => json(adm.cookie, `${s.id}/use`, "POST", { playerId: id })));
+    expect(res.map((r) => r.status).sort()).toEqual([200, 409]);
   });
 
   it("quem enviou apaga a própria arte em análise", async () => {
