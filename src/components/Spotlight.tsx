@@ -325,7 +325,8 @@ export function ArtCreditLine({ credit, label, size = "text-xs" }: { credit: Art
       {label}{" "}
       {external ? (
         <a href={credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm font-bold text-zinc-100 underline decoration-zinc-500 underline-offset-2 transition hover:decoration-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">
-          {credit.name} <span aria-hidden="true">↗</span>
+          {/* espaço que não quebra: a seta nunca cai sozinha na linha de baixo */}
+          {credit.name}{" "}<span aria-hidden="true">↗</span>
         </a>
       ) : (
         <span className="font-bold text-zinc-100">{credit.name}</span>
