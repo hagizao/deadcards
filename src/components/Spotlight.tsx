@@ -26,15 +26,15 @@ const revealed = new Set<string>();
 const S = strings({
   pt: { notOwned: "Você não possui esta carta", favorite: "Favoritar", favorited: "Favorita", limit: `Até ${MAX_FAVORITES} favoritas. Abra uma favorita e desmarque para marcar outra.`, failed: "Não foi possível salvar a favorita.",
     owners: (n: number) => (n === 0 ? "Ninguém tem esta carta ainda" : n === 1 ? "1 conta tem esta carta" : `${n.toLocaleString("pt-BR")} contas têm esta carta`),
-    cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por", portfolio: "portfólio",
+    cardOf: (name: string) => `Carta de ${name}`, close: "Fechar", special: "Especial", edit: "Editar carta", versions: "Versões", main: "Principal", version: "Versão", artBy: "Arte por", profile: "ver perfil",
     stats: "Atributos" },
   en: { notOwned: "You don't own this card", favorite: "Favorite", favorited: "Favorite", limit: `Up to ${MAX_FAVORITES} favorites. Open one and unmark it to pick another.`, failed: "Could not save the favorite.",
     owners: (n: number) => (n === 0 ? "Nobody owns this card yet" : n === 1 ? "1 account owns this card" : `${n.toLocaleString("en-US")} accounts own this card`),
-    cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", versions: "Versions", main: "Main", version: "Version", artBy: "Art by", portfolio: "portfolio",
+    cardOf: (name: string) => `${name}'s card`, close: "Close", special: "Special", edit: "Edit card", versions: "Versions", main: "Main", version: "Version", artBy: "Art by", profile: "view profile",
     stats: "Attributes" },
   es: { notOwned: "No tienes esta carta", favorite: "Marcar favorita", favorited: "Favorita", limit: `Hasta ${MAX_FAVORITES} favoritas. Abre una y desmárcala para marcar otra.`, failed: "No se pudo guardar la favorita.",
     owners: (n: number) => (n === 0 ? "Nadie tiene esta carta todavía" : n === 1 ? "1 cuenta tiene esta carta" : `${n.toLocaleString("es")} cuentas tienen esta carta`),
-    cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de", portfolio: "portafolio",
+    cardOf: (name: string) => `Carta de ${name}`, close: "Cerrar", special: "Especial", edit: "Editar carta", versions: "Versiones", main: "Principal", version: "Versión", artBy: "Arte de", profile: "ver perfil",
     stats: "Atributos" },
 });
 
@@ -202,7 +202,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
                 </p>
               )}
               {player.art?.credit && (
-                <ArtCreditLine credit={player.art.credit} label={t.artBy} portfolio={t.portfolio}
+                <ArtCreditLine credit={player.art.credit} label={t.artBy} profileLabel={t.profile}
                   onProfile={!preview && onOpenProfile && artists?.[player.id] ? () => onOpenProfile(artists[player.id]) : undefined} />
               )}
             </div>
@@ -291,33 +291,27 @@ function useOwnerCount(id: string | undefined) {
 }
 
 /** `onProfile`: o artista tem perfil no site; o nome leva até ele e o link de fora vira "portfólio ↗". */
-export function ArtCreditLine({ credit, label, onProfile, portfolio }: { credit: ArtCredit; label: string; onProfile?: () => void; portfolio?: string }) {
+/** O nome do artista leva ao link que ele mandou; com `onProfile` (artista com perfil no site), "ver perfil" embaixo leva ao perfil dele aqui. */
+export function ArtCreditLine({ credit, label, onProfile, profileLabel }: { credit: ArtCredit; label: string; onProfile?: () => void; profileLabel?: string }) {
   const external = !!credit.url && /^https?:\/\//i.test(credit.url);
-  if (onProfile) return (
-    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-zinc-400">
-      <span>
-        {label}{" "}
-        <button type="button" onClick={onProfile} className="cursor-pointer rounded-sm font-bold text-rose-200 underline decoration-rose-300/50 underline-offset-2 transition hover:decoration-rose-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">
-          {credit.name}
-        </button>
-      </span>
-      {external && (
-        <a href={credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm text-zinc-400 underline decoration-zinc-600 underline-offset-2 transition hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
-          {portfolio} <span aria-hidden="true">↗</span>
-        </a>
-      )}
-    </p>
-  );
   return (
-    <p className="mt-1 text-xs text-zinc-400">
-      {label}{" "}
-      {external ? (
-        <a href={credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm font-bold text-zinc-100 underline decoration-zinc-500 underline-offset-2 transition hover:decoration-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">
-          {credit.name}
-        </a>
-      ) : (
-        <span className="font-bold text-zinc-100">{credit.name}</span>
+    <div className="mt-1 flex flex-col items-start gap-1 text-xs text-zinc-400">
+      <p>
+        {label}{" "}
+        {external ? (
+          <a href={credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm font-bold text-zinc-100 underline decoration-zinc-500 underline-offset-2 transition hover:decoration-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white">
+            {credit.name} <span aria-hidden="true">↗</span>
+          </a>
+        ) : (
+          <span className="font-bold text-zinc-100">{credit.name}</span>
+        )}
+      </p>
+      {onProfile && (
+        <button type="button" onClick={onProfile} className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-sm font-bold text-rose-200 underline decoration-rose-300/50 underline-offset-2 transition hover:decoration-rose-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:text-white sm:min-h-0">
+          <Icon name="brush" className="size-3.5" />
+          {profileLabel}
+        </button>
       )}
-    </p>
+    </div>
   );
 }
