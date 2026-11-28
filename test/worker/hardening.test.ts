@@ -1,5 +1,5 @@
 import { SELF, env } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { login, seedCode, seedPlayer } from "../helpers/fixtures";
 import { PROFILE_CARD_PATH } from "../../src/lib/profile";
 
@@ -65,6 +65,8 @@ describe("histórico da carta do perfil", () => {
 
 describe("login por idToken", () => {
   it("está desligado", async () => {
+    // o Better Auth registra a recusa como erro no console; o espião só tira o erro esperado da saída do teste
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await SELF.fetch("http://test/api/auth/sign-in/social", {
       method: "POST",
       headers: { origin: "http://test", "content-type": "application/json" },
@@ -72,5 +74,6 @@ describe("login por idToken", () => {
     });
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(JSON.stringify(await res.json())).toContain("ID_TOKEN_NOT_SUPPORTED");
+    logged.mockRestore();
   });
 });

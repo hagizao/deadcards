@@ -46,7 +46,11 @@ describe("handle do perfil", () => {
     mockProviders("Bad Name!", null);
     await syncHandle(env, { userId, providerId: "twitch", accessToken: "t" });
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    // a falha do provedor é registrada no console e não quebra o login; o espião só tira o erro esperado da saída do teste
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     await syncHandle(env, { userId, providerId: "twitch", accessToken: "t" });
+    expect(logged).toHaveBeenCalledWith("handle sync failed", expect.any(Error));
+    logged.mockRestore();
     await syncHandle(env, { userId, providerId: "twitch", accessToken: null });
     expect(await handleOf(env, userId)).toBeNull();
   });
