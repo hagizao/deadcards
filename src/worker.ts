@@ -23,7 +23,7 @@ export interface Env {
 }
 
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
-const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home", "packs", "events"];
+const UPLOAD_FOLDERS = ["players", "teams", "heroes", "home", "packs", "events"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "altHero", "inactive", "exclusive", "art"];
 const ID_RE = /^[\w-]{1,64}$/;
