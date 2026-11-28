@@ -227,7 +227,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
             {/* a prévia de uma arte enviada não é uma carta do site: não tem link para compartilhar */}
             {!preview && <ShareCardButton key={player.id} id={player.id} name={player.name} />}
             {onEdit && <button type="button" onClick={() => onEdit(player.id)} className={`${pill(true)} ml-auto hover:bg-white`}>{t.edit}</button>}
-            {player.special && player.specialText && <span className="text-xs font-bold text-amber-200">✦ {player.specialText}</span>}
+            {player.special && player.specialText && <span className="text-sm font-bold text-amber-200">✦ {player.specialText}</span>}
           </div>
           {favIssue?.id === player.id && <p role="alert" className="text-sm text-red-300">{t[favIssue.r]}</p>}
 
