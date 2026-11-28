@@ -402,7 +402,7 @@ function Shell() {
       </nav>
 
       <AnimatePresence>
-        {spotlight && <Spotlight key="spotlight" playerId={spotlight} onClose={() => setSpotlight(null)} onSwitch={setSpotlight} onEdit={me?.admin ? editCard : undefined} />}
+        {spotlight && <Spotlight key="spotlight" playerId={spotlight} onClose={() => setSpotlight(null)} onSwitch={setSpotlight} onEdit={me?.admin ? editCard : undefined} onOpenProfile={(key) => { setSpotlight(null); openProfile(key); }} />}
       </AnimatePresence>
     </>
   );

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useDeferredValue, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { ProfileSkeleton } from "../components/Skeleton";
 import { Achievements } from "../components/Achievements";
+import { ArtistAdminPanel, ArtistBadge, ProfileArtist } from "../components/ArtistArea";
 import { Card } from "../components/Card";
 import { CardExportButton } from "../components/CardExportButton";
 import { Icon } from "../components/Icon";
@@ -95,6 +96,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
   const [copy, setCopy] = useState<"copied" | "copyFailed">();
   const cardRef = useRef<HTMLDivElement>(null);
 
+  const [version, setVersion] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     profileRequest<PublicProfile>(`/api/users/${encodeURIComponent(userId)}`, { signal: controller.signal })
@@ -104,7 +106,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
       })
       .catch((e) => { if (!controller.signal.aborted) setError(issueOf(e)); });
     return () => controller.abort();
-  }, [userId]);
+  }, [userId, version]);
 
   const share = () => {
     navigator.clipboard.writeText(location.origin + profileUrl(profile?.handle ?? userId))
@@ -132,6 +134,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
         {/* nome do perfil um terço menor que o título das abas (pageTitle) */}
         <h1 id="profile-title" className="font-display text-2xl font-extrabold tracking-[0.11em] text-balance wrap-break-word text-area uppercase title-depth sm:text-[2rem] lg:text-2xl">{profile.name}</h1>
         {profile.handle && <p className="truncate text-sm font-semibold text-zinc-300">@{profile.handle}</p>}
+        {profile.artist && <ArtistBadge />}
         {card && <p className="truncate text-sm text-zinc-400">{card.name} · {card.hero}</p>}
       </div>
     </div>
@@ -177,6 +180,8 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
         </div>
       )}
 
+      {me?.admin && <ArtistAdminPanel userId={profile.id} onChanged={() => setVersion((v) => v + 1)} />}
+      <ProfileArtist artist={profile.artist} name={profile.name} onOpenCard={onOpenCard} />
       {editing && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />}
       <ProfileFavorites ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} />
       <ProfileCards ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} onRedeem={onRedeem} />
