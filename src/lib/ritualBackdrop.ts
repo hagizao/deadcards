@@ -1,4 +1,7 @@
 /**
+ * A animação original do fundo do site, guardada como fonte: o site toca o vídeo gravado dela (`npm run ritual:render`),
+ * porque desenhar isto a cada quadro travava a página. Daqui o site só usa `grainTile`.
+ *
  * Fundo animado do site: o ritual visto de longe. Um redemoinho achatado pela perspectiva sobre uma cidade
  * art déco, com um olho de luz no centro, um feixe até a torre mais alta, almas subindo das janelas e
  * relâmpagos raros. Canvas 2D puro, sem React: o componente só cria, troca a cor e destrói.
