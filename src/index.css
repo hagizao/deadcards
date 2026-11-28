@@ -25,6 +25,8 @@
   /* cor da área atual (lib/areas.ts troca por aba); fora de uma área, o bege do site */
   --color-area: #ffefd7;
   --color-dl-black: #10130d;
+  /* cinza da mistura "color": tira a saturação do que fica embaixo (fundo do ritual e perfil de artista) */
+  --color-graphite: #8a8a8a;
   --color-dl-bevel-from: #373d45;
   --color-dl-bevel-to: #4d5860;
   --color-dl-bevel-hover-from: #4c5561;
@@ -577,7 +579,7 @@ select { color-scheme: dark; }
    (carimbo, pincel, curtir) */
 .dossier-hero-artist::after,
 .ritual-tint-artist {
-  background: #8a8a8a;
+  background: var(--color-graphite);
 }
 .dossier-showcase::before {
   content: "";
@@ -598,4 +600,10 @@ select { color-scheme: dark; }
   z-index: -1;
   background: radial-gradient(40% 35% at 50% 50%, color-mix(in srgb, var(--side) 16%, transparent), transparent 100%);
   pointer-events: none;
+}
+
+/* janela modal aberta (editor da carta do perfil): a página embaixo não rola, e o espaço da barra fica para nada pular */
+html:has(dialog[open]) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
 }

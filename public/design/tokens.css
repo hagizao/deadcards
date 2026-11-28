@@ -21,6 +21,7 @@
   --color-dl-text: #ffefd7;
   --color-area: #ffefd7; /* trocado por aba em src/lib/areas.ts */
   --color-dl-black: #10130d;
+  --color-graphite: #8a8a8a; /* mistura "color" que tira a saturação: ritual e perfil de artista */
   --color-br-green: #00b84a;
   --color-br-yellow: #ffd400;
   --color-amber-hand: #ff9a3c;
