@@ -130,7 +130,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="font-typewriter text-xs tracking-[0.2em] text-zinc-300 uppercase">{t.file} {fileNo(profile.id)}</span>
         {/* nome do perfil um terço menor que o título das abas (pageTitle) */}
-        <h1 id="profile-title" className="font-display text-2xl font-extrabold tracking-[0.11em] text-balance wrap-break-word text-area uppercase title-depth sm:text-[2rem]">{profile.name}</h1>
+        <h1 id="profile-title" className="font-display text-2xl font-extrabold tracking-[0.11em] text-balance wrap-break-word text-area uppercase title-depth sm:text-[2rem] lg:text-2xl">{profile.name}</h1>
         {profile.handle && <p className="truncate text-sm font-semibold text-zinc-300">@{profile.handle}</p>}
         {card && <p className="truncate text-sm text-zinc-400">{card.name} · {card.hero}</p>}
       </div>
@@ -157,7 +157,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
             </div>
           )}
           <div className="flex flex-col items-center gap-5 lg:w-fit lg:shrink-0">
-            <div className="w-full lg:max-w-80">{identity}</div>
+            <div className="w-full lg:max-w-96">{identity}</div>
             {card && <div ref={cardRef} className="w-fit max-w-full"><Card player={profilePlayer(card)} /></div>}
             {card && tier ? (
               <div className="flex flex-wrap items-center justify-center gap-3">

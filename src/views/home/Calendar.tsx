@@ -187,8 +187,8 @@ export function Calendar() {
                 const br = evs.some((ev) => ev.brazil);
                 const tip = hot?.cell === k ? evs.filter((ev) => ev.t.id === hot.id) : [];
                 const col = i % 7;
-                // nas duas primeiras semanas o balão abre para baixo, para não cobrir o nome do mês
-                const below = i < 14;
+                // o balão abre para baixo e só sobe na última semana: para cima ele cobriria o nome do mês e os dias da semana
+                const below = i < cells.length - 7;
                 return (
                   <div key={k} className="relative">
                     <button
