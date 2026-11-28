@@ -42,6 +42,7 @@ describe("Banco de artes", () => {
     expect((await send(cookie, { meta: { ...meta, consent: false } })).status).toBe(400);
     expect((await send(cookie, { meta: { ...meta, own: undefined } })).status).toBe(400);
     expect((await send(cookie, { meta: { ...meta, credit: { name: "" } } })).status).toBe(400);
+    expect((await send(cookie, { meta: { ...meta, credit: { name: "@artista" } } })).status).toBe(400);
     expect((await send(cookie, { meta: { ...meta, credit: { name: "a", url: "javascript:alert(1)" } } })).status).toBe(400);
     expect((await send(cookie, { image: "<svg onload=alert(1)>" })).status).toBe(400);
     expect(await list(cookie)).toEqual([]);
@@ -146,5 +147,61 @@ describe("Banco de artes", () => {
     const [s] = await list(cookie);
     expect((await json(cookie, s.id, "DELETE")).status).toBe(200);
     expect(await list(cookie)).toEqual([]);
+  });
+
+  it("admin marca como usada à mão (sem carta) e pode voltar atrás; a lista traz a extensão", async () => {
+    const { cookie } = await login("artista6");
+    await send(cookie, { fg: PNG });
+    const [s] = await list(cookie);
+    expect([s.ext, s.fgExt]).toEqual(["png", "png"]);
+    expect((await json(cookie, s.id, "PATCH", { status: "used" })).status).toBe(403);
+    const adm = await admin();
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "used" })).status).toBe(200);
+    const [used] = await list(cookie);
+    expect([used.status, used.usedPlayerId]).toEqual(["used", undefined]);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "pending" })).status).toBe(200);
+    expect((await list(cookie))[0].status).toBe("pending");
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "aprovada" })).status).toBe(400);
+  });
+
+  it("guarda as cores e a espessura da moldura só válidas e só com moldura", async () => {
+    const { cookie } = await login("artista7");
+    await send(cookie, { meta: { ...meta, layout: { zoom: 100, x: 50, y: 50, frame: "deco", frameTune: { c1: "#FF0000", c2: "red;}", pad: 99, x: 1 } } } });
+    await send(cookie, { meta: { ...meta, layout: { zoom: 100, x: 50, y: 50, frameTune: { c1: "#00ff00" } } } });
+    const [semMoldura, comMoldura] = await list(cookie);
+    expect(comMoldura.layout.frameTune).toEqual({ c1: "#ff0000", pad: 10 });
+    expect(semMoldura.layout.frameTune).toBeUndefined();
+  });
+
+  it("recusa com motivo: quem enviou vê; voltar para análise apaga o motivo", async () => {
+    const { cookie } = await login("artista8");
+    await send(cookie);
+    const [s] = await list(cookie);
+    const adm = await admin();
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "rejected", reason: 42 })).status).toBe(400);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "rejected", reason: `  ${"x".repeat(250)}  ` })).status).toBe(200);
+    const [rejected] = await list(cookie);
+    expect([rejected.status, rejected.reason?.length]).toEqual(["rejected", 200]);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "pending" })).status).toBe(200);
+    expect((await list(cookie))[0].reason).toBeUndefined();
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "rejected" })).status).toBe(200);
+    expect((await list(cookie))[0]).toMatchObject({ status: "rejected" });
+    expect((await list(cookie))[0].reason).toBeUndefined();
+  });
+
+  it("guardada libera espaço no limite, pode voltar para análise e ainda vai para carta", async () => {
+    const { cookie } = await login("guardado");
+    for (let i = 0; i < 10; i++) await send(cookie);
+    expect((await send(cookie)).status).toBe(409);
+    const adm = await admin();
+    const [s] = await list(cookie);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "saved" })).status).toBe(200);
+    expect((await list(cookie)).find((x) => x.id === s.id)?.status).toBe("saved");
+    expect((await send(cookie)).status).toBe(200);
+    await seedPlayer("p3");
+    await env.DB.prepare(`UPDATE players SET extra_json = '{"special":true}' WHERE id = 'p3'`).run();
+    expect((await json(adm.cookie, `${s.id}/use`, "POST", { playerId: "p3" })).status).toBe(200);
+    expect((await list(cookie)).find((x) => x.id === s.id)?.status).toBe("used");
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "nope" })).status).toBe(400);
   });
 });
