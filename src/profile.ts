@@ -1,7 +1,8 @@
 import { artistInfo } from "./artists";
 import { currentUser } from "./auth";
 import type { Env } from "./worker";
-import { MAX_FAVORITES, parseProfileCard, type ProfileCard, type ProfileCardState, type PublicProfile } from "./lib/profile";
+import { sniffImage } from "./artSubmissions";
+import { MAX_FAVORITES, PROFILE_ART_MAX_BYTES, parseProfileCard, profileArtPrefix, type ProfileCard, type ProfileCardState, type PublicProfile } from "./lib/profile";
 
 const HISTORY_LIMIT = 20;
 
@@ -21,6 +22,12 @@ export async function profileCard(env: Env, request: Request): Promise<Response>
 
   const card = parseProfileCard(await request.json().catch(() => null));
   if (!card) return json({ code: "invalid_card" }, 400);
+  if (card.art) {
+    // arte própria é só de artista, e só a que a própria conta enviou; quem deixou de ser artista pode manter a que já tinha
+    const kept = await env.DB.prepare("SELECT json_extract(snapshot, '$.art.url') AS url FROM profile_cards WHERE user_id = ?").bind(user.id).first<string | null>("url");
+    if (!card.art.url.startsWith(profileArtPrefix(user.id))) return json({ code: "invalid_card" }, 400);
+    if (kept !== card.art.url && !(await isArtist(env, user.id))) return json({ code: "not_artist" }, 403);
+  }
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO profile_cards (user_id, snapshot, updated_at) VALUES (?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET snapshot = excluded.snapshot, updated_at = excluded.updated_at
@@ -81,4 +88,23 @@ export async function favorite(env: Env, request: Request, playerId: string): Pr
   }
   const { results } = await favoritesQuery(env, user.id).all<{ player_id: string }>();
   return json({ favorites: results.map((r) => r.player_id) });
+}
+
+const isArtist = async (env: Env, userId: string) => !!(await env.DB.prepare("SELECT 1 FROM artists WHERE user_id = ?").bind(userId).first());
+
+/** POST com a imagem no campo `image`: guarda a arte da carta de perfil no R2 e devolve o endereço. Só artistas. */
+export async function profileArt(env: Env, request: Request): Promise<Response> {
+  const user = await currentUser(env, request);
+  if (!user) return json({ code: "login" }, 401);
+  if (request.method !== "POST") return json({ code: "method" }, 405);
+  if (!(await isArtist(env, user.id))) return json({ code: "not_artist" }, 403);
+  const form = await request.formData().catch(() => null);
+  const file = form?.get("image");
+  if (!file || typeof file === "string") return json({ code: "invalid_image" }, 400);
+  const buf = await file.arrayBuffer();
+  const kind = buf.byteLength && buf.byteLength <= PROFILE_ART_MAX_BYTES ? sniffImage(buf) : null;
+  if (!kind) return json({ code: "invalid_image" }, 400);
+  const key = `profile-art/${user.id}/${crypto.randomUUID()}.${kind.ext}`;
+  await env.ASSETS_BUCKET.put(key, buf, { httpMetadata: { contentType: kind.type } });
+  return json({ url: `/img/${key}` });
 }

@@ -1,12 +1,12 @@
 /// <reference types="@cloudflare/workers-types" />
 import { createAuth, currentUser } from "./auth";
-import { favorite, profileCard, publicProfile } from "./profile";
+import { favorite, profileArt, profileCard, publicProfile } from "./profile";
 import { cardLikes } from "./likes";
 import { artists, artistsByCard } from "./artists";
 import { ARTISTS_PATH } from "./lib/artists";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
-import { PROFILE_CARD_PATH } from "./lib/profile";
+import { PROFILE_ART_PATH, PROFILE_CARD_PATH } from "./lib/profile";
 import { HOME_FEATURED_MAX, SCHEDULE_LABEL_MAX, TOURNAMENT_DESC_MAX, TOURNAMENT_NAME_MAX } from "./lib/types";
 import { artCredit, imgUrl, parse, playerFromRow } from "./rows";
 import { packTypes, packs } from "./packs";
@@ -444,6 +444,7 @@ export default {
     }
     if (url.pathname.startsWith("/api/account/link/")) return accountLink(env, request, url.pathname.slice("/api/account/link/".length));
     if (url.pathname === PROFILE_CARD_PATH) return profileCard(env, request);
+    if (url.pathname === PROFILE_ART_PATH) return profileArt(env, request);
     const fav = url.pathname.match(/^\/api\/favorites\/([^/]+)$/);
     if (fav) return favorite(env, request, decode(fav[1]) ?? "");
     const profileUser = url.pathname.match(/^\/api\/users\/([^/]+)$/);
