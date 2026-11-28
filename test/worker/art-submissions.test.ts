@@ -197,6 +197,7 @@ describe("Banco de artes", () => {
     const [s] = await list(cookie);
     expect((await json(adm.cookie, s.id, "PATCH", { status: "saved" })).status).toBe(200);
     expect((await list(cookie)).find((x) => x.id === s.id)?.status).toBe("saved");
+    expect((await json(cookie, s.id, "DELETE")).status).toBe(409);
     expect((await send(cookie)).status).toBe(200);
     await seedPlayer("p3");
     await env.DB.prepare(`UPDATE players SET extra_json = '{"special":true}' WHERE id = 'p3'`).run();

@@ -143,7 +143,7 @@ async function applyToCard(env: Env, row: Row, request: Request): Promise<Respon
 
   // reserva a arte antes de copiar: dois "usar" ao mesmo tempo não aplicam a mesma arte em duas cartas
   const claim = await env.DB.prepare("UPDATE art_submissions SET status = 'used', used_player_id = ? WHERE id = ? AND status IN ('pending', 'saved')").bind(playerId, row.id).run();
-  if (!claim.meta.changes) return bad("só dá para usar arte em análise", 409, "not_pending");
+  if (!claim.meta.changes) return bad("só dá para usar arte em análise ou guardada", 409, "not_pending");
   const release = () => env.DB.prepare("UPDATE art_submissions SET status = ?, used_player_id = NULL WHERE id = ?").bind(row.status, row.id).run();
 
   const copy = async (key: string) => {
@@ -209,7 +209,7 @@ export async function artSubmissions(env: Env, request: Request, rest: string): 
 
   if (request.method === "DELETE") {
     // quem enviou apaga a arte em análise ou recusada; o admin apaga qualquer uma (a carta que já usa a arte fica com a cópia dela)
-    if (!user.admin && row.status === "used") return bad("arte já usada numa carta", 409, "not_pending");
+    if (!user.admin && row.status !== "pending" && row.status !== "rejected") return bad("arte já guardada ou usada", 409, "not_pending");
     await env.ASSETS_BUCKET.delete([row.image_key, ...(row.fg_key ? [row.fg_key] : [])]);
     await env.DB.prepare("DELETE FROM art_submissions WHERE id = ?").bind(row.id).run();
     return Response.json({ ok: true });

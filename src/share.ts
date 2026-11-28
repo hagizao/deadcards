@@ -117,8 +117,5 @@ export async function sharePage(env: Env, request: Request, url: URL): Promise<R
     .on('meta[property^="og:"], meta[name^="twitter:"], meta[name="description"]', { element: (el) => { el.remove(); } })
     .on("head", { element: (el) => { el.append(metaTags(meta, url.href), { html: true }); } })
     .transform(page);
-  const headers = new Headers(res.headers);
-  // a prévia muda quando a carta muda; os robôs das redes guardam o resto por conta própria
-  headers.set("cache-control", "public, max-age=300");
-  return new Response(res.body, { status: res.status, headers });
+  return new Response(res.body, { status: res.status, headers: res.headers });
 }

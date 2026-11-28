@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { Card } from "../components/Card";
 import { HoldButton } from "../components/HoldButton";
 import { Range } from "../components/Range";
-import { ART_PENDING_MAX, ART_SUBMISSIONS_PATH, ART_SUBMISSION_MAX_BYTES, previewCard, type ArtLayout, type ArtSubmission } from "../lib/artSubmissions";
+import { ART_PENDING_MAX, ART_STATUS_TONE, ART_SUBMISSIONS_PATH, ART_SUBMISSION_MAX_BYTES, previewCard, type ArtLayout, type ArtSubmission } from "../lib/artSubmissions";
 import { getPlayerOvr, isMainCard, isRetired, teamOf } from "../lib/cards";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
@@ -70,7 +70,6 @@ const S = strings({
 });
 
 type ErrorCode = keyof (typeof S)["pt"]["errors"];
-const STATUS_TONE = { pending: "text-amber-200", saved: "text-sky-300", used: "text-emerald-300", rejected: "text-zinc-400" } as const;
 
 /** Imagem local para a prévia: um endereço blob: que some quando a imagem muda ou a tela fecha. Nada sobe antes do envio. */
 function useLocalImage() {
@@ -193,9 +192,9 @@ export function ArtSubmit() {
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-7">
-          <fieldset className="flex flex-col gap-5">
+          <fieldset className="flex flex-col gap-4">
             <legend className="mb-3 text-xs font-bold tracking-widest text-zinc-300 uppercase">{t.image}</legend>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline">
               <div role="group" aria-label={t.image} className="flex shrink-0 flex-wrap gap-2">
                 <button type="button" aria-pressed={!split} onClick={() => chooseSplit(false)} className={pill(!split)}>{t.single}</button>
                 <button type="button" aria-pressed={split} onClick={() => chooseSplit(true)} className={pill(split)}>{t.split}</button>
@@ -230,12 +229,12 @@ export function ArtSubmit() {
                 <label className="flex flex-col gap-1.5 text-xs font-bold tracking-wider text-zinc-300 uppercase">
                   {t.frameC1}
                   <input type="color" value={layout.frameTune?.c1 ?? FRAME_PRESETS[layout.frame].c1} onChange={(e) => setTune({ c1: e.target.value })}
-                    className="h-11 w-20 cursor-pointer rounded-lg bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:h-10" />
+                    className="h-11 w-20 cursor-pointer rounded-lg bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:h-9" />
                 </label>
                 <label className="flex flex-col gap-1.5 text-xs font-bold tracking-wider text-zinc-300 uppercase">
                   {t.frameC2}
                   <input type="color" value={layout.frameTune?.c2 ?? FRAME_PRESETS[layout.frame].c2} onChange={(e) => setTune({ c2: e.target.value })}
-                    className="h-11 w-20 cursor-pointer rounded-lg bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:h-10" />
+                    className="h-11 w-20 cursor-pointer rounded-lg bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:h-9" />
                 </label>
                 <div className="min-w-40 flex-1 sm:max-w-60">
                   <Range label={t.framePad} value={layout.frameTune?.pad ?? FRAME_PRESETS[layout.frame].pad} min={2} max={10} onChange={(v) => setTune({ pad: v })} />
@@ -295,10 +294,10 @@ function MySubmissions({ list, onRemove }: { list?: ArtSubmission[]; onRemove: (
           {list.map((s) => (
             <li key={s.id} className="flex flex-col gap-2">
               <img src={s.image} alt={s.credit.name} loading="lazy" className="aspect-3/4 w-full rounded-lg bg-zinc-900 object-cover" />
-              <span className={`text-xs font-bold tracking-wider uppercase ${STATUS_TONE[s.status]}`}>{t.status[s.status]}</span>
+              <span className={`text-xs font-bold tracking-wider uppercase ${ART_STATUS_TONE[s.status]}`}>{t.status[s.status]}</span>
               {s.reason && <span className="text-xs text-zinc-200">{t.reason} {s.reason}</span>}
               <span className="text-xs text-zinc-400">{s.credit.name} · {date.format(s.createdAt)}</span>
-              {s.status !== "used" && (
+              {(s.status === "pending" || s.status === "rejected") && (
                 <HoldButton onConfirm={() => onRemove(s.id)} label={t.delLabel} className={`${pill(false)} self-start`}>{t.del}</HoldButton>
               )}
             </li>
