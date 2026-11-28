@@ -26,8 +26,8 @@ export function RitualBackground({ color = BASE, artist = false }: { color?: str
           <source src="/ritual/ritual.mp4" type="video/mp4" />
         </video>
       )}
-      {/* a cor da aba pinta o vídeo neutro */}
-      <div className="absolute inset-0 mix-blend-color transition-colors duration-700 motion-reduce:transition-none" style={{ backgroundColor: color }} />
+      {/* a cor da aba pinta o vídeo neutro, apagada (45% do croma, o resto cinza): diz onde você está sem tingir a tela inteira */}
+      <div className="absolute inset-0 mix-blend-color transition-colors duration-700 motion-reduce:transition-none" style={{ backgroundColor: `color-mix(in oklch, ${color} 45%, #8a8a8a)` }} />
       {/* o grafite do artista entra e sai por opacidade */}
       <div className={`ritual-tint-artist absolute inset-0 mix-blend-color transition-opacity duration-700 motion-reduce:transition-none ${artist ? "opacity-100" : "opacity-0"}`} />
       {/* véu escuro: o ritual fica de fundo, sem competir com o texto. No perfil de artista o ritual aparece 30% mais (35% → 45%) */}
