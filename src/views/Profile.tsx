@@ -129,7 +129,8 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
   const owner = me?.id === profile.id;
   const card = profile.card;
   const tier = card && getCardTier(profilePlayer(card), settings.tierConfig!);
-  const art = card && heroArt(card.hero);
+  // atrás da ficha: a arte própria da carta (artistas) ou, sem ela, a arte do herói
+  const art = card?.art ?? (card && heroArt(card.hero));
   // ficha do dossiê: foto 3×4 com carimbo, número da ficha à máquina de escrever, nome em destaque
   const identity = (
     <div className="flex min-w-0 items-center gap-7">
@@ -163,11 +164,11 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
         </>
       ) : (
         // carta do perfil à esquerda (só a carta, sem os atributos detalhados) e conquistas ocupando o resto da largura;
-        // atrás, a arte do herói da carta, grande e na cor da raridade dela
+        // atrás, a arte da carta (a própria ou a do herói), grande e na cor da raridade dela
         <div className="relative isolate flex flex-col gap-6 lg:flex-row">
           {art && tier && (
             <div aria-hidden="true" className="dossier-hero pointer-events-none absolute -top-28 -left-56 -z-10 size-176" style={{ "--hero-c": tier.c } as CSSProperties}>
-              <img src={art.url} alt="" className="size-full object-cover object-top" />
+              <img src={art.url} alt="" className="size-full object-cover object-top" style={card?.art ? { objectPosition: `${card.art.x ?? 50}% ${card.art.y ?? 50}%` } : undefined} />
             </div>
           )}
           <div className="flex flex-col items-center gap-5 lg:w-fit lg:shrink-0">
