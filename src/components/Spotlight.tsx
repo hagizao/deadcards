@@ -8,7 +8,7 @@ import { STAT_NAMES } from "../lib/statNames";
 import { STAT_KEYS, getPlayerOvr, isAltHero, isMainCard, isRetired, teamOf, useLabel } from "../lib/cards";
 import { getCardTier } from "../lib/rarity";
 import { Card } from "./Card";
-import { CardExportButton } from "./CardExportButton";
+import { ShareCardButton } from "./ShareCardButton";
 import { Icon } from "./Icon";
 import { easeOut, pill } from "../lib/ui";
 import { cascade, enter, flightOrigin, springFlight } from "../lib/motion";
@@ -44,7 +44,6 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
   const cardRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLSpanElement>(null);
-  const [exportReadyId, setExportReadyId] = useState<string>();
   const { owned, favorites } = useMyCards();
   const [favIssue, setFavIssue] = useState<{ id: string; r: Exclude<FavoriteResult, "ok"> }>();
   const [favBusy, setFavBusy] = useState(false);
@@ -64,7 +63,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
     revealed.add(playerId);
     const ovrEl = cardRef.current.querySelector("[data-ovr]")?.firstChild;
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ delay: 0.12, onComplete: () => setExportReadyId(playerId) });
+      const tl = gsap.timeline({ delay: 0.12 });
       tl.fromTo(flashRef.current, { opacity: 0, scale: 0.5 }, { opacity: 0.9, scale: 1.1, duration: 0.25, ease: "power2.out" })
         .to(flashRef.current, { opacity: 0, scale: 1.35, duration: 0.5, ease: "power2.in" });
       // vindo da grade a carta já chega voando; o pulo da revelação fica só para quando ela abre do nada
@@ -208,7 +207,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit }: { playerId: s
                 {fav ? t.favorited : t.favorite}
               </button>
             )}
-            <CardExportButton key={player.id} cardRef={cardRef} name={player.name} disabled={reveal && exportReadyId !== playerId} />
+            <ShareCardButton key={player.id} id={player.id} name={player.name} />
             {onEdit && <button type="button" onClick={() => onEdit(player.id)} className={`${pill(true)} ml-auto hover:bg-white`}>{t.edit}</button>}
             {player.special && player.specialText && <span className="text-xs font-bold text-amber-200">✦ {player.specialText}</span>}
           </div>
