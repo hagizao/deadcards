@@ -5,6 +5,7 @@ export const ART_PENDING_MAX = 10;
 export const ART_SUBMISSION_MAX_BYTES = 5 * 1024 * 1024;
 export const ART_SUBMISSIONS_PATH = "/api/art-submissions";
 export const ART_REJECT_REASON_MAX = 200;
+export const ART_STATUS_TONE = { pending: "text-amber-200", saved: "text-zinc-100", used: "text-emerald-300", rejected: "text-zinc-400" } as const;
 
 export type ArtLayer = { zoom: number; x: number; y: number };
 /** Cores e espessura da moldura, como no Editor da carta; sem elas, as da moldura escolhida. */

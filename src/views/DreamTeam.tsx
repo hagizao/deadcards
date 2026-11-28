@@ -100,7 +100,7 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
       <p className="text-xs text-zinc-400">{t.subtitle}</p>
 
       <div className="flex flex-wrap items-end gap-4">
-        <label className="flex min-w-0 flex-1 basis-64 flex-col gap-2">
+        <label className="flex min-w-0 flex-1 basis-64 flex-col gap-1.5">
           <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.name}</span>
           <input className={`${field} w-full min-w-0`} maxLength={SQUAD_NAME_MAX} placeholder={t.placeholder} value={name}
             onChange={(e) => { setName(e.target.value); onEdit(); }} />
@@ -112,7 +112,7 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
         <div className="flex flex-col">
           <span className="font-display text-5xl leading-none font-black text-area tabular-nums title-depth">{chosen.length ? avg(getPlayerOvr) : "–"}</span>
           <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.ovr}</span>

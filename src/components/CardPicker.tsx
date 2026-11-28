@@ -29,7 +29,7 @@ function HeroFace({ hero, className }: { hero: string; className: string }) {
   const icon = heroIcon(hero);
   return (
     <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-900 ${className}`}>
-      {icon ? <img src={icon} alt="" className="size-full scale-110 object-cover" /> : <span className="text-[10px] font-bold text-zinc-300">{hero.slice(0, 3)}</span>}
+      {icon ? <img src={icon} alt="" className="size-full scale-110 object-cover" /> : <span className="text-xs font-bold text-zinc-300">{hero.slice(0, 3)}</span>}
     </span>
   );
 }
@@ -106,8 +106,9 @@ export function Picker({ label, value, onChange }: { label: string; value: strin
       <div role="group" aria-label={t.players} className="max-h-120 overflow-y-auto overscroll-contain">
         {groups.map(({ team, list }) => (
           <div key={team.id} className="flex flex-col">
-            <p className="flex items-center gap-3 px-2 pt-5 pb-2 text-[22px] font-bold tracking-widest text-area uppercase">
-              <span className="size-10 shrink-0 overflow-hidden rounded-md"><TeamLogo team={team} /></span>
+            <p className="flex items-center gap-4 px-4 pt-5 pb-2 text-2xl font-bold tracking-widest text-area uppercase">
+              {/* mesma coluna do rosto do herói nas linhas de baixo (size-14), com o logo menor dentro */}
+              <span className="flex size-14 shrink-0 items-center justify-center"><span className="size-10 overflow-hidden rounded-md"><TeamLogo team={team} /></span></span>
               <span className="truncate">{team.name}</span>
             </p>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2 p-1">
@@ -139,7 +140,7 @@ export function Picker({ label, value, onChange }: { label: string; value: strin
                 <button key={v.id} type="button" aria-pressed={on} onClick={() => onChange(v.id)} title={`${v.hero} · ${getPlayerOvr(v)}`}
                   aria-label={`${v.hero} · ${getPlayerOvr(v)}${cap ? ` · ${cap}` : ""}`}
                   className="group flex w-14 cursor-pointer flex-col items-center gap-1 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
-                  <HeroFace hero={v.hero} className={`size-12 transition group-hover:scale-105 group-active:scale-95 motion-reduce:transition-none ${on ? "ring-2 ring-dl-text ring-offset-2 ring-offset-zinc-950" : "ring-1 ring-zinc-200/15"}`} />
+                  <HeroFace hero={v.hero} className={`size-12 transition-transform group-hover:scale-105 group-active:scale-95 motion-reduce:transition-none ${on ? "ring-2 ring-dl-text ring-offset-2 ring-offset-zinc-950" : "ring-1 ring-zinc-200/15"}`} />
                   <span className={`max-w-full truncate text-[10px] font-bold tracking-wider uppercase ${on ? "text-dl-text" : "text-zinc-400"}`}>{cap ?? getPlayerOvr(v)}</span>
                 </button>
               );

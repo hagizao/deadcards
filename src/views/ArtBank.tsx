@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card } from "../components/Card";
 import { HoldButton } from "../components/HoldButton";
 import { Spotlight } from "../components/Spotlight";
-import { ART_REJECT_REASON_MAX, ART_SUBMISSIONS_PATH, previewCard, type ArtSubmission } from "../lib/artSubmissions";
+import { ART_REJECT_REASON_MAX, ART_STATUS_TONE, ART_SUBMISSIONS_PATH, previewCard, type ArtSubmission } from "../lib/artSubmissions";
 import { isMainCard } from "../lib/cards";
 import { useData } from "../lib/data";
 import { FRAME_PRESETS } from "../lib/rarity";
@@ -13,7 +13,6 @@ import { field, pill, primaryBtn } from "../lib/ui";
 // Editor (só admin, em português como o resto do Editor): o banco de artes enviadas pelas pessoas.
 // O fluxo é ver a arte numa carta, baixar e aplicar à mão no Editor da carta; "Usada" marca que já foi.
 const STATUS = { pending: "Em análise", saved: "Guardada", used: "Usada", rejected: "Recusada" } as const;
-const TONE = { pending: "text-amber-200", saved: "text-sky-300", used: "text-emerald-300", rejected: "text-zinc-400" } as const;
 // abaixo disso a arte tende a ficar borrada na carta grande e no PNG exportado
 const MIN_W = 600;
 const MIN_H = 840;
@@ -114,7 +113,7 @@ export function ArtBank() {
           ))}
         </div>
         {artists.length > 1 && (
-          <label className="flex min-w-48 flex-col gap-1 text-xs font-bold tracking-wider text-zinc-300 uppercase">
+          <label className="flex min-w-48 flex-col gap-1.5 text-xs font-bold tracking-wider text-zinc-300 uppercase">
             Artista
             <select value={artist} onChange={(e) => setArtist(e.target.value)} className={field}>
               <option value="">Todos ({list?.length ?? 0})</option>
@@ -169,7 +168,7 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
     <li className="flex flex-col gap-4">
       <div className="self-center"><Card player={card} variant="medium" onOpen={() => onOpen(card)} /></div>
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-bold tracking-wider text-zinc-300 uppercase">
+        <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-xs font-bold tracking-wider text-zinc-300 uppercase">
           Moldura
           <select value={frame} onChange={(e) => setFrame(e.target.value)} className={field}>
             <option value="">Padrão da carta</option>
@@ -180,10 +179,10 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
       </div>
 
       <div className="flex flex-col gap-1.5 text-sm">
-        <span className={`text-xs font-bold tracking-wider uppercase ${TONE[s.status]}`}>{STATUS[s.status]}{used && ` · na carta de ${used.name}`}</span>
-        <span className="font-bold text-zinc-100">
+        <span className={`text-xs font-bold tracking-wider uppercase ${ART_STATUS_TONE[s.status]}`}>{STATUS[s.status]}{used && ` · na carta de ${used.name}`}</span>
+        <span className="flex flex-wrap items-baseline gap-x-1.5 font-bold text-zinc-100">
           {s.credit.url ? <a href={s.credit.url} target="_blank" rel="noopener noreferrer" className="rounded-sm underline decoration-zinc-500 underline-offset-2 hover:decoration-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">{s.credit.name}</a> : s.credit.name}
-          {s.credit.url && <span className="ml-1.5 text-xs font-normal text-zinc-400">{new URL(s.credit.url).hostname.replace(/^www\./, "")}</span>}
+          {s.credit.url && <span className="text-xs font-normal text-zinc-400">{new URL(s.credit.url).hostname.replace(/^www\./, "")}</span>}
         </span>
         <span className="text-xs text-zinc-400">
           Enviada por {s.user} · <time dateTime={new Date(s.createdAt).toISOString()} title={full.format(s.createdAt)}>{ago(s.createdAt)}</time>
