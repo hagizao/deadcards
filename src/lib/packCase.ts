@@ -5,6 +5,9 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import crateUrl from "../assets/pack/crate.glb?url";
+import piecesUrl from "../assets/pack/pieces.glb?url";
 import { SOUND_PEAK, type PackSoundId } from "./packSounds";
 
 /** 0 = comum, 1 = rara (S ou especial), 2 = Eternus. */
@@ -408,6 +411,87 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
     return { pivot, plate, glowMat, open: false };
   });
 
+  // ---------- caixa do jogo (item_crate_tough_2): a maleta acima vira só a lógica (dobradiça, travas, toque) ----------
+  // a caixa aparece de quina (dois lados à vista); os cadeados da frente fazem o papel das duas travas e, quando a
+  // tampa da maleta abriria, a caixa se quebra nas peças do próprio jogo
+  const CRATE_S = 1.35;
+  const loader = new GLTFLoader();
+  const [crateGl, piecesGl] = await Promise.all([loader.loadAsync(crateUrl), loader.loadAsync(piecesUrl)]).catch(() => [null, null]);
+  const crateG = new THREE.Group();
+  const piecesG = new THREE.Group();
+  const lockMeshes: THREE.Object3D[] = [];
+  const pieceState: { o: THREE.Object3D; v: THREE.Vector3; w: THREE.Vector3; home: THREE.Vector3 }[] = [];
+  let broken = false, brokeAt = 0;
+  if (crateGl && piecesGl) {
+    const hideMats = new Set<THREE.Material>([shellMat, trimMat, steelMat, grooveMat, foamMat, label.material as THREE.Material]);
+    caseG.traverse((o) => { if (o instanceof THREE.Mesh && hideMats.has(o.material as THREE.Material)) o.visible = false; });
+    crateG.scale.setScalar(CRATE_S);
+    crateG.rotation.y = -Math.PI / 4;
+    caseG.add(crateG);
+    const prep = (root: THREE.Object3D) => root.traverse((o) => {
+      if (o instanceof THREE.Mesh) { o.castShadow = true; o.receiveShadow = true; (o.material as THREE.MeshStandardMaterial).roughness = 0.78; }
+    });
+    prep(crateGl.scene); prep(piecesGl.scene);
+    crateG.add(crateGl.scene);
+    // luz de frente (os lados da caixa ficavam no escuro só com a lâmpada de cima)
+    const fill = new THREE.DirectionalLight(0xffe6c8, 1.1);
+    fill.position.set(0, 3, 8);
+    scene.add(fill);
+    for (const n of ["lock_1", "lock_2", "lock_3", "lock_4"]) { const l = crateGl.scene.getObjectByName(n); if (l) lockMeshes.push(l); }
+    piecesG.add(piecesGl.scene);
+    piecesG.visible = false;
+    crateG.add(piecesG);
+    for (const o of piecesGl.scene.children) pieceState.push({ o, v: new THREE.Vector3(), w: new THREE.Vector3(), home: o.position.clone() });
+    // travas = cadeado da frente-esquerda (lock_3, lado +Z da caixa) e da frente-direita (lock_2, lado +X)
+    caseG.updateMatrixWorld(true);
+    const front = [crateGl.scene.getObjectByName("lock_3"), crateGl.scene.getObjectByName("lock_2")];
+    front.forEach((lk, i) => {
+      if (!lk) return;
+      const l = latches[i];
+      l.pivot.position.copy(caseG.worldToLocal(lk.getWorldPosition(new THREE.Vector3())));
+      l.pivot.rotation.order = "YXZ";
+      l.pivot.rotation.y = i === 0 ? -Math.PI / 4 : Math.PI / 4;
+      // brilho e área de toque descem para o corpo do cadeado (ele pendura abaixo do ponto de giro)
+      l.pivot.children.forEach((c) => { if (c.visible || c instanceof THREE.Mesh) c.position.y = -0.42; c.position.z = 0.22; });
+    });
+  }
+  /** cadeados acompanham a trava: giram para fora pela argola; abertos, ficam pendurados tortos */
+  const syncLocks = () => {
+    const [l3, l2] = [lockMeshes[2], lockMeshes[1]];
+    if (l3) l3.rotation.x = -latches[0].pivot.rotation.x * 0.75;
+    if (l2) l2.rotation.z = latches[1].pivot.rotation.x * 0.75;
+  };
+  /** quebra: a caixa some e as peças do jogo voam a partir do lugar de cada parte */
+  const breakCrate = () => {
+    if (broken || !crateGl) return;
+    broken = true; brokeAt = performance.now();
+    crateGl.scene.visible = false;
+    piecesG.visible = true;
+    for (const p of pieceState) {
+      p.o.position.copy(p.home);
+      p.o.rotation.set(0, 0, 0);
+      const out = new THREE.Vector3(p.home.x, 0, p.home.z);
+      if (out.lengthSq() < 0.05) out.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+      out.normalize().multiplyScalar(reduce ? 0 : 1.1 + Math.random() * 0.9);
+      p.v.set(out.x, reduce ? 0 : 1.2 + Math.random() * 1.3 + Math.max(0, p.home.y - 0.8) * 1.2, out.z);
+      p.w.set((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 5);
+    }
+  };
+  /** física simples das peças (gravidade, chão, atrito) e sumiço depois de ~1,6 s */
+  const stepPieces = (dt: number) => {
+    if (!broken) return;
+    const age = (performance.now() - brokeAt) / 1000;
+    for (const p of pieceState) {
+      p.v.y -= 9.8 * dt;
+      p.o.position.addScaledVector(p.v, dt);
+      p.o.rotation.x += p.w.x * dt; p.o.rotation.y += p.w.y * dt; p.o.rotation.z += p.w.z * dt;
+      if (p.o.position.y < 0.05) { p.o.position.y = 0.05; p.v.y *= -0.3; p.v.x *= 0.6; p.v.z *= 0.6; p.w.multiplyScalar(0.6); }
+      const fade = gsap.utils.clamp(0, 1, (age - 0.9) / 0.5);
+      p.o.scale.setScalar(1 - fade);
+    }
+    if (age > 1.5) piecesG.visible = false;
+  };
+
   // ---------- luz da raridade: sai da carta, não da maleta ----------
   const additive = (o: THREE.MeshBasicMaterialParameters) => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, ...o });
   const tinted: { m: { color: THREE.Color }; hi: boolean }[] = [];
@@ -428,6 +512,8 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
   const seamGlow = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.2, 0.06), tint(additive({}), true));
   seamGlow.position.set(0, HB + 0.02, D / 2 + 0.03);
   caseG.add(seamGlow);
+  // a fresta acesa é da maleta; com a caixa do jogo ela ficaria solta no ar
+  if (crateGl) seamGlow.visible = false;
   const shaftTex = glowTex(64, 256, (u, v) => Math.exp(-(((u - 0.5) / 0.17) ** 2)) * Math.pow(v, 2.2) * Math.min(1, (1 - v) * 12));
   const light = { level: 0 };
   const shafts = new THREE.Group();
@@ -747,6 +833,15 @@ export async function createPackCase(canvas: HTMLCanvasElement, opts: CaseOption
     camera.position.set(CAM.pos.x + shakeO.x + sway.x * 0.45, CAM.pos.y * d + shakeO.y - sway.y * 0.25, CAM.pos.z * d);
     camera.lookAt(CAM.look.x, CAM.look.y + aim.y, CAM.look.z);
     if (drop.on) caseG.position.y = drop.y + (W / 2) * Math.abs(Math.sin(caseG.rotation.z)) + (D / 2) * Math.abs(Math.sin(caseG.rotation.x));
+    // caixa: a dobradiça invisível da maleta comanda; emperrar faz a caixa pular e tremer, abrir quebra a caixa
+    if (crateGl && !broken) {
+      const h = Math.max(0, -hinge.rotation.x);
+      crateG.position.y = Math.min(h, 0.45) * 0.08;
+      crateG.rotation.z = Math.sin(t * 60) * Math.min(h, 0.45) * 0.05;
+      if (h > 0.6) breakCrate();
+    }
+    syncLocks();
+    stepPieces(dt);
     updatePuffs(dt);
     paint(t);
     // sombra de contato acompanha a maleta
