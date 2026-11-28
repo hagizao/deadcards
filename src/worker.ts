@@ -8,6 +8,7 @@ import { HOME_FEATURED_MAX, SCHEDULE_LABEL_MAX, TOURNAMENT_DESC_MAX, TOURNAMENT_
 import { artCredit, imgUrl, parse, playerFromRow } from "./rows";
 import { packTypes, packs } from "./packs";
 import { artSubmissions } from "./artSubmissions";
+import { isSharePath, sharePage } from "./share";
 import { ART_SUBMISSIONS_PATH } from "./lib/artSubmissions";
 
 export interface Env {
@@ -423,6 +424,8 @@ Enviado pelo site por **${nick ? noPing(nick) : "anônimo"}**.`;
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    // links compartilhados: o site com a prévia (título e imagem) da carta, do time ou do perfil
+    if (request.method === "GET" && isSharePath(url.pathname)) return sharePage(env, request, url);
     if (url.pathname.startsWith("/api/auth/")) return createAuth(env, request).handler(request);
     // não depende do SameSite padrão do Better Auth; sem Origin nem Sec-Fetch-Site não é navegador, logo não é CSRF
     if (url.pathname.startsWith("/api/") && crossSite(request, url)) return bad("origem inválida", 403, "origin");

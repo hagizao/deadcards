@@ -4,20 +4,30 @@ import type { ArtCredit, Player } from "./types";
 export const ART_PENDING_MAX = 10;
 export const ART_SUBMISSION_MAX_BYTES = 5 * 1024 * 1024;
 export const ART_SUBMISSIONS_PATH = "/api/art-submissions";
+export const ART_REJECT_REASON_MAX = 200;
+export const ART_STATUS_TONE = { pending: "text-amber-200", saved: "text-zinc-100", used: "text-emerald-300", rejected: "text-zinc-400" } as const;
 
 export type ArtLayer = { zoom: number; x: number; y: number };
-export type ArtLayout = ArtLayer & { fg?: ArtLayer; frame?: string; playerId?: string };
+/** Cores e espessura da moldura, como no Editor da carta; sem elas, as da moldura escolhida. */
+export type FrameTune = { c1?: string; c2?: string; pad?: number };
+export type ArtLayout = ArtLayer & { fg?: ArtLayer; frame?: string; frameTune?: FrameTune; playerId?: string };
 
 export type ArtSubmission = {
   id: string;
-  status: "pending" | "used" | "rejected";
+  /** saved: guardada no banco para usar depois (não conta no limite de quem enviou). */
+  status: "pending" | "saved" | "used" | "rejected";
   /** Endereços privados (só quem enviou e admins abrem). */
   image: string;
+  /** Extensão dos arquivos (png, jpg, webp), para o download sair com o nome certo. */
+  ext: string;
   fg?: string;
+  fgExt?: string;
   layout: ArtLayout;
   credit: ArtCredit;
   createdAt: number;
   usedPlayerId?: string;
+  /** Motivo da recusa, escrito pelo admin: quem enviou vê em "Minhas artes". */
+  reason?: string;
   /** Nome de quem enviou: só na lista do admin. */
   user?: string;
 };
@@ -27,7 +37,7 @@ export function previewCard(player: Player, layout: ArtLayout, image: string, fg
   return {
     ...player,
     special: true,
-    frame: layout.frame ? { style: layout.frame } : player.frame,
+    frame: layout.frame ? { style: layout.frame, ...layout.frameTune } : player.frame,
     art: {
       url: image, zoom: layout.zoom, x: layout.x, y: layout.y,
       ...(fg && layout.fg ? { fg: { url: fg, ...layout.fg } } : {}),

@@ -28,10 +28,10 @@ const S = strings({
       teams: ["Times", "Elencos, regiões e o OVR de cada time"],
       tierlist: ["Tier List", "Quem está no topo, do SS ao D"],
       collection: ["Coleção", "Todas as cartas, com busca e ordenação"],
-      compare: ["Comparar", "Duas cartas lado a lado, atributo por atributo"],
+      compare: ["Lab", "Monte o seu elenco dos sonhos e compare cartas"],
       redeem: ["Resgatar", "Tem um código? Resgate sua carta"],
     },
-    meta: { teams: (n: number) => `${n} times`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cartas`, compare: () => "1 contra 1", redeem: () => "Precisa entrar" },
+    meta: { teams: (n: number) => `${n} times`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cartas`, compare: () => "2 modos", redeem: () => "Precisa entrar" },
   },
   en: {
     explore: "Explore", ranking: "Team ranking", allTeams: (n: number) => `See all ${n} teams`,
@@ -40,10 +40,10 @@ const S = strings({
       teams: ["Teams", "Rosters, regions and each team's OVR"],
       tierlist: ["Tier List", "Who's on top, from SS to D"],
       collection: ["Collection", "Every card, with search and sorting"],
-      compare: ["Compare", "Two cards side by side, stat by stat"],
+      compare: ["Lab", "Build your dream team and compare cards"],
       redeem: ["Redeem", "Got a code? Redeem your card"],
     },
-    meta: { teams: (n: number) => `${n} teams`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cards`, compare: () => "1 vs 1", redeem: () => "Sign-in needed" },
+    meta: { teams: (n: number) => `${n} teams`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cards`, compare: () => "2 modes", redeem: () => "Sign-in needed" },
   },
   es: {
     explore: "Explora", ranking: "Ranking de equipos", allTeams: (n: number) => `Ver los ${n} equipos`,
@@ -52,10 +52,10 @@ const S = strings({
       teams: ["Equipos", "Plantillas, regiones y el OVR de cada equipo"],
       tierlist: ["Tier List", "Quién está arriba, de SS a D"],
       collection: ["Colección", "Todas las cartas, con búsqueda y orden"],
-      compare: ["Comparar", "Dos cartas lado a lado, atributo por atributo"],
+      compare: ["Lab", "Arma tu equipo soñado y compara cartas"],
       redeem: ["Canjear", "¿Tienes un código? Canjea tu carta"],
     },
-    meta: { teams: (n: number) => `${n} equipos`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cartas`, compare: () => "1 contra 1", redeem: () => "Hay que iniciar sesión" },
+    meta: { teams: (n: number) => `${n} equipos`, tierlist: (n: number) => `${n} tiers`, collection: (n: number) => `${n} cartas`, compare: () => "2 modos", redeem: () => "Hay que iniciar sesión" },
   },
 });
 

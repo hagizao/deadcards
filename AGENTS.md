@@ -27,6 +27,7 @@ O dev roda tudo local (Vite + `@cloudflare/vite-plugin`) em `http://localhost:51
 | `npm test` | Testes (Vitest) em `test/` |
 | `npm run db:migrate` | Aplica migrations no D1 local |
 | `npm run db:pull` | Substitui o D1 local por uma cópia de produção (guarda o antigo em `.wrangler/backup/`) |
+| `npm run db:seed-art` | Cria artes simuladas no banco de artes (só D1 e R2 locais) para testar o Editor › Artes enviadas |
 | `npm run db:import -- <save.json> [--remote]` | Importa um save JSON para D1 e R2 |
 | `npm run design:guide` | Depois do `build`, regenera `public/design/app.css` e `card.html` a partir do código |
 | `npm run ritual:render -- <url do dev>` | Com o `dev` rodando, regrava o vídeo do fundo (`public/ritual/`) a partir de `src/lib/ritualBackdrop.ts`; precisa de ffmpeg e de Playwright (`PW_DIR`) |

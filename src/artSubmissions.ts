@@ -2,7 +2,7 @@ import { currentUser } from "./auth";
 import type { Env } from "./worker";
 import type { ArtCredit } from "./lib/types";
 import { artCredit, parse } from "./rows";
-import { ART_PENDING_MAX, ART_SUBMISSION_MAX_BYTES, type ArtLayout, type ArtSubmission } from "./lib/artSubmissions";
+import { ART_PENDING_MAX, ART_REJECT_REASON_MAX, ART_SUBMISSION_MAX_BYTES, type ArtLayout, type ArtSubmission } from "./lib/artSubmissions";
 
 /**
  * Banco de artes: qualquer conta logada envia uma arte (com a camada da frente opcional) já ajustada numa carta especial;
@@ -11,7 +11,7 @@ import { ART_PENDING_MAX, ART_SUBMISSION_MAX_BYTES, type ArtLayout, type ArtSubm
 
 type Row = {
   id: string; user_id: string; image_key: string; fg_key: string | null; layout_json: string; credit_name: string; credit_url: string | null;
-  status: ArtSubmission["status"]; used_player_id: string | null; created_at: number; user_name?: string | null;
+  status: ArtSubmission["status"]; used_player_id: string | null; reject_reason?: string | null; created_at: number; user_name?: string | null;
 };
 
 const bad = (msg: string, status = 400, code?: string) => Response.json({ error: msg, code }, { status });
@@ -36,7 +36,15 @@ export function layoutOf(v: unknown, hasFg: boolean): ArtLayout {
   const fg = (l.fg && typeof l.fg === "object" ? l.fg : {}) as Record<string, unknown>;
   const out: ArtLayout = { zoom: clamp(l.zoom, 50, 300, 100), x: clamp(l.x, 0, 100, 50), y: clamp(l.y, 0, 100, 50) };
   if (hasFg) out.fg = { zoom: clamp(fg.zoom, 50, 300, 100), x: clamp(fg.x, 0, 100, 50), y: clamp(fg.y, 0, 100, 50) };
-  if (typeof l.frame === "string" && /^[a-z-]{1,32}$/.test(l.frame)) out.frame = l.frame;
+  if (typeof l.frame === "string" && /^[a-z-]{1,32}$/.test(l.frame)) {
+    out.frame = l.frame;
+    // cores só em hex e espessura nos limites do Editor; só valem junto com uma moldura
+    const tune = (l.frameTune && typeof l.frameTune === "object" ? l.frameTune : {}) as Record<string, unknown>;
+    const hex = (v: unknown) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : undefined);
+    const frameTune = { c1: hex(tune.c1), c2: hex(tune.c2), pad: tune.pad === undefined ? undefined : clamp(tune.pad, 2, 10, 4) };
+    const kept = Object.fromEntries(Object.entries(frameTune).filter(([, v]) => v !== undefined));
+    if (Object.keys(kept).length) out.frameTune = kept;
+  }
   if (typeof l.playerId === "string" && ID_RE.test(l.playerId)) out.playerId = l.playerId;
   return out;
 }
@@ -48,20 +56,24 @@ const creditOf = (v: unknown): ArtCredit | null => {
 // duas imagens de até 5 MB mais o meta e as bordas do multipart
 const MAX_BODY = 2 * ART_SUBMISSION_MAX_BYTES + 64 * 1024;
 // recusadas contam no limite até a pessoa apagar: senão cada recusa libera espaço para mais um envio
+// guardadas e usadas não contam: guardar uma arte libera espaço para a pessoa mandar outra
 const COUNTED = "status IN ('pending', 'rejected')";
 
 const imageUrl = (id: string, layer: "bg" | "fg") => `/api/art-submissions/${id}/image/${layer}`;
+const extOf = (key: string) => key.split(".").pop() ?? "png";
 
 function toSubmission(r: Row, withUser: boolean): ArtSubmission {
   return {
     id: r.id,
     status: r.status,
     image: imageUrl(r.id, "bg"),
-    ...(r.fg_key ? { fg: imageUrl(r.id, "fg") } : {}),
+    ext: extOf(r.image_key),
+    ...(r.fg_key ? { fg: imageUrl(r.id, "fg"), fgExt: extOf(r.fg_key) } : {}),
     layout: parse<ArtLayout>(r.layout_json, { zoom: 100, x: 50, y: 50 }),
     credit: r.credit_url ? { name: r.credit_name, url: r.credit_url } : { name: r.credit_name },
     createdAt: r.created_at,
     ...(r.used_player_id ? { usedPlayerId: r.used_player_id } : {}),
+    ...(r.status === "rejected" && r.reject_reason ? { reason: r.reject_reason } : {}),
     ...(withUser ? { user: r.user_name ?? "?" } : {}),
   };
 }
@@ -88,8 +100,9 @@ async function create(env: Env, request: Request, userId: string): Promise<Respo
   try { meta = JSON.parse(String(form.get("meta") ?? "")) as Record<string, unknown>; } catch { return bad("envio inválido"); }
   // as duas confirmações são obrigatórias: a arte é da pessoa (feita por ela, não por IA) e ela autoriza o uso com crédito
   if (meta.own !== true || meta.consent !== true) return bad("confirme que a arte é sua e autorize o uso", 400, "consent");
+  // o link é obrigatório: é por ele que quem vê a carta chega ao trabalho do artista
   const credit = creditOf(meta.credit);
-  if (!credit) return bad("crédito inválido: nome até 60 caracteres e link http(s)", 400, "credit");
+  if (!credit?.url) return bad("crédito inválido: nome até 60 caracteres e link http(s) obrigatório", 400, "credit");
   const image = await readImage(form, "image");
   if (!image || image === "bad") return bad("imagem PNG, JPG ou WebP de até 5 MB", 400, "image");
   const fg = await readImage(form, "fg");
@@ -118,7 +131,7 @@ async function create(env: Env, request: Request, userId: string): Promise<Respo
 /** Leva a arte para uma carta especial: copia as imagens para players/ (públicas) e grava arte, ajuste e crédito na carta. */
 async function applyToCard(env: Env, row: Row, request: Request): Promise<Response> {
   // cada uso copia as imagens: arte já usada ou recusada não entra de novo
-  if (row.status !== "pending") return bad("só dá para usar arte em análise", 409, "not_pending");
+  if (row.status !== "pending" && row.status !== "saved") return bad("só dá para usar arte em análise ou guardada", 409, "not_pending");
   const body = (await request.json().catch(() => null)) as { playerId?: unknown } | null;
   const playerId = body?.playerId;
   if (typeof playerId !== "string" || !ID_RE.test(playerId)) return bad("carta inválida");
@@ -129,9 +142,9 @@ async function applyToCard(env: Env, row: Row, request: Request): Promise<Respon
   if (extra.special !== true) return bad("as artes do banco só vão em cartas especiais", 400, "not_special");
 
   // reserva a arte antes de copiar: dois "usar" ao mesmo tempo não aplicam a mesma arte em duas cartas
-  const claim = await env.DB.prepare("UPDATE art_submissions SET status = 'used', used_player_id = ? WHERE id = ? AND status = 'pending'").bind(playerId, row.id).run();
-  if (!claim.meta.changes) return bad("só dá para usar arte em análise", 409, "not_pending");
-  const release = () => env.DB.prepare("UPDATE art_submissions SET status = 'pending', used_player_id = NULL WHERE id = ?").bind(row.id).run();
+  const claim = await env.DB.prepare("UPDATE art_submissions SET status = 'used', used_player_id = ? WHERE id = ? AND status IN ('pending', 'saved')").bind(playerId, row.id).run();
+  if (!claim.meta.changes) return bad("só dá para usar arte em análise ou guardada", 409, "not_pending");
+  const release = () => env.DB.prepare("UPDATE art_submissions SET status = ?, used_player_id = NULL WHERE id = ?").bind(row.status, row.id).run();
 
   const copy = async (key: string) => {
     const obj = await env.ASSETS_BUCKET.get(key);
@@ -196,17 +209,22 @@ export async function artSubmissions(env: Env, request: Request, rest: string): 
 
   if (request.method === "DELETE") {
     // quem enviou apaga a arte em análise ou recusada; o admin apaga qualquer uma (a carta que já usa a arte fica com a cópia dela)
-    if (!user.admin && row.status === "used") return bad("arte já usada numa carta", 409, "not_pending");
+    if (!user.admin && row.status !== "pending" && row.status !== "rejected") return bad("arte já guardada ou usada", 409, "not_pending");
     await env.ASSETS_BUCKET.delete([row.image_key, ...(row.fg_key ? [row.fg_key] : [])]);
     await env.DB.prepare("DELETE FROM art_submissions WHERE id = ?").bind(row.id).run();
     return Response.json({ ok: true });
   }
   if (request.method === "PATCH") {
     if (!user.admin) return bad("sem permissão", 403);
-    const body = (await request.json().catch(() => null)) as { status?: unknown } | null;
-    if (body?.status !== "rejected" && body?.status !== "pending") return bad("status inválido");
-    // arte usada não volta para análise: cada uso copia as imagens para uma carta
-    const res = await env.DB.prepare("UPDATE art_submissions SET status = ? WHERE id = ? AND status != 'used'").bind(body.status, row.id).run();
+    const body = (await request.json().catch(() => null)) as { status?: unknown; reason?: unknown } | null;
+    // saved: guardada para usar depois; sai da conta do limite, então a pessoa pode mandar mais
+    if (!body || !["pending", "saved", "used", "rejected"].includes(body.status as string)) return bad("status inválido");
+    // "usada" à mão (o admin baixou e aplicou fora daqui) não tem carta e pode voltar atrás;
+    // a usada pelo "usar" fica presa: cada uso copia as imagens para uma carta
+    // o motivo só vale na recusa; voltar para análise ou marcar usada apaga o motivo antigo
+    if (body.reason !== undefined && body.reason !== null && typeof body.reason !== "string") return bad("motivo inválido");
+    const reason = body.status === "rejected" && typeof body.reason === "string" ? body.reason.trim().slice(0, ART_REJECT_REASON_MAX) || null : null;
+    const res = await env.DB.prepare("UPDATE art_submissions SET status = ?, reject_reason = ? WHERE id = ? AND used_player_id IS NULL").bind(body.status, reason, row.id).run();
     if (!res.meta.changes) return bad("arte já usada numa carta", 409, "not_pending");
     return Response.json({ ok: true });
   }

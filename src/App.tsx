@@ -12,7 +12,7 @@ import { Account } from "./components/Account";
 import { finishLink, type LinkResult } from "./lib/authClient";
 import { Editor } from "./views/Editor";
 import { Legal } from "./views/Legal";
-import { Compare } from "./views/Compare";
+import { Lab } from "./views/Lab";
 import { LANGS, LANG_LABEL, LangProvider, type Lang, strings, useLang, useT } from "./lib/i18n";
 import { Feedback } from "./views/Feedback";
 import { areaStyle, areaTier, type AreaKey } from "./lib/areas";
@@ -22,7 +22,7 @@ import { Profile } from "./views/Profile";
 import { easeOut } from "./lib/ui";
 import { Settings } from "./views/Settings";
 import { ArtSubmit } from "./views/ArtSubmit";
-import { profileUrl } from "./lib/profile";
+import { parseRoute, routePath, teamByKey, teamKey } from "./lib/route";
 
 const REPO = "https://github.com/hagizao/deadcards";
 
@@ -45,7 +45,7 @@ const NAV_ICON = { teams: "shield", tierlist: "bars", collection: "cards", redee
 
 const S = strings({
   pt: {
-    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", redeem: "Resgatar", compare: "Comparar" },
+    tabs: { teams: "Times", tierlist: "Tier List", collection: "Coleção", redeem: "Resgatar", compare: "Lab" },
     mainNav: "Navegação principal",
     projectLinks: "Links do projeto",
     language: "Idioma",
@@ -64,7 +64,7 @@ const S = strings({
     rmClose: "Fechar aviso",
   },
   en: {
-    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", redeem: "Redeem", compare: "Compare" },
+    tabs: { teams: "Teams", tierlist: "Tier List", collection: "Collection", redeem: "Redeem", compare: "Lab" },
     mainNav: "Main navigation",
     projectLinks: "Project links",
     language: "Language",
@@ -83,7 +83,7 @@ const S = strings({
     rmClose: "Dismiss notice",
   },
   es: {
-    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", redeem: "Canjear", compare: "Comparar" },
+    tabs: { teams: "Equipos", tierlist: "Tier List", collection: "Colección", redeem: "Canjear", compare: "Lab" },
     mainNav: "Navegación principal",
     projectLinks: "Enlaces del proyecto",
     language: "Idioma",
@@ -240,21 +240,27 @@ export default function App() {
   );
 }
 
-const sharedProfile = () => /^\/u\/((?:@|%40)?[A-Za-z0-9._-]{1,64})$/.exec(location.pathname)?.[1].replace("%40", "@");
-
 function Shell() {
-  const [profileId, setProfileId] = useState(sharedProfile);
-  const [tab, setTab] = useState<Tab>(() => profileId ? "profile" : location.pathname === "/privacy" ? "privacy" : location.pathname === "/terms" ? "terms" : "home");
+  // o endereço de entrada decide a tela: aba, perfil, time ou carta aberta (links compartilhados)
+  const [start] = useState(() => parseRoute(location.pathname));
+  const [profileId, setProfileId] = useState(start.profile);
+  const [tab, setTab] = useState<Tab>(start.tab);
   // direção da troca de aba, derivada durante a renderização (padrão do React para "valor anterior")
   const [shown, setShown] = useState({ tab, dir: 0 });
   if (shown.tab !== tab) setShown({ tab, dir: Math.sign(TAB_ORDER.indexOf(tab) - TAB_ORDER.indexOf(shown.tab)) });
-  const [focusTeam, setFocusTeam] = useState<string>();
-  const [spotlight, setSpotlight] = useState<string | null>(null);
+  // focusTeam rola até o time (vindo de outra tela); team é o time escolhido, que vai para o endereço.
+  // os dois guardam a chave do link (a sigla, ou o id quando a sigla se repete)
+  const [focusTeam, setFocusTeam] = useState(start.team);
+  const [team, setTeam] = useState(start.team);
+  const [spotlight, setSpotlight] = useState<string | null>(start.card ?? null);
+  // aba de dentro do Lab e o elenco de um link compartilhado (some quando a pessoa mexe no elenco)
+  const [lab, setLab] = useState(start.lab);
+  const [squad, setSquad] = useState(start.squad);
   const [editId, setEditId] = useState<string | null>(null);
-  const { me } = useData();
+  const { me, teams } = useData();
   const t = useT(S);
-  const go = (id: Tab) => { setFocusTeam(undefined); setTab(id); };
-  const openTeam = (id: string) => { setFocusTeam(id); setTab("teams"); };
+  const go = (id: Tab) => { setFocusTeam(undefined); setTeam(undefined); setLab(undefined); setSquad(undefined); setTab(id); };
+  const openTeam = (id: string) => { const key = teamKey(teams, id); setFocusTeam(key); setTeam(key); setTab("teams"); };
   const editCard = (id: string) => { setSpotlight(null); setEditId(id); setTab("editor"); };
   const openProfile = (id: string) => { setProfileId(id); setTab("profile"); };
   useEffect(() => { window.scrollTo(0, 0); }, [tab, profileId]);
@@ -263,10 +269,29 @@ function Shell() {
     if (new URLSearchParams(location.search).get("link") !== "finish") return;
     void finishLink().then((result) => { if (result) { setLinkResult(result); setTab("settings"); } });
   }, []);
+  // cada tela vira uma entrada no histórico: o voltar do navegador volta para a tela anterior (e fecha a carta aberta)
+  const first = useRef(true);
   useEffect(() => {
-    const path = tab === "profile" && profileId ? profileUrl(profileId) : tab === "privacy" || tab === "terms" ? `/${tab}` : "/";
-    if (location.pathname !== path) history.replaceState(null, "", path);
-  }, [tab, profileId]);
+    const path = routePath({ tab, profile: profileId, team, card: spotlight ?? undefined, lab, squad });
+    if (location.pathname !== path) history[first.current ? "replaceState" : "pushState"](null, "", path);
+    // o título da prévia (carta, time, perfil) vale só para quem chegou pelo link; navegando, volta ao do site
+    if (!first.current) document.title = "Cardslock";
+    first.current = false;
+  }, [tab, profileId, team, spotlight, lab, squad]);
+  useEffect(() => {
+    const back = () => {
+      const r = parseRoute(location.pathname);
+      setTab(r.tab);
+      setProfileId(r.profile);
+      setTeam(r.team);
+      setFocusTeam(r.team);
+      setSpotlight(r.card ?? null);
+      setLab(r.lab);
+      setSquad(r.squad);
+    };
+    addEventListener("popstate", back);
+    return () => removeEventListener("popstate", back);
+  }, []);
 
   return (
     <>
@@ -316,11 +341,11 @@ function Shell() {
             transition={{ duration: 0.25, ease: easeOut }}
           >
             {tab === "home" && <Home onOpenTeam={openTeam} onOpenCard={setSpotlight} onNavigate={go} />}
-            {tab === "teams" && <Teams focusTeamId={focusTeam} onOpenCard={setSpotlight} />}
+            {tab === "teams" && <Teams focusTeamId={focusTeam && teamByKey(teams, focusTeam)?.id} teamId={team && teamByKey(teams, team)?.id} onOpenCard={setSpotlight} onPick={(id) => setTeam(teamKey(teams, id))} />}
             {tab === "tierlist" && <TierList onOpenCard={setSpotlight} onOpenTeam={openTeam} />}
             {tab === "collection" && <Collection onOpenCard={setSpotlight} />}
             {tab === "redeem" && <Redeem onOpenCard={setSpotlight} />}
-            {tab === "compare" && <Compare onOpenCard={setSpotlight} />}
+            {tab === "compare" && <Lab sub={lab ?? "dream"} squad={squad} onSub={(s) => { setSquad(undefined); setLab(s === "compare" ? "compare" : undefined); }} onSquadEdit={() => setSquad(undefined)} onOpenCard={setSpotlight} />}
             {tab === "profile" && profileId && <Profile key={profileId} userId={profileId} onOpenCard={setSpotlight} onRedeem={() => setTab("redeem")} />}
             {tab === "settings" && me && <Settings link={linkResult} />}
             {tab === "art" && me && <ArtSubmit />}
