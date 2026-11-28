@@ -1,10 +1,14 @@
+import { motion } from "motion/react";
 import { useDeferredValue, useEffect, useState } from "react";
 import { Card } from "./Card";
 import { Icon } from "./Icon";
+import { LikeButton } from "./LikeButton";
+import { RailArrows } from "./Rail";
+import { useRail } from "../lib/rail";
 import { isRetired, teamOf } from "../lib/cards";
 import { useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
-import { artistCardPath, artistPath, type ArtistAdmin, type ArtistInfo } from "../lib/artists";
+import { artistCardPath, artistLikesPath, artistPath, type ArtistAdmin, type ArtistInfo } from "../lib/artists";
 import type { Player } from "../lib/types";
 import { field, pill } from "../lib/ui";
 
@@ -15,7 +19,7 @@ const S = strings({
     admin: "Admin · Artista", mark: "Marcar como artista", marked: "É artista", linked: "Cartas com a arte desta pessoa", none: "Nenhuma carta vinculada.",
     unlink: "Desvincular", link: "Vincular", search: "Buscar carta especial para vincular", searchPlaceholder: "Jogador, herói, time ou artista…",
     linkHint: "Vincular dá a carta para a pessoa e faz o Arte por da carta levar a este perfil.", artBy: "Arte por", failed: "Não foi possível salvar. Tente de novo.",
-    retired: "fora de circulação",
+    retired: "fora de circulação", prev: "Cartas anteriores", next: "Próximas cartas",
   },
   en: {
     artist: "Artist", lead: (name: string) => `Cards with art by ${name}`, cards: (n: number) => (n === 1 ? "1 card" : `${n} cards`),
@@ -23,7 +27,7 @@ const S = strings({
     admin: "Admin · Artist", mark: "Mark as artist", marked: "Is an artist", linked: "Cards with this person's art", none: "No linked cards.",
     unlink: "Unlink", link: "Link", search: "Search a special card to link", searchPlaceholder: "Player, hero, team or artist…",
     linkHint: "Linking gives the card to this person and makes the card's Art by lead to this profile.", artBy: "Art by", failed: "Could not save. Try again.",
-    retired: "out of circulation",
+    retired: "out of circulation", prev: "Previous cards", next: "Next cards",
   },
   es: {
     artist: "Artista", lead: (name: string) => `Cartas con arte de ${name}`, cards: (n: number) => (n === 1 ? "1 carta" : `${n} cartas`),
@@ -31,63 +35,67 @@ const S = strings({
     admin: "Admin · Artista", mark: "Marcar como artista", marked: "Es artista", linked: "Cartas con el arte de esta persona", none: "Ninguna carta vinculada.",
     unlink: "Desvincular", link: "Vincular", search: "Buscar carta especial para vincular", searchPlaceholder: "Jugador, héroe, equipo o artista…",
     linkHint: "Vincular le da la carta a esta persona y hace que el Arte de la carta lleve a este perfil.", artBy: "Arte de", failed: "No se pudo guardar. Intenta de nuevo.",
-    retired: "fuera de circulación",
+    retired: "fuera de circulación", prev: "Cartas anteriores", next: "Siguientes cartas",
   },
 });
 
-/** Selo de artista, ao lado do nome no perfil. */
+/** Selo de artista, embaixo do nome no perfil: em destaque, com o brilho rosa das curtidas. */
 export function ArtistBadge() {
   const t = useT(S);
   return (
-    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-rose-500/15 px-3 py-1 text-xs font-extrabold tracking-widest text-rose-200 uppercase">
-      <Icon name="brush" className="size-4" />
+    <span className="inline-flex w-fit items-center gap-2 rounded-full bg-linear-to-r from-rose-500 to-fuchsia-600 px-4 py-1.5 text-sm font-black tracking-[0.2em] text-white uppercase shadow-[0_0_22px_rgba(244,63,94,0.55)]">
+      <Icon name="brush" className="size-5" />
       {t.artist}
     </span>
   );
 }
 
 const byIds = (players: Player[], ids: string[]) => ids.map((id) => players.find((p) => p.id === id)).filter((p): p is Player => !!p);
+const CARD_W = 222;
 
-/** Área de artista no perfil: as cartas ativas com a arte da pessoa, o total de curtidas delas e o portfólio. */
-export function ProfileArtist({ artist, name, onOpenCard }: { artist: ArtistInfo | null; name: string; onOpenCard: (id: string) => void }) {
+/**
+ * Vitrine do artista, no lugar das conquistas: as cartas ativas com a arte da pessoa numa faixa que rola para os lados
+ * (como o elenco na aba Times), o botão de curtir o artista (o total soma as curtidas das cartas e as do perfil) e o portfólio.
+ */
+export function ArtistShowcase({ artist, userId, name, own, onOpenCard }: { artist: ArtistInfo; userId: string; name: string; own: boolean; onOpenCard: (id: string) => void }) {
   const t = useT(S);
   const { players } = useData();
-  if (!artist) return null;
   const cards = byIds(players, artist.cards).filter((p) => !isRetired(p));
   const portfolio = cards.map((p) => p.art?.credit?.url).find((u) => u && /^https?:\/\//i.test(u));
+  const [rowEl, setRowEl] = useState<HTMLDivElement | null>(null);
+  const rail = useRail(rowEl, cards.length, { item: CARD_W, gap: 24 });
 
   return (
-    <section aria-labelledby="profile-artist-title" className="flex flex-col gap-5 border-t border-zinc-200/15 pt-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 id="profile-artist-title" className="flex items-center gap-2 font-display text-lg font-black text-rose-200">
-            <Icon name="brush" className="size-5" />
+    <section aria-labelledby="profile-artist-title" className="flex min-w-0 flex-1 flex-col gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h2 id="profile-artist-title" className="flex items-center gap-3 font-display text-4xl font-black text-rose-300 title-depth">
+            <Icon name="brush" className="size-8" />
             {t.artist}
           </h2>
-          <p className="text-sm text-zinc-300">{t.lead(name)}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <span className="font-display text-2xl font-black text-dl-text tabular-nums">{t.cards(cards.length)}</span>
-          <span className="flex items-center gap-2 font-display text-2xl font-black text-rose-300 tabular-nums">
-            <Icon name="heart" className="size-6 fill-current" />
-            {t.likes(artist.likes)}
-          </span>
+          <p className="text-sm text-zinc-300">{t.lead(name)} · {t.cards(cards.length)}</p>
           {portfolio && (
-            <a href={portfolio} target="_blank" rel="noopener noreferrer" className={pill(false)}>
+            <a href={portfolio} target="_blank" rel="noopener noreferrer" className={`${pill(false)} self-start`}>
               {t.portfolio} <span aria-hidden="true">↗</span>
             </a>
           )}
         </div>
+        <LikeButton path={artistLikesPath(userId)} own={own} />
       </div>
       {cards.length ? (
-        // vitrine com luz rosa, a cor das curtidas
-        <ul className="relative isolate flex flex-wrap justify-center gap-6 sm:justify-start">
-          {cards.map((p) => (
-            <li key={p.id} className="drop-shadow-[0_0_24px_rgb(244_63_94/0.3)]">
-              <Card player={p} variant="medium" onOpen={() => onOpenCard(p.id)} />
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-end"><RailArrows rail={rail} prev={t.prev} next={t.next} /></div>
+          {/* o fade das pontas é uma máscara e corta tudo fora da caixa: o padding em volta dá lugar ao brilho e à subida do hover */}
+          <div ref={setRowEl} className={`${rail.fadeStrong} overflow-x-clip px-6 pt-4 pb-8 rail-glow`}>
+            <motion.ul className="flex gap-6" {...rail.track}>
+              {cards.map((p, i) => (
+                <li key={p.id} className="shrink-0 drop-shadow-[0_0_24px_rgb(244_63_94/0.3)]" inert={rail.hidden(i) || undefined}>
+                  <Card player={p} variant="medium" onOpen={() => onOpenCard(p.id)} />
+                </li>
+              ))}
+            </motion.ul>
+          </div>
+        </div>
       ) : <p className="text-sm text-zinc-400">{t.empty}</p>}
     </section>
   );

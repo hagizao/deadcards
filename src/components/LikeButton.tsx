@@ -2,20 +2,22 @@ import { motion, useAnimate, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useData } from "../lib/data";
 import { strings, useT } from "../lib/i18n";
-import { likesPath, type CardLikes } from "../lib/likes";
+import type { CardLikes } from "../lib/likes";
 import { Icon } from "./Icon";
 
 const S = strings({
-  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: "Dê uma moral para o artista.", signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida." },
-  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: "Cheer on the artist.", signIn: "Sign in to like", failed: "Could not save the like." },
-  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: "Anima al artista.", signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta." },
+  pt: { like: "Curtir", liked: "Curtida", count: (n: number) => (n === 1 ? "1 curtida" : `${n.toLocaleString("pt-BR")} curtidas`), hint: "Dê uma moral para o artista.", signIn: "Entre para curtir", failed: "Não foi possível salvar a curtida.", likes: "Curtidas", own: "Curtidas do seu perfil." },
+  en: { like: "Like", liked: "Liked", count: (n: number) => (n === 1 ? "1 like" : `${n.toLocaleString("en-US")} likes`), hint: "Cheer on the artist.", signIn: "Sign in to like", failed: "Could not save the like.", likes: "Likes", own: "Your profile likes." },
+  es: { like: "Me gusta", liked: "Te gusta", count: (n: number) => (n === 1 ? "1 me gusta" : `${n.toLocaleString("es")} me gusta`), hint: "Anima al artista.", signIn: "Ingresa para dar me gusta", failed: "No se pudo guardar el me gusta.", likes: "Me gusta", own: "Los me gusta de tu perfil." },
 });
 
 /**
- * Curtir carta especial: botão grande, com o total à vista de todos, para dar moral para quem fez a arte.
- * Sem login, o mesmo botão leva para entrar.
+ * Curtir: botão grande, com o total à vista de todos, para dar moral para quem fez a arte.
+ * `path` é a API das curtidas (de uma carta especial ou do perfil do artista). Sem login, o mesmo botão leva para entrar;
+ * `own` (o seu próprio perfil) mostra só o total, sem curtir.
  */
-export function LikeButton({ id }: { id: string }) {
+export function LikeButton({ path, own = false }: { path: string; own?: boolean }) {
+  const id = path;
   const t = useT(S);
   const { me } = useData();
   const still = useReducedMotion();
@@ -26,12 +28,12 @@ export function LikeButton({ id }: { id: string }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(likesPath(id), { signal: controller.signal })
+    fetch(path, { signal: controller.signal })
       .then((r) => (r.ok ? (r.json() as Promise<CardLikes>) : Promise.reject(new Error(String(r.status)))))
       .then((l) => setState({ id, ...l }))
       .catch(() => { /* sem total: o botão espera, e curtir ainda funciona */ });
     return () => controller.abort();
-  }, [id, me?.id]);
+  }, [id, path, me?.id]);
 
   const likes = state?.id === id ? state : undefined;
   const liked = !!likes?.liked;
@@ -45,7 +47,7 @@ export function LikeButton({ id }: { id: string }) {
     if (!before.liked && !still) animate("[data-heart]", { scale: [1, 1.45, 0.9, 1] }, { duration: 0.35 });
     setBusy(true);
     try {
-      const r = await fetch(likesPath(id), { method: before.liked ? "DELETE" : "PUT" });
+      const r = await fetch(path, { method: before.liked ? "DELETE" : "PUT" });
       if (!r.ok) throw new Error(String(r.status));
       setState({ id, ...(await r.json() as CardLikes) });
     } catch {
@@ -68,6 +70,18 @@ export function LikeButton({ id }: { id: string }) {
       <span aria-hidden="true" className="h-5 w-px bg-current opacity-40" />
       <span className="font-display text-xl tabular-nums" aria-live="polite">{likes ? likes.count.toLocaleString() : "–"}</span>
     </>
+  );
+
+  if (own) return (
+    <div className="flex w-fit flex-col items-center gap-1.5">
+      <span className="flex min-h-12 items-center gap-3 rounded-full bg-rose-500/15 px-5 text-base font-extrabold tracking-wide text-rose-200 uppercase ring-1 ring-rose-400/50">
+        <Icon name="heart" className="size-6 fill-current" />
+        <span>{t.likes}</span>
+        <span aria-hidden="true" className="h-5 w-px bg-current opacity-40" />
+        <span className="font-display text-xl tabular-nums">{likes ? likes.count.toLocaleString() : "–"}</span>
+      </span>
+      <span className="text-xs whitespace-nowrap text-zinc-400">{t.own}</span>
+    </div>
   );
 
   return (

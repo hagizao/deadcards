@@ -11,6 +11,7 @@ import type { Player } from "../lib/types";
 import { Card } from "./Card";
 import { ShareCardButton } from "./ShareCardButton";
 import { LikeButton } from "./LikeButton";
+import { likesPath } from "../lib/likes";
 import { Icon } from "./Icon";
 import { easeOut, pill } from "../lib/ui";
 import { cascade, enter, flightOrigin, springFlight } from "../lib/motion";
@@ -205,7 +206,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
                   onProfile={!preview && onOpenProfile && artists?.[player.id] ? () => onOpenProfile(artists[player.id]) : undefined} />
               )}
             </div>
-            {player.special && !preview && <div className="order-last w-full sm:order-0 sm:w-auto"><LikeButton id={player.id} /></div>}
+            {player.special && !preview && <div className="order-last w-full sm:order-0 sm:w-auto"><LikeButton path={likesPath(player.id)} /></div>}
             <button type="button" onClick={onClose} aria-label={t.close} className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-zinc-800/60 text-zinc-300 transition hover:bg-zinc-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:size-9"><Icon name="x" /></button>
           </div>
 

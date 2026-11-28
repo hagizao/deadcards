@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useDeferredValue, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from "react";
 import { ProfileSkeleton } from "../components/Skeleton";
 import { Achievements } from "../components/Achievements";
-import { ArtistAdminPanel, ArtistBadge, ProfileArtist } from "../components/ArtistArea";
+import { ArtistAdminPanel, ArtistBadge, ArtistShowcase } from "../components/ArtistArea";
 import { Card } from "../components/Card";
 import { CardExportButton } from "../components/CardExportButton";
 import { Icon } from "../components/Icon";
@@ -10,7 +10,7 @@ import { Range } from "../components/Range";
 import { POSITIONS, STAT_KEYS, calculateOVR, getPlayerOvr, teamOf, useLabel } from "../lib/cards";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
-import { MAX_FAVORITES, PROFILE_CARD_PATH, PROFILE_NAME_MAX, profilePlayer, profileUrl, summarizeCollection, type ProfileCard, type ProfileCardState, type PublicProfile } from "../lib/profile";
+import { MAX_FAVORITES, PROFILE_ART_PATH, PROFILE_CARD_PATH, PROFILE_NAME_MAX, profilePlayer, profileUrl, summarizeCollection, type ProfileCard, type ProfileCardState, type PublicProfile } from "../lib/profile";
 import { getCardTier } from "../lib/rarity";
 import { useMyCards } from "../lib/myCards";
 import type { Player } from "../lib/types";
@@ -33,6 +33,9 @@ const S = strings({
     noCard: "Ainda não montou uma carta.", cards: "Coleção", noCards: "Nenhuma carta na coleção ainda.", redeem: "Resgatar carta",
     not_found: "Perfil não encontrado.",
     invalid_card: "Confira o nome, o herói e os atributos.", unavailable: "Não foi possível carregar agora.", login: "Entre para editar sua carta.",
+    not_artist: "Só artistas podem usar arte própria na carta.", invalid_image: "Envie uma imagem PNG, JPG ou WebP de até 5 MB.",
+    art: "Arte da carta", artHint: "Como artista, você pode usar uma arte sua na carta. Sem ela, a carta usa a arte do herói.",
+    artUpload: "Enviar arte", artChange: "Trocar arte", artRemove: "Tirar arte", uploading: "Enviando…",
   },
   en: {
     favorites: "Favorites", favoritesHint: `Open a card and tap Favorite: up to ${MAX_FAVORITES} are featured here.`,
@@ -48,6 +51,9 @@ const S = strings({
     noCard: "No card built yet.", cards: "Collection", noCards: "No cards in the collection yet.", redeem: "Redeem a card",
     not_found: "Profile not found.",
     invalid_card: "Check the name, hero and attributes.", unavailable: "Could not load right now.", login: "Sign in to edit your card.",
+    not_artist: "Only artists can use their own art on the card.", invalid_image: "Send a PNG, JPG or WebP image up to 5 MB.",
+    art: "Card art", artHint: "As an artist, you can use your own art on the card. Without it, the card uses the hero art.",
+    artUpload: "Upload art", artChange: "Change art", artRemove: "Remove art", uploading: "Uploading…",
   },
   es: {
     favorites: "Favoritas", favoritesHint: `Abre una carta y toca Marcar favorita: hasta ${MAX_FAVORITES} se destacan aquí.`,
@@ -63,6 +69,9 @@ const S = strings({
     noCard: "Todavía no armó una carta.", cards: "Colección", noCards: "Todavía no hay cartas en la colección.", redeem: "Canjear carta",
     not_found: "Perfil no encontrado.",
     invalid_card: "Revisa el nombre, el héroe y los atributos.", unavailable: "No se pudo cargar ahora.", login: "Inicia sesión para editar tu carta.",
+    not_artist: "Solo los artistas pueden usar arte propio en la carta.", invalid_image: "Envía una imagen PNG, JPG o WebP de hasta 5 MB.",
+    art: "Arte de la carta", artHint: "Como artista, puedes usar un arte tuyo en la carta. Sin él, la carta usa el arte del héroe.",
+    artUpload: "Enviar arte", artChange: "Cambiar arte", artRemove: "Quitar arte", uploading: "Enviando…",
   },
 });
 
@@ -73,7 +82,8 @@ const fileNo = (id: string) => {
   return String(h % 10000).padStart(4, "0");
 };
 
-type Issue = "invalid_card" | "unavailable" | "login" | "not_found";
+type Issue = "invalid_card" | "unavailable" | "login" | "not_found" | "not_artist" | "invalid_image";
+const ISSUES: Issue[] = ["invalid_card", "unavailable", "login", "not_found", "not_artist", "invalid_image"];
 
 async function profileRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
@@ -84,7 +94,7 @@ async function profileRequest<T>(path: string, init?: RequestInit): Promise<T> {
 
 function issueOf(error: unknown): Issue {
   const code = error instanceof Error ? error.message : "";
-  return code === "invalid_card" || code === "login" || code === "not_found" ? code : "unavailable";
+  return (ISSUES as string[]).includes(code) ? code as Issue : "unavailable";
 }
 
 export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOpenCard: (id: string) => void; onRedeem: () => void }) {
@@ -146,6 +156,7 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
         <>
           {identity}
           <ProfileEditor
+            artist={!!profile.artist}
             onCancel={() => setEditing(false)}
             onSaved={(saved) => { setProfile({ ...profile, card: saved }); setEditing(false); }}
           />
@@ -176,13 +187,14 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
             </div>
             {copy && <p role="status" className={`text-sm ${copy === "copied" ? "text-emerald-300" : "text-red-300"}`}>{t[copy]}</p>}
           </div>
-          <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />
+          {profile.artist
+            ? <ArtistShowcase artist={profile.artist} userId={profile.id} name={profile.name} own={owner} onOpenCard={onOpenCard} />
+            : <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />}
         </div>
       )}
 
       {me?.admin && <ArtistAdminPanel userId={profile.id} onChanged={() => setVersion((v) => v + 1)} />}
-      <ProfileArtist artist={profile.artist} name={profile.name} onOpenCard={onOpenCard} />
-      {editing && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />}
+      {(editing || profile.artist) && <Achievements ids={profile.cards} profileCard={!!profile.card} favorites={profile.favorites.length} collapsible seenKey={owner ? `achievements-seen:${profile.id}` : undefined} />}
       <ProfileFavorites ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} />
       <ProfileCards ids={profile.cards} profileFavorites={profile.favorites} owner={owner} onOpenCard={onOpenCard} onRedeem={onRedeem} />
     </section>
@@ -327,7 +339,8 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
   );
 }
 
-function ProfileEditor({ onSaved, onCancel }: { onSaved: (card: ProfileCard) => void; onCancel: () => void }) {
+/** `artist`: só artistas veem a opção de usar arte própria na carta. */
+function ProfileEditor({ artist, onSaved, onCancel }: { artist: boolean; onSaved: (card: ProfileCard) => void; onCancel: () => void }) {
   const t = useT(S);
   const locale = useLocale();
   const { me, heroNames } = useData();
@@ -335,6 +348,7 @@ function ProfileEditor({ onSaved, onCancel }: { onSaved: (card: ProfileCard) => 
   const [state, setState] = useState<ProfileCardState>();
   const [draft, setDraft] = useState<ProfileCard>();
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<Issue>();
 
   useEffect(() => {
@@ -354,6 +368,24 @@ function ProfileEditor({ onSaved, onCancel }: { onSaved: (card: ProfileCard) => 
   const dirty = !!card && JSON.stringify(card) !== JSON.stringify(current?.card);
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
   const update = (patch: Partial<ProfileCard>) => { if (card) setDraft({ ...card, ...patch }); };
+
+  const uploadArt = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(undefined);
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.set("image", file);
+      const { url } = await profileRequest<{ url: string }>(PROFILE_ART_PATH, { method: "POST", body: form });
+      update({ art: { url, zoom: 100, x: 50, y: 50 } });
+    } catch (err) {
+      setError(issueOf(err));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const save = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -415,6 +447,28 @@ function ProfileEditor({ onSaved, onCancel }: { onSaved: (card: ProfileCard) => 
               ))}
             </div>
           </fieldset>
+          {artist && (
+            <fieldset className="flex flex-col gap-3" disabled={busy || uploading}>
+              <legend className="mb-3 text-sm font-bold text-zinc-100">{t.art}</legend>
+              <p className="text-xs text-zinc-400">{t.artHint}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className={`${pill(false)} has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-zinc-100 has-disabled:cursor-wait has-disabled:opacity-60`}>
+                  <Icon name="brush" className="size-4" />
+                  {card.art ? t.artChange : t.artUpload}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadArt} className="sr-only" />
+                </label>
+                {card.art && <button type="button" onClick={() => update({ art: undefined })} className={pill(false)}>{t.artRemove}</button>}
+                {uploading && <span role="status" className="text-sm text-zinc-400">{t.uploading}</span>}
+              </div>
+              {card.art && (
+                <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+                  <Range label="Zoom" value={card.art.zoom ?? 100} min={50} max={300} onChange={(v) => update({ art: { ...card.art!, zoom: v } })} />
+                  <Range label="X" value={card.art.x ?? 50} min={0} max={100} onChange={(v) => update({ art: { ...card.art!, x: v } })} />
+                  <Range label="Y" value={card.art.y ?? 50} min={0} max={100} onChange={(v) => update({ art: { ...card.art!, y: v } })} />
+                </div>
+              )}
+            </fieldset>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <button type="submit" disabled={busy || !dirty} className={primaryBtn}>{busy ? t.saving : t.save}</button>
             <button type="button" disabled={busy} onClick={onCancel} className={`${pill(false)} disabled:opacity-50`}>{t.cancel}</button>
