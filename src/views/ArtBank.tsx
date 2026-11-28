@@ -217,7 +217,7 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
               placeholder="Escreva ou escolha abaixo" className={`${field} resize-none py-1.5 font-normal tracking-normal normal-case`} />
           </label>
           <div className="flex flex-wrap gap-2">
-            {REASONS.map((r) => <button key={r} type="button" aria-pressed={reason === r} onClick={() => setReason(r)} className={`${pill(reason === r)} text-left tracking-normal normal-case`}>{r}</button>)}
+            {REASONS.map((r) => <button key={r} type="button" aria-pressed={reason === r} onClick={() => setReason(r)} className="min-h-11 cursor-pointer rounded-lg bg-zinc-100/5 px-3 py-1.5 text-left text-xs text-zinc-200 transition-colors hover:bg-zinc-100/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/15 aria-pressed:bg-zinc-100 aria-pressed:text-zinc-950 sm:min-h-9">{r}</button>)}
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="submit" className={primaryBtn}>Confirmar recusa</button>
