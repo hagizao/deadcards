@@ -169,8 +169,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
           exit={{ opacity: 0, scale: 0.97 }}
           transition={{ type: "spring", duration: 0.35, bounce: 0.12 }}
         >
-          {/* a aura troca de cor junto com a carta (versões, raridade, moldura) */}
-          <div className="spotlight-aura absolute inset-0 rounded-3xl transition-[border-color,box-shadow] duration-300" style={{ "--sp-c": tier.c, "--sp-hi": tier.hi } as CSSProperties} />
+          {/* só carta especial: a aura troca de cor junto com a carta (versões, raridade, moldura) */}
+          {player.special && <div className="spotlight-aura absolute inset-0 rounded-3xl transition-[border-color,box-shadow] duration-300" style={{ "--sp-c": tier.c, "--sp-hi": tier.hi } as CSSProperties} />}
         </motion.div>
       {/* sem rolagem lateral: o clarão da revelação passa da largura do painel no celular */}
       <div
