@@ -64,7 +64,8 @@ export function ArtistShowcase({ artist, userId, name, own, onOpenCard, headerCl
   return (
     // display: contents: o cabeçalho e a faixa viram células da grade do perfil
     <section aria-labelledby="profile-artist-title" className="contents">
-      <div className={`flex min-w-0 flex-wrap items-end justify-between gap-4 ${headerClassName}`}>
+      {/* lg:px-16 = o padding da faixa: o título começa na linha da primeira carta e o curtir termina na linha das setas */}
+      <div className={`flex min-w-0 flex-wrap items-end justify-between gap-4 lg:px-16 ${headerClassName}`}>
         <div className="flex flex-col gap-2">
           {/* o carimbo da ficha já diz "Artista": o título é o que a vitrine mostra */}
           <h2 id="profile-artist-title" className="flex items-center gap-2 font-display text-xl font-black text-balance text-zinc-100 sm:text-2xl">

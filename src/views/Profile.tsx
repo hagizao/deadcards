@@ -37,7 +37,7 @@ const S = strings({
     art: "Arte da carta", artHint: "Como artista, você pode usar uma arte sua na carta. Sem ela, a carta usa a arte do herói.",
     artUpload: "Enviar arte", artChange: "Trocar arte", artRemove: "Tirar arte", uploading: "Enviando…",
     frame: "Moldura", frameHint: "Escolha uma moldura de carta especial e ajuste as cores e a espessura.", frameNone: "Sem moldura",
-    frameColor: "Cor da moldura", frameGlow: "Cor do brilho", frameWidth: "Espessura",
+    artZoom: "Zoom", artX: "Posição horizontal", artY: "Posição vertical", frameColor: "Cor da moldura", frameGlow: "Cor do brilho", frameWidth: "Espessura",
   },
   en: {
     favorites: "Favorites", favoritesHint: `Open a card and tap Favorite: up to ${MAX_FAVORITES} are featured here.`,
@@ -57,7 +57,7 @@ const S = strings({
     art: "Card art", artHint: "As an artist, you can use your own art on the card. Without it, the card uses the hero art.",
     artUpload: "Upload art", artChange: "Change art", artRemove: "Remove art", uploading: "Uploading…",
     frame: "Frame", frameHint: "Pick a special card frame and tune its colors and thickness.", frameNone: "No frame",
-    frameColor: "Frame color", frameGlow: "Glow color", frameWidth: "Thickness",
+    artZoom: "Zoom", artX: "Horizontal position", artY: "Vertical position", frameColor: "Frame color", frameGlow: "Glow color", frameWidth: "Thickness",
   },
   es: {
     favorites: "Favoritas", favoritesHint: `Abre una carta y toca Marcar favorita: hasta ${MAX_FAVORITES} se destacan aquí.`,
@@ -77,7 +77,7 @@ const S = strings({
     art: "Arte de la carta", artHint: "Como artista, puedes usar un arte tuyo en la carta. Sin él, la carta usa el arte del héroe.",
     artUpload: "Enviar arte", artChange: "Cambiar arte", artRemove: "Quitar arte", uploading: "Enviando…",
     frame: "Marco", frameHint: "Elige un marco de carta especial y ajusta los colores y el grosor.", frameNone: "Sin marco",
-    frameColor: "Color del marco", frameGlow: "Color del brillo", frameWidth: "Grosor",
+    artZoom: "Zoom", artX: "Posición horizontal", artY: "Posición vertical", frameColor: "Color del marco", frameGlow: "Color del brillo", frameWidth: "Grosor",
   },
 });
 
@@ -381,10 +381,13 @@ function ProfileCards({ ids, profileFavorites, owner, onOpenCard, onRedeem }: { 
 /** O editor da carta abre numa janela por cima do perfil (fecha com Esc ou Cancelar): o perfil embaixo não muda de lugar. */
 function EditorDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
-  // sem close() na limpeza: no modo estrito o efeito roda duas vezes, e o evento close fecharia o editor logo ao abrir
+  // sem close() na limpeza: no modo estrito o efeito roda duas vezes, e o evento close fecharia o editor logo ao abrir.
+  // Cancelar e Salvar desmontam a janela sem passar pelo close nativo: o foco volta à mão para quem abriu
   useEffect(() => {
     const dialog = ref.current;
+    const opener = document.activeElement instanceof HTMLElement && !dialog?.contains(document.activeElement) ? document.activeElement : null;
     if (dialog && !dialog.open) dialog.showModal();
+    return () => { if (opener?.isConnected) opener.focus(); };
   }, []);
   return (
     <dialog ref={ref} aria-labelledby="profile-editor-title" onClose={onClose}
@@ -519,9 +522,9 @@ function ProfileEditor({ artist, onSaved, onCancel }: { artist: boolean; onSaved
               </div>
               {card.art && (
                 <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-                  <Range label="Zoom" value={card.art.zoom ?? 100} min={50} max={300} onChange={(v) => update({ art: { ...card.art!, zoom: v } })} />
-                  <Range label="X" value={card.art.x ?? 50} min={0} max={100} onChange={(v) => update({ art: { ...card.art!, x: v } })} />
-                  <Range label="Y" value={card.art.y ?? 50} min={0} max={100} onChange={(v) => update({ art: { ...card.art!, y: v } })} />
+                  <Range label={t.artZoom} value={card.art.zoom ?? 100} min={50} max={300} onChange={(v) => update({ art: { ...card.art!, zoom: v } })} />
+                  <Range label={t.artX} value={card.art.x ?? 50} min={0} max={100} onChange={(v) => update({ art: { ...card.art!, x: v } })} />
+                  <Range label={t.artY} value={card.art.y ?? 50} min={0} max={100} onChange={(v) => update({ art: { ...card.art!, y: v } })} />
                 </div>
               )}
             </fieldset>

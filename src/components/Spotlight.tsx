@@ -227,7 +227,10 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
                 <LikeButton path={likesPath(player.id)} onArtist={artistKey && onOpenProfile ? () => onOpenProfile(artistKey) : undefined} />
               </div>
             )}
-            <button type="button" onClick={onClose} aria-label={t.close} className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-zinc-800/60 text-zinc-300 transition hover:bg-zinc-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:size-9"><Icon name="x" /></button>
+            {/* do sm em diante a área do fechar tem a altura do curtir (48 px), com o círculo no meio: os dois dividem a linha de centro */}
+            <button type="button" onClick={onClose} aria-label={t.close} className="group flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 sm:size-12">
+              <span className="flex size-11 items-center justify-center rounded-full bg-zinc-800/60 text-zinc-300 transition group-hover:bg-zinc-800 group-hover:text-white group-active:bg-zinc-700 sm:size-9"><Icon name="x" /></span>
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -282,6 +285,8 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
                         {icon ? <img src={icon} alt="" className="size-full scale-110 object-cover" /> : <span className="text-[10px] font-bold text-zinc-300">{v.hero.slice(0, 3)}</span>}
                       </span>
                       {caption && <span className={`max-w-full truncate text-[10px] font-bold tracking-wider uppercase ${on ? "text-dl-text" : "text-zinc-400"}`}>{caption}</span>}
+                      {/* o time da versão fica à vista (no toque e no teclado não há hover para o title) */}
+                      {caption && !isMainCard(v) && <span className="max-w-full truncate text-[10px] font-bold tracking-wider text-zinc-500 uppercase">{teamOf(teams, v).tag}</span>}
                     </button>
                   );
                 })}

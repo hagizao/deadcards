@@ -91,16 +91,19 @@ const ACCEPT = "image/png,image/jpeg,image/webp";
 
 /** Sem imagem, uma área grande de escolher ou soltar (é o passo principal da tela); com imagem, só o botão de trocar. */
 function ImageInput({ label, drop, hint, chosen, onFile }: { label: string; drop: string; hint: string; chosen: boolean; onFile: (f: File) => void }) {
+  const t = useT(S);
   const [over, setOver] = useState(false);
-  const input = <input type="file" accept={ACCEPT} className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onFile(f); }} />;
+  const [bad, setBad] = useState(false);
+  const input = <input type="file" accept={ACCEPT} className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { setBad(false); onFile(f); } }} />;
   if (chosen) return <label className={`${pill(false)} cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-100`}>{label}{input}</label>;
   return (
     <label
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files?.[0]; if (f && ACCEPT.split(",").includes(f.type)) onFile(f); }}
+      onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files?.[0]; const ok = !!f && ACCEPT.split(",").includes(f.type); setBad(!ok); if (ok) onFile(f); }}
       className={`flex min-h-28 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-100 hover:border-zinc-200/50 hover:bg-zinc-100/5 active:bg-zinc-100/10 ${over ? "border-dl-text bg-zinc-100/10" : "border-zinc-200/20"}`}>
       <span className="text-sm font-bold tracking-widest text-zinc-100 uppercase">{label}</span>
       <span className="text-xs text-zinc-400">{drop} · {hint}</span>
+      {bad && <span role="alert" className="text-xs text-red-300">{t.errors.image}</span>}
       {input}
     </label>
   );
@@ -296,7 +299,7 @@ export function ArtSubmit() {
 
           <div className="flex flex-wrap items-center gap-4">
             <button type="submit" disabled={busy || !bg.file || (split && !fg.file)} className={primaryBtn}>{busy ? t.sending : t.send}</button>
-            {!msg && missing && <p className="text-xs text-zinc-400">{missing}</p>}
+            {!msg && missing && <p aria-live="polite" className="text-xs text-zinc-400">{missing}</p>}
             {msg && <p role={msg.ok ? "status" : "alert"} className={`text-sm ${msg.ok ? "text-emerald-300" : "text-red-300"}`}>{msg.text}</p>}
           </div>
         </div>
