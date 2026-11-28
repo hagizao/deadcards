@@ -310,6 +310,8 @@
     .rk-wrap:hover {
       filter: var(--card-vol) drop-shadow(0 0 calc(var(--rk-gr, 0px) * 1.9) var(--rk-glow, transparent));
     }
+    /* Spotlight: com a carta em movimento o Chrome corta o brilho num retângulo; some durante o movimento e volta pela transition */
+    [data-moving] .rk-wrap { filter: var(--card-vol) drop-shadow(0 0 0 transparent); transition: none; }
     .rk-ring {
       position: absolute;
       inset: 0;

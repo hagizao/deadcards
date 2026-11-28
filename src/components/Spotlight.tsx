@@ -71,12 +71,17 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
     if (!reveal || !cardRef.current) return;
     revealed.add(playerId);
     const ovrEl = cardRef.current.querySelector("[data-ovr]")?.firstChild;
+    const panel = fly ? null : cardRef.current.closest<HTMLElement>("[data-spotlight-panel]");
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ delay: 0.12, onComplete: () => setFlashDone(playerId) });
       tl.fromTo(flashRef.current, { opacity: 0, scale: 0.5 }, { opacity: 0.9, scale: 1.1, duration: 0.25, ease: "power2.out" })
         .to(flashRef.current, { opacity: 0, scale: 1.35, duration: 0.5, ease: "power2.in" });
       // vindo da grade a carta já chega voando; o pulo da revelação fica só para quando ela abre do nada
-      if (!fly) tl.from(cardRef.current, { y: 40, scale: 0.85, opacity: 0, duration: 0.6, ease: "back.out(1.6)", clearProps: "transform,opacity" }, 0.05);
+      if (!fly) {
+        tl.from(cardRef.current, { y: 40, scale: 0.85, opacity: 0, duration: 0.6, ease: "back.out(1.6)", clearProps: "transform,opacity",
+          onComplete: () => { if (panel) delete panel.dataset.moving; } }, 0.05);
+        if (panel) panel.dataset.moving = "";
+      }
       if (ovrEl) {
         const n = { v: 0 };
         ovrEl.nodeValue = "0";
@@ -87,15 +92,16 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
         tl.from(split.chars, { opacity: 0, y: 12, duration: 0.3, stagger: 0.025, ease: "power2.out" }, 0.4);
       }
     });
-    return () => { ctx.revert(); if (ovrEl) ovrEl.nodeValue = String(ovr); };
+    return () => { ctx.revert(); if (ovrEl) ovrEl.nodeValue = String(ovr); if (panel) delete panel.dataset.moving; };
   }, [reveal, playerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // a carta sai de onde estava na grade, cresce até aqui e, ao fechar, volta para o mesmo lugar
   const flyRef = useRef<HTMLDivElement>(null);
   // o painel rola por dentro (overflow) e cortaria a carta enquanto ela voa de fora dele: durante o voo ele deixa vazar
   const scrollRef = useRef<HTMLDivElement>(null);
-  const unclip = () => { if (scrollRef.current) scrollRef.current.style.overflow = "visible"; };
-  const reclip = () => { if (scrollRef.current) scrollRef.current.style.overflow = ""; };
+  // enquanto a carta se mexe (voo ou pulo da revelação) o Chrome corta o brilho dela num retângulo: data-moving apaga o brilho, que volta suave ao pousar
+  const unclip = () => { if (scrollRef.current) { scrollRef.current.style.overflow = "visible"; scrollRef.current.dataset.moving = ""; } };
+  const reclip = () => { if (scrollRef.current) { scrollRef.current.style.overflow = ""; delete scrollRef.current.dataset.moving; } };
   const [isPresent, safeToRemove] = usePresence();
   const [firstId] = useState(playerId);
   const flightGap = (from: HTMLElement, el: HTMLElement) => {
@@ -175,6 +181,7 @@ export function Spotlight({ playerId, onClose, onSwitch, onEdit, onOpenProfile, 
       {/* sem rolagem lateral: o clarão da revelação passa da largura do painel no celular */}
       <div
         ref={scrollRef}
+        data-spotlight-panel
         className="relative flex max-h-[92dvh] w-full scrollbar-none flex-col items-center gap-8 overflow-x-hidden overflow-y-auto overscroll-contain rounded-3xl p-4 sm:p-8 md:flex-row md:items-start"
       >
         <div ref={flyRef} className="relative z-10 max-w-full">
