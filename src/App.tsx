@@ -1,7 +1,6 @@
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
 import { DataProvider, useData } from "./lib/data";
-import { hexToRgba } from "./lib/cards";
 import { Home } from "./views/Home";
 import { Teams } from "./views/Teams";
 import { TierList } from "./views/TierList";
@@ -16,7 +15,8 @@ import { Legal } from "./views/Legal";
 import { Compare } from "./views/Compare";
 import { LANGS, LANG_LABEL, LangProvider, type Lang, strings, useLang, useT } from "./lib/i18n";
 import { Feedback } from "./views/Feedback";
-import { areaStyle, type AreaKey } from "./lib/areas";
+import { areaStyle, areaTier, type AreaKey } from "./lib/areas";
+import { RitualBackground } from "./components/RitualBackground";
 import { Icon } from "./components/Icon";
 import { Profile } from "./views/Profile";
 import { easeOut } from "./lib/ui";
@@ -232,28 +232,10 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <LangProvider>
         <DataProvider>
-          {location.pathname === "/login" ? <><Background /><Login /></> : <Shell />}
+          {location.pathname === "/login" ? <><RitualBackground /><Login /></> : <Shell />}
         </DataProvider>
       </LangProvider>
     </MotionConfig>
-  );
-}
-
-function Background() {
-  const { settings } = useData();
-  const bg = settings.bg;
-  if (!bg) return null;
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
-      {bg.imageUrl && (
-        <div
-          className="absolute -inset-6 bg-center bg-no-repeat"
-          style={{ backgroundImage: `url("${bg.imageUrl}")`, backgroundSize: bg.size || "cover", opacity: bg.imageOpacity / 100, filter: `blur(${bg.blur}px)` }}
-        />
-      )}
-      <div className="absolute inset-0" style={{ background: hexToRgba(bg.color, bg.overlayOpacity / 100) }} />
-      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 15%, rgba(255,255,255,0.03) 0%, rgba(9,9,11,0.72) 100%)" }} />
-    </div>
   );
 }
 
@@ -287,7 +269,8 @@ function Shell() {
 
   return (
     <>
-      <Background />
+      {/* luz do fundo: a Home pega o azul de Times e Times fica no bege do site; as outras abas, a cor da área */}
+      <RitualBackground color={tab === "home" ? areaTier("teams").c : tab === "teams" ? undefined : TAB_AREA[tab] && areaTier(TAB_AREA[tab]).c} />
       {/* cabeçalho sem caixa: no topo é transparente; rolando, uma sombra escura desce atrás dele para o menu seguir legível */}
       <header className="sticky top-0 z-40">
         <ScrollShade />
@@ -321,8 +304,10 @@ function Shell() {
       </header>
 
       <ReducedMotionNotice />
-      {/* clip no eixo x: a tela que entra deslizando de lado não pode criar rolagem horizontal no celular */}
-      <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 sm:px-6 sm:py-10 lg:px-8" style={areaStyle(TAB_AREA[tab])}>
+      {/* clip no eixo x na largura da janela (não na do conteúdo): a tela que entra deslizando de lado não cria rolagem
+          horizontal no celular, e brilhos e névoas que passam da coluna somem no fade deles em vez de num corte reto */}
+      <div className="overflow-x-clip">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8" style={areaStyle(TAB_AREA[tab])}>
         <motion.div
             key={tab}
             initial={{ opacity: 0, x: shown.dir * 24 }}
@@ -342,6 +327,7 @@ function Shell() {
             {tab === "feedback" && <Feedback />}
           </motion.div>
       </main>
+      </div>
 
       <footer className="mt-6 border-t border-zinc-200/10 pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-zinc-400 sm:px-6 lg:px-8">

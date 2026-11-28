@@ -39,13 +39,13 @@ export function NewCards({ onOpenCard }: { onOpenCard: (id: string) => void }) {
     <section aria-labelledby="home-new" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <Reveal className="flex flex-col gap-2">
-          <h2 id="home-new" className={sectionTitle}>{t.title}</h2>
+          <h2 id="home-new" className={`${sectionTitle} deco-star`}>{t.title}</h2>
           <p className="text-sm text-zinc-300">{t.lead}</p>
         </Reveal>
         <RailArrows rail={rail} prev={t.prev} next={t.next} />
       </div>
       {/* o fade das pontas é uma máscara e corta tudo fora da caixa: o padding em volta dá lugar ao brilho e à subida do hover (useRail mede só a área de dentro) */}
-      <div ref={setRailEl} className={`${rail.fade} overflow-x-clip px-6 pt-6 pb-10`}>
+      <div ref={setRailEl} className={`${rail.fade} overflow-x-clip px-6 pt-6 pb-10 rail-glow`}>
         <motion.ul className="flex gap-5" {...rail.track}>
           {latest.map((p, i) => (
             <li key={p.id} className="shrink-0" inert={rail.hidden(i) || undefined}>

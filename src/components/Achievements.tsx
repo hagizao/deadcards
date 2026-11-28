@@ -217,8 +217,10 @@ function AchievementTile({ a, t, hide, fresh, delay }: { a: Achievement; t: Text
       transition={{ duration: 0.3, ease: easeOut, delay }}
       className={`${TILE[a.rarity]} ${hide ? "max-lg:hidden" : ""} flex items-center gap-3 rounded-xl p-3`}
     >
-      <span className={`ach-medal relative flex size-12 shrink-0 items-center justify-center rounded-full bg-zinc-950 ${fresh ? "ach-fresh" : ""}`}>
-        <Icon name={ICON[a.rarity]} className="size-6" />
+      {/* insígnia art déco: placa escalonada com a moldura no metal da raridade */}
+      <span className={`ach-medal relative flex size-12 shrink-0 items-center justify-center ${fresh ? "ach-fresh" : ""}`}>
+        <span aria-hidden="true" className="ach-badge absolute inset-0" />
+        <Icon name={ICON[a.rarity]} className="relative size-6" />
         {!a.done && (
           <span className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-full bg-zinc-800 text-zinc-400">
             <Icon name="lock" className="size-3" />

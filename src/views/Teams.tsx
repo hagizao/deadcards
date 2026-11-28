@@ -197,7 +197,7 @@ function TeamPanel({ team, ovr, size, onOpenCard }: { team: Team; ovr: { rounded
       </div>
       {roster.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{t.emptyRoster}</p>}
       {/* o fade das pontas é uma máscara e corta tudo fora da caixa: o padding em volta dá lugar ao brilho e à subida do hover (useRail mede só a área de dentro) */}
-      <div ref={setRowEl} className={`${rail.fadeStrong} overflow-x-clip px-6 pt-6 pb-10`}>
+      <div ref={setRowEl} className={`${rail.fadeStrong} overflow-x-clip px-6 pt-6 pb-10 rail-glow`}>
         <motion.ul className="flex gap-6" {...rail.track}>
           {roster.map((p, i) => (
             <motion.li key={p.id} className="shrink-0" inert={rail.hidden(i) || undefined} initial={{ opacity: 0, y: 12, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: Math.min(i, 5) * 0.04, duration: 0.25, ease: easeOut }}>

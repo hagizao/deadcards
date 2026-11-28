@@ -61,7 +61,7 @@ export const api = {
   removePackType: (id: string) => call(`/api/pack-types/${encodeURIComponent(id)}`, { method: "DELETE" }),
   inventory: () => get<{ packs: InventoryPack[] }>("/api/packs"),
   openPack: (id: string) => post<{ cards: { id: string; kind: PackKind }[]; test?: boolean }>(`/api/packs/${encodeURIComponent(id)}/open`),
-  upload: async (folder: "players" | "teams" | "heroes" | "bg" | "home" | "packs" | "events", file: File) =>
+  upload: async (folder: "players" | "teams" | "heroes" | "home" | "packs" | "events", file: File) =>
     (await call(`/api/upload/${folder}`, { method: "POST", headers: { "content-type": file.type }, body: file })).url!,
 };
 

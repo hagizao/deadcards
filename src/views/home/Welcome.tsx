@@ -46,7 +46,7 @@ export function Welcome({ onNavigate }: { onNavigate: (area: Area) => void }) {
 
   return (
     <section aria-labelledby="home-welcome" className="flex flex-col gap-5">
-      <h2 id="home-welcome" className={sectionTitle}>{t.title}</h2>
+      <h2 id="home-welcome" className={`${sectionTitle} deco-arch`}>{t.title}</h2>
       <ol className="grid gap-4 md:grid-cols-3">
         {t.steps.map(([title, text], i) => (
           <motion.li key={title} className="flex gap-3" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ ...enter, delay: cascade(i, 0.08) }}>

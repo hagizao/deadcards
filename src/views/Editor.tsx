@@ -542,7 +542,7 @@ function TeamsForm() {
 
 const DEFAULT_BG: BgSettings = { enabled: true, color: "#09090b", imageOpacity: 60, overlayOpacity: 55, blur: 0, size: "cover" };
 
-function BgFields({ bg, onChange, folder, title }: { bg?: BgSettings; onChange: (bg: BgSettings | undefined) => void; folder: "bg" | "teams"; title: string }) {
+function BgFields({ bg, onChange, folder, title }: { bg?: BgSettings; onChange: (bg: BgSettings | undefined) => void; folder: "teams"; title: string }) {
   const b = bg ?? DEFAULT_BG;
   const set = (patch: Partial<BgSettings>) => onChange({ ...b, ...patch });
   return (
@@ -620,7 +620,6 @@ function HeroesForm() {
 
 function LookForm() {
   const { settings, players, teams, reload } = useData();
-  const [bg, setBg] = useState(settings.bg);
   const [homeHero, setHomeHero] = useState(settings.homeHero);
   const [featured, setFeatured] = useState(() => Array.from({ length: HOME_FEATURED_MAX }, (_, i) => settings.homeFeatured?.[i] ?? ""));
   const [guide, setGuide] = useState(settings.homeGuide ?? "");
@@ -636,8 +635,7 @@ function LookForm() {
   return (
     <div className="grid items-start gap-6 lg:grid-cols-2">
       <div className="space-y-5">
-        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Fundo e capa</h2>
-        <BgFields bg={bg} onChange={setBg} folder="bg" title="Fundo do site" />
+        <h2 className="text-lg font-black tracking-[0.12em] text-white uppercase">Capa</h2>
         <div className="space-y-3 border-l border-zinc-200/15 pl-4">
           <span className="text-[11px] font-bold tracking-[0.18em] text-zinc-400 uppercase">Imagem da capa (Home)</span>
           {homeHero && <img src={homeHero} alt="" className="h-28 rounded-lg object-cover" />}
@@ -687,7 +685,7 @@ function LookForm() {
         ))}
       </div>
       <div className="flex items-center gap-3 lg:col-span-2">
-        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { bg: bg ?? null, homeHero: homeHero ?? null, homeFeatured: featured.filter(Boolean), homeGuide: guide || null, tierConfig: tiers }), "Aparência salva!")}>
+        <button type="button" className={primary} disabled={busy} onClick={() => run(() => api.save("settings", "app", { homeHero: homeHero ?? null, homeFeatured: featured.filter(Boolean), homeGuide: guide || null, tierConfig: tiers }), "Aparência salva!")}>
           {busy ? "Salvando…" : "Salvar aparência"}
         </button>
         <Toast msg={msg} />

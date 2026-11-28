@@ -71,7 +71,6 @@ export const SCHEDULE_LABEL_MAX = 24;
 
 export type Settings = {
   tierConfig?: TierBand[];
-  bg?: BgSettings;
   homeHero?: string;
   homeFeatured?: string[];
   /** Carta usada em "Como ler uma carta" na Home; sem escolha, a primeira em destaque. */

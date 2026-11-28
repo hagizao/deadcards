@@ -23,7 +23,7 @@ export interface Env {
 }
 
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
-const UPLOAD_FOLDERS = ["players", "teams", "heroes", "bg", "home", "packs", "events"];
+const UPLOAD_FOLDERS = ["players", "teams", "heroes", "home", "packs", "events"];
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const PLAYER_EXTRA = ["footer", "footerSize", "footerColor", "special", "specialText", "frame", "variantOf", "altHero", "inactive", "exclusive", "art"];
 const ID_RE = /^[\w-]{1,64}$/;
@@ -122,7 +122,6 @@ async function appData(env: Env): Promise<Response> {
     env.DB.prepare("SELECT * FROM tournament_dates WHERE starts_at >= unixepoch() - ? ORDER BY starts_at, id").bind(SCHEDULE_PAST_DAYS * 86400),
   ]);
   const s = Object.fromEntries((settings.results as { key: string; value_json: string }[]).map((r) => [r.key, parse<unknown>(r.value_json, null)]));
-  const bg = s.bg as Record<string, unknown> | null;
   return Response.json({
     teams: (teams.results as Record<string, string | null>[]).map((t) => {
       const tbg = parse<Record<string, unknown> | null>(t.bg_json, null);
@@ -146,7 +145,6 @@ async function appData(env: Env): Promise<Response> {
       .map((h) => [h.name, { name: h.name, url: imgUrl(h.image_key), zoom: h.zoom, x: h.x, y: h.y }])),
     settings: {
       tierConfig: s.tierConfig ?? undefined,
-      bg: bg ? { ...bg, imageUrl: imgUrl((s.bgImageKey as string) ?? null) } : undefined,
       homeHero: imgUrl((s.homeHeroKey as string) ?? null),
       homeFeatured: (s.homeFeatured as string[] | null) ?? undefined,
       homeGuide: (s.homeGuide as string | null) ?? undefined,
@@ -295,7 +293,6 @@ async function write(env: Env, request: Request, kind: string, id: string): Prom
       if (!Array.isArray(tc) || tc.length > 10 || !tc.every((x) => x && typeof x === "object" && typeof x.key === "string" && Number.isFinite(x.min))) return bad("faixas de raridade inválidas");
       rows.tierConfig = tc;
     }
-    if (b.bg !== undefined) { const bg = b.bg as Record<string, unknown> | null; rows.bg = bg ? { ...bg, imageUrl: "" } : null; rows.bgImageKey = keyOf(bg?.imageUrl); }
     if (b.homeHero !== undefined) rows.homeHeroKey = keyOf(b.homeHero);
     if (b.homeFeatured !== undefined) {
       const f = b.homeFeatured;
