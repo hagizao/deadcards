@@ -75,10 +75,12 @@ export function Compare({ onOpenCard }: { onOpenCard: (id: string) => void }) {
   // o seletor abre na largura toda, acima das cartas (nas duas colunas ele ficava espremido)
   const [picking, setPicking] = useState<number | null>(null);
   const panel = useRef<HTMLDivElement>(null);
+  // só ao abrir: trocar de vaga com o painel aberto não mexe na rolagem
+  const open = picking !== null;
   useEffect(() => {
-    if (picking === null) return;
+    if (!open) return;
     panel.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  }, [picking]);
+  }, [open]);
 
   return (
     <section className="space-y-6">

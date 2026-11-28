@@ -78,10 +78,12 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
   const [picking, setPicking] = useState<number | null>(null);
   // o seletor abre acima das vagas: leva a tela até ele (no celular a vaga clicada pode estar bem abaixo)
   const panel = useRef<HTMLDivElement>(null);
+  // só ao abrir: trocar de vaga com o painel aberto não mexe na rolagem
+  const open = picking !== null;
   useEffect(() => {
-    if (picking === null) return;
+    if (!open) return;
     panel.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  }, [picking]);
+  }, [open]);
 
   const cards = slots.map((id) => (id ? players.find((p) => p.id === id) : undefined));
   const chosen = cards.filter((p): p is Player => !!p);
