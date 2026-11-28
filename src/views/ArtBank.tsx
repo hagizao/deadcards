@@ -72,26 +72,33 @@ function Submission({ s, run }: { s: ArtSubmission; run: (fn: () => Promise<void
   return (
     <li className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
       {base && <div className="w-fit shrink-0"><Card player={previewCard(base, s.layout, s.image, s.fg, s.credit)} variant="medium" /></div>}
-      <div className="flex w-full min-w-0 flex-col gap-2 text-sm">
-        <span className={`text-xs font-bold tracking-wider uppercase ${TONE[s.status]}`}>{STATUS[s.status]}{used && ` · ${used.name}`}</span>
-        <span className="font-bold text-zinc-100">
-          {s.credit.url ? <a href={s.credit.url} target="_blank" rel="noopener noreferrer" className="underline decoration-zinc-500 underline-offset-2 hover:decoration-zinc-100">{s.credit.name}</a> : s.credit.name}
-        </span>
-        <span className="text-xs text-zinc-400">Enviada por {s.user} · {date.format(s.createdAt)}</span>
-        <span className="text-xs text-zinc-400">Moldura testada: {s.layout.frame ?? "padrão"}{s.fg ? " · com camada da frente" : ""}</span>
-        <a href={s.image} target="_blank" rel="noopener noreferrer" className={`${pill(false)} self-start`}>Abrir imagem</a>
-        <label className="mt-2 flex flex-col gap-1.5 text-xs font-bold tracking-wider text-zinc-300 uppercase">
-          Carta especial
-          <select value={target} onChange={(e) => setTarget(e.target.value)} className={field}>
-            {!specials.length && <option value="">Nenhuma carta especial</option>}
-            {specials.map((p) => <option key={p.id} value={p.id}>{p.name} · {teamOf(teams, p).tag} · {p.hero}{p.specialText ? ` · ${p.specialText}` : ""}</option>)}
-          </select>
-        </label>
+      <div className="flex w-full min-w-0 flex-col gap-4 text-sm">
+        <div className="flex flex-col gap-2">
+          <span className={`text-xs font-bold tracking-wider uppercase ${TONE[s.status]}`}>{STATUS[s.status]}{used && ` · ${used.name}`}</span>
+          <span className="font-bold text-zinc-100">
+            {s.credit.url ? <a href={s.credit.url} target="_blank" rel="noopener noreferrer" className="underline decoration-zinc-500 underline-offset-2 hover:decoration-zinc-100">{s.credit.name}</a> : s.credit.name}
+          </span>
+          <span className="text-xs text-zinc-400">Enviada por {s.user} · {date.format(s.createdAt)}</span>
+          <span className="text-xs text-zinc-400">Moldura testada: {s.layout.frame ?? "padrão"}{s.fg ? " · com camada da frente" : ""}</span>
+          <a href={s.image} target="_blank" rel="noopener noreferrer" className={`${pill(false)} self-start`}>Abrir imagem</a>
+        </div>
+        {s.status === "pending" && (
+          <label className="flex flex-col gap-1.5 text-xs font-bold tracking-wider text-zinc-300 uppercase">
+            Carta especial
+            <select value={target} onChange={(e) => setTarget(e.target.value)} className={field}>
+              {!specials.length && <option value="">Nenhuma carta especial</option>}
+              {specials.map((p) => <option key={p.id} value={p.id}>{p.name} · {teamOf(teams, p).tag} · {p.hero}{p.specialText ? ` · ${p.specialText}` : ""}</option>)}
+            </select>
+          </label>
+        )}
         <div className="flex flex-wrap gap-2">
-          <HoldButton disabled={!target} className={primaryBtn} label="Usar esta arte na carta escolhida (troca a arte atual dela)"
-            onConfirm={() => void run(() => call(`${s.id}/use`, "POST", { playerId: target }), "Arte aplicada na carta.", true)}>
-            Segure p/ usar
-          </HoldButton>
+          {/* só arte em análise vai para uma carta: cada uso copia as imagens */}
+          {s.status === "pending" && (
+            <HoldButton disabled={!target} className={primaryBtn} label="Usar esta arte na carta escolhida (troca a arte atual dela)"
+              onConfirm={() => void run(() => call(`${s.id}/use`, "POST", { playerId: target }), "Arte aplicada na carta.", true)}>
+              Segure p/ usar
+            </HoldButton>
+          )}
           {s.status === "pending" && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "rejected" }), "Arte recusada.")}>Recusar</button>}
           {s.status === "rejected" && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "pending" }), "De volta para análise.")}>Voltar p/ análise</button>}
           <HoldButton className={pill(false)} label="Apagar esta arte do banco" onConfirm={() => void run(() => call(s.id, "DELETE"), "Arte apagada.")}>Segure p/ apagar</HoldButton>

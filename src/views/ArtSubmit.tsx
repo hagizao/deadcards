@@ -21,10 +21,10 @@ const S = strings({
     own: "Fiz esta arte (não é de IA nem de outra pessoa).",
     consent: "Autorizo o Cardslock a usar esta arte nas cartas especiais, com o meu crédito.",
     send: "Enviar arte", sending: "Enviando…", sent: "Arte enviada! Ela fica em análise.",
-    mine: "Minhas artes", none: "Você ainda não enviou nenhuma arte.", limit: (n: number) => `Até ${n} artes em análise por vez.`,
+    mine: "Minhas artes", none: "Você ainda não enviou nenhuma arte.", limit: (n: number) => `Até ${n} artes em análise ou recusadas por vez; apague as recusadas para enviar mais.`,
     status: { pending: "Em análise", used: "Usada numa carta", rejected: "Recusada" },
     del: "Apagar", delLabel: "Apagar esta arte",
-    errors: { consent: "Marque as duas confirmações.", credit: "Confira o nome e o link do crédito.", image: "A imagem precisa ser PNG, JPG ou WebP de até 5 MB.", limit: `Você já tem ${ART_PENDING_MAX} artes em análise.`, login: "Entre para enviar artes.", failed: "Não foi possível enviar agora." },
+    errors: { consent: "Marque as duas confirmações.", credit: "Confira o nome e o link do crédito.", image: "A imagem precisa ser PNG, JPG ou WebP de até 5 MB.", limit: `Você já tem ${ART_PENDING_MAX} artes em análise ou recusadas. Apague uma recusada para enviar outra.`, login: "Entre para enviar artes.", failed: "Não foi possível enviar agora." },
   },
   en: {
     title: "Submit art",
@@ -37,10 +37,10 @@ const S = strings({
     own: "I made this art (not AI and not someone else's).",
     consent: "I allow Cardslock to use this art on special cards, with my credit.",
     send: "Submit art", sending: "Submitting…", sent: "Art submitted! It is now under review.",
-    mine: "My art", none: "You haven't submitted any art yet.", limit: (n: number) => `Up to ${n} pieces under review at a time.`,
+    mine: "My art", none: "You haven't submitted any art yet.", limit: (n: number) => `Up to ${n} pieces under review or declined at a time; delete declined ones to submit more.`,
     status: { pending: "Under review", used: "Used on a card", rejected: "Declined" },
     del: "Delete", delLabel: "Delete this art",
-    errors: { consent: "Check both confirmations.", credit: "Check the credit name and link.", image: "The image must be PNG, JPG or WebP up to 5 MB.", limit: `You already have ${ART_PENDING_MAX} pieces under review.`, login: "Sign in to submit art.", failed: "Could not submit right now." },
+    errors: { consent: "Check both confirmations.", credit: "Check the credit name and link.", image: "The image must be PNG, JPG or WebP up to 5 MB.", limit: `You already have ${ART_PENDING_MAX} pieces under review or declined. Delete a declined one to submit another.`, login: "Sign in to submit art.", failed: "Could not submit right now." },
   },
   es: {
     title: "Enviar arte",
@@ -53,10 +53,10 @@ const S = strings({
     own: "Hice esta arte (no es de IA ni de otra persona).",
     consent: "Autorizo a Cardslock a usar esta arte en cartas especiales, con mi crédito.",
     send: "Enviar arte", sending: "Enviando…", sent: "¡Arte enviada! Queda en revisión.",
-    mine: "Mis artes", none: "Todavía no enviaste ninguna arte.", limit: (n: number) => `Hasta ${n} artes en revisión a la vez.`,
+    mine: "Mis artes", none: "Todavía no enviaste ninguna arte.", limit: (n: number) => `Hasta ${n} artes en revisión o rechazadas a la vez; borra las rechazadas para enviar más.`,
     status: { pending: "En revisión", used: "Usada en una carta", rejected: "Rechazada" },
     del: "Borrar", delLabel: "Borrar esta arte",
-    errors: { consent: "Marca las dos confirmaciones.", credit: "Revisa el nombre y el enlace del crédito.", image: "La imagen debe ser PNG, JPG o WebP de hasta 5 MB.", limit: `Ya tienes ${ART_PENDING_MAX} artes en revisión.`, login: "Inicia sesión para enviar artes.", failed: "No se pudo enviar ahora." },
+    errors: { consent: "Marca las dos confirmaciones.", credit: "Revisa el nombre y el enlace del crédito.", image: "La imagen debe ser PNG, JPG o WebP de hasta 5 MB.", limit: `Ya tienes ${ART_PENDING_MAX} artes en revisión o rechazadas. Borra una rechazada para enviar otra.`, login: "Inicia sesión para enviar artes.", failed: "No se pudo enviar ahora." },
   },
 });
 
@@ -258,7 +258,7 @@ function MySubmissions({ list, onRemove }: { list?: ArtSubmission[]; onRemove: (
               <img src={s.image} alt={s.credit.name} loading="lazy" className="aspect-3/4 w-full rounded-lg bg-zinc-900 object-cover" />
               <span className={`text-xs font-bold tracking-wider uppercase ${STATUS_TONE[s.status]}`}>{t.status[s.status]}</span>
               <span className="text-xs text-zinc-400">{s.credit.name} · {date.format(s.createdAt)}</span>
-              {s.status === "pending" && (
+              {s.status !== "used" && (
                 <HoldButton onConfirm={() => onRemove(s.id)} label={t.delLabel} className={`${pill(false)} self-start`}>{t.del}</HoldButton>
               )}
             </li>
