@@ -4,6 +4,7 @@ import type { ArtCredit, Player } from "./types";
 export const ART_PENDING_MAX = 10;
 export const ART_SUBMISSION_MAX_BYTES = 5 * 1024 * 1024;
 export const ART_SUBMISSIONS_PATH = "/api/art-submissions";
+export const ART_REJECT_REASON_MAX = 200;
 
 export type ArtLayer = { zoom: number; x: number; y: number };
 /** Cores e espessura da moldura, como no Editor da carta; sem elas, as da moldura escolhida. */
@@ -23,6 +24,8 @@ export type ArtSubmission = {
   credit: ArtCredit;
   createdAt: number;
   usedPlayerId?: string;
+  /** Motivo da recusa, escrito pelo admin: quem enviou vê em "Minhas artes". */
+  reason?: string;
   /** Nome de quem enviou: só na lista do admin. */
   user?: string;
 };

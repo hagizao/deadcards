@@ -172,4 +172,20 @@ describe("Banco de artes", () => {
     expect(comMoldura.layout.frameTune).toEqual({ c1: "#ff0000", pad: 10 });
     expect(semMoldura.layout.frameTune).toBeUndefined();
   });
+
+  it("recusa com motivo: quem enviou vê; voltar para análise apaga o motivo", async () => {
+    const { cookie } = await login("artista8");
+    await send(cookie);
+    const [s] = await list(cookie);
+    const adm = await admin();
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "rejected", reason: 42 })).status).toBe(400);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "rejected", reason: `  ${"x".repeat(250)}  ` })).status).toBe(200);
+    const [rejected] = await list(cookie);
+    expect([rejected.status, rejected.reason?.length]).toEqual(["rejected", 200]);
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "pending" })).status).toBe(200);
+    expect((await list(cookie))[0].reason).toBeUndefined();
+    expect((await json(adm.cookie, s.id, "PATCH", { status: "rejected" })).status).toBe(200);
+    expect((await list(cookie))[0]).toMatchObject({ status: "rejected" });
+    expect((await list(cookie))[0].reason).toBeUndefined();
+  });
 });

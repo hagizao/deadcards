@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card } from "../components/Card";
 import { HoldButton } from "../components/HoldButton";
 import { Spotlight } from "../components/Spotlight";
-import { ART_SUBMISSIONS_PATH, previewCard, type ArtSubmission } from "../lib/artSubmissions";
+import { ART_REJECT_REASON_MAX, ART_SUBMISSIONS_PATH, previewCard, type ArtSubmission } from "../lib/artSubmissions";
 import { isMainCard } from "../lib/cards";
 import { useData } from "../lib/data";
 import { FRAME_PRESETS } from "../lib/rarity";
@@ -19,6 +19,13 @@ const MIN_W = 600;
 const MIN_H = 840;
 // todas as artes na mesma carta, para comparar umas com as outras
 const BASE_NAME = "mikaels";
+// motivos comuns, para recusar com um clique (dá para editar antes de confirmar)
+const REASONS = [
+  "Resolução baixa: a arte fica borrada na carta.",
+  "Não parece ser uma arte original.",
+  "Não combina com o estilo das cartas.",
+  "O link do crédito não leva ao seu trabalho.",
+];
 
 async function call(path: string, method: string, body?: unknown) {
   const r = await fetch(`${ART_SUBMISSIONS_PATH}/${path}`, {
@@ -135,6 +142,9 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
   const [frame, setFrame] = useState(s.layout.frame ?? "");
   const [withFg, setWithFg] = useState(true);
   const [copied, setCopied] = useState(false);
+  // recusa em dois passos: abre o campo do motivo, depois confirma
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
   const size = useImageSize(s.image);
   const small = !!size && (size.w < MIN_W || size.h < MIN_H);
   const used = players.find((p) => p.id === s.usedPlayerId);
@@ -178,6 +188,7 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
         <span className="text-xs text-zinc-400">
           Enviada por {s.user} · <time dateTime={new Date(s.createdAt).toISOString()} title={full.format(s.createdAt)}>{ago(s.createdAt)}</time>
         </span>
+        {s.reason && <span className="text-xs text-zinc-300">Motivo: {s.reason}</span>}
         {otherName && <span className="text-xs font-bold text-amber-200">Crédito diferente da conta que enviou</span>}
         <span className="text-xs text-zinc-400">
           {size ? `${size.w}×${size.h} px` : "…"} · {s.ext.toUpperCase()}{s.fg ? " · com camada da frente" : ""}
@@ -193,10 +204,27 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
         <a href={s.image} download={`${name}.${s.ext}`} className={primaryBtn}>Baixar</a>
         {s.fg && <a href={s.fg} download={`${name}-frente.${s.fgExt ?? s.ext}`} className={pill(false)}>Baixar frente</a>}
         {s.status === "pending" && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "used" }), "Marcada como usada.")}>Marcar usada</button>}
-        {s.status === "pending" && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "rejected" }), "Arte recusada.")}>Recusar</button>}
+        {s.status === "pending" && !rejecting && <button type="button" className={pill(false)} onClick={() => setRejecting(true)}>Recusar</button>}
         {s.status !== "pending" && !s.usedPlayerId && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "pending" }), "De volta para análise.")}>Voltar p/ análise</button>}
         <HoldButton className={pill(false)} label="Apagar esta arte do banco" onConfirm={() => void run(() => call(s.id, "DELETE"), "Arte apagada.")}>Segure p/ apagar</HoldButton>
       </div>
+      {rejecting && (
+        <form className="flex flex-col gap-3 rounded-xl bg-zinc-950/60 p-3"
+          onSubmit={(e) => { e.preventDefault(); void run(() => call(s.id, "PATCH", { status: "rejected", reason }), "Arte recusada.").then(() => setRejecting(false)); }}>
+          <label className="flex flex-col gap-1.5 text-xs font-bold tracking-wider text-zinc-300 uppercase">
+            Motivo da recusa (quem enviou vê)
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={ART_REJECT_REASON_MAX} rows={2}
+              placeholder="Escreva ou escolha abaixo" className={`${field} resize-none py-1.5 font-normal tracking-normal normal-case`} />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {REASONS.map((r) => <button key={r} type="button" aria-pressed={reason === r} onClick={() => setReason(r)} className={`${pill(reason === r)} text-left tracking-normal normal-case`}>{r}</button>)}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" className={primaryBtn}>Confirmar recusa</button>
+            <button type="button" className={pill(false)} onClick={() => { setRejecting(false); setReason(""); }}>Cancelar</button>
+          </div>
+        </form>
+      )}
     </li>
   );
 }

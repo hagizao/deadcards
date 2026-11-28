@@ -2,7 +2,7 @@ import { currentUser } from "./auth";
 import type { Env } from "./worker";
 import type { ArtCredit } from "./lib/types";
 import { artCredit, parse } from "./rows";
-import { ART_PENDING_MAX, ART_SUBMISSION_MAX_BYTES, type ArtLayout, type ArtSubmission } from "./lib/artSubmissions";
+import { ART_PENDING_MAX, ART_REJECT_REASON_MAX, ART_SUBMISSION_MAX_BYTES, type ArtLayout, type ArtSubmission } from "./lib/artSubmissions";
 
 /**
  * Banco de artes: qualquer conta logada envia uma arte (com a camada da frente opcional) já ajustada numa carta especial;
@@ -11,7 +11,7 @@ import { ART_PENDING_MAX, ART_SUBMISSION_MAX_BYTES, type ArtLayout, type ArtSubm
 
 type Row = {
   id: string; user_id: string; image_key: string; fg_key: string | null; layout_json: string; credit_name: string; credit_url: string | null;
-  status: ArtSubmission["status"]; used_player_id: string | null; created_at: number; user_name?: string | null;
+  status: ArtSubmission["status"]; used_player_id: string | null; reject_reason?: string | null; created_at: number; user_name?: string | null;
 };
 
 const bad = (msg: string, status = 400, code?: string) => Response.json({ error: msg, code }, { status });
@@ -72,6 +72,7 @@ function toSubmission(r: Row, withUser: boolean): ArtSubmission {
     credit: r.credit_url ? { name: r.credit_name, url: r.credit_url } : { name: r.credit_name },
     createdAt: r.created_at,
     ...(r.used_player_id ? { usedPlayerId: r.used_player_id } : {}),
+    ...(r.status === "rejected" && r.reject_reason ? { reason: r.reject_reason } : {}),
     ...(withUser ? { user: r.user_name ?? "?" } : {}),
   };
 }
@@ -214,11 +215,14 @@ export async function artSubmissions(env: Env, request: Request, rest: string): 
   }
   if (request.method === "PATCH") {
     if (!user.admin) return bad("sem permissão", 403);
-    const body = (await request.json().catch(() => null)) as { status?: unknown } | null;
+    const body = (await request.json().catch(() => null)) as { status?: unknown; reason?: unknown } | null;
     if (body?.status !== "rejected" && body?.status !== "pending" && body?.status !== "used") return bad("status inválido");
     // "usada" à mão (o admin baixou e aplicou fora daqui) não tem carta e pode voltar atrás;
     // a usada pelo "usar" fica presa: cada uso copia as imagens para uma carta
-    const res = await env.DB.prepare("UPDATE art_submissions SET status = ? WHERE id = ? AND used_player_id IS NULL").bind(body.status, row.id).run();
+    // o motivo só vale na recusa; voltar para análise ou marcar usada apaga o motivo antigo
+    if (body.reason !== undefined && body.reason !== null && typeof body.reason !== "string") return bad("motivo inválido");
+    const reason = body.status === "rejected" && typeof body.reason === "string" ? body.reason.trim().slice(0, ART_REJECT_REASON_MAX) || null : null;
+    const res = await env.DB.prepare("UPDATE art_submissions SET status = ?, reject_reason = ? WHERE id = ? AND used_player_id IS NULL").bind(body.status, reason, row.id).run();
     if (!res.meta.changes) return bad("arte já usada numa carta", 409, "not_pending");
     return Response.json({ ok: true });
   }

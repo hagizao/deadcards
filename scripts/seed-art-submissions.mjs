@@ -60,7 +60,7 @@ const items = [
   { id: "seed-2", user: 0, credit: ["@artistateste", "https://instagram.com/artistateste"], size: [900, 1260], colors: [[5, 40, 60], [20, 160, 140], [200, 255, 230]], layout: { zoom: 100, x: 50, y: 50, frame: "circuito", fg: { zoom: 100, x: 50, y: 50 } }, fg: [10, 20, 30], at: now - 5 * H },
   { id: "seed-3", user: 1, credit: ["Pintora", "https://x.com/pintora"], size: [420, 600], colors: [[60, 20, 10], [220, 90, 30], [255, 240, 180]], layout: { zoom: 130, x: 45, y: 35, frame: "chamas" }, at: now - 26 * H },
   { id: "seed-4", user: 2, credit: ["Rabisco", null], size: [1000, 1400], colors: [[10, 10, 30], [60, 70, 160], [180, 200, 255]], layout: { zoom: 100, x: 50, y: 50, frame: "gelo" }, at: now - 50 * H },
-  { id: "seed-5", user: 2, credit: ["Rabisco", "https://artstation.com/rabisco"], size: [900, 1260], colors: [[20, 30, 10], [90, 140, 40], [230, 255, 170]], layout: { zoom: 120, x: 50, y: 45 }, status: "rejected", at: now - 80 * H },
+  { id: "seed-5", user: 2, credit: ["Rabisco", "https://artstation.com/rabisco"], size: [900, 1260], colors: [[20, 30, 10], [90, 140, 40], [230, 255, 170]], layout: { zoom: 120, x: 50, y: 45 }, status: "rejected", reason: "Não combina com o estilo das cartas.", at: now - 80 * H },
 ];
 
 const q = (v) => (v === null || v === undefined ? "NULL" : typeof v === "number" ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
@@ -82,8 +82,8 @@ for (const it of items) {
     wrangler("r2", "object", "put", `${BUCKET}/${fgKey}`, "--local", "--file", fgFile, "--content-type", "image/png");
   }
   sql.push(
-    "INSERT INTO art_submissions (id, user_id, image_key, fg_key, layout_json, credit_name, credit_url, status, created_at) VALUES " +
-    `(${[it.id, users[it.user][0], bgKey, fgKey, JSON.stringify(it.layout), it.credit[0], it.credit[1], it.status ?? "pending", Math.round(it.at)].map(q).join(", ")});`,
+    "INSERT INTO art_submissions (id, user_id, image_key, fg_key, layout_json, credit_name, credit_url, status, reject_reason, created_at) VALUES " +
+    `(${[it.id, users[it.user][0], bgKey, fgKey, JSON.stringify(it.layout), it.credit[0], it.credit[1], it.status ?? "pending", it.reason, Math.round(it.at)].map(q).join(", ")});`,
   );
 }
 
