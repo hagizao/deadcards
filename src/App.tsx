@@ -21,6 +21,7 @@ import { Icon } from "./components/Icon";
 import { Profile } from "./views/Profile";
 import { easeOut } from "./lib/ui";
 import { Settings } from "./views/Settings";
+import { ArtSubmit } from "./views/ArtSubmit";
 import { profileUrl } from "./lib/profile";
 
 const REPO = "https://github.com/hagizao/deadcards";
@@ -33,9 +34,9 @@ function GitHubIcon() {
   );
 }
 
-type Tab = "home" | "teams" | "tierlist" | "collection" | "redeem" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "settings";
+type Tab = "home" | "teams" | "tierlist" | "collection" | "redeem" | "compare" | "editor" | "privacy" | "terms" | "feedback" | "profile" | "art" | "settings";
 // ordem da navegação: a tela nova entra pelo lado de quem está à frente ou atrás no menu
-const TAB_ORDER: Tab[] = ["home", "teams", "tierlist", "collection", "redeem", "compare", "profile", "settings", "editor", "feedback", "privacy", "terms"];
+const TAB_ORDER: Tab[] = ["home", "teams", "tierlist", "collection", "redeem", "compare", "profile", "art", "settings", "editor", "feedback", "privacy", "terms"];
 const TABS = ["teams", "tierlist", "collection", "redeem", "compare"] as const;
 // aba -> área de cor (o perfil mostra a coleção da pessoa)
 const TAB_AREA: Partial<Record<Tab, AreaKey>> = { teams: "teams", tierlist: "tierlist", collection: "collection", redeem: "redeem", compare: "compare", profile: "collection" };
@@ -298,7 +299,7 @@ function Shell() {
           </nav>
           <div className="ml-auto flex shrink-0 items-center gap-2 xl:ml-0">
             <LangMenu />
-            <Account onProfile={() => { if (me) openProfile(me.handle ?? me.id); }} onSettings={() => setTab("settings")} onEditor={() => setTab("editor")} />
+            <Account onProfile={() => { if (me) openProfile(me.handle ?? me.id); }} onArt={() => setTab("art")} onSettings={() => setTab("settings")} onEditor={() => setTab("editor")} />
           </div>
         </div>
       </header>
@@ -322,6 +323,7 @@ function Shell() {
             {tab === "compare" && <Compare onOpenCard={setSpotlight} />}
             {tab === "profile" && profileId && <Profile key={profileId} userId={profileId} onOpenCard={setSpotlight} onRedeem={() => setTab("redeem")} />}
             {tab === "settings" && me && <Settings link={linkResult} />}
+            {tab === "art" && me && <ArtSubmit />}
             {tab === "editor" && me?.admin && <Editor editId={editId} onEditId={setEditId} />}
             {(tab === "privacy" || tab === "terms") && <Legal page={tab} />}
             {tab === "feedback" && <Feedback />}

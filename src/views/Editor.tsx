@@ -13,6 +13,7 @@ import { TournamentLogo } from "../components/TournamentLogo";
 import { dateOf, dayKey, dayOf, groupByDay, monthCells, sameDay, weekdayNames, type Day } from "../lib/calendar";
 import { arrowBtn } from "../lib/ui";
 import { HoldButton } from "../components/HoldButton";
+import { ArtBank } from "./ArtBank";
 import { Icon } from "../components/Icon";
 import { Range } from "../components/Range";
 import { PackArt } from "../components/Pack";
@@ -29,6 +30,7 @@ const SECTIONS = [
   { id: "packs", label: "Packs" },
   { id: "codes", label: "Códigos" },
   { id: "universal", label: "Coleção universal" },
+  { id: "art", label: "Artes enviadas" },
   { id: "sounds", label: "Sons" },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
@@ -138,6 +140,7 @@ export function Editor({ editId, onEditId }: { editId: string | null; onEditId: 
           {section === "codes" && <CodesForm />}
           {section === "universal" && <UniversalCollection onEdit={pick} />}
           {section === "sounds" && <SoundsForm />}
+          {section === "art" && <ArtBank />}
         </motion.div>
       </AnimatePresence>
     </div>
