@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useDeferredValue, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from "react";
 import { ProfileSkeleton } from "../components/Skeleton";
 import { Achievements } from "../components/Achievements";
-import { ArtistAdminPanel, ArtistBadge, ArtistShowcase } from "../components/ArtistArea";
+import { ArtistAdminPanel, ArtistShowcase } from "../components/ArtistArea";
 import { Card } from "../components/Card";
 import { CardExportButton } from "../components/CardExportButton";
 import { Icon } from "../components/Icon";
@@ -29,7 +29,7 @@ const S = strings({
     save: "Salvar carta", saving: "Salvando…", cancel: "Cancelar", unsaved: "Alterações não salvas.",
     loading: "Carregando perfil…", history: "Histórico de versões",
     edit: "Editar minha carta", create: "Montar minha carta", share: "Copiar link", copied: "Link copiado.", copyFailed: "Não foi possível copiar o link.",
-    file: "Ficha nº", stamp: "Arquivado",
+    file: "Ficha nº", stamp: "Arquivado", artistStamp: "Artista",
     noCard: "Ainda não montou uma carta.", cards: "Coleção", noCards: "Nenhuma carta na coleção ainda.", redeem: "Resgatar carta",
     not_found: "Perfil não encontrado.",
     invalid_card: "Confira o nome, o herói e os atributos.", unavailable: "Não foi possível carregar agora.", login: "Entre para editar sua carta.",
@@ -47,7 +47,7 @@ const S = strings({
     save: "Save card", saving: "Saving…", cancel: "Cancel", unsaved: "Unsaved changes.",
     loading: "Loading profile…", history: "Version history",
     edit: "Edit my card", create: "Build my card", share: "Copy link", copied: "Link copied.", copyFailed: "Could not copy the link.",
-    file: "File no.", stamp: "On file",
+    file: "File no.", stamp: "On file", artistStamp: "Artist",
     noCard: "No card built yet.", cards: "Collection", noCards: "No cards in the collection yet.", redeem: "Redeem a card",
     not_found: "Profile not found.",
     invalid_card: "Check the name, hero and attributes.", unavailable: "Could not load right now.", login: "Sign in to edit your card.",
@@ -65,7 +65,7 @@ const S = strings({
     save: "Guardar carta", saving: "Guardando…", cancel: "Cancelar", unsaved: "Cambios sin guardar.",
     loading: "Cargando perfil…", history: "Historial de versiones",
     edit: "Editar mi carta", create: "Armar mi carta", share: "Copiar enlace", copied: "Enlace copiado.", copyFailed: "No se pudo copiar el enlace.",
-    file: "Ficha n.º", stamp: "Archivado",
+    file: "Ficha n.º", stamp: "Archivado", artistStamp: "Artista",
     noCard: "Todavía no armó una carta.", cards: "Colección", noCards: "Todavía no hay cartas en la colección.", redeem: "Canjear carta",
     not_found: "Perfil no encontrado.",
     invalid_card: "Revisa el nombre, el héroe y los atributos.", unavailable: "No se pudo cargar ahora.", login: "Inicia sesión para editar tu carta.",
@@ -137,14 +137,14 @@ export function Profile({ userId, onOpenCard, onRedeem }: { userId: string; onOp
         {profile.image
           ? <img src={profile.image} alt="" className="aspect-3/4 w-16 object-cover grayscale-[0.35] sm:w-20" />
           : <span aria-hidden="true" className="flex aspect-3/4 w-16 items-center justify-center bg-zinc-800 font-display text-2xl font-black text-dl-text sm:w-20">{profile.name.charAt(0).toUpperCase()}</span>}
-        <span aria-hidden="true" className="dossier-stamp absolute -right-4 bottom-1 rotate-[-14deg]">{t.stamp}</span>
+        {/* no perfil de artista o carimbo da ficha diz Artista, em rosa */}
+        <span aria-hidden={!profile.artist} className={`dossier-stamp absolute -right-4 bottom-1 rotate-[-14deg] ${profile.artist ? "dossier-stamp-artist" : ""}`}>{profile.artist ? t.artistStamp : t.stamp}</span>
       </div>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="font-typewriter text-xs tracking-[0.2em] text-zinc-300 uppercase">{t.file} {fileNo(profile.id)}</span>
         {/* nome do perfil um terço menor que o título das abas (pageTitle) */}
         <h1 id="profile-title" className="font-display text-2xl font-extrabold tracking-[0.11em] text-balance wrap-break-word text-area uppercase title-depth sm:text-[2rem] lg:text-2xl">{profile.name}</h1>
         {profile.handle && <p className="truncate text-sm font-semibold text-zinc-300">@{profile.handle}</p>}
-        {profile.artist && <ArtistBadge />}
         {card && <p className="truncate text-sm text-zinc-400">{card.name} · {card.hero}</p>}
       </div>
     </div>

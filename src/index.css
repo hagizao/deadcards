@@ -556,6 +556,11 @@ select { color-scheme: dark; }
   white-space: nowrap;
   background: rgb(9 9 11 / 0.6);
 }
+/* carimbo do perfil de artista: na cor das curtidas, com brilho */
+.dossier-stamp-artist {
+  color: var(--color-rose-300);
+  box-shadow: 0 0 12px rgb(244 63 94 / 0.5);
+}
 .dossier-hero {
   opacity: 0.5;
   mask-image: radial-gradient(closest-side at 50% 40%, #000 25%, transparent 100%);

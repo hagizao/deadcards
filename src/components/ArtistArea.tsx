@@ -39,19 +39,9 @@ const S = strings({
   },
 });
 
-/** Selo de artista, embaixo do nome no perfil: em destaque, com o brilho rosa das curtidas. */
-export function ArtistBadge() {
-  const t = useT(S);
-  return (
-    <span className="inline-flex w-fit items-center gap-2 rounded-full bg-linear-to-r from-rose-500 to-fuchsia-600 px-4 py-1.5 text-sm font-black tracking-[0.2em] text-white uppercase shadow-[0_0_22px_rgba(244,63,94,0.55)]">
-      <Icon name="brush" className="size-5" />
-      {t.artist}
-    </span>
-  );
-}
-
 const byIds = (players: Player[], ids: string[]) => ids.map((id) => players.find((p) => p.id === id)).filter((p): p is Player => !!p);
-const CARD_W = 222;
+// as cartas da vitrine são as médias (222 px) 20% maiores
+const CARD_W = 266;
 
 /**
  * Vitrine do artista, no lugar das conquistas: as cartas ativas com a arte da pessoa numa faixa que rola para os lados
@@ -69,9 +59,10 @@ export function ArtistShowcase({ artist, userId, name, own, onOpenCard }: { arti
     <section aria-labelledby="profile-artist-title" className="flex min-w-0 flex-1 flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-2">
-          <h2 id="profile-artist-title" className="flex items-center gap-3 font-display text-4xl font-black text-rose-300 title-depth">
-            <Icon name="brush" className="size-8" />
-            {t.artist}
+          {/* título um terço maior que o das conquistas, em degradê rosa com brilho */}
+          <h2 id="profile-artist-title" className="flex items-center gap-3 font-display text-5xl font-black tracking-wide uppercase">
+            <Icon name="brush" className="size-11 -rotate-12 text-rose-300 drop-shadow-[0_0_12px_rgb(244_63_94/0.7)]" />
+            <span className="bg-linear-to-r from-rose-200 via-rose-400 to-fuchsia-500 bg-clip-text text-transparent drop-shadow-[0_0_18px_rgb(244_63_94/0.55)]">{t.artist}</span>
           </h2>
           <p className="text-sm text-zinc-300">{t.lead(name)} · {t.cards(cards.length)}</p>
           {portfolio && (
@@ -86,11 +77,11 @@ export function ArtistShowcase({ artist, userId, name, own, onOpenCard }: { arti
         <div className="flex flex-col gap-2">
           <div className="flex justify-end"><RailArrows rail={rail} prev={t.prev} next={t.next} /></div>
           {/* o fade das pontas é uma máscara e corta tudo fora da caixa: o padding em volta dá lugar ao brilho e à subida do hover */}
-          <div ref={setRowEl} className={`${rail.fadeStrong} overflow-x-clip px-6 pt-4 pb-8 rail-glow`}>
+          <div ref={setRowEl} className={`${rail.fadeStrong} overflow-x-clip px-12 pt-12 pb-14 rail-glow`}>
             <motion.ul className="flex gap-6" {...rail.track}>
               {cards.map((p, i) => (
-                <li key={p.id} className="shrink-0 drop-shadow-[0_0_24px_rgb(244_63_94/0.3)]" inert={rail.hidden(i) || undefined}>
-                  <Card player={p} variant="medium" onOpen={() => onOpenCard(p.id)} />
+                <li key={p.id} className="h-[389px] w-[266px] shrink-0 drop-shadow-[0_0_24px_rgb(244_63_94/0.3)]" inert={rail.hidden(i) || undefined}>
+                  <div className="origin-top-left scale-120"><Card player={p} variant="medium" onOpen={() => onOpenCard(p.id)} /></div>
                 </li>
               ))}
             </motion.ul>
