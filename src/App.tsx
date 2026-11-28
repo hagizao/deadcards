@@ -244,6 +244,7 @@ function Shell() {
   // o endereço de entrada decide a tela: aba, perfil, time ou carta aberta (links compartilhados)
   const [start] = useState(() => parseRoute(location.pathname));
   const [profileId, setProfileId] = useState(start.profile);
+  const [artistProfile, setArtistProfile] = useState(false);
   const [tab, setTab] = useState<Tab>(start.tab);
   // direção da troca de aba, derivada durante a renderização (padrão do React para "valor anterior")
   const [shown, setShown] = useState({ tab, dir: 0 });
@@ -296,7 +297,7 @@ function Shell() {
   return (
     <>
       {/* luz do fundo: a Home pega o azul de Times e Times fica no bege do site; as outras abas, a cor da área */}
-      <RitualBackground color={tab === "home" ? areaTier("teams").c : tab === "teams" ? undefined : TAB_AREA[tab] && areaTier(TAB_AREA[tab]).c} />
+      <RitualBackground color={tab === "home" ? areaTier("teams").c : tab === "teams" ? undefined : TAB_AREA[tab] && areaTier(TAB_AREA[tab]).c} artist={tab === "profile" && artistProfile} />
       {/* cabeçalho sem caixa: no topo é transparente; rolando, uma sombra escura desce atrás dele para o menu seguir legível */}
       <header className="sticky top-0 z-40">
         <ScrollShade />
@@ -346,7 +347,7 @@ function Shell() {
             {tab === "collection" && <Collection onOpenCard={setSpotlight} />}
             {tab === "redeem" && <Redeem onOpenCard={setSpotlight} />}
             {tab === "compare" && <Lab sub={lab ?? "dream"} squad={squad} onSub={(s) => { setSquad(undefined); setLab(s === "compare" ? "compare" : undefined); }} onSquadEdit={() => setSquad(undefined)} onOpenCard={setSpotlight} />}
-            {tab === "profile" && profileId && <Profile key={profileId} userId={profileId} onOpenCard={setSpotlight} onRedeem={() => setTab("redeem")} />}
+            {tab === "profile" && profileId && <Profile key={profileId} userId={profileId} onOpenCard={setSpotlight} onRedeem={() => setTab("redeem")} onArtist={setArtistProfile} />}
             {tab === "settings" && me && <Settings link={linkResult} />}
             {tab === "art" && me && <ArtSubmit />}
             {tab === "editor" && me?.admin && <Editor editId={editId} onEditId={setEditId} />}
@@ -402,7 +403,7 @@ function Shell() {
       </nav>
 
       <AnimatePresence>
-        {spotlight && <Spotlight key="spotlight" playerId={spotlight} onClose={() => setSpotlight(null)} onSwitch={setSpotlight} onEdit={me?.admin ? editCard : undefined} />}
+        {spotlight && <Spotlight key="spotlight" playerId={spotlight} onClose={() => setSpotlight(null)} onSwitch={setSpotlight} onEdit={me?.admin ? editCard : undefined} onOpenProfile={(key) => { setSpotlight(null); openProfile(key); }} />}
       </AnimatePresence>
     </>
   );

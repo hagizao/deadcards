@@ -4,6 +4,7 @@ import { Card } from "../components/Card";
 import { HoldButton } from "../components/HoldButton";
 import { Spotlight } from "../components/Spotlight";
 import { ART_REJECT_REASON_MAX, ART_STATUS_TONE, ART_SUBMISSIONS_PATH, previewCard, type ArtSubmission } from "../lib/artSubmissions";
+import { artistCardPath } from "../lib/artists";
 import { isMainCard } from "../lib/cards";
 import { useData } from "../lib/data";
 import { FRAME_PRESETS } from "../lib/rarity";
@@ -136,8 +137,14 @@ export function ArtBank() {
   );
 }
 
+/** Atalho do perfil de artista: a arte usada já diz quem enviou e em qual carta; um clique vincula e dá a carta. */
+async function linkArtist(userId: string, playerId: string) {
+  const r = await fetch(artistCardPath(userId, playerId), { method: "PUT" });
+  if (!r.ok) throw new Error("Não foi possível vincular ao artista");
+}
+
 function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; run: Run; onOpen: (p: Player) => void }) {
-  const { players } = useData();
+  const { players, artists, reload } = useData();
   const [frame, setFrame] = useState(s.layout.frame ?? "");
   const [withFg, setWithFg] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -205,6 +212,9 @@ function Submission({ s, base, run, onOpen }: { s: ArtSubmission; base: Player; 
         {s.status === "pending" && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "saved" }), "Arte guardada no banco para usar depois.")}>Guardar p/ depois</button>}
         {(s.status === "pending" || s.status === "saved") && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "used" }), "Marcada como usada.")}>Marcar usada</button>}
         {s.status === "pending" && !rejecting && <button type="button" className={pill(false)} onClick={() => setRejecting(true)}>Recusar</button>}
+        {s.usedPlayerId && s.userId && (artists?.[s.usedPlayerId]
+          ? <span className="flex min-h-11 items-center text-xs font-bold tracking-wider text-rose-200 uppercase sm:min-h-9">Vinculada ao artista</span>
+          : <button type="button" className={pill(false)} onClick={() => void run(async () => { await linkArtist(s.userId!, s.usedPlayerId!); await reload(); }, `Carta dada para ${s.user} e vinculada ao perfil de artista.`)}>Vincular ao artista</button>)}
         {s.status !== "pending" && !s.usedPlayerId && <button type="button" className={pill(false)} onClick={() => void run(() => call(s.id, "PATCH", { status: "pending" }), "De volta para análise.")}>Voltar p/ análise</button>}
         <HoldButton className={pill(false)} label="Apagar esta arte do banco" onConfirm={() => void run(() => call(s.id, "DELETE"), "Arte apagada.")}>Segure p/ apagar</HoldButton>
       </div>

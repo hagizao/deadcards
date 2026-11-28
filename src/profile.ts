@@ -1,6 +1,8 @@
+import { artistInfo } from "./artists";
 import { currentUser } from "./auth";
 import type { Env } from "./worker";
-import { MAX_FAVORITES, parseProfileCard, type ProfileCard, type ProfileCardState, type PublicProfile } from "./lib/profile";
+import { sniffImage } from "./artSubmissions";
+import { MAX_FAVORITES, PROFILE_ART_MAX_BYTES, parseProfileCard, profileArtPrefix, type ProfileCard, type ProfileCardState, type PublicProfile } from "./lib/profile";
 
 const HISTORY_LIMIT = 20;
 
@@ -20,6 +22,16 @@ export async function profileCard(env: Env, request: Request): Promise<Response>
 
   const card = parseProfileCard(await request.json().catch(() => null));
   if (!card) return json({ code: "invalid_card" }, 400);
+  if (card.art || card.frame) {
+    // arte própria e moldura são só de artista (a arte, só a que a própria conta enviou);
+    // quem deixou de ser artista pode manter a arte e a moldura que já tinha, sem trocar.
+    // A arte que já está na carta pode ter vindo de uma conta mesclada nesta (outro prefixo): ela pode ficar
+    const kept = await env.DB.prepare("SELECT json_extract(snapshot, '$.art.url') AS url, json_extract(snapshot, '$.frame') AS frame FROM profile_cards WHERE user_id = ?")
+      .bind(user.id).first<{ url: string | null; frame: string | null }>();
+    if (card.art && card.art.url !== kept?.url && !card.art.url.startsWith(profileArtPrefix(user.id))) return json({ code: "invalid_card" }, 400);
+    const changed = (card.art && kept?.url !== card.art.url) || (card.frame && kept?.frame !== JSON.stringify(card.frame));
+    if (changed && !(await isArtist(env, user.id))) return json({ code: "not_artist" }, 403);
+  }
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO profile_cards (user_id, snapshot, updated_at) VALUES (?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET snapshot = excluded.snapshot, updated_at = excluded.updated_at
@@ -51,6 +63,7 @@ export async function publicProfile(env: Env, key: string): Promise<Response> {
     card: card.results[0] ? JSON.parse(card.results[0].snapshot!) as ProfileCard : null,
     cards: cards.results.map((r) => r.player_id!),
     favorites: favorites.results.map((r) => r.player_id!),
+    artist: await artistInfo(env, userId),
   };
   return Response.json(result, { headers: { "cache-control": "no-store" } });
 }
@@ -79,4 +92,37 @@ export async function favorite(env: Env, request: Request, playerId: string): Pr
   }
   const { results } = await favoritesQuery(env, user.id).all<{ player_id: string }>();
   return json({ favorites: results.map((r) => r.player_id) });
+}
+
+const isArtist = async (env: Env, userId: string) => !!(await env.DB.prepare("SELECT 1 FROM artists WHERE user_id = ?").bind(userId).first());
+
+/** POST com a imagem no campo `image`: guarda a arte da carta de perfil no R2 e devolve o endereço. Só artistas. */
+export async function profileArt(env: Env, request: Request): Promise<Response> {
+  const user = await currentUser(env, request);
+  if (!user) return json({ code: "login" }, 401);
+  if (request.method !== "POST") return json({ code: "method" }, 405);
+  if (!(await isArtist(env, user.id))) return json({ code: "not_artist" }, 403);
+  // o tamanho vem antes de ler o corpo: um envio enorme não chega a ser lido
+  const length = Number(request.headers.get("content-length"));
+  if (!length || length > PROFILE_ART_MAX_BYTES + 64 * 1024) return json({ code: "invalid_image" }, 413);
+  const form = await request.formData().catch(() => null);
+  const file = form?.get("image");
+  if (!file || typeof file === "string") return json({ code: "invalid_image" }, 400);
+  const buf = await file.arrayBuffer();
+  const kind = buf.byteLength && buf.byteLength <= PROFILE_ART_MAX_BYTES ? sniffImage(buf) : null;
+  if (!kind) return json({ code: "invalid_image" }, 400);
+  const key = `profile-art/${user.id}/${crypto.randomUUID()}.${kind.ext}`;
+  await env.ASSETS_BUCKET.put(key, buf, { httpMetadata: { contentType: kind.type } });
+  await dropUnusedArt(env, user.id, key);
+  return json({ url: `/img/${key}` });
+}
+
+/** Apaga do R2 as artes de perfil da conta que nem a carta nem o histórico usam (enviadas e trocadas antes de salvar). */
+async function dropUnusedArt(env: Env, userId: string, keep: string) {
+  const { results } = await env.DB.prepare(`SELECT json_extract(snapshot, '$.art.url') AS url FROM profile_cards WHERE user_id = ?1
+    UNION SELECT json_extract(snapshot, '$.art.url') FROM profile_card_history WHERE user_id = ?1`).bind(userId).all<{ url: string | null }>();
+  const used = new Set(results.map((r) => r.url));
+  const listed = await env.ASSETS_BUCKET.list({ prefix: `profile-art/${userId}/` });
+  const unused = listed.objects.map((o) => o.key).filter((k) => k !== keep && !used.has(`/img/${k}`));
+  if (unused.length) await env.ASSETS_BUCKET.delete(unused);
 }

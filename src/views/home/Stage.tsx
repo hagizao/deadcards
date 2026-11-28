@@ -7,7 +7,7 @@ import { strings, useT } from "../../lib/i18n";
 import { getCardTier } from "../../lib/rarity";
 import { STAT_NAMES } from "../../lib/statNames";
 import { enter, springSoft } from "../../lib/motion";
-import { pill, primaryBtn } from "../../lib/ui";
+import { arrowBtn, pill, primaryBtn } from "../../lib/ui";
 import { Card } from "../../components/Card";
 import { FillBar } from "../../components/Motion";
 import { Icon } from "../../components/Icon";
@@ -156,16 +156,16 @@ export function Stage({ cards, onOpenCard, onOpenTeam }: { cards: Player[]; onOp
 
           {n > 1 && (
             <div className="flex items-center gap-1">
-              <button type="button" onClick={() => pick(at - 1)} aria-label={t.prev} className="flex size-11 cursor-pointer items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-100/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
+              <button type="button" onClick={() => pick(at - 1)} aria-label={t.prev} className={arrowBtn}>
                 <Icon name="chevron-left" className="size-5" />
               </button>
               {cards.map((c, i) => (
                 <button key={c.id} type="button" onClick={() => pick(i)} aria-label={t.show(c.name)} aria-current={i === at ? "true" : undefined}
                   className="group flex size-11 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
-                  <span className={`h-1.5 rounded-full transition-all duration-300 ${i === at ? "w-6 bg-dl-text" : "w-1.5 bg-zinc-500 group-hover:bg-zinc-300"}`} />
+                  <span className={`h-2 rounded-full transition-all duration-300 ${i === at ? "w-8 bg-dl-text" : "w-2 bg-zinc-400 group-hover:bg-zinc-200"}`} />
                 </button>
               ))}
-              <button type="button" onClick={() => pick(at + 1)} aria-label={t.next} className="flex size-11 cursor-pointer items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-100/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100">
+              <button type="button" onClick={() => pick(at + 1)} aria-label={t.next} className={arrowBtn}>
                 <Icon name="chevron-right" className="size-5" />
               </button>
               <span className="sr-only" aria-live="polite">{t.slide(at + 1, n)}: {p.name}</span>

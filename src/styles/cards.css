@@ -164,6 +164,28 @@
       border: 1px solid rgba(228, 228, 231, 0.22);
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     }
+    /* aura do Spotlight: o brilho da carta (cor da raridade ou da moldura, em --sp-c e --sp-hi) sai também do painel,
+       com a borda tingida e a luz vazando do lado da carta (em cima, no celular) */
+    .spotlight-aura {
+      border: 1px solid color-mix(in srgb, var(--sp-c) 25%, transparent);
+      box-shadow:
+        0 0 40px -10px color-mix(in srgb, var(--sp-c) 35%, transparent),
+        0 0 140px -24px color-mix(in srgb, var(--sp-hi) 25%, transparent),
+        inset 0 0 60px -20px color-mix(in srgb, var(--sp-c) 20%, transparent);
+      background:
+        radial-gradient(55% 75% at 22% 45%, color-mix(in srgb, var(--sp-c) 22%, transparent), transparent 70%),
+        linear-gradient(to top, color-mix(in srgb, var(--sp-c) 12%, transparent), transparent 45%);
+      animation: spAura 3.5s ease-in-out infinite alternate;
+    }
+    @media (max-width: 767px) {
+      .spotlight-aura {
+        background:
+          radial-gradient(90% 40% at 50% 22%, color-mix(in srgb, var(--sp-c) 22%, transparent), transparent 70%),
+          linear-gradient(to top, color-mix(in srgb, var(--sp-c) 12%, transparent), transparent 45%);
+      }
+    }
+    @keyframes spAura { from { opacity: 0.7; } to { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .spotlight-aura { animation: none; } }
 
     /* ==========================================================================
        3. CABEÇALHO INTERATIVO "DEADLOCK CARDS"
@@ -204,6 +226,8 @@
       position: relative;
       padding: var(--rk-pad, 2px);
       clip-path: var(--rk-clip, polygon(0 0, 100% 0, 100% 88%, 50% 100%, 0 88%));
+      /* o clip-path só corta o desenho: sem isto o brilho girando da borda (::before, bem maior que a carta) conta como conteúdo e faz o painel em volta rolar */
+      overflow: clip;
       background: var(--rk-bg, linear-gradient(145deg, rgba(244, 244, 245, 0.58), rgba(113, 113, 122, 0.2) 45%, rgba(228, 228, 231, 0.48)));
       transition: transform 0.2s var(--ease-out);
     }
@@ -286,6 +310,8 @@
     .rk-wrap:hover {
       filter: var(--card-vol) drop-shadow(0 0 calc(var(--rk-gr, 0px) * 1.9) var(--rk-glow, transparent));
     }
+    /* Spotlight: com a carta em movimento o Chrome corta o brilho num retângulo; some durante o movimento e volta pela transition */
+    [data-moving] .rk-wrap { filter: var(--card-vol) drop-shadow(0 0 0 transparent); transition: none; }
     .rk-ring {
       position: absolute;
       inset: 0;

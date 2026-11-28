@@ -4,7 +4,7 @@ import { useData } from "../../lib/data";
 import { STAT_KEYS } from "../../lib/cards";
 import { ALT_HERO_DROP } from "../../lib/cardKinds";
 import { strings, useT } from "../../lib/i18n";
-import { sectionTitle } from "../../lib/ui";
+import { homeTitle } from "../../lib/ui";
 import { RARITY_TIERS, getRarity } from "../../lib/rarity";
 import { STAT_NAMES } from "../../lib/statNames";
 import { motion } from "motion/react";
@@ -156,7 +156,7 @@ export function CardGuide({ sample }: { sample: Player }) {
   return (
     <section aria-labelledby="home-guide" className="flex flex-col gap-6">
       <Reveal className="flex flex-col gap-2">
-        <h2 id="home-guide" className={`${sectionTitle} deco-eye`}>{t.title}</h2>
+        <h2 id="home-guide" className={`${homeTitle} deco-eye`}>{t.title}</h2>
         <p className="max-w-2xl text-sm text-pretty text-zinc-300">{t.lead}</p>
       </Reveal>
 

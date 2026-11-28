@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { strings, useT } from "../lib/i18n";
 import { cardPath } from "../lib/route";
+import { pill } from "../lib/ui";
 
 const S = strings({
   pt: { share: "Compartilhar carta", copied: "Link copiado", text: (name: string) => `A carta de ${name} no Cardslock`, failed: "Copie o link:" },
@@ -42,7 +43,7 @@ export function ShareLinkButton({ path, label, title, disabled }: { path: string
   return (
     <div className="flex flex-col items-start gap-2">
       <button type="button" onClick={() => void share()} disabled={disabled}
-        className="min-h-11 cursor-pointer rounded-lg bg-zinc-800 px-3 text-xs font-bold text-zinc-100 hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50">
+        className={`${pill(false)} disabled:cursor-not-allowed disabled:opacity-50`}>
         <span aria-live="polite">{state === "copied" ? t.copied : label}</span>
       </button>
       {state === "failed" && (

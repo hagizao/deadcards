@@ -1,9 +1,12 @@
 /// <reference types="@cloudflare/workers-types" />
 import { createAuth, currentUser } from "./auth";
-import { favorite, profileCard, publicProfile } from "./profile";
+import { favorite, profileArt, profileCard, publicProfile } from "./profile";
+import { cardLikes } from "./likes";
+import { artists, artistsByCard } from "./artists";
+import { ARTISTS_PATH } from "./lib/artists";
 import { handleOf } from "./handles";
 import { accountLink } from "./link";
-import { PROFILE_CARD_PATH } from "./lib/profile";
+import { PROFILE_ART_PATH, PROFILE_CARD_PATH } from "./lib/profile";
 import { HOME_FEATURED_MAX, SCHEDULE_LABEL_MAX, TOURNAMENT_DESC_MAX, TOURNAMENT_NAME_MAX } from "./lib/types";
 import { artCredit, imgUrl, parse, playerFromRow } from "./rows";
 import { packTypes, packs } from "./packs";
@@ -112,6 +115,8 @@ async function appData(env: Env): Promise<Response> {
     // calendário: do mês passado em diante (o resto do histórico não aparece no site)
     env.DB.prepare("SELECT * FROM tournament_dates WHERE starts_at >= unixepoch() - ? ORDER BY starts_at, id").bind(SCHEDULE_PAST_DAYS * 86400),
   ]);
+  // sem a migration dos artistas aplicada, o site continua no ar: só o "Arte por" não leva ao perfil
+  const artistOf = await artistsByCard(env).catch(() => ({}));
   const s = Object.fromEntries((settings.results as { key: string; value_json: string }[]).map((r) => [r.key, parse<unknown>(r.value_json, null)]));
   return Response.json({
     teams: (teams.results as Record<string, string | null>[]).map((t) => {
@@ -119,6 +124,8 @@ async function appData(env: Env): Promise<Response> {
       return { id: t.id, name: t.name, tag: t.tag, region: t.region, logo: imgUrl(t.logo_key), ...(tbg ? { bg: tbg } : {}) };
     }),
     players: (players.results as Record<string, string | number | null>[]).map(playerFromRow),
+    // carta → perfil do artista no site (só de quem está marcado como artista)
+    artists: artistOf,
     tournaments: (tournaments.results as { id: string; name: string; description: string; logo_key: string | null; stream_url: string | null; watch_url: string | null }[])
       .map((t) => ({
         id: t.id, name: t.name, description: t.description,
@@ -437,6 +444,7 @@ export default {
     }
     if (url.pathname.startsWith("/api/account/link/")) return accountLink(env, request, url.pathname.slice("/api/account/link/".length));
     if (url.pathname === PROFILE_CARD_PATH) return profileCard(env, request);
+    if (url.pathname === PROFILE_ART_PATH) return profileArt(env, request);
     const fav = url.pathname.match(/^\/api\/favorites\/([^/]+)$/);
     if (fav) return favorite(env, request, decode(fav[1]) ?? "");
     const profileUser = url.pathname.match(/^\/api\/users\/([^/]+)$/);
@@ -450,6 +458,7 @@ export default {
       if (!(await currentUser(env, request))?.admin) return bad("sem permissão", 403);
       return packTypes(env, request, url.pathname.slice("/api/pack-types/".length));
     }
+    if (url.pathname.startsWith(`${ARTISTS_PATH}/`)) return artists(env, request, url.pathname.slice(ARTISTS_PATH.length + 1));
     if (url.pathname === ART_SUBMISSIONS_PATH || url.pathname.startsWith(`${ART_SUBMISSIONS_PATH}/`)) return artSubmissions(env, request, url.pathname.slice(ART_SUBMISSIONS_PATH.length + 1));
     if (url.pathname === "/api/feedback") return request.method === "POST" ? feedback(env, request) : bad("método não suportado", 405);
     if (url.pathname === "/api/redeem") return request.method === "POST" ? redeem(env, request) : bad("método não suportado", 405);
@@ -468,6 +477,13 @@ export default {
       if (!ID_RE.test(id)) return bad("id inválido");
       const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM user_cards WHERE player_id = ?").bind(id).first<number>("n");
       return Response.json({ count: count ?? 0 }, { headers: { "cache-control": "public, max-age=60" } });
+    }
+    // curtidas das cartas especiais: o total é público; curtir exige login
+    const likesOf = url.pathname.match(/^\/api\/cards\/([^/]+)\/likes$/);
+    if (likesOf) {
+      const id = decode(likesOf[1]);
+      if (id === null || !ID_RE.test(id)) return bad("id inválido");
+      return cardLikes(env, request, id);
     }
     // coleção universal (Editor): quantas contas têm cada carta e quantas contas existem
     if (url.pathname === "/api/owners") {

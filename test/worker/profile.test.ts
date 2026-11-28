@@ -52,13 +52,13 @@ describe("Minha carta", () => {
     const publicFetch = (id: string) => SELF.fetch(`http://test/api/users/${id}`);
     expect((await publicFetch("nope")).status).toBe(404);
     expect((await publicFetch("bad%20id")).status).toBe(404);
-    expect(await (await publicFetch(userId)).json()).toEqual({ id: userId, handle: null, name: "fan", image: null, card: null, cards: [], favorites: [] });
+    expect(await (await publicFetch(userId)).json()).toEqual({ id: userId, handle: null, name: "fan", image: null, card: null, cards: [], favorites: [], artist: null });
 
     await seedPlayer("p1");
     await env.DB.prepare("INSERT INTO user_cards (user_id, player_id) VALUES (?, 'p1')").bind(userId).run();
     await card("PUT", cookie, myCard);
     const profile = await (await publicFetch(userId)).json<PublicProfile>();
-    expect(profile).toEqual({ id: userId, handle: null, name: "fan", image: null, card: myCard, cards: ["p1"], favorites: [] });
+    expect(profile).toEqual({ id: userId, handle: null, name: "fan", image: null, card: myCard, cards: ["p1"], favorites: [], artist: null });
     expect(JSON.stringify(profile)).not.toContain("@");
   });
 });

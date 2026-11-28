@@ -88,21 +88,17 @@ export function Teams({ focusTeamId, teamId, onOpenCard, onPick }: { focusTeamId
 
   return (
     <section className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      {/* as setas das regiões ficam na linha do título, sem uma linha só para elas */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5">
           <h1 className={pageTitle}>{t.title}</h1>
           <p className="text-xs text-zinc-400 sm:text-sm">{t.hint}</p>
         </div>
-        <button type="button" className={pill(size === "medium")} aria-pressed={size === "medium"} onClick={() => setSize((s) => (s === "team" ? "medium" : "team"))}>
-          {size === "medium" ? t.medium : t.large}
-        </button>
+        <RailArrows rail={regionRail} prev={t.prevRegions} next={t.nextRegions} />
       </div>
 
-      {/* cabeçalho de regiões: uma linha de colunas separadas pela linha fina, com os times encaixados; setas para as que não cabem */}
+      {/* cabeçalho de regiões: uma linha de colunas separadas pela linha fina, com os times encaixados */}
       <nav aria-label={t.regions} className="flex flex-col gap-3">
-        <div className="flex min-h-11 justify-end">
-          <RailArrows rail={regionRail} prev={t.prevRegions} next={t.nextRegions} />
-        </div>
         <div ref={setRegionsEl} className={`${regionRail.fade} overflow-x-clip`}>
           <motion.ul className="flex gap-6" {...regionRail.track}>
             {regionList.map((r, i) => {
@@ -113,7 +109,7 @@ export function Teams({ focusTeamId, teamId, onOpenCard, onPick }: { focusTeamId
                   <div className="flex flex-col gap-1">
                     <h2>
                       <button type="button" aria-expanded={open} aria-controls={`region-${i}`} title={open ? t.collapse : t.expand} onClick={() => setOpen((o) => !o)}
-                        className="group flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-md text-left text-2xl font-extrabold tracking-widest text-zinc-100 uppercase transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:opacity-80">
+                        className="group flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-md text-left text-xl font-extrabold tracking-wider text-zinc-100 uppercase transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:opacity-80">
                         <span aria-hidden="true" className="size-3 shrink-0 rounded-full bg-(--team-accent) shadow-[0_0_10px_var(--team-accent)]" />
                         {label(r)}
                         <Icon name="chevron-down" className={`size-5 shrink-0 text-zinc-500 transition-transform duration-200 group-hover:text-zinc-200 motion-reduce:transition-none ${open ? "" : "-rotate-90"}`} />
@@ -142,7 +138,7 @@ export function Teams({ focusTeamId, teamId, onOpenCard, onPick }: { focusTeamId
       {/* o time escolhido abre embaixo do cabeçalho */}
       <div ref={panelRef} className="scroll-mt-28 border-t border-zinc-200/15 pt-8" aria-live="polite">
         <AnimatePresence mode="wait" initial={false}>
-          {current && <TeamPanel key={current.team.id} team={current.team} ovr={current.o} size={size} onOpenCard={onOpenCard} />}
+          {current && <TeamPanel key={current.team.id} team={current.team} ovr={current.o} size={size} onSize={() => setSize((s) => (s === "team" ? "medium" : "team"))} onOpenCard={onOpenCard} />}
         </AnimatePresence>
       </div>
     </section>
@@ -164,13 +160,13 @@ function TeamPick({ team, active, label, delay, onPick }: { team: Team; active: 
         <span className={`transition-[scale,filter] duration-200 group-hover:scale-105 ${active ? "scale-105 drop-shadow-[0_0_10px_var(--team-accent)]" : "opacity-80 grayscale-35 group-hover:opacity-100 group-hover:grayscale-0"}`}>
           <TeamLogo3D team={team} className="size-18" radius={14} />
         </span>
-        <span className={`line-clamp-2 w-full text-center text-base/tight font-bold tracking-wide text-balance uppercase ${active ? "text-white" : "text-zinc-400 group-hover:text-zinc-200"}`}>{team.name}</span>
+        <span className={`w-full text-center text-sm/tight font-bold tracking-wide text-balance uppercase ${active ? "text-white" : "text-zinc-400 group-hover:text-zinc-200"}`}>{team.name}</span>
       </button>
     </motion.li>
   );
 }
 
-function TeamPanel({ team, ovr, size, onOpenCard }: { team: Team; ovr: { rounded: number; count: number }; size: "team" | "medium"; onOpenCard: (id: string) => void }) {
+function TeamPanel({ team, ovr, size, onSize, onOpenCard }: { team: Team; ovr: { rounded: number; count: number }; size: "team" | "medium"; onSize: () => void; onOpenCard: (id: string) => void }) {
   const t = useT(S);
   const label = useLabel();
   const { players } = useData();
@@ -200,7 +196,13 @@ function TeamPanel({ team, ovr, size, onOpenCard }: { team: Team; ovr: { rounded
           </div>
           <p className="text-sm text-zinc-300">{label(team.region)} · {t.count(roster.length)}</p>
         </div>
-        <RailArrows rail={rail} prev={t.prevCards} next={t.nextCards} />
+        {/* o tamanho das cartas fica junto das cartas que ele muda */}
+        <div className="flex items-center gap-3">
+          <button type="button" className={pill(size === "medium")} aria-pressed={size === "medium"} onClick={onSize}>
+            {size === "medium" ? t.medium : t.large}
+          </button>
+          <RailArrows rail={rail} prev={t.prevCards} next={t.nextCards} />
+        </div>
       </div>
       {roster.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{t.emptyRoster}</p>}
       {/* o fade das pontas é uma máscara e corta tudo fora da caixa: o padding em volta dá lugar ao brilho e à subida do hover (useRail mede só a área de dentro) */}

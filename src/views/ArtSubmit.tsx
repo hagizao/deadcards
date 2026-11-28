@@ -1,9 +1,11 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { Card } from "../components/Card";
 import { HoldButton } from "../components/HoldButton";
+import { Icon } from "../components/Icon";
 import { Range } from "../components/Range";
 import { ART_PENDING_MAX, ART_STATUS_TONE, ART_SUBMISSIONS_PATH, ART_SUBMISSION_MAX_BYTES, previewCard, type ArtLayout, type ArtSubmission } from "../lib/artSubmissions";
 import { getPlayerOvr, isMainCard, isRetired, teamOf } from "../lib/cards";
+import type { Player } from "../lib/types";
 import { useData } from "../lib/data";
 import { strings, useLocale, useT } from "../lib/i18n";
 import { FRAME_PRESETS } from "../lib/rarity";
@@ -24,6 +26,8 @@ const S = strings({
     own: "Fiz esta arte (não é de IA nem de outra pessoa).",
     consent: "Autorizo o Cardslock a usar esta arte nas cartas especiais, com o meu crédito.",
     send: "Enviar arte", sending: "Enviando…", sent: "Arte enviada! Ela fica em análise.",
+    empty: "Sua arte aparece aqui", drop: "ou solte a imagem aqui", previewHint: "Opcional: veja a arte numa carta e numa moldura especial.",
+    needImage: "Escolha a imagem para enviar.", needFg: "Escolha a imagem do personagem.", needChecks: "Marque as duas confirmações para enviar.",
     reason: "Motivo:", mine: "Minhas artes", none: "Você ainda não enviou nenhuma arte.", limit: (n: number) => `Até ${n} artes em análise ou recusadas por vez; apague as recusadas para enviar mais.`,
     status: { pending: "Em análise", saved: "Guardada no banco do Cardslock", used: "Usada numa carta", rejected: "Recusada" },
     del: "Apagar", delLabel: "Apagar esta arte",
@@ -43,6 +47,8 @@ const S = strings({
     own: "I made this art (not AI and not someone else's).",
     consent: "I allow Cardslock to use this art on special cards, with my credit.",
     send: "Submit art", sending: "Submitting…", sent: "Art submitted! It is now under review.",
+    empty: "Your art shows up here", drop: "or drop the image here", previewHint: "Optional: see the art on a card and a special frame.",
+    needImage: "Choose the image to submit.", needFg: "Choose the character image.", needChecks: "Tick both confirmations to submit.",
     reason: "Reason:", mine: "My art", none: "You haven't submitted any art yet.", limit: (n: number) => `Up to ${n} pieces under review or declined at a time; delete declined ones to submit more.`,
     status: { pending: "Under review", saved: "Saved in the Cardslock bank", used: "Used on a card", rejected: "Declined" },
     del: "Delete", delLabel: "Delete this art",
@@ -62,6 +68,8 @@ const S = strings({
     own: "Hice esta arte (no es de IA ni de otra persona).",
     consent: "Autorizo a Cardslock a usar esta arte en cartas especiales, con mi crédito.",
     send: "Enviar arte", sending: "Enviando…", sent: "¡Arte enviada! Queda en revisión.",
+    empty: "Tu arte aparece aquí", drop: "o suelta la imagen aquí", previewHint: "Opcional: mira el arte en una carta y en un marco especial.",
+    needImage: "Elige la imagen para enviar.", needFg: "Elige la imagen del personaje.", needChecks: "Marca las dos confirmaciones para enviar.",
     reason: "Motivo:", mine: "Mis artes", none: "Todavía no enviaste ninguna arte.", limit: (n: number) => `Hasta ${n} artes en revisión o rechazadas a la vez; borra las rechazadas para enviar más.`,
     status: { pending: "En revisión", saved: "Guardada en el banco de Cardslock", used: "Usada en una carta", rejected: "Rechazada" },
     del: "Borrar", delLabel: "Borrar esta arte",
@@ -79,12 +87,24 @@ function useLocalImage() {
   return { file, url, setFile };
 }
 
-function ImageInput({ label, onFile }: { label: string; onFile: (f: File) => void }) {
+const ACCEPT = "image/png,image/jpeg,image/webp";
+
+/** Sem imagem, uma área grande de escolher ou soltar (é o passo principal da tela); com imagem, só o botão de trocar. */
+function ImageInput({ label, drop, hint, chosen, onFile }: { label: string; drop: string; hint: string; chosen: boolean; onFile: (f: File) => void }) {
+  const t = useT(S);
+  const [over, setOver] = useState(false);
+  const [bad, setBad] = useState(false);
+  const input = <input type="file" accept={ACCEPT} className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { setBad(false); onFile(f); } }} />;
+  if (chosen) return <label className={`${pill(false)} cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-100`}>{label}{input}</label>;
   return (
-    <label className={`${pill(false)} cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-100`}>
-      {label}
-      <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only"
-        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onFile(f); }} />
+    <label
+      onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files?.[0]; const ok = !!f && ACCEPT.split(",").includes(f.type); setBad(!ok); if (ok) onFile(f); }}
+      className={`flex min-h-28 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-100 hover:border-zinc-200/50 hover:bg-zinc-100/5 active:bg-zinc-100/10 ${over ? "border-dl-text bg-zinc-100/10" : "border-zinc-200/20"}`}>
+      <span className="text-sm font-bold tracking-widest text-zinc-100 uppercase">{label}</span>
+      <span className="text-xs text-zinc-400">{drop} · {hint}</span>
+      {bad && <span role="alert" className="text-xs text-red-300">{t.errors.image}</span>}
+      {input}
     </label>
   );
 }
@@ -92,16 +112,17 @@ function ImageInput({ label, onFile }: { label: string; onFile: (f: File) => voi
 /** Uma camada da arte: escolher a imagem e, com ela escolhida, ajustar zoom e posição. */
 function Layer({ title, hint, image, value, labels, onChange }: {
   title: string; hint: string; image: ReturnType<typeof useLocalImage>;
-  value: { zoom: number; x: number; y: number }; labels: { pick: string; change: string; zoom: string; x: string; y: string };
+  value: { zoom: number; x: number; y: number }; labels: { pick: string; change: string; drop: string; zoom: string; x: string; y: string };
   onChange: (patch: Partial<{ zoom: number; x: number; y: number }>) => void;
 }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="min-w-24 text-sm font-semibold text-zinc-100">{title}</span>
-        <ImageInput label={image.file ? labels.change : labels.pick} onFile={image.setFile} />
-        <span className="text-xs text-zinc-400">{hint}</span>
+        {image.file && <ImageInput label={labels.change} drop={labels.drop} hint={hint} chosen onFile={image.setFile} />}
+        {image.file && <span className="text-xs text-zinc-400">{hint}</span>}
       </div>
+      {!image.file && <ImageInput label={labels.pick} drop={labels.drop} hint={hint} chosen={false} onFile={image.setFile} />}
       {image.url && (
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
           <Range label={labels.zoom} value={value.zoom} min={50} max={300} onChange={(v) => onChange({ zoom: v })} />
@@ -140,7 +161,9 @@ export function ArtSubmit() {
   const setFg = (patch: Partial<NonNullable<ArtLayout["fg"]>>) => setLayout((l) => ({ ...l, fg: { ...l.fg!, ...patch } }));
   const setTune = (patch: Partial<NonNullable<ArtLayout["frameTune"]>>) => setLayout((l) => ({ ...l, frameTune: { ...l.frameTune, ...patch } }));
   const chooseSplit = (on: boolean) => { setSplit(on); if (!on) fg.setFile(undefined); };
-  const labels = { pick: t.pick, change: t.change, zoom: t.zoom, x: t.x, y: t.y };
+  const labels = { pick: t.pick, change: t.change, drop: t.drop, zoom: t.zoom, x: t.x, y: t.y };
+  // o que falta para enviar, dito ao lado do botão
+  const missing = !bg.file ? t.needImage : split && !fg.file ? t.needFg : !own || !consent ? t.needChecks : undefined;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -188,7 +211,8 @@ export function ArtSubmit() {
         <div className="flex justify-center lg:sticky lg:top-28 lg:w-80 lg:shrink-0">
           {player && bg.url
             ? <Card player={previewCard(player, { ...layout, fg: fg.url ? layout.fg : undefined }, bg.url, fg.url, credit.name.trim() ? { name: credit.name.trim() } : undefined)} />
-            : player && <Card player={{ ...player, special: true, frame: layout.frame ? { style: layout.frame, ...layout.frameTune } : player.frame }} />}
+            // sem imagem, nada de arte de outra pessoa: um molde do tamanho da carta (menor no celular, para o envio aparecer logo)
+            : <div className="flex aspect-295/430 w-40 items-center justify-center rounded-2xl border-2 border-dashed border-zinc-200/15 bg-zinc-950/40 p-4 text-center text-sm font-bold text-zinc-400 lg:w-[295px]">{t.empty}</div>}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-7">
@@ -206,8 +230,14 @@ export function ArtSubmit() {
             {split && <Layer title={t.fgLayer} hint={t.fgFormat} image={fg} value={layout.fg!} labels={{ ...labels, zoom: t.fgZoom, x: t.fgX, y: t.fgY }} onChange={setFg} />}
           </fieldset>
 
-          <fieldset className="flex flex-col gap-4">
-            <legend className="mb-3 text-xs font-bold tracking-widest text-zinc-300 uppercase">{t.preview}</legend>
+          {/* testar é opcional e só muda a prévia: fica recolhido, separado do que vai no envio */}
+          <details className="group rounded-xl bg-zinc-100/5 p-4">
+            <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 [&::-webkit-details-marker]:hidden">
+              <span className="text-xs font-bold tracking-widest text-zinc-100 uppercase">{t.preview}</span>
+              <span className="text-xs text-zinc-400">{t.previewHint}</span>
+              <Icon name="chevron-down" className="ml-auto size-5 text-zinc-400 transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+            </summary>
+            <div className="flex flex-col gap-4 pt-4">
             <label htmlFor={ids.card} className="flex flex-col gap-1.5 text-sm font-semibold text-zinc-100">
               {t.card}
               <select id={ids.card} value={player?.id ?? ""} onChange={(e) => setPlayerId(e.target.value)} className={`${field} sm:max-w-sm`}>
@@ -242,7 +272,8 @@ export function ArtSubmit() {
                 {layout.frameTune && <button type="button" onClick={() => set({ frameTune: undefined })} className={pill(false)}>{t.frameReset}</button>}
               </div>
             )}
-          </fieldset>
+            </div>
+          </details>
 
           <div className="flex flex-wrap gap-4">
             <label htmlFor={ids.credit} className="flex min-w-0 flex-1 basis-48 flex-col gap-1.5 text-sm font-semibold text-zinc-100">
@@ -268,17 +299,18 @@ export function ArtSubmit() {
 
           <div className="flex flex-wrap items-center gap-4">
             <button type="submit" disabled={busy || !bg.file || (split && !fg.file)} className={primaryBtn}>{busy ? t.sending : t.send}</button>
+            {!msg && missing && <p aria-live="polite" className="text-xs text-zinc-400">{missing}</p>}
             {msg && <p role={msg.ok ? "status" : "alert"} className={`text-sm ${msg.ok ? "text-emerald-300" : "text-red-300"}`}>{msg.text}</p>}
           </div>
         </div>
       </form>
 
-      <MySubmissions list={mine} onRemove={remove} />
+      <MySubmissions list={mine} cards={cards} onRemove={remove} />
     </section>
   );
 }
 
-function MySubmissions({ list, onRemove }: { list?: ArtSubmission[]; onRemove: (id: string) => void }) {
+function MySubmissions({ list, cards, onRemove }: { list?: ArtSubmission[]; cards: Player[]; onRemove: (id: string) => void }) {
   const t = useT(S);
   const locale = useLocale();
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
@@ -290,10 +322,16 @@ function MySubmissions({ list, onRemove }: { list?: ArtSubmission[]; onRemove: (
       </div>
       {list && !list.length && <p className="text-sm text-zinc-300">{t.none}</p>}
       {!!list?.length && (
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-5">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(222px,1fr))] gap-5">
           {list.map((s) => (
             <li key={s.id} className="flex flex-col gap-2">
-              <img src={s.image} alt={s.credit.name} loading="lazy" className="aspect-3/4 w-full rounded-lg bg-zinc-900 object-cover" />
+              {/* a arte como fica na carta em que foi testada, com as duas camadas quando o personagem vem separado */}
+              {(() => {
+                const base = cards.find((p) => p.id === s.layout.playerId) ?? cards[0];
+                return base
+                  ? <div className="self-start"><Card player={previewCard(base, s.layout, s.image, s.fg, s.credit)} variant="medium" /></div>
+                  : <img src={s.image} alt={s.credit.name} loading="lazy" className="aspect-3/4 w-full rounded-lg bg-zinc-900 object-cover" />;
+              })()}
               <span className={`text-xs font-bold tracking-wider uppercase ${ART_STATUS_TONE[s.status]}`}>{t.status[s.status]}</span>
               {s.reason && <span className="text-xs text-zinc-200">{t.reason} {s.reason}</span>}
               <span className="text-xs text-zinc-400">{s.credit.name} · {date.format(s.createdAt)}</span>

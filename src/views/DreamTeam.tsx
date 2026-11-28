@@ -14,7 +14,7 @@ const S = strings({
     name: "Nome do elenco",
     placeholder: "Ex.: Melhor time dos EUA",
     fallback: "Elenco dos sonhos",
-    share: "Compartilhar elenco",
+    share: "Compartilhar elenco", shareHint: "Escolha pelo menos uma carta para compartilhar.",
     clear: "Limpar elenco",
     ovr: "OVR do elenco",
     count: (n: number) => `${n} de ${SQUAD_MAX} cartas`,
@@ -31,7 +31,7 @@ const S = strings({
     name: "Squad name",
     placeholder: "E.g.: Best US team",
     fallback: "Dream team",
-    share: "Share squad",
+    share: "Share squad", shareHint: "Pick at least one card to share.",
     clear: "Clear squad",
     ovr: "Squad OVR",
     count: (n: number) => `${n} of ${SQUAD_MAX} cards`,
@@ -48,7 +48,7 @@ const S = strings({
     name: "Nombre del equipo",
     placeholder: "Ej.: Mejor equipo de EE. UU.",
     fallback: "Equipo soñado",
-    share: "Compartir equipo",
+    share: "Compartir equipo", shareHint: "Elige al menos una carta para compartir.",
     clear: "Vaciar equipo",
     ovr: "OVR del equipo",
     count: (n: number) => `${n} de ${SQUAD_MAX} cartas`,
@@ -100,7 +100,7 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
       <p className="text-xs text-zinc-400">{t.subtitle}</p>
 
       <div className="flex flex-wrap items-end gap-4">
-        <label className="flex min-w-0 flex-1 basis-64 flex-col gap-1.5">
+        <label className="flex max-w-md min-w-0 flex-1 basis-64 flex-col gap-1.5">
           <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{t.name}</span>
           <input className={`${field} w-full min-w-0`} maxLength={SQUAD_NAME_MAX} placeholder={t.placeholder} value={name}
             onChange={(e) => { setName(e.target.value); onEdit(); }} />
@@ -110,6 +110,8 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
           <button type="button" className={`${pill(false)} disabled:cursor-not-allowed disabled:opacity-50`} disabled={!chosen.length && !name}
             onClick={() => { setName(""); setPicking(null); edit(emptySlots()); }}>{t.clear}</button>
         </div>
+        {/* o compartilhar desabilitado diz o que falta */}
+        {!chosen.length && <p className="basis-full text-xs text-zinc-400">{t.shareHint}</p>}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
@@ -165,8 +167,8 @@ export function DreamTeam({ squad, onEdit, onOpenCard }: { squad?: string; onEdi
               </>
             ) : (
               <button type="button" aria-pressed={picking === i} onClick={() => setPicking(i)}
-                className="flex aspect-295/430 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-zinc-200/15 p-4 text-center text-xs font-bold text-zinc-300 transition-colors hover:border-zinc-200/40 hover:bg-zinc-100/5 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10 aria-pressed:border-area aria-pressed:text-area">
-                <span aria-hidden="true" className="text-3xl leading-none">+</span>
+                className="flex aspect-295/430 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-zinc-200/15 p-4 text-center text-sm font-bold text-zinc-200 transition-colors hover:border-zinc-200/40 hover:bg-zinc-100/5 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-100/10 aria-pressed:border-area aria-pressed:text-area">
+                <span aria-hidden="true" className="text-5xl leading-none font-light">+</span>
                 {t.pick}
               </button>
             )}

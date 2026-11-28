@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useData } from "../../lib/data";
 import { strings, useLocale, useT } from "../../lib/i18n";
 import { enter } from "../../lib/motion";
-import { arrowBtn, sectionTitle } from "../../lib/ui";
+import { arrowBtn, homeTitle } from "../../lib/ui";
 import { Reveal } from "../../components/Motion";
 import { Icon } from "../../components/Icon";
 import { TournamentLogo } from "../../components/TournamentLogo";
@@ -91,7 +91,7 @@ export function Calendar() {
   return (
     <section className="flex flex-col gap-6" aria-labelledby="home-calendar">
       <Reveal className="flex flex-col gap-2">
-        <h2 id="home-calendar" className={`${sectionTitle} deco-clock`}>{t.title}</h2>
+        <h2 id="home-calendar" className={`${homeTitle} deco-clock`}>{t.title}</h2>
         <p className="text-sm text-zinc-200">{t.lead}</p>
       </Reveal>
 

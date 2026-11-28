@@ -14,7 +14,7 @@ const S = strings({
   pt: {
     title: "Resgatar código",
     subtitle: "Digite o código para ganhar uma carta ou um pack.",
-    signIn: "Entre para resgatar cartas e packs com um código.",
+    signIn: "Nas lives saem códigos que viram cartas e packs, de graça. Entre para resgatar o seu.",
     packs: "Seus packs",
     noPacks: "Nenhum pack fechado. Packs chegam por código.",
     open: "Abrir",
@@ -37,7 +37,7 @@ const S = strings({
   en: {
     title: "Redeem a code",
     subtitle: "Enter the code to get a card or a pack.",
-    signIn: "Sign in to redeem cards and packs with a code.",
+    signIn: "Codes that turn into cards and packs drop on stream, for free. Sign in to redeem yours.",
     packs: "Your packs",
     noPacks: "No closed packs. Packs come from codes.",
     open: "Open",
@@ -60,7 +60,7 @@ const S = strings({
   es: {
     title: "Canjear código",
     subtitle: "Escribe el código para ganar una carta o un pack.",
-    signIn: "Inicia sesión para canjear cartas y packs con un código.",
+    signIn: "En los directos salen códigos que se convierten en cartas y packs, gratis. Inicia sesión para canjear el tuyo.",
     packs: "Tus packs",
     noPacks: "Ningún pack cerrado. Los packs llegan por código.",
     open: "Abrir",

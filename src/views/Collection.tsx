@@ -24,8 +24,8 @@ const S = strings({
     signature: "Só herói de assinatura",
     every: "Todos os heróis",
     mine: "Minha coleção",
-    all: "Ver todas as cartas",
-    signIn: "Entre para ver sua coleção. Ou só veja todas as cartas.",
+    all: "Ver todas as cartas", allTitle: "Todas as cartas",
+    signIn: "Entre para guardar as cartas que você resgata nas lives e montar a sua coleção.",
     empty: "Você ainda não tem cartas. Resgate um código na aba Resgatar ou veja todas as cartas.",
     noMatch: "Nenhuma carta com esses filtros.",
     loading: "Carregando sua coleção…",
@@ -51,8 +51,8 @@ const S = strings({
     signature: "Signature hero only",
     every: "All heroes",
     mine: "My collection",
-    all: "See all cards",
-    signIn: "Sign in to see your collection. Or just browse all cards.",
+    all: "See all cards", allTitle: "All cards",
+    signIn: "Sign in to keep the cards you redeem on stream and build your collection.",
     empty: "You don't have any cards yet. Redeem a code in the Redeem tab or browse all cards.",
     noMatch: "No cards match these filters.",
     loading: "Loading your collection…",
@@ -78,8 +78,8 @@ const S = strings({
     signature: "Solo héroe de firma",
     every: "Todos los héroes",
     mine: "Mi colección",
-    all: "Ver todas las cartas",
-    signIn: "Inicia sesión para ver tu colección. O solo mira todas las cartas.",
+    all: "Ver todas las cartas", allTitle: "Todas las cartas",
+    signIn: "Inicia sesión para guardar las cartas que canjeas en los directos y armar tu colección.",
     empty: "Todavía no tienes cartas. Canjea un código en la pestaña Canjear o mira todas las cartas.",
     noMatch: "Ninguna carta con esos filtros.",
     loading: "Cargando tu colección…",
@@ -140,7 +140,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className={pageTitle}>{mine ? t.mine : t.all}</h1>
+            <h1 className={pageTitle}>{mine ? t.mine : t.allTitle}</h1>
             <p className="mt-1.5 text-xs text-zinc-400">
               {me && owned
                 ? <>{t.progress(signatures.filter((p) => owned.has(p.id)).length, signatures.length)}{alts.length > 0 && <> · {t.progressAlt(alts.filter((p) => owned.has(p.id)).length, alts.length)}</>}</>
@@ -154,7 +154,7 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
             {t.all}
           </button>
         </div>
-        {alts.length > 0 && (
+        {alts.length > 0 && (me || !mine) && (
           <div role="group" aria-label={t.heroMode} className="flex flex-wrap gap-2">
             {/* "todos os heróis" primeiro, à esquerda */}
             {(["every", "signature"] as const).map((m) => (
@@ -168,6 +168,11 @@ export function Collection({ onOpenCard }: { onOpenCard: (id: string) => void })
           <div className="flex max-w-sm flex-col gap-3">
             <p className="text-sm text-zinc-300">{t.signIn}</p>
             <SignInOptions />
+            {/* sem login, ver todas as cartas fica junto das opções de entrar */}
+            <button type="button" onClick={() => { setMode("all"); setLimit(PAGE); }} className={`${pill(false)} self-start`}>
+              <Icon name="cards" className="size-4" />
+              {t.all}
+            </button>
           </div>
         )}
         {(me || !mine) && (

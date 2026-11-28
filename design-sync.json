@@ -9,6 +9,7 @@
     "--color-dl-text": "#ffefd7",
     "--color-area": "#ffefd7 (por aba: teams eternus, tierlist ascendant, collection oracle, compare archon, redeem arcanist; src/lib/areas.ts)",
     "--color-dl-black": "#10130d",
+    "--color-graphite": "#8a8a8a",
     "--color-br-green": "#00b84a (br-frame: dia em que o Brasil joga no calendário)",
     "--color-br-yellow": "#ffd400",
     "--color-amber-hand": "#ff9a3c (lado Âmbar do Comparar)",

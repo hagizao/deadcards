@@ -77,6 +77,24 @@ describe("juntar contas", () => {
     expect(await ids("SELECT id AS v FROM user_packs WHERE user_id = ?", a.userId)).toEqual(["pa", "pb2"]);
   });
 
+  it("leva o selo de artista, as cartas com a arte e as curtidas, sem deixar a conta curtir a si mesma", async () => {
+    const a = await login("a");
+    const b = await login("b", ["google"]);
+    await seedPlayer("arte");
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO artists (user_id) VALUES (?)").bind(b.userId),
+      env.DB.prepare("INSERT INTO card_artists (player_id, user_id) VALUES ('arte', ?)").bind(b.userId),
+      env.DB.prepare("INSERT INTO card_likes (user_id, player_id) VALUES (?, 'arte')").bind(a.userId),
+      env.DB.prepare("INSERT INTO profile_likes (user_id, artist_id) VALUES (?, ?)").bind(a.userId, b.userId),
+    ]);
+    const link = await start(a.cookie);
+    expect(await (await post("finish", `${b.cookie}; ${link}`, { confirm: true })).json()).toMatchObject({ merged: true });
+    expect(await ids("SELECT user_id AS v FROM artists")).toEqual([a.userId]);
+    expect(await ids("SELECT user_id AS v FROM card_artists WHERE player_id = 'arte'")).toEqual([a.userId]);
+    expect(await ids("SELECT user_id AS v FROM card_likes")).toEqual([]);
+    expect(await ids("SELECT user_id AS v FROM profile_likes")).toEqual([]);
+  });
+
   it("pede confirmação para juntar uma conta que já existia e recusa uma que já junta dois logins", async () => {
     const a = await login("a");
     const b = await login("Irmão", ["google"]);
